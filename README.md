@@ -20,6 +20,8 @@ The [40% frontier sweep](docs/frontier_40_study.md) combines cost-trained channe
 
 The [A4500 frontier review](docs/qwen_frontier_gpu_review.md) validates all 16 candidates and finds **30.76% mean estimated savings**, including complete state, versus 29.84% for the matched frozen control. Pre-RoPE source coding contributes 0.37 percentage points; compact indices supply the largest gain. All attempted lower-bit planes fall back, and expensive head-shift search adds little. The review quantifies the remaining 1.48-bit gap to 40% and gives separate next experiments for speed and larger savings.
 
+The [four-idea conditional study](docs/conditional_40_study.md) adds actual device Huffman exponent coding, separate sign coding, joint KV anchors, and actual-prefill joint producer features. `--producer-study --producer-preset conditional` compares **13 candidates**, including raw-transfer and fast pre-RoPE controls. It records complete bytes/state, rejected predictor costs, distribution/error histograms, per-head source statistics, isolated decode workspace and full DEV checks for every candidate. Target-machine GPU results are pending.
+
 For result commits, use `python scripts/package_results.py RUN --destination benchmark_results/NAME`. It preserves the full report as verified `results.json.gz`, alongside the smaller reports and decoder state. Large frontier reports can exceed GitHub's raw-file limit. The [sharing and repair instructions](docs/frontier_40_study.md#repair-a-rejected-oversized-report-commit) explain how to amend a rejected unpublished commit.
 
 ## Clone and install

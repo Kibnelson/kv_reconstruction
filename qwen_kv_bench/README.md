@@ -146,6 +146,38 @@ The BF16 weights alone occupy about **7.49 GiB**, before KV, attention workspace
 
 ## Inspect, share and extend
 
+The separate forward-hook preset `--producer-study --producer-preset conditional`
+compares four conditional ideas in 13 fixed candidates: true device Huffman
+exponent streams, separate sign streams, KV anchor prediction, and actual-prefill
+joint K/V features. Raw packets, fast pre-RoPE coding and zero/mean prediction
+provide controls. Start with a short GPU run:
+
+```bash
+python qwen_kv_gpu_bench.py --producer-study --producer-preset conditional \
+  --device cuda --lengths 2048 --cases 1 \
+  --train-tokens 512 --dev-tokens 512 --chunk-tokens 512 \
+  --tile-tokens 64 --max-tiles 72 --sample-pairs 16 \
+  --repeats 3 --generation-steps 2 --output runs/qwen_conditional_smoke
+```
+
+Use `--lengths 2048 8192 --cases 3` and a fresh output directory for the complete
+comparison. All registered candidates receive complete DEV continuation checks.
+`decision_summary.json` records matched-control deltas, complete bit ledgers,
+prediction/distribution diagnostics and isolated encode/decode allocation peaks.
+The whole report also includes per-head source costs/correlations and all TRAIN
+fit/probability identities. Encoder-only latent weights are conservatively
+included in headline state charges and reported separately. Huffman decoding is
+an eager device implementation with bitstream-sized scratch, rather than a fused
+kernel. GPU performance and pretrained-model savings require target-machine
+measurements. Tiny random CPU runs verify functionality only.
+
+Share completed runs with `python scripts/package_results.py RUN --destination
+benchmark_results/NAME` from a repository checkout. It preserves the complete
+report as verified `results.json.gz`, copies `decision_summary.json` and decoder
+artifacts, and excludes raw hidden/KV captures and model weights. This avoids
+committing oversized raw JSON. The repository's `docs/conditional_40_study.md`
+explains every candidate, its cost boundaries, and full run/push commands.
+
 The output contains JSON results, CSV tables, a Markdown summary, model/source/calibration provenance and a shareable ZIP written beside the results directory. The ZIP excludes model weights and raw prompt KV. Exact method status, measured versus estimated size, backend and skipped checks are part of the result; inspect them before comparing rows.
 
 ```bash

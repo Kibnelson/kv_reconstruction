@@ -42,7 +42,7 @@ def _parser():
     p.add_argument("--revision", default=None)
     p.add_argument("--local-files-only", action="store_true")
     p.add_argument("--tiny", action="store_true", help="No-download random tiny Qwen; functionality only")
-    p.add_argument("--producer-preset", choices=("baseline", "frontier"), default="baseline")
+    p.add_argument("--producer-preset", choices=("baseline", "frontier", "conditional"), default="baseline")
     p.add_argument("--lengths", nargs="+", type=int)
     p.add_argument("--cases", type=int, choices=(1, 2, 3), default=3)
     p.add_argument("--train-tokens", type=int)
@@ -197,7 +197,9 @@ class _Inline:
                     row[key] += timing["wall_seconds"]
                 del pair, packet, prepared
             except Exception as error:
-                row.update(status="error", error=f"{type(error).__name__}: {error}")
+                row.update(status="error", error=f"{type(error).__name__}: {error}",
+                    failed_record={key: record[key] for key in ("layer", "start", "tokens")},
+                    error_traceback=traceback.format_exc(limit=6))
     def report(self):
         return dict(enabled=True, methods=list(self.metrics.values()),
             scope="Recipe encoding and exact verification execute inside attention producer callbacks before its forward returns. Hook diagnostics first copy selected features to CPU; preparation stages them back to the selected device. Instrumented prefill includes state preparation, all recipes, synchronization and verification. Packets are discarded; full raw KV remains resident. This is neither zero-copy nor fused encoding, nor the overhead of deploying one recipe.")
@@ -205,13 +207,16 @@ class _Inline:
 
 def _measure(records, captured, spec, models, context, device, args, output, state_files, codec=None):
     codec = _codec_or_default(codec)
-    state = codec.make_state(spec, models, context, device)
+    state, preparation = runtime.timed_call(lambda: codec.make_state(spec, models, context, device), device)
     state_info = _state_file(state, codec, output, state_files)
     count = len(records)
     selected = set(np.linspace(0, count - 1, min(count, args.sample_pairs), dtype=np.int64).tolist())
     components = Counter(); traces = []; samples = []
     payload = raw = 0; staging = encoding = decoding = 0.; events = Counter()
     initial = runtime.reset_peak_memory(device)
+    isolate_workspace = getattr(args, "producer_preset", "baseline") == "conditional"
+    isolated_peaks = dict(encode=[], decode=[])
+    operation_peak = initial.get("peak_allocated_bytes", 0)
     started = time.perf_counter()
     for index, record in enumerate(records):
         if hasattr(codec, "prepare_record"):
@@ -219,8 +224,20 @@ def _measure(records, captured, spec, models, context, device, args, output, sta
             staging += stage["wall_seconds"]
         else:
             prepared = record
+        before_encode = runtime.reset_peak_memory(device) if isolate_workspace else None
         packet, encode = runtime.timed_call(lambda: codec.encode(prepared, spec, state), device)
+        if isolate_workspace:
+            after_encode = runtime.memory_snapshot(device)
+            before_decode = runtime.reset_peak_memory(device)
         pair, decode = runtime.timed_call(lambda: codec.decode(packet, state), device)
+        if isolate_workspace:
+            after_decode = runtime.memory_snapshot(device)
+            for label, before, after in (("encode", before_encode, after_encode), ("decode", before_decode, after_decode)):
+                peak = after.get("peak_allocated_bytes")
+                allocated = before.get("allocated_bytes")
+                if peak is not None and allocated is not None:
+                    isolated_peaks[label].append(max(0, peak - allocated))
+                    operation_peak = max(operation_peak or 0, peak)
         _check(pair, record)  # D2H correctness validation is outside decode timing.
         stats = packet.stats
         parts = stats["component_bytes"]
@@ -235,7 +252,7 @@ def _measure(records, captured, spec, models, context, device, args, output, sta
         traces.append(dict(ordinal=index, layer=record["layer"], start=record["start"], tokens=record["tokens"],
             raw_bytes=nraw, serialized_bytes=size, component_bytes=parts,
             encode_seconds=encode["wall_seconds"], decode_seconds=decode["wall_seconds"]))
-        if getattr(args, "producer_preset", "baseline") == "frontier" and hasattr(codec, "describe"):
+        if getattr(args, "producer_preset", "baseline") in ("frontier", "conditional") and hasattr(codec, "describe"):
             traces[-1]["recipe_diagnostics"] = codec.describe(packet)
         if index in selected:
             samples.append((g.packet_to_cpu(packet), record))
@@ -258,6 +275,7 @@ def _measure(records, captured, spec, models, context, device, args, output, sta
         actual_record_payload_bytes=payload, calculated_outer_framing_bytes=outer,
         serialized_bytes=serialized, component_bytes=dict(components),
         decoder_state_bytes=charged, native_state_physical_bytes=int(state.physical_nbytes), decoder_state_info=state_info,
+        state_preparation=preparation,
         state_id=state.state_id, estimated_full_cache_serialized_bytes=estimated if count != total else None,
         savings_including_state_percent=100 * (1 - (serialized + charged) / raw),
         estimated_full_savings_including_state_percent=100 * (1 - (estimated + charged) / full_raw) if count != total else None,
@@ -270,6 +288,14 @@ def _measure(records, captured, spec, models, context, device, args, output, sta
         one_pass_total_wall_seconds=time.perf_counter() - started, record_diagnostics=traces,
         byte_accounting="Actual paired K/V packet fields plus calculated 32-byte cache header and 8*(pair_count+1) index. Complete decoder state charged once under its reported max(serialized,resident) contract. Sampled full-cache estimates scale inner record bytes by total/measured; outer container is not persisted.",
         scope="Producer features observed during actual forward, exported to CPU, then replay encoded on the selected device. Needed-input H2D staging and encode are reported separately when prepare_record is available. Full raw capture remains necessary; no compact attention or serving gain.")
+    if isolate_workspace:
+        if operation_peak:
+            result["memory"]["after_measurement"]["peak_allocated_bytes"] = operation_peak
+        result["isolated_workspace"] = dict(
+            **{label: dict(records=len(values), peak_extra_allocated_bytes=max(values) if values else None,
+                           mean_extra_allocated_bytes=statistics.mean(values) if values else None)
+               for label, values in isolated_peaks.items()},
+            scope="Per-record peak minus allocation immediately before each operation. Decode includes reconstructed outputs, excludes already resident state, input packet and staged producer tensors. Encode includes output packet. CPU has no comparable allocator measurement. These are eager operations, not compact-attention workspace.")
     full_stored = (estimated if count != total else serialized) + charged
     effective_bits = 16 * full_stored / full_raw
     result["effective_bits_per_BF16_word_including_state"] = effective_bits
@@ -342,6 +368,8 @@ def _generation(model, captured, records, specs, models, context, device, args, 
                 first_token=captured["first_token"], steps=args.generation_steps)
             if not all(measurement[key] for key in ("all_logits_bitwise_equal", "all_tokens_equal", "all_appended_KV_bitwise_equal")):
                 raise AssertionError("Producer full DEV continuation differs")
+            if not all(step["logits_finite"] for step in measurement["per_step"]):
+                raise AssertionError("Producer full DEV continuation has nonfinite logits")
             measurement["producer_restore_scope"] = "GPU decoder outputs return to CPU for existing generation-check cache reconstruction; this roundtrip is correctness plumbing, not a serving latency claim."
             row.update(status="ok", measurement=measurement)
             del packets, state
@@ -385,12 +413,17 @@ def _summary(report):
     lines += ["", "Continuation checks use complete DEV coverage and compare exact logits, tokens and appended KV. Hook auditing and producer feature copies are included in instrumented prefill capture; that duration is not production overhead for one deployed recipe.", ""]
     if report.get("fatal_error"):
         lines += ["Run error: " + report["fatal_error"], ""]
+    if report.get("config", {}).get("producer_preset") == "conditional":
+        lines += ["## Four conditional experiments", "",
+            "The fixed candidates compare exponent Huffman coding, separate sign coding, joint prediction from retained KV anchors, and joint prediction from actual-prefill hidden features. Rank variants, raw packets, zero/mean predictors and fast pre-RoPE controls are retained even when they lose. All registered candidates receive complete DEV continuation checks unless explicitly disabled.", "",
+            "See decision_summary.json for matched control deltas, complete component-bit ledgers, per-layer rates, aggregated prediction/correction/fallback diagnostics and separate encode/decode allocation peaks. conditional_diagnostics in results.json adds per-head source costs, lower-byte distributions, sign transitions and observed K/V correlations. Diagnostics are descriptive; no TEST-derived model is fitted.", "",
+            "Predictor fit uses ridge MSE initialization followed by TRAIN-only shrinkage selection using actual NumPy BF16 correction-byte proxies. These proxies are recorded separately from measured GPU packets. Encoder-only latent weights are conservatively included in headline decoder-state charges, with their numerical role broken out. Eager encode timings include bounded diagnostic aggregates; no serving speedup is inferred.", ""]
     return "\n".join(lines), dict(format="qwen_producer_summary_v1", status=report["status"], cases=cases,
         generation_checks=[dict(name=r["name"], status=r["status"]) for r in report["generation_checks"]], scope=report["scope"])
 
 
 def _bundle(output, state_files):
-    names = [name for name in ("results.json", "results.csv", "summary.md", "producer_summary.json", "source_manifest.json", "frozen_manifest.json") if (output / name).is_file()]
+    names = [name for name in ("results.json", "results.csv", "summary.md", "producer_summary.json", "decision_summary.json", "source_manifest.json", "frozen_manifest.json") if (output / name).is_file()]
     manifest = []
     for relative in names + sorted(state_files):
         data = (output / relative).read_bytes()
@@ -426,10 +459,15 @@ def main(argv=None):
         markdown, machine = _summary(report)
         (output / "summary.md").write_text(markdown, encoding="utf-8")
         write_json(output / "producer_summary.json", machine)
+        if args.producer_preset == "conditional":
+            from .conditional_reporting import analyze
+            write_json(output / "decision_summary.json", analyze(report))
     write_json(output / "source_manifest.json", report["source_manifest"])
     save()
     try:
-        if args.producer_preset == "frontier":
+        if args.producer_preset == "conditional":
+            from . import conditional_codec as codec, conditional_models as model_api
+        elif args.producer_preset == "frontier":
             from . import frontier_codec as codec, frontier_models as model_api
         else:
             from . import producer_codec as codec, producer_models as model_api
@@ -446,6 +484,9 @@ def main(argv=None):
         if max(args.lengths + [args.train_tokens, args.dev_tokens]) > model.config.max_position_embeddings:
             raise ValueError("Requested producer context exceeds model configuration")
         specs = list(codec.recipes()); report["candidates"] = specs
+        if args.producer_preset == "conditional":
+            from .conditional_reporting import protocol
+            report["experiment_protocol"] = protocol(specs)
         training = []; metadata = []
         for fixture in TRAIN:
             _note("Producer TRAIN: " + fixture["name"])
@@ -453,8 +494,10 @@ def main(argv=None):
             training.append(records)
             metadata.append(dict(name=fixture["name"], split="train", input_ids_sha256=captured["input_ids_sha256"], producer_audit=captured["producer_audit"]))
         _note("Fitting producer predictors from TRAIN only")
+        fit_started = time.perf_counter()
         models = model_api.fit(training, output / "calibration", rank=args.rank,
             training_metadata=metadata, model_identity=identity, seed=args.seed)
+        report["training_fit_wall_seconds"] = time.perf_counter() - fit_started
         report["calibration"] = {}
         for name, value in models.items():
             path = Path(value.path)
@@ -474,11 +517,16 @@ def main(argv=None):
             capture={k: v for k, v in captured.items() if k != "matrices"}, producer_context=_context_info(context), results=[])
         report["cases"].append(dev)
         def diagnose(case, records):
-            if args.producer_preset == "frontier":
+            if args.producer_preset in ("frontier", "conditional"):
                 from .frontier_diagnostics import analyze
                 started_diagnostics = time.perf_counter()
                 case["frontier_diagnostics"] = analyze(records)
                 case["frontier_diagnostics_cpu_seconds"] = time.perf_counter() - started_diagnostics
+            if args.producer_preset == "conditional":
+                from .conditional_diagnostics import analyze
+                started_diagnostics = time.perf_counter()
+                case["conditional_diagnostics"] = analyze(records, models)
+                case["conditional_diagnostics_cpu_seconds"] = time.perf_counter() - started_diagnostics
         diagnose(dev, records)
         def measure_case(case, captured, records, context):
             for spec in specs:
@@ -487,7 +535,8 @@ def main(argv=None):
                 try:
                     row.update(status="ok", measurement=_measure(records, captured, spec, models, context, device, args, output, state_files, codec))
                 except Exception as error:
-                    row.update(status="error", error=f"{type(error).__name__}: {error}")
+                    row.update(status="error", error=f"{type(error).__name__}: {error}",
+                        error_traceback=traceback.format_exc(limit=8))
                     _note(row["error"])
                 case["results"].append(row); save()
         measure_case(dev, captured, records, context)
@@ -496,6 +545,8 @@ def main(argv=None):
         frozen = dict(model_identity=identity, source_sha256=report["source_manifest"]["sources_sha256"],
             calibration=report["calibration"], decoder_artifacts=state_files.copy(), candidates=specs,
             configuration=report["config"], selection_source="TRAIN-only fits; fixed recipes and DEV representatives before fresh TEST captures")
+        if "experiment_protocol" in report:
+            frozen["experiment_protocol"] = report["experiment_protocol"]
         report["freeze"] = dict(manifest=frozen, sha256=_digest(frozen))
         write_json(output / "frozen_manifest.json", report["freeze"]); save()
         for length in args.lengths:

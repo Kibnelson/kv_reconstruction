@@ -279,6 +279,8 @@ class Packet:
         elif self.metadata["method"] == "prefill_exponent":
             from .exponent_recipe import describe
             result["prefill_recipe"] = describe(self)
+        elif self.metadata["method"] == "conditional_pair":
+            result["native_entropy_backend"] = "frozen_canonical_huffman_and_exact_bitpacking"
         return result
 
 
@@ -314,7 +316,7 @@ def validate_packet(packet, check_header=True):
     meta = packet.metadata
     # Producer-study pair packets have a dedicated encoder/decoder and are not
     # part of the legacy native_options/self-test method grid.
-    if (meta.get("version") != 1 or meta.get("method") not in (*NATIVE_METHODS, "producer_pair", "frontier_pair") or
+    if (meta.get("version") != 1 or meta.get("method") not in (*NATIVE_METHODS, "producer_pair", "frontier_pair", "conditional_pair") or
             not isinstance(meta.get("shape"), list) or len(meta["shape"]) != 2 or
             any(not isinstance(n, int) or n < 0 for n in meta["shape"])):
         raise ValueError("invalid native packet descriptor")
@@ -705,6 +707,9 @@ def decode(packet, state=None):
     if meta["method"] == "frontier_pair":
         from .frontier_codec import decode as decode_frontier
         return decode_frontier(packet, state)
+    if meta["method"] == "conditional_pair":
+        from .conditional_codec import decode as decode_conditional
+        return decode_conditional(packet, state)
     if meta["method"] != "prefill" and state.state_id != meta["state_id"]:
         raise ValueError("native state identity mismatch")
     method = meta["method"]

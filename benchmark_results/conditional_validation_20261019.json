@@ -1,0 +1,127 @@
+{
+  "format": "conditional_authoring_validation_v1",
+  "date_utc": "2026-10-19",
+  "status": "passed",
+  "parent_commit": "65edba9150d7831e5dad66a020c1c3310a5cf77c",
+  "environment": {
+    "python": "3.12.14",
+    "torch": "2.11.0+cpu",
+    "transformers": "4.57.6",
+    "numpy": "2.3.5",
+    "device": "cpu"
+  },
+  "second_setup": {
+    "torch": "2.14.1+cpu",
+    "transformers": "5.20.1",
+    "numpy": "2.5.4"
+  },
+  "suites": [
+    {
+      "command": "python -m unittest discover -s qwen_kv_bench -p 'test_*.py' -v",
+      "total": 236,
+      "skipped": 11,
+      "passed": 225,
+      "log_sha256": "4bd83cd9fcbc74b941300228bdc89b4decebf4ecc92ade86f4fa240109525e1b"
+    },
+    {
+      "command": "python -m unittest qwen_kv_bench.test_conditional_entropy qwen_kv_bench.test_conditional_models qwen_kv_bench.test_conditional_codec qwen_kv_bench.test_conditional_generation qwen_kv_bench.test_conditional_diagnostics qwen_kv_bench.test_conditional_reporting qwen_kv_bench.test_conditional_study -v",
+      "total": 46,
+      "skipped": 2,
+      "passed": 44,
+      "log_sha256": "c0dfb2962964dfa6fe7709fad228a6314bc9199071342d26055973d7c2517c3d"
+    },
+    {
+      "command": "python -m unittest tests.test_standalone_build tests.test_package_results -v",
+      "total": 12,
+      "skipped": 0,
+      "passed": 12,
+      "log_sha256": "278209821bacb21e5b1ea5ad7a27fad8ce7599ed8c28e93dcfd2d465d4662133"
+    }
+  ],
+  "portable_tiny_run": {
+    "package": "benchmark_results/conditional_tiny_20261019",
+    "candidates": 13,
+    "method_rows": 39,
+    "pair_checks_per_track": 104,
+    "generation_checks": 13,
+    "generation_steps": 2,
+    "complete_dev_tokens": 24,
+    "source_files_verified": 158,
+    "source_sha256": "8e04169b3eaaaa4d3219b7d893b243391f6279e2da9d337943e6474bd36f3629",
+    "frozen_sha256": "90b3abcb502b2c6ca2e8d069eefdc508a9c748f7ee46f176255333e80bcbdfbd",
+    "elapsed_seconds": 23.10545169100078,
+    "models_loaded_with_canonical_crc_sha_identity": {
+      "frozen": {
+        "bytes": 12608,
+        "model_id": "4cd157d648d2755bf7027a1104f157a7b1bb049edd22d75111a229068012c2e4",
+        "kind": "frozen"
+      },
+      "hidden": {
+        "bytes": 16793,
+        "model_id": "520678bc4d34e220052aeb1429d178c85c72c8d7cf1632e9861e992eaec1d758",
+        "kind": "hidden"
+      },
+      "hidden_abs": {
+        "bytes": 16789,
+        "model_id": "7a57cce27cb067c917684c772eb3aa2d581e672e7c8f52e7773cce7416f483fe",
+        "kind": "hidden_abs"
+      },
+      "cost_final": {
+        "bytes": 13941,
+        "model_id": "d86b9ababcb5a8c2f59f53348a7dc24a4c150590882866b2e65983c49e2cb167",
+        "kind": "frozen"
+      },
+      "cost_pre_rope": {
+        "bytes": 13963,
+        "model_id": "6f33bab82ddb53a6c08266b9c3331df2916e168bc9142e5fe646b2c37841c8dd",
+        "kind": "frozen"
+      },
+      "cost_kproj": {
+        "bytes": 13955,
+        "model_id": "7dde19aded5fccc723b7547b9c280393cb3837b70b325856b2ffa0d52a629eae",
+        "kind": "frozen"
+      },
+      "conditional_entropy": {
+        "bytes": 120494,
+        "model_id": "74185f350a16a125cc5f502425459bf0ea23aeadc5942ef4e5c247c4a01e472c",
+        "kind": "conditional_entropy"
+      },
+      "conditional_anchor_r8": {
+        "bytes": 21493,
+        "model_id": "5ac9aae6eb058e54547a8a608247e80511f5266985c9c7bfe6d62c2e78fd9c35",
+        "kind": "conditional_anchor"
+      },
+      "conditional_anchor_r32": {
+        "bytes": 34109,
+        "model_id": "dd412e7311916b11bffb695f7f58d0383859d0e3c8c9084fd0a0cec7019a765e",
+        "kind": "conditional_anchor"
+      },
+      "conditional_latent_r8": {
+        "bytes": 26318,
+        "model_id": "baec762276d1baff1db5b81117a4c79d9151c543f533f96f91e09b6ec87e38a8",
+        "kind": "conditional_latent"
+      },
+      "conditional_latent_r32": {
+        "bytes": 50903,
+        "model_id": "82c3b734b5ee180888143571858aa7385d316c8fe8d57953f828fcfd103dac35",
+        "kind": "conditional_latent"
+      },
+      "conditional_mean": {
+        "bytes": 14708,
+        "model_id": "e54f75d52a240da502a5581ab43b17d76c26bd36faa8432aeb93708c3790f9aa",
+        "kind": "conditional_mean"
+      }
+    }
+  },
+  "checks": {
+    "source_and_freeze_hashes": true,
+    "all_packet_components_and_complete_state": true,
+    "all_inline_packets_match_replay": true,
+    "all_generation_logits_finite_bitwise_equal": true,
+    "gpu_execution_measured": false,
+    "pretrained_model_savings_measured": false,
+    "standalone_build_matches_source": true,
+    "compileall_and_whitespace_check": true
+  },
+  "scope": "Random tiny BF16 Qwen3 CPU functionality and exactness only. Hardware-dependent skips are not passes. GPU performance, pretrained compression rates and serving/capacity gains remain unmeasured."
+}
