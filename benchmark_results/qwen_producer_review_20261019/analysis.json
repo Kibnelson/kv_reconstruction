@@ -1,0 +1,3275 @@
+{
+  "format": "producer_review_analysis_v1",
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-111-generic-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "versions": {
+      "torch": "2.11.0+cu128",
+      "transformers": "4.57.6",
+      "numpy": "2.3.5",
+      "safetensors": "0.8.0"
+    },
+    "requested_device": "cuda:0",
+    "accelerators": [
+      {
+        "backend": "cuda",
+        "available": true,
+        "devices": [
+          {
+            "index": 0,
+            "name": "NVIDIA RTX A4500",
+            "memory": {
+              "device": "cuda:0",
+              "allocated_bytes": 0,
+              "reserved_bytes": 0,
+              "peak_allocated_bytes": 0,
+              "peak_reserved_bytes": 0,
+              "free_device_bytes": 20645937152,
+              "total_device_bytes": 20993015808
+            },
+            "reported_bf16_support": true
+          }
+        ]
+      },
+      {
+        "backend": "xpu",
+        "available": false,
+        "devices": []
+      }
+    ],
+    "model_download_performed": false,
+    "host_available_memory_bytes": 63277404160,
+    "torch_cuda_build": "12.8",
+    "torch_hip_build": null,
+    "selected_device": "cuda:0",
+    "selection_error": null,
+    "memory": {
+      "device": "cuda:0",
+      "allocated_bytes": 0,
+      "reserved_bytes": 0,
+      "peak_allocated_bytes": 0,
+      "peak_reserved_bytes": 0,
+      "free_device_bytes": 20645937152,
+      "total_device_bytes": 20993015808
+    },
+    "bf16_probe": {
+      "success": true,
+      "error": null,
+      "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support"
+    },
+    "operation_probes": {
+      "int64_bitwise": {
+        "success": true,
+        "error": null,
+        "scope": "int64 device allocation, shifts, XOR, AND and equality"
+      },
+      "uint16_view_copy": {
+        "success": true,
+        "error": null,
+        "scope": "uint16/BF16 bit reinterpretation, device clone and copy to CPU"
+      },
+      "float64_pointwise": {
+        "success": true,
+        "error": null,
+        "scope": "float64 device allocation, multiply/add, rounding and equality"
+      }
+    },
+    "native_codec_capability_note": "Native E8 and binary predictors currently use float64. Some Intel/XPU devices may support BF16 while rejecting those float64 operations. An auxiliary probe failure does not veto other BF16 model/native format runs; report unsupported methods separately. These compact probes do not establish complete codec support or performance."
+  },
+  "config": {
+    "device": "cuda",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "local_files_only": false,
+    "tiny": false,
+    "lengths": [
+      2048,
+      8192
+    ],
+    "cases": 3,
+    "train_tokens": 512,
+    "dev_tokens": 512,
+    "chunk_tokens": 512,
+    "tile_tokens": 64,
+    "max_tiles": 72,
+    "rank": 8,
+    "repeats": 3,
+    "sample_pairs": 16,
+    "generation_steps": 2,
+    "skip_inline": false,
+    "threads": 4,
+    "seed": 71,
+    "output": "runs/qwen_producer_hooks"
+  },
+  "elapsed_seconds": 159.77734217606485,
+  "test_case_count": 6,
+  "test_case_method_means": [
+    {
+      "name": "producer_kv_median",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 29.387526710828144,
+        "minimum": 29.30426862504747,
+        "maximum": 29.50627737575107
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 7.588684558868408,
+        "minimum": 7.557901553809643,
+        "maximum": 7.630730513483286
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 8.74159011679391,
+        "minimum": 8.708493784070015,
+        "maximum": 8.799108676612377
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.42790553911968515,
+        "minimum": 0.4261430973807971,
+        "maximum": 0.4324627419312795
+      }
+    },
+    {
+      "name": "producer_kv_fixed127",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 21.224958477196868,
+        "minimum": 21.03981640603807,
+        "maximum": 21.402875582377114
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 7.515132815266649,
+        "minimum": 7.440974470227957,
+        "maximum": 7.562575396150351
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 8.59382019067804,
+        "minimum": 8.503733668476343,
+        "maximum": 8.667581714689732
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.4553423366612858,
+        "minimum": 0.4392400797870424,
+        "maximum": 0.48243192334969837
+      }
+    },
+    {
+      "name": "producer_frozen_exponent",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 29.84312738257426,
+        "minimum": 29.76647557483779,
+        "maximum": 29.91556889481015
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 7.012134495501717,
+        "minimum": 6.944006774574518,
+        "maximum": 7.114531472325325
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 8.018498386566838,
+        "minimum": 7.936055306345224,
+        "maximum": 8.16656043753028
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.4309047944843769,
+        "minimum": 0.42387698259618545,
+        "maximum": 0.446640368964937
+      }
+    },
+    {
+      "name": "producer_hidden_exponent",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 28.779029680622948,
+        "minimum": 28.665286964840362,
+        "maximum": 28.90042298369937
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 8.466449022913972,
+        "minimum": 8.357732556760311,
+        "maximum": 8.718043100088835
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 9.52102344793578,
+        "minimum": 9.378117509186268,
+        "maximum": 9.862795006483793
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.659785388658444,
+        "minimum": 0.6524337869551446,
+        "maximum": 0.6812686721483866
+      }
+    },
+    {
+      "name": "producer_hidden_abs_exponent",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 28.734177157834722,
+        "minimum": 28.607733382119072,
+        "maximum": 28.852550023131897
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 8.263686516632637,
+        "minimum": 8.178149815648794,
+        "maximum": 8.531752042472363
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 9.310286647329727,
+        "minimum": 9.192587342113256,
+        "maximum": 9.668087121099234
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.6738115205532974,
+        "minimum": 0.6535709318187501,
+        "maximum": 0.7075389019317098
+      }
+    },
+    {
+      "name": "producer_pre_rope_residual",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 29.204647408591377,
+        "minimum": 29.125536812676323,
+        "maximum": 29.315780268775093
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 9.33239523631831,
+        "minimum": 9.20288311317563,
+        "maximum": 9.73618496209383
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 10.608820477500558,
+        "minimum": 10.443496983498335,
+        "maximum": 11.135431006550789
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.5626205044488112,
+        "minimum": 0.5439060429732004,
+        "maximum": 0.5920204437441297
+      }
+    },
+    {
+      "name": "producer_pre_rope_coset",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 29.206936226950752,
+        "minimum": 29.127825631035698,
+        "maximum": 29.318069087134468
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 9.465896291658282,
+        "minimum": 9.374018292874098,
+        "maximum": 9.579033125191927
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 10.743308501938978,
+        "minimum": 10.625071357935667,
+        "maximum": 10.900295339524746
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.5587731936463604,
+        "minimum": 0.5504599668913417,
+        "maximum": 0.5634764416350259
+      }
+    },
+    {
+      "name": "producer_kproj_norm_rope_residual",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 29.176077370842297,
+        "minimum": 29.090653194321526,
+        "maximum": 29.29697823193338
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 9.567865480979284,
+        "minimum": 9.40715242177248,
+        "maximum": 9.842371102422476
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 10.848825021336475,
+        "minimum": 10.658746119588614,
+        "maximum": 11.213572230190039
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.5549094639718533,
+        "minimum": 0.5469862371683121,
+        "maximum": 0.559987293349372
+      }
+    },
+    {
+      "name": "producer_kproj_norm_rope_coset",
+      "cases": 6,
+      "savings_percent": {
+        "mean": 29.17836618920167,
+        "minimum": 29.0929420126809,
+        "maximum": 29.299267050292755
+      },
+      "decode_ms_per_raw_MiB": {
+        "mean": 9.74036380648613,
+        "minimum": 9.585126768797636,
+        "maximum": 9.988143108785152
+      },
+      "transfer_decode_ms_per_raw_MiB": {
+        "mean": 11.020024850343665,
+        "minimum": 10.833204723894596,
+        "maximum": 11.346485000103712
+      },
+      "staging_ms_per_raw_MiB": {
+        "mean": 0.5594395894419264,
+        "minimum": 0.5437516503863864,
+        "maximum": 0.5884953877992101
+      }
+    }
+  ],
+  "cases": [
+    {
+      "name": "test_pottery_kiln_diary_2048",
+      "tokens": 2048,
+      "methods": [
+        {
+          "name": "producer_kv_median",
+          "savings_percent": 29.30426862504747,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.580534089356661,
+          "transfer_decode_ms_per_raw_MiB": 8.729355875402689,
+          "staging_ms_per_raw_MiB": 0.4282647536860572,
+          "component_bits_per_BF16_word": {
+            "header": 0.09797244601779515,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.836877610948351,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kv_fixed127",
+          "savings_percent": 21.402875582377114,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.440974470227957,
+          "transfer_decode_ms_per_raw_MiB": 8.503733668476343,
+          "staging_ms_per_raw_MiB": 0.44317305501964355,
+          "component_bits_per_BF16_word": {
+            "header": 0.0929684109157986,
+            "lower_bits": 8.0,
+            "exponent_payload": 4.2311045328776045,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_frozen_exponent",
+          "savings_percent": 29.90573015477922,
+          "state_bytes": 213519,
+          "decode_ms_per_raw_MiB": 6.944006774574518,
+          "transfer_decode_ms_per_raw_MiB": 7.936055306345224,
+          "staging_ms_per_raw_MiB": 0.42387698259618545,
+          "component_bits_per_BF16_word": {
+            "header": 0.04926639133029514,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.90303717719184,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_exponent",
+          "savings_percent": 28.665286964840362,
+          "state_bytes": 1432460,
+          "decode_ms_per_raw_MiB": 8.718043100088835,
+          "transfer_decode_ms_per_raw_MiB": 9.862795006483793,
+          "staging_ms_per_raw_MiB": 0.6571817729208205,
+          "component_bits_per_BF16_word": {
+            "header": 0.05164676242404514,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.0032958984375,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_abs_exponent",
+          "savings_percent": 28.607733382119072,
+          "state_bytes": 1432250,
+          "decode_ms_per_raw_MiB": 8.272803388535976,
+          "transfer_decode_ms_per_raw_MiB": 9.316641837358475,
+          "staging_ms_per_raw_MiB": 0.6535709318187501,
+          "component_bits_per_BF16_word": {
+            "header": 0.05213504367404514,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.012027316623264,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_residual",
+          "savings_percent": 29.125536812676323,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.20288311317563,
+          "transfer_decode_ms_per_raw_MiB": 10.443496983498335,
+          "staging_ms_per_raw_MiB": 0.5920204437441297,
+          "component_bits_per_BF16_word": {
+            "header": 0.11420779758029515,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8101492987738714,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_coset",
+          "savings_percent": 29.127825631035698,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.375325869768858,
+          "transfer_decode_ms_per_raw_MiB": 10.629980359226465,
+          "staging_ms_per_raw_MiB": 0.558171421289444,
+          "component_bits_per_BF16_word": {
+            "header": 0.11384158664279515,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8101492987738714,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_residual",
+          "savings_percent": 29.090653194321526,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.40715242177248,
+          "transfer_decode_ms_per_raw_MiB": 10.658746119588614,
+          "staging_ms_per_raw_MiB": 0.5583765192164315,
+          "component_bits_per_BF16_word": {
+            "header": 0.11506228976779515,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8142259385850696,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_coset",
+          "savings_percent": 29.0929420126809,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.988143108785152,
+          "transfer_decode_ms_per_raw_MiB": 11.346485000103712,
+          "staging_ms_per_raw_MiB": 0.554748707347446,
+          "component_bits_per_BF16_word": {
+            "header": 0.11469607883029515,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8142259385850696,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        }
+      ],
+      "comparisons": {
+        "producer_kv_median__to__producer_frozen_exponent": {
+          "net_savings_gain_percentage_points": 0.6014615297317505,
+          "component_gains_percentage_points": {
+            "anchors": 0.78125,
+            "exponent_payload": -0.4134972890218099,
+            "header": 0.304412841796875,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.07070402304331462
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.8142471313476562,
+            "1": 0.7356643676757812,
+            "2": 0.749969482421875,
+            "3": 0.49839019775390625,
+            "4": 0.4009246826171875,
+            "5": 0.6328582763671875,
+            "6": 0.6443023681640625,
+            "7": 0.6282806396484375,
+            "8": 0.746917724609375,
+            "9": 0.5765914916992188,
+            "10": 0.47245025634765625,
+            "11": 0.6200790405273438,
+            "12": 0.6769180297851562,
+            "13": 0.75836181640625,
+            "14": 0.6765365600585938,
+            "15": 0.714874267578125,
+            "16": 0.719451904296875,
+            "17": 0.72174072265625,
+            "18": 0.7654190063476562,
+            "19": 0.6990432739257812,
+            "20": 0.6635665893554688,
+            "21": 0.7154464721679688,
+            "22": 0.658416748046875,
+            "23": 0.673675537109375,
+            "24": 0.7266998291015625,
+            "25": 0.7516860961914062,
+            "26": 0.7854461669921875,
+            "27": 0.7009506225585938,
+            "28": 0.7038116455078125,
+            "29": 0.6725311279296875,
+            "30": 0.6378173828125,
+            "31": 0.69122314453125,
+            "32": 0.689697265625,
+            "33": 0.6017684936523438,
+            "34": 0.64544677734375,
+            "35": 0.6267547607421875
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_exponent": {
+          "net_savings_gain_percentage_points": -1.2404431899388584,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.6266170077853732,
+            "features": -0.1953125,
+            "header": -0.0148773193359375,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.40363636281755233
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.321197509765625,
+            "1": -0.32806396484375,
+            "2": -0.9691238403320312,
+            "3": -1.1821746826171875,
+            "4": -0.5456924438476562,
+            "5": -0.8958816528320312,
+            "6": -0.8708953857421875,
+            "7": -1.1295318603515625,
+            "8": -1.0833740234375,
+            "9": -1.0835647583007812,
+            "10": -0.8270263671875,
+            "11": -0.90789794921875,
+            "12": -0.9649276733398438,
+            "13": -0.9532928466796875,
+            "14": -0.777435302734375,
+            "15": -0.8195877075195312,
+            "16": -0.6467819213867188,
+            "17": -0.6626129150390625,
+            "18": -0.8440017700195312,
+            "19": -0.7961273193359375,
+            "20": -0.6605148315429688,
+            "21": -0.608062744140625,
+            "22": -0.6420135498046875,
+            "23": -0.646209716796875,
+            "24": -0.84381103515625,
+            "25": -0.7589340209960938,
+            "26": -0.9922027587890625,
+            "27": -1.0000228881835938,
+            "28": -0.9874343872070312,
+            "29": -1.0858535766601562,
+            "30": -0.7890701293945312,
+            "31": -1.0282516479492188,
+            "32": -0.9063720703125,
+            "33": -1.116180419921875,
+            "34": -1.2048721313476562,
+            "35": -0.8884429931640625
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_abs_exponent": {
+          "net_savings_gain_percentage_points": -1.2979967726601487,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.6811883714463975,
+            "features": -0.1953125,
+            "header": -0.0179290771484375,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.4035668240653144
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.197601318359375,
+            "1": -0.377655029296875,
+            "2": -0.3841400146484375,
+            "3": -0.9580612182617188,
+            "4": -1.0499954223632812,
+            "5": -1.0326385498046875,
+            "6": -1.0711669921875,
+            "7": -1.0889053344726562,
+            "8": -1.1341094970703125,
+            "9": -1.1747360229492188,
+            "10": -0.8893966674804688,
+            "11": -0.9246826171875,
+            "12": -0.9851455688476562,
+            "13": -0.958251953125,
+            "14": -0.8266448974609375,
+            "15": -0.8686065673828125,
+            "16": -0.7654190063476562,
+            "17": -0.738525390625,
+            "18": -0.8646011352539062,
+            "19": -0.8245468139648438,
+            "20": -0.7593154907226562,
+            "21": -0.77362060546875,
+            "22": -0.6361007690429688,
+            "23": -0.6990432739257812,
+            "24": -0.9283065795898438,
+            "25": -0.769805908203125,
+            "26": -1.05133056640625,
+            "27": -0.9931564331054688,
+            "28": -1.0608673095703125,
+            "29": -1.1749267578125,
+            "30": -0.8035659790039062,
+            "31": -1.113128662109375,
+            "32": -0.9387969970703125,
+            "33": -1.2510299682617188,
+            "34": -1.30615234375,
+            "35": -0.82550048828125
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_pre_rope_coset": {
+          "net_savings_gain_percentage_points": -0.17644299401177221,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.16705195109049478,
+            "header": -0.09918212890625,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.00017219119601779513
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.22430419921875,
+            "1": -0.19397735595703125,
+            "2": -0.1827239990234375,
+            "3": -0.206756591796875,
+            "4": -0.31452178955078125,
+            "5": -0.2353668212890625,
+            "6": -0.270843505859375,
+            "7": -0.23784637451171875,
+            "8": -0.2391815185546875,
+            "9": -0.13790130615234375,
+            "10": -0.24585723876953125,
+            "11": -0.22258758544921875,
+            "12": -0.2063751220703125,
+            "13": -0.1300811767578125,
+            "14": -0.24662017822265625,
+            "15": -0.1651763916015625,
+            "16": -0.15888214111328125,
+            "17": -0.10890960693359375,
+            "18": -0.16040802001953125,
+            "19": -0.118255615234375,
+            "20": -0.08754730224609375,
+            "21": -0.2201080322265625,
+            "22": -0.15773773193359375,
+            "23": -0.23059844970703125,
+            "24": -0.12035369873046875,
+            "25": -0.14934539794921875,
+            "26": -0.057220458984375,
+            "27": -0.09746551513671875,
+            "28": -0.14781951904296875,
+            "29": -0.093841552734375,
+            "30": -0.16155242919921875,
+            "31": -0.11310577392578125,
+            "32": -0.14820098876953125,
+            "33": -0.08087158203125,
+            "34": -0.2201080322265625,
+            "35": -0.2532958984375
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_kproj_norm_rope_coset": {
+          "net_savings_gain_percentage_points": -0.21132661236656958,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.1415729522705078,
+            "header": -0.104522705078125,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.004236234558953179
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.09365081787109375,
+            "1": -0.37021636962890625,
+            "2": -0.32958984375,
+            "3": -0.3055572509765625,
+            "4": -0.3753662109375,
+            "5": -0.24929046630859375,
+            "6": -0.3299713134765625,
+            "7": -0.26988983154296875,
+            "8": -0.28362274169921875,
+            "9": -0.1781463623046875,
+            "10": -0.289154052734375,
+            "11": -0.27484893798828125,
+            "12": -0.21839141845703125,
+            "13": -0.1678466796875,
+            "14": -0.25196075439453125,
+            "15": -0.21514892578125,
+            "16": -0.1979827880859375,
+            "17": -0.13103485107421875,
+            "18": -0.189971923828125,
+            "19": -0.1468658447265625,
+            "20": -0.12989044189453125,
+            "21": -0.222015380859375,
+            "22": -0.20122528076171875,
+            "23": -0.251007080078125,
+            "24": -0.14591217041015625,
+            "25": -0.16574859619140625,
+            "26": -0.07648468017578125,
+            "27": -0.1094818115234375,
+            "28": -0.15888214111328125,
+            "29": -0.1438140869140625,
+            "30": -0.2010345458984375,
+            "31": -0.140380859375,
+            "32": -0.17604827880859375,
+            "33": -0.13370513916015625,
+            "34": -0.251007080078125,
+            "35": -0.2674102783203125
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        }
+      },
+      "projections": {
+        "producer_pre_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.371584786309135,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        },
+        "producer_kproj_norm_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.336701167954338,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        }
+      },
+      "oracles": {
+        "frozen_median_prerope": {
+          "candidates": [
+            "producer_frozen_exponent",
+            "producer_kv_median",
+            "producer_pre_rope_coset"
+          ],
+          "savings_percent": 29.905176493856644,
+          "gain_over_best_fixed_percentage_points": -0.0005536609225771372,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 214039,
+          "selections": {
+            "producer_frozen_exponent": 72
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "all_nine": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_kv_fixed127",
+            "producer_frozen_exponent",
+            "producer_hidden_exponent",
+            "producer_hidden_abs_exponent",
+            "producer_pre_rope_residual",
+            "producer_pre_rope_coset",
+            "producer_kproj_norm_rope_residual",
+            "producer_kproj_norm_rope_coset"
+          ],
+          "savings_percent": 28.964297638999092,
+          "gain_over_best_fixed_percentage_points": -0.9414325157801287,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 3091542,
+          "selections": {
+            "producer_hidden_exponent": 3,
+            "producer_frozen_exponent": 69
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "best_subset_including_state": {
+          "candidates": [
+            "producer_frozen_exponent"
+          ],
+          "savings_percent": 29.90573015477922,
+          "gain_over_best_fixed_percentage_points": 0.0,
+          "mode_bytes_per_pair": 0,
+          "all_candidate_states_charged_bytes": 213519,
+          "selections": {
+            "producer_frozen_exponent": 72
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured. Exhaustive candidate-subset search includes fixed single methods with no selector byte; all choices use TEST results and provide no held-out adaptive-policy evidence.",
+          "gain_over_best_existing_fixed_percentage_points": 0.0,
+          "subsets_examined": 511
+        }
+      }
+    },
+    {
+      "name": "test_python_dependency_walk_2048",
+      "tokens": 2048,
+      "methods": [
+        {
+          "name": "producer_kv_median",
+          "savings_percent": 29.308109813266327,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.586662191897631,
+          "transfer_decode_ms_per_raw_MiB": 8.75529833137989,
+          "staging_ms_per_raw_MiB": 0.42646419670846725,
+          "component_bits_per_BF16_word": {
+            "header": 0.09796990288628472,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8362655639648438,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kv_fixed127",
+          "savings_percent": 21.201417181226944,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.521498017013073,
+          "transfer_decode_ms_per_raw_MiB": 8.590487763285637,
+          "staging_ms_per_raw_MiB": 0.47183181676599717,
+          "component_bits_per_BF16_word": {
+            "header": 0.09296502007378472,
+            "lower_bits": 8.0,
+            "exponent_payload": 4.2633412679036455,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_frozen_exponent",
+          "savings_percent": 29.888892504904007,
+          "state_bytes": 213519,
+          "decode_ms_per_raw_MiB": 7.114531472325325,
+          "transfer_decode_ms_per_raw_MiB": 8.16656043753028,
+          "staging_ms_per_raw_MiB": 0.42808780239688027,
+          "component_bits_per_BF16_word": {
+            "header": 0.04927402072482639,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.9057235717773438,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_exponent",
+          "savings_percent": 28.72211535771688,
+          "state_bytes": 1432460,
+          "decode_ms_per_raw_MiB": 8.398171979933977,
+          "transfer_decode_ms_per_raw_MiB": 9.420523419976234,
+          "staging_ms_per_raw_MiB": 0.6529446691274643,
+          "component_bits_per_BF16_word": {
+            "header": 0.05164761013454861,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.9942025078667536,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_abs_exponent",
+          "savings_percent": 28.658500644895767,
+          "state_bytes": 1432250,
+          "decode_ms_per_raw_MiB": 8.531752042472363,
+          "transfer_decode_ms_per_raw_MiB": 9.668087121099234,
+          "staging_ms_per_raw_MiB": 0.6566798935333887,
+          "component_bits_per_BF16_word": {
+            "header": 0.05213504367404514,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.003904554578993,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_residual",
+          "savings_percent": 29.12853558858236,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.317124728113413,
+          "transfer_decode_ms_per_raw_MiB": 10.566191747784615,
+          "staging_ms_per_raw_MiB": 0.5561954652269682,
+          "component_bits_per_BF16_word": {
+            "header": 0.11420525444878472,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8096720377604165,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_coset",
+          "savings_percent": 29.130824406941734,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.412905666977167,
+          "transfer_decode_ms_per_raw_MiB": 10.669772513210773,
+          "staging_ms_per_raw_MiB": 0.5598342460062768,
+          "component_bits_per_BF16_word": {
+            "header": 0.11383904351128472,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8096720377604165,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_residual",
+          "savings_percent": 29.095135463608635,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.842371102422476,
+          "transfer_decode_ms_per_raw_MiB": 11.213572230190039,
+          "staging_ms_per_raw_MiB": 0.5572835604349772,
+          "component_bits_per_BF16_word": {
+            "header": 0.11505974663628472,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8135113186306424,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_coset",
+          "savings_percent": 29.09742428196801,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.857160039246082,
+          "transfer_decode_ms_per_raw_MiB": 11.164598166942596,
+          "staging_ms_per_raw_MiB": 0.5578450444671843,
+          "component_bits_per_BF16_word": {
+            "header": 0.11469353569878472,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8135113186306424,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        }
+      ],
+      "comparisons": {
+        "producer_kv_median__to__producer_frozen_exponent": {
+          "net_savings_gain_percentage_points": 0.5807826916376797,
+          "component_gains_percentage_points": {
+            "anchors": 0.78125,
+            "exponent_payload": -0.434112548828125,
+            "header": 0.30434926350911456,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.07070402304331462
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.8541107177734375,
+            "1": 0.7402420043945312,
+            "2": 0.714874267578125,
+            "3": 0.6519317626953125,
+            "4": 0.43544769287109375,
+            "5": 0.6387710571289062,
+            "6": 0.6561279296875,
+            "7": 0.5435943603515625,
+            "8": 0.6237030029296875,
+            "9": 0.5723953247070312,
+            "10": 0.46100616455078125,
+            "11": 0.6256103515625,
+            "12": 0.7236480712890625,
+            "13": 0.7413864135742188,
+            "14": 0.6895065307617188,
+            "15": 0.6557464599609375,
+            "16": 0.7078170776367188,
+            "17": 0.67901611328125,
+            "18": 0.69732666015625,
+            "19": 0.7493972778320312,
+            "20": 0.6809234619140625,
+            "21": 0.726318359375,
+            "22": 0.59967041015625,
+            "23": 0.6601333618164062,
+            "24": 0.6875991821289062,
+            "25": 0.6902694702148438,
+            "26": 0.7404327392578125,
+            "27": 0.6830215454101562,
+            "28": 0.6616592407226562,
+            "29": 0.6015777587890625,
+            "30": 0.5678176879882812,
+            "31": 0.666046142578125,
+            "32": 0.6061553955078125,
+            "33": 0.5331039428710938,
+            "34": 0.5464553833007812,
+            "35": 0.6406784057617188
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_exponent": {
+          "net_savings_gain_percentage_points": -1.1667771471871262,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.5529933505588107,
+            "features": -0.1953125,
+            "header": -0.014834933810763888,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.40363636281755233
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.04215240478515625,
+            "1": -0.2269744873046875,
+            "2": -0.6490707397460938,
+            "3": -1.2821197509765625,
+            "4": -0.524139404296875,
+            "5": -0.34580230712890625,
+            "6": -0.2735137939453125,
+            "7": -0.7184982299804688,
+            "8": -0.5998611450195312,
+            "9": -0.77362060546875,
+            "10": -0.7762908935546875,
+            "11": -0.82855224609375,
+            "12": -0.81787109375,
+            "13": -0.864410400390625,
+            "14": -0.8134841918945312,
+            "15": -0.7658004760742188,
+            "16": -0.8373260498046875,
+            "17": -0.8319854736328125,
+            "18": -1.0570526123046875,
+            "19": -0.922393798828125,
+            "20": -0.75225830078125,
+            "21": -0.664520263671875,
+            "22": -0.6618499755859375,
+            "23": -0.6893157958984375,
+            "24": -0.7219314575195312,
+            "25": -0.6315231323242188,
+            "26": -0.882720947265625,
+            "27": -0.9532928466796875,
+            "28": -0.8312225341796875,
+            "29": -0.9166717529296875,
+            "30": -0.8846282958984375,
+            "31": -1.001739501953125,
+            "32": -0.931549072265625,
+            "33": -1.108551025390625,
+            "34": -1.0066986083984375,
+            "35": -0.9679794311523438
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_abs_exponent": {
+          "net_savings_gain_percentage_points": -1.2303918600082397,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.6136311425103081,
+            "features": -0.1953125,
+            "header": -0.017881393432617188,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.4035668240653144
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.22563934326171875,
+            "1": -0.3635406494140625,
+            "2": -0.7257461547851562,
+            "3": -1.3223648071289062,
+            "4": -0.6090164184570312,
+            "5": -0.33893585205078125,
+            "6": -0.38089752197265625,
+            "7": -0.7429122924804688,
+            "8": -0.6097793579101562,
+            "9": -0.7534027099609375,
+            "10": -0.749969482421875,
+            "11": -0.865936279296875,
+            "12": -0.8420944213867188,
+            "13": -0.8464813232421875,
+            "14": -0.8054733276367188,
+            "15": -0.772857666015625,
+            "16": -0.8697509765625,
+            "17": -0.8321762084960938,
+            "18": -0.9807586669921875,
+            "19": -0.9176254272460938,
+            "20": -0.91400146484375,
+            "21": -0.8001327514648438,
+            "22": -0.6443023681640625,
+            "23": -0.777435302734375,
+            "24": -0.72479248046875,
+            "25": -0.6862640380859375,
+            "26": -1.0272979736328125,
+            "27": -1.030731201171875,
+            "28": -0.8935928344726562,
+            "29": -1.1775970458984375,
+            "30": -0.8863449096679688,
+            "31": -1.0951995849609375,
+            "32": -1.0028839111328125,
+            "33": -1.3477325439453125,
+            "34": -1.221466064453125,
+            "35": -0.9805679321289062
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_pre_rope_coset": {
+          "net_savings_gain_percentage_points": -0.177285406324593,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.16620953877766928,
+            "header": -0.09918212890625,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.00017219119601779513
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.23345947265625,
+            "1": -0.1880645751953125,
+            "2": -0.152587890625,
+            "3": -0.17604827880859375,
+            "4": -0.3208160400390625,
+            "5": -0.1804351806640625,
+            "6": -0.24204254150390625,
+            "7": -0.21610260009765625,
+            "8": -0.23593902587890625,
+            "9": -0.10890960693359375,
+            "10": -0.273895263671875,
+            "11": -0.2040863037109375,
+            "12": -0.20656585693359375,
+            "13": -0.131988525390625,
+            "14": -0.23345947265625,
+            "15": -0.15697479248046875,
+            "16": -0.1857757568359375,
+            "17": -0.115966796875,
+            "18": -0.18310546875,
+            "19": -0.14495849609375,
+            "20": -0.12664794921875,
+            "21": -0.1789093017578125,
+            "22": -0.1697540283203125,
+            "23": -0.21152496337890625,
+            "24": -0.12226104736328125,
+            "25": -0.17185211181640625,
+            "26": -0.090789794921875,
+            "27": -0.09517669677734375,
+            "28": -0.1659393310546875,
+            "29": -0.09860992431640625,
+            "30": -0.1911163330078125,
+            "31": -0.13370513916015625,
+            "32": -0.1529693603515625,
+            "33": -0.09059906005859375,
+            "34": -0.20389556884765625,
+            "35": -0.2811431884765625
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_kproj_norm_rope_coset": {
+          "net_savings_gain_percentage_points": -0.21068553129831713,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.14221403333875868,
+            "header": -0.104522705078125,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.004236234558953179
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.102996826171875,
+            "1": -0.28820037841796875,
+            "2": -0.25882720947265625,
+            "3": -0.24433135986328125,
+            "4": -0.35648345947265625,
+            "5": -0.18768310546875,
+            "6": -0.32329559326171875,
+            "7": -0.27523040771484375,
+            "8": -0.28781890869140625,
+            "9": -0.15201568603515625,
+            "10": -0.32501220703125,
+            "11": -0.25348663330078125,
+            "12": -0.235748291015625,
+            "13": -0.16956329345703125,
+            "14": -0.28476715087890625,
+            "15": -0.19779205322265625,
+            "16": -0.244140625,
+            "17": -0.16155242919921875,
+            "18": -0.19855499267578125,
+            "19": -0.168609619140625,
+            "20": -0.1766204833984375,
+            "21": -0.1804351806640625,
+            "22": -0.199127197265625,
+            "23": -0.2330780029296875,
+            "24": -0.1209259033203125,
+            "25": -0.2002716064453125,
+            "26": -0.11806488037109375,
+            "27": -0.0949859619140625,
+            "28": -0.1758575439453125,
+            "29": -0.1373291015625,
+            "30": -0.22430419921875,
+            "31": -0.14057159423828125,
+            "32": -0.2071380615234375,
+            "33": -0.13904571533203125,
+            "34": -0.26264190673828125,
+            "35": -0.3116607666015625
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        }
+      },
+      "projections": {
+        "producer_pre_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.37458356221517,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        },
+        "producer_kproj_norm_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.341183437241448,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        }
+      },
+      "oracles": {
+        "frozen_median_prerope": {
+          "candidates": [
+            "producer_frozen_exponent",
+            "producer_kv_median",
+            "producer_pre_rope_coset"
+          ],
+          "savings_percent": 29.888338843981423,
+          "gain_over_best_fixed_percentage_points": -0.0005536609225842426,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 214039,
+          "selections": {
+            "producer_frozen_exponent": 72
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "all_nine": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_kv_fixed127",
+            "producer_frozen_exponent",
+            "producer_hidden_exponent",
+            "producer_hidden_abs_exponent",
+            "producer_pre_rope_residual",
+            "producer_pre_rope_coset",
+            "producer_kproj_norm_rope_residual",
+            "producer_kproj_norm_rope_coset"
+          ],
+          "savings_percent": 28.9406783050961,
+          "gain_over_best_fixed_percentage_points": -0.9482141998079072,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 3091542,
+          "selections": {
+            "producer_hidden_exponent": 2,
+            "producer_frozen_exponent": 70
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "best_subset_including_state": {
+          "candidates": [
+            "producer_frozen_exponent"
+          ],
+          "savings_percent": 29.888892504904007,
+          "gain_over_best_fixed_percentage_points": 0.0,
+          "mode_bytes_per_pair": 0,
+          "all_candidate_states_charged_bytes": 213519,
+          "selections": {
+            "producer_frozen_exponent": 72
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured. Exhaustive candidate-subset search includes fixed single methods with no selector byte; all choices use TEST results and provide no held-out adaptive-policy evidence.",
+          "gain_over_best_existing_fixed_percentage_points": 0.0,
+          "subsets_examined": 511
+        }
+      }
+    },
+    {
+      "name": "test_museum_loan_register_2048",
+      "tokens": 2048,
+      "methods": [
+        {
+          "name": "producer_kv_median",
+          "savings_percent": 29.40751976437039,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.589222863316536,
+          "transfer_decode_ms_per_raw_MiB": 8.725724183022976,
+          "staging_ms_per_raw_MiB": 0.42725302692916656,
+          "component_bits_per_BF16_word": {
+            "header": 0.0979707505967882,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.820359124077691,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kv_fixed127",
+          "savings_percent": 21.259098582797577,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.520805113017559,
+          "transfer_decode_ms_per_raw_MiB": 8.613904472440481,
+          "staging_ms_per_raw_MiB": 0.48243192334969837,
+          "component_bits_per_BF16_word": {
+            "header": 0.09297010633680555,
+            "lower_bits": 8.0,
+            "exponent_payload": 4.254107157389323,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_frozen_exponent",
+          "savings_percent": 29.91556889481015,
+          "state_bytes": 213519,
+          "decode_ms_per_raw_MiB": 7.003371138125658,
+          "transfer_decode_ms_per_raw_MiB": 8.026771247386932,
+          "staging_ms_per_raw_MiB": 0.4298016428947449,
+          "component_bits_per_BF16_word": {
+            "header": 0.04927232530381945,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.901457044813368,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_exponent",
+          "savings_percent": 28.802552488115097,
+          "state_bytes": 1432460,
+          "decode_ms_per_raw_MiB": 8.357732556760311,
+          "transfer_decode_ms_per_raw_MiB": 9.378117509186268,
+          "staging_ms_per_raw_MiB": 0.6524337869551446,
+          "component_bits_per_BF16_word": {
+            "header": 0.051645914713541664,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.981334262424045,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_abs_exponent",
+          "savings_percent": 28.727064530054726,
+          "state_bytes": 1432250,
+          "decode_ms_per_raw_MiB": 8.178149815648794,
+          "transfer_decode_ms_per_raw_MiB": 9.192587342113256,
+          "staging_ms_per_raw_MiB": 0.7051822418967882,
+          "component_bits_per_BF16_word": {
+            "header": 0.052134195963541664,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.9929351806640625,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_residual",
+          "savings_percent": 29.232724507649742,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.228999260812998,
+          "transfer_decode_ms_per_raw_MiB": 10.475597810000181,
+          "staging_ms_per_raw_MiB": 0.5439060429732004,
+          "component_bits_per_BF16_word": {
+            "header": 0.1142061021592882,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.793000962999132,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_coset",
+          "savings_percent": 29.235013326009117,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.548056405037642,
+          "transfer_decode_ms_per_raw_MiB": 10.84891241043806,
+          "staging_ms_per_raw_MiB": 0.5606855783197615,
+          "component_bits_per_BF16_word": {
+            "header": 0.1138398912217882,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.793000962999132,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_residual",
+          "savings_percent": 29.205915331840515,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.471378289163113,
+          "transfer_decode_ms_per_raw_MiB": 10.73963288217783,
+          "staging_ms_per_raw_MiB": 0.5535963508817885,
+          "component_bits_per_BF16_word": {
+            "header": 0.1150605943467882,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7957856920030384,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_coset",
+          "savings_percent": 29.20820415019989,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.585126768797636,
+          "transfer_decode_ms_per_raw_MiB": 10.833204723894596,
+          "staging_ms_per_raw_MiB": 0.5884953877992101,
+          "component_bits_per_BF16_word": {
+            "header": 0.1146943834092882,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7957856920030384,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        }
+      ],
+      "comparisons": {
+        "producer_kv_median__to__producer_frozen_exponent": {
+          "net_savings_gain_percentage_points": 0.5080491304397583,
+          "component_gains_percentage_points": {
+            "anchors": 0.78125,
+            "exponent_payload": -0.5068620045979818,
+            "header": 0.3043651580810547,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.07070402304331462
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.8386611938476562,
+            "1": 0.7287979125976562,
+            "2": 0.6540298461914062,
+            "3": 0.43964385986328125,
+            "4": 0.351715087890625,
+            "5": 0.6513595581054688,
+            "6": 0.5914688110351562,
+            "7": 0.4924774169921875,
+            "8": 0.5224227905273438,
+            "9": 0.48503875732421875,
+            "10": 0.37708282470703125,
+            "11": 0.4863739013671875,
+            "12": 0.6862640380859375,
+            "13": 0.69122314453125,
+            "14": 0.6536483764648438,
+            "15": 0.6223678588867188,
+            "16": 0.6025314331054688,
+            "17": 0.5296707153320312,
+            "18": 0.5743026733398438,
+            "19": 0.634002685546875,
+            "20": 0.5321502685546875,
+            "21": 0.6250381469726562,
+            "22": 0.5624771118164062,
+            "23": 0.5954742431640625,
+            "24": 0.5670547485351562,
+            "25": 0.5773544311523438,
+            "26": 0.55389404296875,
+            "27": 0.6223678588867188,
+            "28": 0.537109375,
+            "29": 0.5420684814453125,
+            "30": 0.5407333374023438,
+            "31": 0.6183624267578125,
+            "32": 0.569915771484375,
+            "33": 0.5189895629882812,
+            "34": 0.603485107421875,
+            "35": 0.6555557250976562
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_exponent": {
+          "net_savings_gain_percentage_points": -1.1130164066950528,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.49923261006673175,
+            "features": -0.1953125,
+            "header": -0.014834933810763888,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.40363636281755233
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.1171112060546875,
+            "1": -0.289154052734375,
+            "2": -0.817108154296875,
+            "3": -1.0961532592773438,
+            "4": -0.6643295288085938,
+            "5": -0.690460205078125,
+            "6": -0.6906509399414062,
+            "7": -0.7322311401367188,
+            "8": -0.7219314575195312,
+            "9": -0.6986618041992188,
+            "10": -0.5887985229492188,
+            "11": -0.7129669189453125,
+            "12": -0.8710861206054688,
+            "13": -0.7259368896484375,
+            "14": -0.6250381469726562,
+            "15": -0.7623672485351562,
+            "16": -0.7329940795898438,
+            "17": -0.8226394653320312,
+            "18": -0.7030487060546875,
+            "19": -0.74462890625,
+            "20": -0.7047653198242188,
+            "21": -0.5901336669921875,
+            "22": -0.563812255859375,
+            "23": -0.595855712890625,
+            "24": -0.5971908569335938,
+            "25": -0.5826950073242188,
+            "26": -0.7349014282226562,
+            "27": -0.8398056030273438,
+            "28": -0.7946014404296875,
+            "29": -0.977325439453125,
+            "30": -0.6944656372070312,
+            "31": -0.862884521484375,
+            "32": -0.7707595825195312,
+            "33": -0.972747802734375,
+            "34": -0.8663177490234375,
+            "35": -0.81634521484375
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_abs_exponent": {
+          "net_savings_gain_percentage_points": -1.188504364755424,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.5717383490668403,
+            "features": -0.1953125,
+            "header": -0.017886691623263888,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.4035668240653144
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.5222320556640625,
+            "1": -0.4924774169921875,
+            "2": -0.5861282348632812,
+            "3": -1.2004852294921875,
+            "4": -0.9342193603515625,
+            "5": -0.8398056030273438,
+            "6": -0.7974624633789062,
+            "7": -0.7343292236328125,
+            "8": -0.737762451171875,
+            "9": -0.7638931274414062,
+            "10": -0.6046295166015625,
+            "11": -0.7017135620117188,
+            "12": -0.8708953857421875,
+            "13": -0.7719039916992188,
+            "14": -0.655364990234375,
+            "15": -0.7719039916992188,
+            "16": -0.8121490478515625,
+            "17": -0.8901596069335938,
+            "18": -0.6788253784179688,
+            "19": -0.8390426635742188,
+            "20": -0.6984710693359375,
+            "21": -0.6683349609375,
+            "22": -0.5521774291992188,
+            "23": -0.6837844848632812,
+            "24": -0.7165908813476562,
+            "25": -0.714111328125,
+            "26": -0.8289337158203125,
+            "27": -0.923919677734375,
+            "28": -0.8459091186523438,
+            "29": -1.0284423828125,
+            "30": -0.7333755493164062,
+            "31": -0.8819580078125,
+            "32": -0.811004638671875,
+            "33": -1.088714599609375,
+            "34": -0.980377197265625,
+            "35": -0.8962631225585938
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_pre_rope_coset": {
+          "net_savings_gain_percentage_points": -0.17250643836127466,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.17098850674099392,
+            "header": -0.09918212890625,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.00017219119601779513
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.23174285888671875,
+            "1": -0.22735595703125,
+            "2": -0.201416015625,
+            "3": -0.1987457275390625,
+            "4": -0.3093719482421875,
+            "5": -0.20503997802734375,
+            "6": -0.247955322265625,
+            "7": -0.16689300537109375,
+            "8": -0.24318695068359375,
+            "9": -0.141143798828125,
+            "10": -0.22373199462890625,
+            "11": -0.212860107421875,
+            "12": -0.189208984375,
+            "13": -0.13828277587890625,
+            "14": -0.238800048828125,
+            "15": -0.15354156494140625,
+            "16": -0.15106201171875,
+            "17": -0.08087158203125,
+            "18": -0.14057159423828125,
+            "19": -0.146484375,
+            "20": -0.09593963623046875,
+            "21": -0.1598358154296875,
+            "22": -0.11501312255859375,
+            "23": -0.22640228271484375,
+            "24": -0.133514404296875,
+            "25": -0.177001953125,
+            "26": -0.1125335693359375,
+            "27": -0.12302398681640625,
+            "28": -0.13942718505859375,
+            "29": -0.09593963623046875,
+            "30": -0.153350830078125,
+            "31": -0.128936767578125,
+            "32": -0.15354156494140625,
+            "33": -0.07343292236328125,
+            "34": -0.19321441650390625,
+            "35": -0.274658203125
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_kproj_norm_rope_coset": {
+          "net_savings_gain_percentage_points": -0.19931561417050148,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.15358395046657985,
+            "header": -0.104522705078125,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.004236234558953179
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.16078948974609375,
+            "1": -0.33206939697265625,
+            "2": -0.32863616943359375,
+            "3": -0.2166748046875,
+            "4": -0.32863616943359375,
+            "5": -0.197601318359375,
+            "6": -0.2658843994140625,
+            "7": -0.1895904541015625,
+            "8": -0.2872467041015625,
+            "9": -0.15659332275390625,
+            "10": -0.26149749755859375,
+            "11": -0.25539398193359375,
+            "12": -0.211334228515625,
+            "13": -0.1598358154296875,
+            "14": -0.2780914306640625,
+            "15": -0.193023681640625,
+            "16": -0.1953125,
+            "17": -0.13523101806640625,
+            "18": -0.1434326171875,
+            "19": -0.16841888427734375,
+            "20": -0.13942718505859375,
+            "21": -0.16689300537109375,
+            "22": -0.1483917236328125,
+            "23": -0.2689361572265625,
+            "24": -0.164031982421875,
+            "25": -0.21381378173828125,
+            "26": -0.14057159423828125,
+            "27": -0.14247894287109375,
+            "28": -0.133514404296875,
+            "29": -0.13065338134765625,
+            "30": -0.19245147705078125,
+            "31": -0.17452239990234375,
+            "32": -0.16937255859375,
+            "33": -0.1377105712890625,
+            "34": -0.23174285888671875,
+            "35": -0.3246307373046875
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        }
+      },
+      "projections": {
+        "producer_pre_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.478772481282554,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        },
+        "producer_kproj_norm_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.451963305473328,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        }
+      },
+      "oracles": {
+        "frozen_median_prerope": {
+          "candidates": [
+            "producer_frozen_exponent",
+            "producer_kv_median",
+            "producer_pre_rope_coset"
+          ],
+          "savings_percent": 29.915015233887566,
+          "gain_over_best_fixed_percentage_points": -0.0005536609225842426,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 214039,
+          "selections": {
+            "producer_frozen_exponent": 72
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "all_nine": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_kv_fixed127",
+            "producer_frozen_exponent",
+            "producer_hidden_exponent",
+            "producer_hidden_abs_exponent",
+            "producer_pre_rope_residual",
+            "producer_pre_rope_coset",
+            "producer_kproj_norm_rope_residual",
+            "producer_kproj_norm_rope_coset"
+          ],
+          "savings_percent": 28.967900408638847,
+          "gain_over_best_fixed_percentage_points": -0.9476684861713025,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 3091542,
+          "selections": {
+            "producer_hidden_exponent": 2,
+            "producer_frozen_exponent": 69,
+            "producer_hidden_abs_exponent": 1
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "best_subset_including_state": {
+          "candidates": [
+            "producer_frozen_exponent"
+          ],
+          "savings_percent": 29.91556889481015,
+          "gain_over_best_fixed_percentage_points": 0.0,
+          "mode_bytes_per_pair": 0,
+          "all_candidate_states_charged_bytes": 213519,
+          "selections": {
+            "producer_frozen_exponent": 72
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured. Exhaustive candidate-subset search includes fixed single methods with no selector byte; all choices use TEST results and provide no held-out adaptive-policy evidence.",
+          "gain_over_best_existing_fixed_percentage_points": 0.0,
+          "subsets_examined": 511
+        }
+      }
+    },
+    {
+      "name": "test_pottery_kiln_diary_8192",
+      "tokens": 8192,
+      "methods": [
+        {
+          "name": "producer_kv_median",
+          "savings_percent": 29.41444913546244,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.587056141346693,
+          "transfer_decode_ms_per_raw_MiB": 8.731559850275517,
+          "staging_ms_per_raw_MiB": 0.4324627419312795,
+          "component_bits_per_BF16_word": {
+            "header": 0.09799448649088542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.819228278266059,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kv_fixed127",
+          "savings_percent": 21.300694015291,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.526970002800226,
+          "transfer_decode_ms_per_raw_MiB": 8.593159727752209,
+          "staging_ms_per_raw_MiB": 0.44109030730194515,
+          "component_bits_per_BF16_word": {
+            "header": 0.09298960367838542,
+            "lower_bits": 8.0,
+            "exponent_payload": 4.247433980305989,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_frozen_exponent",
+          "savings_percent": 29.790015435881088,
+          "state_bytes": 213519,
+          "decode_ms_per_raw_MiB": 7.027051877230406,
+          "transfer_decode_ms_per_raw_MiB": 8.01871158182621,
+          "staging_ms_per_raw_MiB": 0.43211546209123397,
+          "component_bits_per_BF16_word": {
+            "header": 0.04931810167100695,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.9299858940972223,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_exponent",
+          "savings_percent": 28.771412041452194,
+          "state_bytes": 1432460,
+          "decode_ms_per_raw_MiB": 8.38391249999404,
+          "transfer_decode_ms_per_raw_MiB": 9.41472640261054,
+          "staging_ms_per_raw_MiB": 0.6540803652670648,
+          "component_bits_per_BF16_word": {
+            "header": 0.0516908433702257,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.0431942409939237,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_abs_exponent",
+          "savings_percent": 28.76224766174952,
+          "state_bytes": 1432250,
+          "decode_ms_per_raw_MiB": 8.189554791897535,
+          "transfer_decode_ms_per_raw_MiB": 9.226799942553043,
+          "staging_ms_per_raw_MiB": 0.7075389019317098,
+          "component_bits_per_BF16_word": {
+            "header": 0.0521791246202257,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.044175042046441,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_residual",
+          "savings_percent": 29.228715101877846,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.73618496209383,
+          "transfer_decode_ms_per_raw_MiB": 11.135431006550789,
+          "staging_ms_per_raw_MiB": 0.5559702921244833,
+          "component_bits_per_BF16_word": {
+            "header": 0.11422983805338542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7936409844292536,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_coset",
+          "savings_percent": 29.23100392023722,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.506038390100002,
+          "transfer_decode_ms_per_raw_MiB": 10.78581903129816,
+          "staging_ms_per_raw_MiB": 0.5634764416350259,
+          "component_bits_per_BF16_word": {
+            "header": 0.11386362711588542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7936409844292536,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_residual",
+          "savings_percent": 29.199449138508903,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.601251222193241,
+          "transfer_decode_ms_per_raw_MiB": 10.871110018342733,
+          "staging_ms_per_raw_MiB": 0.559987293349372,
+          "component_bits_per_BF16_word": {
+            "header": 0.11508433024088542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7973064846462674,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_coset",
+          "savings_percent": 29.20173795686828,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.719133842736483,
+          "transfer_decode_ms_per_raw_MiB": 10.986268520355225,
+          "staging_ms_per_raw_MiB": 0.553681929078367,
+          "component_bits_per_BF16_word": {
+            "header": 0.11471811930338542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7973064846462674,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        }
+      ],
+      "comparisons": {
+        "producer_kv_median__to__producer_frozen_exponent": {
+          "net_savings_gain_percentage_points": 0.37556630041864736,
+          "component_gains_percentage_points": {
+            "anchors": 0.78125,
+            "exponent_payload": -0.69223509894477,
+            "header": 0.30422740512424046,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.017676005760828655
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.7287979125976562,
+            "1": 0.49915313720703125,
+            "2": 0.5619049072265625,
+            "3": 0.435638427734375,
+            "4": 0.21190643310546875,
+            "5": 0.31757354736328125,
+            "6": 0.4444122314453125,
+            "7": 0.37250518798828125,
+            "8": 0.40130615234375,
+            "9": 0.39844512939453125,
+            "10": 0.102996826171875,
+            "11": 0.42362213134765625,
+            "12": 0.39310455322265625,
+            "13": 0.4886627197265625,
+            "14": 0.25959014892578125,
+            "15": 0.3757476806640625,
+            "16": 0.32825469970703125,
+            "17": 0.30422210693359375,
+            "18": 0.2399444580078125,
+            "19": 0.38909912109375,
+            "20": 0.33092498779296875,
+            "21": 0.4638671875,
+            "22": 0.324249267578125,
+            "23": 0.4039764404296875,
+            "24": 0.44956207275390625,
+            "25": 0.43697357177734375,
+            "26": 0.45490264892578125,
+            "27": 0.46138763427734375,
+            "28": 0.39043426513671875,
+            "29": 0.37631988525390625,
+            "30": 0.348663330078125,
+            "31": 0.5079269409179688,
+            "32": 0.4779815673828125,
+            "33": 0.325775146484375,
+            "34": 0.30803680419921875,
+            "35": 0.418853759765625
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_exponent": {
+          "net_savings_gain_percentage_points": -1.0186033944288937,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.7075521681043837,
+            "features": -0.1953125,
+            "header": -0.014829635620117188,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.10090909070438808
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.2437591552734375,
+            "1": -0.9763717651367188,
+            "2": -1.6719818115234375,
+            "3": -1.8480300903320312,
+            "4": -0.49877166748046875,
+            "5": -0.8182525634765625,
+            "6": -0.920867919921875,
+            "7": -1.13372802734375,
+            "8": -0.9172439575195312,
+            "9": -1.0232925415039062,
+            "10": -0.9914398193359375,
+            "11": -1.0469436645507812,
+            "12": -1.081085205078125,
+            "13": -1.0152816772460938,
+            "14": -0.9172439575195312,
+            "15": -0.7955551147460938,
+            "16": -0.9532928466796875,
+            "17": -0.7892608642578125,
+            "18": -0.5504608154296875,
+            "19": -0.8382797241210938,
+            "20": -0.76141357421875,
+            "21": -0.6307601928710938,
+            "22": -0.6570816040039062,
+            "23": -0.6799697875976562,
+            "24": -0.8745193481445312,
+            "25": -0.7631301879882812,
+            "26": -1.004791259765625,
+            "27": -1.0293960571289062,
+            "28": -0.8104324340820312,
+            "29": -1.1287689208984375,
+            "30": -0.7808685302734375,
+            "31": -1.0894775390625,
+            "32": -0.9447097778320312,
+            "33": -1.13677978515625,
+            "34": -1.2407302856445312,
+            "35": -0.960540771484375
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_abs_exponent": {
+          "net_savings_gain_percentage_points": -1.0277677741315685,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.7136821746826172,
+            "features": -0.1953125,
+            "header": -0.017881393432617188,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.1008917060163286
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.262451171875,
+            "1": -0.5994796752929688,
+            "2": -0.7007598876953125,
+            "3": -0.749969482421875,
+            "4": -1.1430740356445312,
+            "5": -0.9975433349609375,
+            "6": -1.1835098266601562,
+            "7": -0.9969711303710938,
+            "8": -0.9891510009765625,
+            "9": -1.087188720703125,
+            "10": -1.03759765625,
+            "11": -1.0791778564453125,
+            "12": -1.0890960693359375,
+            "13": -0.9672164916992188,
+            "14": -0.8975982666015625,
+            "15": -0.7814407348632812,
+            "16": -0.9195327758789062,
+            "17": -0.8794784545898438,
+            "18": -0.7265090942382812,
+            "19": -0.7848739624023438,
+            "20": -0.7608413696289062,
+            "21": -0.681304931640625,
+            "22": -0.5964279174804688,
+            "23": -0.6772994995117188,
+            "24": -0.8953094482421875,
+            "25": -0.7930755615234375,
+            "26": -1.0591506958007812,
+            "27": -0.9784698486328125,
+            "28": -0.9185791015625,
+            "29": -1.3332366943359375,
+            "30": -0.7839202880859375,
+            "31": -1.26495361328125,
+            "32": -0.9653091430664062,
+            "33": -1.409912109375,
+            "34": -1.4947891235351562,
+            "35": -0.8823394775390625
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_pre_rope_coset": {
+          "net_savings_gain_percentage_points": -0.18344521522521973,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.1599205864800347,
+            "header": -0.09918212890625,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -4.304779900444878e-05
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.22258758544921875,
+            "1": -0.19969940185546875,
+            "2": -0.20961761474609375,
+            "3": -0.2140045166015625,
+            "4": -0.29010772705078125,
+            "5": -0.238800048828125,
+            "6": -0.31032562255859375,
+            "7": -0.24280548095703125,
+            "8": -0.2338409423828125,
+            "9": -0.13866424560546875,
+            "10": -0.2349853515625,
+            "11": -0.20427703857421875,
+            "12": -0.20847320556640625,
+            "13": -0.135040283203125,
+            "14": -0.246429443359375,
+            "15": -0.16193389892578125,
+            "16": -0.1758575439453125,
+            "17": -0.087738037109375,
+            "18": -0.18463134765625,
+            "19": -0.1331329345703125,
+            "20": -0.112152099609375,
+            "21": -0.19168853759765625,
+            "22": -0.174713134765625,
+            "23": -0.196075439453125,
+            "24": -0.10890960693359375,
+            "25": -0.220489501953125,
+            "26": -0.12264251708984375,
+            "27": -0.08335113525390625,
+            "28": -0.18939971923828125,
+            "29": -0.1079559326171875,
+            "30": -0.2010345458984375,
+            "31": -0.11119842529296875,
+            "32": -0.13294219970703125,
+            "33": -0.0957489013671875,
+            "34": -0.23288726806640625,
+            "35": -0.2483367919921875
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_kproj_norm_rope_coset": {
+          "net_savings_gain_percentage_points": -0.21271117859416222,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.1370112101236979,
+            "header": -0.104522705078125,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.0010590586397382948
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.0804901123046875,
+            "1": -0.33779144287109375,
+            "2": -0.27370452880859375,
+            "3": -0.301361083984375,
+            "4": -0.34732818603515625,
+            "5": -0.2712249755859375,
+            "6": -0.35552978515625,
+            "7": -0.2750396728515625,
+            "8": -0.2933502197265625,
+            "9": -0.17910003662109375,
+            "10": -0.27599334716796875,
+            "11": -0.2704620361328125,
+            "12": -0.228118896484375,
+            "13": -0.1644134521484375,
+            "14": -0.26493072509765625,
+            "15": -0.19931793212890625,
+            "16": -0.21114349365234375,
+            "17": -0.1094818115234375,
+            "18": -0.20961761474609375,
+            "19": -0.133514404296875,
+            "20": -0.152587890625,
+            "21": -0.2155303955078125,
+            "22": -0.1895904541015625,
+            "23": -0.21457672119140625,
+            "24": -0.1373291015625,
+            "25": -0.23059844970703125,
+            "26": -0.14247894287109375,
+            "27": -0.09307861328125,
+            "28": -0.21305084228515625,
+            "29": -0.139617919921875,
+            "30": -0.23040771484375,
+            "31": -0.16613006591796875,
+            "32": -0.15583038330078125,
+            "33": -0.1529693603515625,
+            "34": -0.2880096435546875,
+            "35": -0.27675628662109375
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        }
+      },
+      "projections": {
+        "producer_pre_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.47476307551066,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        },
+        "producer_kproj_norm_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.445497112141716,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        }
+      },
+      "oracles": {
+        "frozen_median_prerope": {
+          "candidates": [
+            "producer_frozen_exponent",
+            "producer_kv_median",
+            "producer_pre_rope_coset"
+          ],
+          "savings_percent": 29.791551248894798,
+          "gain_over_best_fixed_percentage_points": 0.0015358130137101966,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 214039,
+          "selections": {
+            "producer_frozen_exponent": 71,
+            "producer_kv_median": 1
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "all_nine": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_kv_fixed127",
+            "producer_frozen_exponent",
+            "producer_hidden_exponent",
+            "producer_hidden_abs_exponent",
+            "producer_pre_rope_residual",
+            "producer_pre_rope_coset",
+            "producer_kproj_norm_rope_residual",
+            "producer_kproj_norm_rope_coset"
+          ],
+          "savings_percent": 29.560110469659172,
+          "gain_over_best_fixed_percentage_points": -0.22990496622191614,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 3091542,
+          "selections": {
+            "producer_hidden_exponent": 2,
+            "producer_frozen_exponent": 69,
+            "producer_kv_median": 1
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "best_subset_including_state": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_frozen_exponent"
+          ],
+          "savings_percent": 29.791594296693802,
+          "gain_over_best_fixed_percentage_points": 0.001578860812713856,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 213519,
+          "selections": {
+            "producer_frozen_exponent": 71,
+            "producer_kv_median": 1
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured. Exhaustive candidate-subset search includes fixed single methods with no selector byte; all choices use TEST results and provide no held-out adaptive-policy evidence.",
+          "gain_over_best_existing_fixed_percentage_points": 0.001578860812713856,
+          "subsets_examined": 511
+        }
+      }
+    },
+    {
+      "name": "test_python_dependency_walk_8192",
+      "tokens": 8192,
+      "methods": [
+        {
+          "name": "producer_kv_median",
+          "savings_percent": 29.384535551071167,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.630730513483286,
+          "transfer_decode_ms_per_raw_MiB": 8.799108676612377,
+          "staging_ms_per_raw_MiB": 0.4261430973807971,
+          "component_bits_per_BF16_word": {
+            "header": 0.09799448649088542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8240144517686634,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kv_fixed127",
+          "savings_percent": 21.03981640603807,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.562575396150351,
+          "transfer_decode_ms_per_raw_MiB": 8.667581714689732,
+          "staging_ms_per_raw_MiB": 0.4392400797870424,
+          "component_bits_per_BF16_word": {
+            "header": 0.09298790825737847,
+            "lower_bits": 8.0,
+            "exponent_payload": 4.289176093207465,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_frozen_exponent",
+          "savings_percent": 29.76647557483779,
+          "state_bytes": 213519,
+          "decode_ms_per_raw_MiB": 6.991364993155003,
+          "transfer_decode_ms_per_raw_MiB": 7.975301239639521,
+          "staging_ms_per_raw_MiB": 0.446640368964937,
+          "component_bits_per_BF16_word": {
+            "header": 0.04932742648654514,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.933742947048611,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_exponent",
+          "savings_percent": 28.812388247913788,
+          "state_bytes": 1432460,
+          "decode_ms_per_raw_MiB": 8.514281827956438,
+          "transfer_decode_ms_per_raw_MiB": 9.584786836057901,
+          "staging_ms_per_raw_MiB": 0.6812686721483866,
+          "component_bits_per_BF16_word": {
+            "header": 0.05169508192274305,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.0366338094075522,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_abs_exponent",
+          "savings_percent": 28.796966705057358,
+          "state_bytes": 1432250,
+          "decode_ms_per_raw_MiB": 8.21124017238617,
+          "transfer_decode_ms_per_raw_MiB": 9.228437207639217,
+          "staging_ms_per_raw_MiB": 0.659850322537952,
+          "component_bits_per_BF16_word": {
+            "header": 0.052174886067708336,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.038624233669705,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_residual",
+          "savings_percent": 29.1965921719869,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.21340985223651,
+          "transfer_decode_ms_per_raw_MiB": 10.483067482709885,
+          "staging_ms_per_raw_MiB": 0.5642859679129388,
+          "component_bits_per_BF16_word": {
+            "header": 0.11422983805338542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7987806532118054,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_coset",
+          "savings_percent": 29.198880990346275,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.579033125191927,
+          "transfer_decode_ms_per_raw_MiB": 10.900295339524746,
+          "staging_ms_per_raw_MiB": 0.560011507736312,
+          "component_bits_per_BF16_word": {
+            "header": 0.11386362711588542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7987806532118054,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_residual",
+          "savings_percent": 29.168332864840828,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.584261570125818,
+          "transfer_decode_ms_per_raw_MiB": 10.859014466404915,
+          "staging_ms_per_raw_MiB": 0.5532268227802383,
+          "component_bits_per_BF16_word": {
+            "header": 0.11508433024088542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.80228508843316,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_coset",
+          "savings_percent": 29.170621683200203,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.63410409167409,
+          "transfer_decode_ms_per_raw_MiB": 10.881157591938972,
+          "staging_ms_per_raw_MiB": 0.5581148175729645,
+          "component_bits_per_BF16_word": {
+            "header": 0.11471811930338542,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.80228508843316,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        }
+      ],
+      "comparisons": {
+        "producer_kv_median__to__producer_frozen_exponent": {
+          "net_savings_gain_percentage_points": 0.3819400237666244,
+          "component_gains_percentage_points": {
+            "anchors": 0.78125,
+            "exponent_payload": -0.6858030954996744,
+            "header": 0.30416912502712673,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.017676005760828655
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.8258819580078125,
+            "1": 0.572967529296875,
+            "2": 0.5825042724609375,
+            "3": 0.554656982421875,
+            "4": 0.24509429931640625,
+            "5": 0.37670135498046875,
+            "6": 0.5016326904296875,
+            "7": 0.32100677490234375,
+            "8": 0.18825531005859375,
+            "9": 0.41255950927734375,
+            "10": 0.05245208740234375,
+            "11": 0.421142578125,
+            "12": 0.4238128662109375,
+            "13": 0.52490234375,
+            "14": 0.40225982666015625,
+            "15": 0.4535675048828125,
+            "16": 0.5071640014648438,
+            "17": 0.2727508544921875,
+            "18": 0.3452301025390625,
+            "19": 0.4924774169921875,
+            "20": 0.3894805908203125,
+            "21": 0.48236846923828125,
+            "22": 0.3704071044921875,
+            "23": 0.38089752197265625,
+            "24": 0.42400360107421875,
+            "25": 0.35839080810546875,
+            "26": 0.3360748291015625,
+            "27": 0.30155181884765625,
+            "28": 0.45261383056640625,
+            "29": 0.3154754638671875,
+            "30": 0.30117034912109375,
+            "31": 0.45490264892578125,
+            "32": 0.4131317138671875,
+            "33": 0.295257568359375,
+            "34": 0.24585723876953125,
+            "35": 0.3875732421875
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_exponent": {
+          "net_savings_gain_percentage_points": -0.9540873269240038,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.643067889743381,
+            "features": -0.1953125,
+            "header": -0.014797846476236979,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.10090909070438808
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.0728607177734375,
+            "1": -0.37517547607421875,
+            "2": -1.0700225830078125,
+            "3": -1.7255783081054688,
+            "4": -0.52032470703125,
+            "5": -0.31108856201171875,
+            "6": -0.34275054931640625,
+            "7": -0.7299423217773438,
+            "8": -0.4116058349609375,
+            "9": -0.7482528686523438,
+            "10": -0.856781005859375,
+            "11": -0.8642196655273438,
+            "12": -0.9166717529296875,
+            "13": -0.971221923828125,
+            "14": -1.01165771484375,
+            "15": -0.9120941162109375,
+            "16": -1.1669158935546875,
+            "17": -1.1135101318359375,
+            "18": -0.876617431640625,
+            "19": -1.0639190673828125,
+            "20": -1.0377883911132812,
+            "21": -0.8485794067382812,
+            "22": -0.7961273193359375,
+            "23": -0.7808685302734375,
+            "24": -0.72174072265625,
+            "25": -0.6925582885742188,
+            "26": -0.8806228637695312,
+            "27": -0.9710311889648438,
+            "28": -0.8245468139648438,
+            "29": -1.0457992553710938,
+            "30": -0.8268356323242188,
+            "31": -1.0835647583007812,
+            "32": -0.9653091430664062,
+            "33": -1.1474609375,
+            "34": -1.1333465576171875,
+            "35": -1.0427474975585938
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_abs_exponent": {
+          "net_savings_gain_percentage_points": -0.9695088697804337,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.6555080413818359,
+            "features": -0.1953125,
+            "header": -0.017796622382269964,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.1008917060163286
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.11997222900390625,
+            "1": -0.5220413208007812,
+            "2": -1.094818115234375,
+            "3": -1.36566162109375,
+            "4": -0.4909515380859375,
+            "5": -0.31871795654296875,
+            "6": -0.4337310791015625,
+            "7": -0.640106201171875,
+            "8": -0.45833587646484375,
+            "9": -0.7360458374023438,
+            "10": -0.8266448974609375,
+            "11": -0.9418487548828125,
+            "12": -0.9002685546875,
+            "13": -0.9204864501953125,
+            "14": -0.9441375732421875,
+            "15": -0.7699966430664062,
+            "16": -1.0194778442382812,
+            "17": -0.862884521484375,
+            "18": -0.8518218994140625,
+            "19": -0.9138107299804688,
+            "20": -0.9235382080078125,
+            "21": -0.821685791015625,
+            "22": -0.6916046142578125,
+            "23": -0.736236572265625,
+            "24": -0.6999969482421875,
+            "25": -0.746917724609375,
+            "26": -1.0175704956054688,
+            "27": -1.1194229125976562,
+            "28": -0.8880615234375,
+            "29": -1.361846923828125,
+            "30": -0.8779525756835938,
+            "31": -1.2037277221679688,
+            "32": -1.052093505859375,
+            "33": -1.517486572265625,
+            "34": -1.4492034912109375,
+            "35": -1.0311126708984375
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_pre_rope_coset": {
+          "net_savings_gain_percentage_points": -0.18565456072489184,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.15771124098036024,
+            "header": -0.09918212890625,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -4.304779900444878e-05
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.24166107177734375,
+            "1": -0.215911865234375,
+            "2": -0.18672943115234375,
+            "3": -0.18825531005859375,
+            "4": -0.289154052734375,
+            "5": -0.2162933349609375,
+            "6": -0.2452850341796875,
+            "7": -0.2719879150390625,
+            "8": -0.2223968505859375,
+            "9": -0.11272430419921875,
+            "10": -0.27561187744140625,
+            "11": -0.209808349609375,
+            "12": -0.23021697998046875,
+            "13": -0.1430511474609375,
+            "14": -0.2414703369140625,
+            "15": -0.15850067138671875,
+            "16": -0.18405914306640625,
+            "17": -0.11997222900390625,
+            "18": -0.18825531005859375,
+            "19": -0.141143798828125,
+            "20": -0.13713836669921875,
+            "21": -0.1678466796875,
+            "22": -0.1590728759765625,
+            "23": -0.22716522216796875,
+            "24": -0.12187957763671875,
+            "25": -0.17032623291015625,
+            "26": -0.086212158203125,
+            "27": -0.11806488037109375,
+            "28": -0.18310546875,
+            "29": -0.1377105712890625,
+            "30": -0.2170562744140625,
+            "31": -0.14667510986328125,
+            "32": -0.1129150390625,
+            "33": -0.12302398681640625,
+            "34": -0.23479461669921875,
+            "35": -0.25653839111328125
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_kproj_norm_rope_coset": {
+          "net_savings_gain_percentage_points": -0.21391386787096422,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.1358085208468967,
+            "header": -0.104522705078125,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.0010590586397382948
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.08831024169921875,
+            "1": -0.3192901611328125,
+            "2": -0.22735595703125,
+            "3": -0.27294158935546875,
+            "4": -0.34027099609375,
+            "5": -0.19512176513671875,
+            "6": -0.299072265625,
+            "7": -0.295257568359375,
+            "8": -0.25234222412109375,
+            "9": -0.1499176025390625,
+            "10": -0.302886962890625,
+            "11": -0.2513885498046875,
+            "12": -0.2506256103515625,
+            "13": -0.17337799072265625,
+            "14": -0.3021240234375,
+            "15": -0.19969940185546875,
+            "16": -0.21800994873046875,
+            "17": -0.15583038330078125,
+            "18": -0.22335052490234375,
+            "19": -0.1728057861328125,
+            "20": -0.1739501953125,
+            "21": -0.19054412841796875,
+            "22": -0.1689910888671875,
+            "23": -0.250244140625,
+            "24": -0.14476776123046875,
+            "25": -0.20751953125,
+            "26": -0.1190185546875,
+            "27": -0.156402587890625,
+            "28": -0.18157958984375,
+            "29": -0.17604827880859375,
+            "30": -0.2532958984375,
+            "31": -0.17986297607421875,
+            "32": -0.146484375,
+            "33": -0.19588470458984375,
+            "34": -0.30040740966796875,
+            "35": -0.304412841796875
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        }
+      },
+      "projections": {
+        "producer_pre_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.442640145619713,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        },
+        "producer_kproj_norm_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.41438083847364,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        }
+      },
+      "oracles": {
+        "frozen_median_prerope": {
+          "candidates": [
+            "producer_frozen_exponent",
+            "producer_kv_median",
+            "producer_pre_rope_coset"
+          ],
+          "savings_percent": 29.769616739617454,
+          "gain_over_best_fixed_percentage_points": 0.003141164779663086,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 214039,
+          "selections": {
+            "producer_frozen_exponent": 70,
+            "producer_kv_median": 2
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "all_nine": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_kv_fixed127",
+            "producer_frozen_exponent",
+            "producer_hidden_exponent",
+            "producer_hidden_abs_exponent",
+            "producer_pre_rope_residual",
+            "producer_pre_rope_coset",
+            "producer_kproj_norm_rope_residual",
+            "producer_kproj_norm_rope_coset"
+          ],
+          "savings_percent": 29.535076518853508,
+          "gain_over_best_fixed_percentage_points": -0.23139905598428356,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 3091542,
+          "selections": {
+            "producer_hidden_exponent": 1,
+            "producer_frozen_exponent": 69,
+            "producer_kv_median": 2
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "best_subset_including_state": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_frozen_exponent"
+          ],
+          "savings_percent": 29.769659787416458,
+          "gain_over_best_fixed_percentage_points": 0.0031842125786667452,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 213519,
+          "selections": {
+            "producer_frozen_exponent": 70,
+            "producer_kv_median": 2
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured. Exhaustive candidate-subset search includes fixed single methods with no selector byte; all choices use TEST results and provide no held-out adaptive-policy evidence.",
+          "gain_over_best_existing_fixed_percentage_points": 0.0031842125786667452,
+          "subsets_examined": 511
+        }
+      }
+    },
+    {
+      "name": "test_museum_loan_register_8192",
+      "tokens": 8192,
+      "methods": [
+        {
+          "name": "producer_kv_median",
+          "savings_percent": 29.50627737575107,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.557901553809643,
+          "transfer_decode_ms_per_raw_MiB": 8.708493784070015,
+          "staging_ms_per_raw_MiB": 0.4268454180823432,
+          "component_bits_per_BF16_word": {
+            "header": 0.09799618191189235,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.8045340643988714,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kv_fixed127",
+          "savings_percent": 21.145849095450508,
+          "state_bytes": 0,
+          "decode_ms_per_raw_MiB": 7.517973892390728,
+          "transfer_decode_ms_per_raw_MiB": 8.59405379742384,
+          "staging_ms_per_raw_MiB": 0.4542868377433883,
+          "component_bits_per_BF16_word": {
+            "header": 0.09298790825737847,
+            "lower_bits": 8.0,
+            "exponent_payload": 4.272210862901476,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_frozen_exponent",
+          "savings_percent": 29.7920817302333,
+          "state_bytes": 213519,
+          "decode_ms_per_raw_MiB": 6.992480717599392,
+          "transfer_decode_ms_per_raw_MiB": 7.987590506672859,
+          "staging_ms_per_raw_MiB": 0.42490650796227986,
+          "component_bits_per_BF16_word": {
+            "header": 0.049329121907552086,
+            "lower_bits": 8.0,
+            "exponent_payload": 2.9296442667643228,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_exponent",
+          "savings_percent": 28.90042298369937,
+          "state_bytes": 1432460,
+          "decode_ms_per_raw_MiB": 8.426552172750235,
+          "transfer_decode_ms_per_raw_MiB": 9.465191513299942,
+          "staging_ms_per_raw_MiB": 0.6608030655317836,
+          "component_bits_per_BF16_word": {
+            "header": 0.05168321397569445,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.0225601196289062,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_hidden_abs_exponent",
+          "savings_percent": 28.852550023131897,
+          "state_bytes": 1432250,
+          "decode_ms_per_raw_MiB": 8.19861888885498,
+          "transfer_decode_ms_per_raw_MiB": 9.229166433215141,
+          "staging_ms_per_raw_MiB": 0.6600468316011958,
+          "component_bits_per_BF16_word": {
+            "header": 0.0521697998046875,
+            "features": 0.03125,
+            "lower_bits": 8.0,
+            "exponent_payload": 3.0297359890407987,
+            "stream_indices": 0.2509765625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_residual",
+          "savings_percent": 29.315780268775093,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.29576950147748,
+          "transfer_decode_ms_per_raw_MiB": 10.549137834459543,
+          "staging_ms_per_raw_MiB": 0.5633448147111468,
+          "component_bits_per_BF16_word": {
+            "header": 0.11423153347439235,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7797088623046875,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_pre_rope_coset",
+          "savings_percent": 29.318069087134468,
+          "state_bytes": 520,
+          "decode_ms_per_raw_MiB": 9.374018292874098,
+          "transfer_decode_ms_per_raw_MiB": 10.625071357935667,
+          "staging_ms_per_raw_MiB": 0.5504599668913417,
+          "component_bits_per_BF16_word": {
+            "header": 0.11386532253689235,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7797088623046875,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_residual",
+          "savings_percent": 29.29697823193338,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.500778280198574,
+          "transfer_decode_ms_per_raw_MiB": 10.750874411314726,
+          "staging_ms_per_raw_MiB": 0.5469862371683121,
+          "component_bits_per_BF16_word": {
+            "header": 0.11508602566189235,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7817001342773438,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        },
+        {
+          "name": "producer_kproj_norm_rope_coset",
+          "savings_percent": 29.299267050292755,
+          "state_bytes": 12793,
+          "decode_ms_per_raw_MiB": 9.658514987677336,
+          "transfer_decode_ms_per_raw_MiB": 10.908435098826885,
+          "staging_ms_per_raw_MiB": 0.5437516503863864,
+          "component_bits_per_BF16_word": {
+            "header": 0.11471981472439235,
+            "lower_bits": 8.0,
+            "anchors": 0.125,
+            "exponent_payload": 2.7817001342773438,
+            "stream_indices": 0.2509765625,
+            "corrections": 0.0,
+            "correction_widths": 0.0390625,
+            "outer_framing": 0.0005221896701388889
+          }
+        }
+      ],
+      "comparisons": {
+        "producer_kv_median__to__producer_frozen_exponent": {
+          "net_savings_gain_percentage_points": 0.28580435448223085,
+          "component_gains_percentage_points": {
+            "anchors": 0.78125,
+            "exponent_payload": -0.7819387647840712,
+            "header": 0.30416912502712673,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.017676005760828655
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.7837295532226562,
+            "1": 0.54473876953125,
+            "2": 0.443267822265625,
+            "3": 0.38242340087890625,
+            "4": 0.16078948974609375,
+            "5": 0.33359527587890625,
+            "6": 0.3997802734375,
+            "7": 0.255584716796875,
+            "8": 0.119781494140625,
+            "9": 0.31757354736328125,
+            "10": -0.04940032958984375,
+            "11": 0.1880645751953125,
+            "12": 0.3452301025390625,
+            "13": 0.3993988037109375,
+            "14": 0.28839111328125,
+            "15": 0.37021636962890625,
+            "16": 0.28591156005859375,
+            "17": 0.09899139404296875,
+            "18": 0.0965118408203125,
+            "19": 0.3574371337890625,
+            "20": 0.16269683837890625,
+            "21": 0.3528594970703125,
+            "22": 0.2262115478515625,
+            "23": 0.3520965576171875,
+            "24": 0.29697418212890625,
+            "25": 0.2086639404296875,
+            "26": 0.2780914306640625,
+            "27": 0.3082275390625,
+            "28": 0.2490997314453125,
+            "29": 0.2986907958984375,
+            "30": 0.2910614013671875,
+            "31": 0.44956207275390625,
+            "32": 0.33893585205078125,
+            "33": 0.27141571044921875,
+            "34": 0.28400421142578125,
+            "35": 0.43468475341796875
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_exponent": {
+          "net_savings_gain_percentage_points": -0.8916587465339276,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.5807240804036459,
+            "features": -0.1953125,
+            "header": -0.014713075425889757,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.10090909070438808
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.0453948974609375,
+            "1": -0.6856918334960938,
+            "2": -1.5003204345703125,
+            "3": -1.4787673950195312,
+            "4": -0.6467819213867188,
+            "5": -0.6319046020507812,
+            "6": -0.7558822631835938,
+            "7": -0.7730484008789062,
+            "8": -0.5907058715820312,
+            "9": -0.7318496704101562,
+            "10": -0.8153915405273438,
+            "11": -0.7383346557617188,
+            "12": -0.9441375732421875,
+            "13": -0.7965087890625,
+            "14": -0.7602691650390625,
+            "15": -0.7450103759765625,
+            "16": -0.8747100830078125,
+            "17": -0.7863998413085938,
+            "18": -0.61492919921875,
+            "19": -0.9220123291015625,
+            "20": -0.7843017578125,
+            "21": -0.6643295288085938,
+            "22": -0.574493408203125,
+            "23": -0.6933212280273438,
+            "24": -0.6866455078125,
+            "25": -0.5762100219726562,
+            "26": -0.7572174072265625,
+            "27": -0.8419036865234375,
+            "28": -0.7930755615234375,
+            "29": -0.9786605834960938,
+            "30": -0.6616592407226562,
+            "31": -0.9647369384765625,
+            "32": -0.8222579956054688,
+            "33": -1.0667800903320312,
+            "34": -0.9393692016601562,
+            "35": -0.914764404296875
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_frozen_exponent__to__producer_hidden_abs_exponent": {
+          "net_savings_gain_percentage_points": -0.939531707101402,
+          "component_gains_percentage_points": {
+            "exponent_payload": -0.6255732642279731,
+            "features": -0.1953125,
+            "header": -0.017754236857096355,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.1008917060163286
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.49991607666015625,
+            "1": -0.8453369140625,
+            "2": -1.2464523315429688,
+            "3": -0.9630203247070312,
+            "4": -0.7791519165039062,
+            "5": -0.838470458984375,
+            "6": -0.943756103515625,
+            "7": -0.7234573364257812,
+            "8": -0.6948471069335938,
+            "9": -0.7905960083007812,
+            "10": -0.7951736450195312,
+            "11": -0.7860183715820312,
+            "12": -0.9189605712890625,
+            "13": -0.836181640625,
+            "14": -0.74920654296875,
+            "15": -0.7062911987304688,
+            "16": -0.8632659912109375,
+            "17": -0.820159912109375,
+            "18": -0.566864013671875,
+            "19": -0.8302688598632812,
+            "20": -0.7946014404296875,
+            "21": -0.7236480712890625,
+            "22": -0.57525634765625,
+            "23": -0.6839752197265625,
+            "24": -0.7480621337890625,
+            "25": -0.68511962890625,
+            "26": -0.8562088012695312,
+            "27": -0.9416580200195312,
+            "28": -0.8953094482421875,
+            "29": -1.1030197143554688,
+            "30": -0.7213592529296875,
+            "31": -0.9922027587890625,
+            "32": -0.9126663208007812,
+            "33": -1.2203216552734375,
+            "34": -1.1632919311523438,
+            "35": -0.9769439697265625
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_pre_rope_coset": {
+          "net_savings_gain_percentage_points": -0.18820828861660033,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.15515751308865017,
+            "header": -0.09918212890625,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -4.304779900444878e-05
+          },
+          "record_payload_gain_by_layer": {
+            "0": -0.23403167724609375,
+            "1": -0.2201080322265625,
+            "2": -0.2185821533203125,
+            "3": -0.24433135986328125,
+            "4": -0.2788543701171875,
+            "5": -0.21495819091796875,
+            "6": -0.25081634521484375,
+            "7": -0.2307891845703125,
+            "8": -0.20313262939453125,
+            "9": -0.17452239990234375,
+            "10": -0.25539398193359375,
+            "11": -0.1926422119140625,
+            "12": -0.1659393310546875,
+            "13": -0.14934539794921875,
+            "14": -0.25424957275390625,
+            "15": -0.1857757568359375,
+            "16": -0.14286041259765625,
+            "17": -0.08640289306640625,
+            "18": -0.17337799072265625,
+            "19": -0.140380859375,
+            "20": -0.1110076904296875,
+            "21": -0.218963623046875,
+            "22": -0.17299652099609375,
+            "23": -0.2079010009765625,
+            "24": -0.14820098876953125,
+            "25": -0.20542144775390625,
+            "26": -0.1049041748046875,
+            "27": -0.1636505126953125,
+            "28": -0.1674652099609375,
+            "29": -0.1323699951171875,
+            "30": -0.19702911376953125,
+            "31": -0.1567840576171875,
+            "32": -0.15201568603515625,
+            "33": -0.13484954833984375,
+            "34": -0.21209716796875,
+            "35": -0.27179718017578125
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        },
+        "producer_kv_median__to__producer_kproj_norm_rope_coset": {
+          "net_savings_gain_percentage_points": -0.2070103254583131,
+          "component_gains_percentage_points": {
+            "anchors": 0.0,
+            "correction_widths": -0.244140625,
+            "corrections": 0.0,
+            "exponent_payload": 0.1427120632595486,
+            "header": -0.104522705078125,
+            "lower_bits": 0.0,
+            "outer_framing": 0.0,
+            "stream_indices": 0.0,
+            "state": -0.0010590586397382948
+          },
+          "record_payload_gain_by_layer": {
+            "0": 0.1392364501953125,
+            "1": -0.2979278564453125,
+            "2": -0.2346038818359375,
+            "3": -0.2635955810546875,
+            "4": -0.30727386474609375,
+            "5": -0.20885467529296875,
+            "6": -0.2925872802734375,
+            "7": -0.24871826171875,
+            "8": -0.2521514892578125,
+            "9": -0.1796722412109375,
+            "10": -0.2704620361328125,
+            "11": -0.2361297607421875,
+            "12": -0.18520355224609375,
+            "13": -0.15697479248046875,
+            "14": -0.28438568115234375,
+            "15": -0.213623046875,
+            "16": -0.19474029541015625,
+            "17": -0.139617919921875,
+            "18": -0.19817352294921875,
+            "19": -0.17795562744140625,
+            "20": -0.15926361083984375,
+            "21": -0.22983551025390625,
+            "22": -0.1953125,
+            "23": -0.2468109130859375,
+            "24": -0.1399993896484375,
+            "25": -0.23403167724609375,
+            "26": -0.11768341064453125,
+            "27": -0.17490386962890625,
+            "28": -0.1712799072265625,
+            "29": -0.147247314453125,
+            "30": -0.23651123046875,
+            "31": -0.2010345458984375,
+            "32": -0.189971923828125,
+            "33": -0.20294189453125,
+            "34": -0.22945404052734375,
+            "35": -0.3345489501953125
+          },
+          "scope": "Actual paired packet components plus full state once per cache; positive means fewer candidate bytes. Changes in header format are included and are not predictor-quality evidence."
+        }
+      },
+      "projections": {
+        "producer_pre_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.561828242407906,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        },
+        "producer_kproj_norm_rope_coset": {
+          "zero_correction_payload_verified": true,
+          "width_bytes": 46080,
+          "proposed_flag_bytes": 72,
+          "projected_savings_gain_percentage_points": 0.2437591552734375,
+          "projected_savings_percent": 29.543026205566193,
+          "scope": "Unimplemented zero-correction mode projection: remove observed all-zero width tables, charge one mode byte per pair, keep all other bytes/state. Encoder must verify exact replay and retain a correction fallback; this is not measured new-format savings or speed."
+        }
+      },
+      "oracles": {
+        "frozen_median_prerope": {
+          "candidates": [
+            "producer_frozen_exponent",
+            "producer_kv_median",
+            "producer_pre_rope_coset"
+          ],
+          "savings_percent": 29.79904818865988,
+          "gain_over_best_fixed_percentage_points": 0.006966458426582278,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 214039,
+          "selections": {
+            "producer_frozen_exponent": 68,
+            "producer_kv_median": 4
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "all_nine": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_kv_fixed127",
+            "producer_frozen_exponent",
+            "producer_hidden_exponent",
+            "producer_hidden_abs_exponent",
+            "producer_pre_rope_residual",
+            "producer_pre_rope_coset",
+            "producer_kproj_norm_rope_residual",
+            "producer_kproj_norm_rope_coset"
+          ],
+          "savings_percent": 29.564624528090157,
+          "gain_over_best_fixed_percentage_points": -0.22745720214314247,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 3091542,
+          "selections": {
+            "producer_hidden_exponent": 1,
+            "producer_frozen_exponent": 67,
+            "producer_kv_median": 4
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured."
+        },
+        "best_subset_including_state": {
+          "candidates": [
+            "producer_kv_median",
+            "producer_frozen_exponent"
+          ],
+          "savings_percent": 29.799091236458885,
+          "gain_over_best_fixed_percentage_points": 0.0070095062255859375,
+          "mode_bytes_per_pair": 1,
+          "all_candidate_states_charged_bytes": 213519,
+          "selections": {
+            "producer_frozen_exponent": 68,
+            "producer_kv_median": 4
+          },
+          "scope": "TEST-informed offline size calculation, not a deployment policy or tested adaptive codec. All allowed state artifacts are charged, shared identical state IDs once. Existing packet headers remain; one selector byte per pair is added for multiple candidates. No selection/encoding/restore speed is measured. Exhaustive candidate-subset search includes fixed single methods with no selector byte; all choices use TEST results and provide no held-out adaptive-policy evidence.",
+          "gain_over_best_existing_fixed_percentage_points": 0.0070095062255859375,
+          "subsets_examined": 511
+        }
+      }
+    }
+  ],
+  "scope": "Six correlated synthetic TEST cases; full-cache sizes are sample extrapolations. Same-record comparisons within this run. Timing describes eager, synchronized, prepared-state microbenchmarks. No matched raw transfer, cold SSD, compact attention, concurrency or serving gain is demonstrated."
+}
