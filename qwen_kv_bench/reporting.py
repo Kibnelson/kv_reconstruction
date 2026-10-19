@@ -179,6 +179,9 @@ def _summary(report):
             lines += ["", *[f"- {_cell(case.get('name', ''))}: {_cell(case['error'])}" for case in skipped]]
         lines.append("")
     checks = report.get("generation_checks") or []
+    if any((case.get("capture") or {}).get("prefill_recipes", {}).get("enabled") for case in report.get("cases", [])):
+        lines += ["## Recipes constructed during prefill", "",
+                  "Rows with track `prefill_observer` build recipes directly from returned device KV between prefill chunks, before CPU export. Their encode/decode totals cover selected records and one exact verification; they are not repeated restore latency samples. Post-capture `native_packet` rows measure the same method separately. Instrumented capture prefill time includes all observer work. Full raw KV remains resident and compact packets are discarded after verification; this does not establish reduced model-cache memory or compact attention.", ""]
     lines += ["## Model continuation checks", ""]
     if not checks:
         lines += ["No model continuation check is recorded yet. This report does not infer one from cache roundtrips.", ""]

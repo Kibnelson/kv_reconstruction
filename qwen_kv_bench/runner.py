@@ -40,6 +40,7 @@ def parser():
     p.add_argument("--tile-tokens", type=int, default=16, help="Independently decodable record length")
     p.add_argument("--max-records", type=int, default=72, help="Evenly spaced record sample per codec/case; full-cache sizes are estimates")
     p.add_argument("--full-cache", action="store_true", help="Encode and verify every record; substantially slower")
+    p.add_argument("--prefill-recipes", action="store_true", help="Also derive and verify selected prefill recipes directly on device between model prefill chunks; full raw model cache remains resident")
     p.add_argument("--dev-records", type=int, default=8, help="Frozen development selection sample")
     p.add_argument("--repeats", type=int, default=3)
     p.add_argument("--measure-io", action="store_true", help="Also benchmark buffered temporary-file write/fsync/read; reads may hit page cache")
@@ -92,11 +93,15 @@ def _source_manifest():
     return {"embedded_payload_sha256": os.environ.get("QWEN_KV_SOURCE_SHA256"), "files": files, "sources_sha256": digest_json(files)}
 
 
-def _capture_fixture(model, tokenizer, fixture, tokens, device, args):
+def _capture_fixture(model, tokenizer, fixture, tokens, device, args, prefill_specs=None, max_records=None):
     from .fixtures import build_input_ids
     from .model_runtime import capture
     ids = build_input_ids(tokenizer, fixture, tokens)
-    result = capture(model, ids, device, args.chunk_tokens)
+    observer = None
+    if prefill_specs:
+        from .prefill_observer import PrefillRecipeObserver
+        observer = PrefillRecipeObserver(prefill_specs, tokens, args.tile_tokens, device, max_records=max_records)
+    result = capture(model, ids, device, args.chunk_tokens, prefill_observer=observer)
     result["input_ids_sha256"] = digest_json(ids)
     result["fixture_name"] = fixture["name"]
     return result
@@ -303,6 +308,9 @@ def main(argv=None):
         if set(args.native_methods) - set(selected):
             p.error("Unknown native method; use --native-preset all --list-methods")
         native_specs = [selected[n] for n in args.native_methods]
+    prefill_specs = [s for s in native_specs if s["method"] == "prefill"] if args.prefill_recipes else []
+    if args.prefill_recipes and not prefill_specs:
+        p.error("--prefill-recipes requires at least one native_prefill_* method and cannot use --skip-native")
     if args.list_methods:
         print(json.dumps({"cpu_reference": specs, "native_packet": native_specs}, indent=2))
         return 0
@@ -374,8 +382,10 @@ def main(argv=None):
         _release(device)
         adapters = build_registry(args.preset, artifacts, output, names=list(specs), grid=args.grid, expected_model_identity=identity)
         note("Development capture; choosing one representative generation check per track")
-        dev = _capture_fixture(model, tokenizer, DEV[0], args.dev_tokens, device, args)
-        dev_case = dict(name=DEV[0]["name"], split="dev", tokens=args.dev_tokens, fixture=DEV[0], capture=_capture_metadata(dev), results=[])
+        dev = _capture_fixture(model, tokenizer, DEV[0], args.dev_tokens, device, args,
+                               prefill_specs=prefill_specs, max_records=args.dev_records)
+        dev_case = dict(name=DEV[0]["name"], split="dev", tokens=args.dev_tokens, fixture=DEV[0], capture=_capture_metadata(dev),
+                        results=list(dev.get("prefill_recipes", {}).get("results", [])))
         report["cases"].append(dev_case)
         def record_dev(row):
             dev_case["results"].append(row)
@@ -404,8 +414,10 @@ def main(argv=None):
                 captured = None
                 try:
                     note(f"TEST capture: {fixture['name']}, {tokens} tokens")
-                    captured = _capture_fixture(model, tokenizer, fixture, tokens, device, args)
+                    captured = _capture_fixture(model, tokenizer, fixture, tokens, device, args,
+                        prefill_specs=prefill_specs, max_records=None if args.full_cache else args.max_records)
                     case["capture"] = _capture_metadata(captured)
+                    case["results"].extend(captured.get("prefill_recipes", {}).get("results", []))
                     case["status"] = "captured"
                     save()
                     def record_test(row):

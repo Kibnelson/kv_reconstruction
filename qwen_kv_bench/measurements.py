@@ -287,6 +287,7 @@ def measure_native(matrices,native_spec,state,device,outputdir,repeats=3,io_byte
     components=Counter();payload=raw=0;encode_times=[];decode_times=[];input_times=[];encode_events=[];decode_events=[]
     samples=[];sample_bytes=0;baseline=d.memory_start();all_start=time.perf_counter()
     runtime_diagnostics={};entropy_backend=None;preloaded_rotation_ids=dict(state.rotation_ids)
+    prefill_recipe_totals=Counter();prefill_recipe_description={}
     for index,layer,kind,start,words,want_sample in records():
         source=torch.from_numpy(words)
         tensor,input_elapsed,_=d.timed(lambda:source.to(device=d.device,copy=True))
@@ -300,6 +301,12 @@ def measure_native(matrices,native_spec,state,device,outputdir,repeats=3,io_byte
         if event is not None: decode_events.append(event)
         _check(restored.detach().cpu().numpy(),words)
         stats=packet.stats
+        if 'prefill_recipe' in stats:
+            for key,value in stats['prefill_recipe'].items():
+                if isinstance(value,(int,float)):
+                    prefill_recipe_totals[key]+=value
+                else:
+                    prefill_recipe_description[key]=value
         runtime_diagnostics.update(stats.get('runtime_diagnostics',{}))
         entropy_backend=stats.get('native_entropy_backend')
         parts=stats['component_bytes']
@@ -327,6 +334,8 @@ def measure_native(matrices,native_spec,state,device,outputdir,repeats=3,io_byte
         device_event_elapsed=dict(encode_seconds_total=sum(encode_events) if encode_events else None,
                                   decode_seconds_total=sum(decode_events) if decode_events else None),
         scope='Separately named tensor packet format, not a GPU implementation of the CPU entropy wire formats. Record input CPU→device staging, device encode and device decode are separately synchronized. Full cache is not retained on accelerator. Packet JSON headers and all physical tensor payload bytes are measured; specified 32-byte cache framing and offset costs are added arithmetically, with no complete outer container persisted. Prefetched validated host launch descriptors and CPU descriptor guards are included in native execution; authoritative JSON header parsing/validation occurs during explicit packet transfer/restore. CPU runs establish functionality only. No attention, concurrency, or admission benefit is measured.')
+    if prefill_recipe_description:
+        result['prefill_recipe']=dict(prefill_recipe_description,**prefill_recipe_totals)
     if samples:
         # Sample packet transfer happens outside isolated decode timing.
         sample_times=[];sample_events=[];restore_times=[]

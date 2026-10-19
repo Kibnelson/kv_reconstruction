@@ -141,4 +141,13 @@ These use grouped bitpacking, a validated host launch descriptor, and device ten
 | `native_binary_hadamard_d64_f32_bitpack` | binary | `{"amplitude_precision": "f32", "assignment": "radius", "dimension": 64, "transform": "hadamard"}` |
 | `native_binary_hadamard_d64_bf16_bitpack` | binary | `{"amplitude_precision": "bf16", "assignment": "radius", "dimension": 64, "transform": "hadamard"}` |
 
+| `native_prefill_zero_coset` | prefill | `{"correction": "coset", "group_size": 8, "predictor": "zero", "step_log2": 6}` |
+| `native_prefill_zero_residual` | prefill | `{"correction": "residual", "group_size": 8, "predictor": "zero", "step_log2": 6}` |
+| `native_prefill_midpoint_coset` | prefill | `{"correction": "coset", "group_size": 8, "predictor": "midpoint", "step_log2": 6}` |
+| `native_prefill_midpoint_residual` | prefill | `{"correction": "residual", "group_size": 8, "predictor": "midpoint", "step_log2": 6}` |
+| `native_prefill_affine_coset` | prefill | `{"correction": "coset", "group_size": 8, "predictor": "affine", "step_log2": 6}` |
+| `native_prefill_affine_residual` | prefill | `{"correction": "residual", "group_size": 8, "predictor": "affine", "step_log2": 6}` |
+| `native_prefill_e8_coset` | prefill | `{"correction": "coset", "group_size": 8, "predictor": "e8", "step_log2": 6}` |
+| `native_prefill_e8_residual` | prefill | `{"correction": "residual", "group_size": 8, "predictor": "e8", "step_log2": 6}` |
+
 The list is generated from `candidate_specs("all", grid=True)` and `native_options("all")`. The default all preset omits the extra CPU parameter grid; main and smoke select smaller sets.

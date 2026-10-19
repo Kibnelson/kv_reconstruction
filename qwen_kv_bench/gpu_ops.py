@@ -19,7 +19,7 @@ from typing import Any
 import torch
 
 
-NATIVE_METHODS = ("raw", "exponent", "learned", "e8_symbol", "learned_e8", "binary")
+NATIVE_METHODS = ("raw", "exponent", "learned", "e8_symbol", "learned_e8", "binary", "prefill")
 CPU_ENTROPY_ONLY = ("huffman", "deflate", "rice", "original_entropy_formats")
 
 
@@ -118,9 +118,19 @@ def _adaptive(values, fields, descriptions, name, group_size=64, signed=False, m
 
 def _restore(fields, descriptions, name):
     d = descriptions[name]
-    result = _unpack_variable(fields[name], fields[name + "_widths"], d["count"], d["group_size"],
+    result = _unpack_variable(fields[name], _restore_widths(fields, descriptions, name), d["count"], d["group_size"],
                               d["max_width"], d["nbits"])
     return _unzigzag(result) if d["signed"] else result
+
+
+def _restore_widths(fields, descriptions, name):
+    """Legacy native widths are bytes; prefill correction widths are nibbles."""
+    d = descriptions[name]
+    widths = fields[name + "_widths"]
+    if d.get("width_storage_bits", 8) == 4:
+        groups = (d["count"] + d["group_size"] - 1) // d["group_size"]
+        return _unpack_fixed(widths, groups, 4)
+    return widths
 
 
 def canonical_matmul(left, matrix):
@@ -185,6 +195,8 @@ def make_state(codebooks=None, device="cpu", state_id=None, rotations=None):
     books = {}
     digest = hashlib.sha256()
     for key, source in sorted((codebooks or {}).items()):
+        if hasattr(source, "flags") and not source.flags.writeable:
+            source = source.copy()
         value = torch.as_tensor(source, dtype=torch.int32, device=device).contiguous()
         if value.ndim != 2 or value.shape[1] != 8:
             raise ValueError("expected 8D dictionary rows")
@@ -196,6 +208,8 @@ def make_state(codebooks=None, device="cpu", state_id=None, rotations=None):
     result = NativeState(books, {}, state_id or digest.hexdigest())
     for key, source in (rotations or {}).items():
         dimension, transform, seed = key
+        if hasattr(source, "flags") and not source.flags.writeable:
+            source = source.copy()
         value = torch.as_tensor(source, dtype=torch.float64, device="cpu").contiguous()
         if value.shape != (dimension, dimension):
             raise ValueError("invalid explicit transform dimensions")
@@ -218,7 +232,7 @@ class Packet:
 
     @property
     def stats(self):
-        return dict(format="new_native_group_bitpack_v1", method=self.metadata["method"],
+        result = dict(format="new_native_group_bitpack_v1", method=self.metadata["method"],
             serialized_bytes=self.physical_nbytes, raw_payload_bytes=2 * math.prod(self.metadata["shape"]),
             component_bytes=dict(header=self.header.numel(), **{key: value.untyped_storage().nbytes() for key, value in self.fields.items()}),
             native_entropy_backend="grouped_fixed_width_bitpacking", original_cpu_format=False,
@@ -229,6 +243,20 @@ class Packet:
                 "device_header_d2h_on_each_decode": False,
                 "host_descriptor_guard_cost_in_decode": True},
             allocator_accounting="caller must measure memory_allocated delta/peak separately")
+        if self.metadata["method"] == "prefill":
+            component = result["component_bytes"]
+            correction_names = ("prefill_correction", "prefill_correction_widths")
+            result["prefill_recipe"] = dict(
+                predictor=self.metadata["predictor"], correction=self.metadata["correction"],
+                prediction_scope=self.metadata["prediction_scope"], external_state_bytes=0,
+                predictor_payload_bytes=sum(value for name, value in component.items()
+                    if name not in ("header", "original_signs", *correction_names)),
+                correction_payload_bytes=component["prefill_correction"],
+                correction_width_bytes=component["prefill_correction_widths"],
+                original_sign_bytes=component["original_signs"],
+                header_bytes=component["header"],
+                symbol_domain="BF16 magnitude bit patterns modulo 32768")
+        return result
 
 
 def _descriptor_bytes(metadata):
@@ -322,6 +350,10 @@ def native_options(preset="main"):
                 methods.append(dict(name=f"native_binary_{transform}_d{dimension}_{precision}_bitpack",
                     method="binary", options=dict(dimension=dimension, transform=transform,
                     amplitude_precision=precision, assignment="radius")))
+    for predictor in ("zero", "midpoint", "affine", "e8"):
+        for correction in ("coset", "residual"):
+            methods.append(dict(name=f"native_prefill_{predictor}_{correction}", method="prefill",
+                options=dict(predictor=predictor, correction=correction, group_size=8, step_log2=6)))
     return methods
 
 
@@ -388,8 +420,97 @@ def _binary_prediction(base, bits, amplitudes, rotation):
     return torch.round(base.to(torch.float64) + amplitudes.to(torch.float64)[:, None] * u).clamp(0, 32767).to(torch.int64)
 
 
+def _prefill_prediction(magnitude, fields, descriptions, predictor, group_size, step_log2):
+    """Build a predictor from this tile alone; all decoder inputs enter fields.
+
+    Magnitude symbols are integer BF16 bit patterns, not real-valued magnitudes.
+    The E8 predictor compresses one channel template, repeated over token rows;
+    it is distinct from the existing E8 coding of every token's symbols.
+    """
+    tokens, channels = magnitude.shape
+    if magnitude.numel() == 0:
+        return torch.zeros_like(magnitude)
+    if predictor == "zero":
+        return torch.zeros_like(magnitude)
+    if predictor == "affine":
+        first, last = magnitude[0], magnitude[-1]
+        fields["prefill_first"] = _wire(first.to(torch.uint16))
+        fields["prefill_last"] = _wire(last.to(torch.uint16))
+        rows = torch.arange(tokens, device=magnitude.device, dtype=torch.int64)[:, None]
+        return first[None, :] + torch.div((last - first)[None, :] * rows,
+            max(tokens - 1, 1), rounding_mode="floor")
+    midpoint = torch.div(magnitude.amin(dim=0) + magnitude.amax(dim=0), 2,
+        rounding_mode="floor")
+    if predictor == "midpoint":
+        fields["prefill_midpoint"] = _wire(midpoint.to(torch.uint16))
+        return midpoint[None, :].expand(tokens, channels)
+    # Pad a channel tail by repeating the last real midpoint.  The minimum
+    # grouping is fixed at 64 channels independently of correction group size.
+    padded_channels = ((channels + 7) // 8) * 8
+    template = torch.cat((midpoint, midpoint[-1:].expand(padded_channels - channels)))
+    padding = (-padded_channels) % 64
+    grouped = torch.cat((template, torch.full((padding,), 32767,
+        device=magnitude.device, dtype=torch.int64))).reshape(-1, 64)
+    minimum = grouped.amin(dim=1)
+    fields["prefill_e8_minimum"] = _wire(minimum.to(torch.uint16))
+    base = minimum.repeat_interleave(64)[:padded_channels]
+    points2 = nearest_e8_twice((template - base).reshape(-1, 8).to(torch.float64)
+        / (1 << step_log2))
+    _store_e8(points2, fields, descriptions, group_size)
+    template = (base + points2.reshape(-1) * (1 << (step_log2 - 1))).clamp(0, 32767)
+    return template[:channels][None, :].expand(tokens, channels)
+
+
+def _restore_prefill_prediction(meta, fields):
+    tokens, channels = meta["shape"]
+    device = next(iter(fields.values())).device
+    if tokens * channels == 0:
+        return torch.zeros((tokens, channels), device=device, dtype=torch.int64)
+    predictor = meta["predictor"]
+    if predictor == "zero":
+        return torch.zeros((tokens, channels), device=device, dtype=torch.int64)
+    if predictor == "affine":
+        first = fields["prefill_first"].view(torch.uint16).to(torch.int64)
+        last = fields["prefill_last"].view(torch.uint16).to(torch.int64)
+        rows = torch.arange(tokens, device=device, dtype=torch.int64)[:, None]
+        return first[None, :] + torch.div((last - first)[None, :] * rows,
+            max(tokens - 1, 1), rounding_mode="floor")
+    if predictor == "midpoint":
+        template = fields["prefill_midpoint"].view(torch.uint16).to(torch.int64)
+    else:
+        padded_channels = ((channels + 7) // 8) * 8
+        minimum = fields["prefill_e8_minimum"].view(torch.uint16).to(torch.int64)
+        base = minimum.repeat_interleave(64)[:padded_channels]
+        points2 = _restore_e8(fields, meta["descriptions"], padded_channels // 8)
+        template = (base + points2.reshape(-1) * (1 << (meta["step_log2"] - 1))).clamp(0, 32767)[:channels]
+    return template[None, :].expand(tokens, channels)
+
+
+def _prefill_coset(magnitude, prediction, residual, fields, descriptions, group_size):
+    """Store original symbols modulo 2**b, with b selected by exact error.
+
+    The shortest circular residual is in [-16384, 16383].  Zigzag widths
+    guarantee -2**(b-1) <= error < 2**(b-1); the negative tie is intentional.
+    Width zero denotes exact prediction; width 15 transmits the whole symbol.
+    Width selection is identical to the matched signed-residual control.
+    """
+    coded = _zigzag(residual.reshape(-1))
+    padding = (-coded.numel()) % group_size
+    grouped = torch.cat((coded, torch.zeros(padding, device=coded.device,
+        dtype=torch.int64))).reshape(-1, group_size)
+    widths = _width(grouped.amax(dim=1), 15)
+    expanded = widths.to(torch.int64).repeat_interleave(group_size)[:coded.numel()]
+    values = magnitude.reshape(-1) & ((1 << expanded) - 1)
+    payload, nbits = _pack_variable(values, widths, group_size, 15)
+    fields["prefill_correction_widths"] = widths.contiguous()
+    fields["prefill_correction"] = payload
+    descriptions["prefill_correction"] = dict(count=coded.numel(), group_size=group_size,
+        max_width=15, signed=False, nbits=nbits)
+
+
 def encode(words, state=None, method="raw", key="global", group_size=64, assignment="radius",
-           dimension=64, transform="identity", seed=104729, amplitude_precision="bf16", step_log2=10):
+           dimension=64, transform="identity", seed=104729, amplitude_precision="bf16", step_log2=10,
+           predictor="midpoint", correction="coset"):
     """Encode GPU uint16 words without copying record values to CPU.
 
     Data-dependent bitstream allocation uses tensor indexing and can synchronize
@@ -402,6 +523,11 @@ def encode(words, state=None, method="raw", key="global", group_size=64, assignm
         raise NotImplementedError("no native decoder for CPU entropy formats")
     if group_size < 1 or assignment not in ("radius", "l1") or amplitude_precision not in ("f32", "bf16"):
         raise ValueError("unsupported native parameters")
+    if method == "prefill" and (predictor not in ("zero", "midpoint", "affine", "e8")
+            or correction not in ("coset", "residual")):
+        raise ValueError("unsupported prefill predictor or correction")
+    if method == "prefill" and predictor == "e8" and not 1 <= step_log2 <= 14:
+        raise ValueError("invalid prefill E8 step")
     state = state or NativeState()
     fields, descriptions = {}, {}
     meta = dict(version=1, method=method, shape=list(words.shape), key=key, state_id=state.state_id,
@@ -410,9 +536,30 @@ def encode(words, state=None, method="raw", key="global", group_size=64, assignm
         step_log2=step_log2, original_cpu_format=False)
     flat = words.contiguous().reshape(-1).to(torch.int64)
     count = flat.numel()
-    if method == "raw" or count == 0:
+    if method == "raw" or (count == 0 and method != "prefill"):
         fields["raw"] = _wire(words.clone())
         meta["method"] = "raw"
+        return _finish(fields, meta, words.device)
+    if method == "prefill":
+        # These packets never depend on external learned dictionaries, even if
+        # the benchmark has prepared a NativeState for other method families.
+        meta.update(state_id="no_learned_state", predictor=predictor, correction=correction,
+            prediction_scope="same tile across token rows; BF16 magnitude symbols",
+            circular_symbol_bits=15, prefill_e8_minimum_group_channels=64,
+            prefill_e8_tail_padding="repeat final real midpoint")
+        magnitude = (flat & 32767).reshape(words.shape)
+        fields["original_signs"], _ = _pack_fixed(flat >> 15, 1)
+        prediction = _prefill_prediction(magnitude, fields, descriptions, predictor, group_size, step_log2)
+        residual = ((magnitude - prediction + 16384) & 32767) - 16384
+        if correction == "coset":
+            _prefill_coset(magnitude, prediction, residual, fields, descriptions, group_size)
+        else:
+            _adaptive(residual, fields, descriptions, "prefill_correction", group_size, True, 15)
+        # Widths are in 0..15, so two group widths fit in each byte.  An odd
+        # group count leaves four zero padding bits, inferred from record shape.
+        widths = fields["prefill_correction_widths"]
+        fields["prefill_correction_widths"], _ = _pack_fixed(widths, 4)
+        descriptions["prefill_correction"]["width_storage_bits"] = 4
         return _finish(fields, meta, words.device)
     if method == "exponent":
         exponent = (flat >> 7) & 255
@@ -488,12 +635,25 @@ def decode(packet, state=None):
     state = state or NativeState()
     validate_packet(packet, check_header=not packet._header_verified)
     meta, fields = packet.metadata, packet.fields
-    if state.state_id != meta["state_id"]:
+    if meta["method"] != "prefill" and state.state_id != meta["state_id"]:
         raise ValueError("native state identity mismatch")
     method = meta["method"]
     count = math.prod(meta["shape"])
     if method == "raw":
         return fields["raw"].view(torch.uint16).reshape(meta["shape"]).clone()
+    if method == "prefill":
+        prediction = _restore_prefill_prediction(meta, fields).reshape(-1)
+        encoded = _restore(fields, meta["descriptions"], "prefill_correction")
+        if meta["correction"] == "coset":
+            widths = _restore_widths(fields, meta["descriptions"], "prefill_correction").to(torch.int64).repeat_interleave(meta["group_size"])[:count]
+            modulus = 1 << widths
+            half = modulus >> 1
+            delta = ((encoded - prediction + half) & (modulus - 1)) - half
+            magnitude = (prediction + delta) & 32767
+        else:
+            magnitude = (prediction + encoded) & 32767
+        signs = _unpack_fixed(fields["original_signs"], count, 1)
+        return (magnitude | (signs << 15)).to(torch.uint16).reshape(meta["shape"])
     if method == "exponent":
         delta = _restore(fields, meta["descriptions"], "exponent_delta")
         minimum = fields["exponent_minimum"].to(torch.int64).repeat_interleave(meta["group_size"])[:count]

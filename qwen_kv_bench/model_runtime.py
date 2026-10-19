@@ -412,12 +412,21 @@ def _step(model, token, cache, device):
                  past_key_values=cache, use_cache=True, logits_to_keep=1)
 
 
-def capture(model, ids, device, chunk_tokens=512):
-    """Chunk prefill and export CPU words; complete cache still occupies device."""
+def capture(model, ids, device, chunk_tokens=512, prefill_observer=None):
+    """Chunk prefill and export CPU words; complete cache still occupies device.
+
+    An optional synchronous observer receives ``(cache, start, end, total)``
+    after each chunk, while the returned KV is still on the selected device.
+    It may read the complete causal prefix, including the newly added rows.
+    Observer work is included in the reported prefill timing. This hook does
+    not evict raw cache tensors or establish compact-resident model attention.
+    """
     _require_torch()
     device = torch.device(device)
     if not isinstance(chunk_tokens, int) or chunk_tokens < 1 or not len(ids):
         raise ValueError("Positive chunk_tokens and nonempty token IDs are required")
+    if prefill_observer is not None and not callable(prefill_observer):
+        raise TypeError("prefill_observer must be callable")
     tokens = torch.as_tensor(ids, dtype=torch.long, device=device).reshape(1, -1)
     initial = reset_peak_memory(device)
     with torch.inference_mode():
@@ -430,8 +439,11 @@ def capture(model, ids, device, chunk_tokens=512):
                     attention_mask=torch.ones((1, end), dtype=torch.long, device=device),
                     past_key_values=cache, use_cache=True, logits_to_keep=1)
                 cache = output.past_key_values
+                if prefill_observer is not None:
+                    prefill_observer(cache, start, end, tokens.shape[1])
             return output
         output, prefill_timing = timed_call(run_prefill, device)
+        prefill_timing["observer_included"] = prefill_observer is not None
         cache_class = type(output.past_key_values).__module__ + "." + type(output.past_key_values).__qualname__
         geometry = cache_geometry(output.past_key_values)
         expected_layers = getattr(model.config, "num_hidden_layers", None)
@@ -448,7 +460,7 @@ def capture(model, ids, device, chunk_tokens=512):
         copy_memory = memory_snapshot(device)
     del output, tokens
     synchronize(device)
-    return {"matrices": matrices, "first_token": first_token, "geometry": geometry,
+    result = {"matrices": matrices, "first_token": first_token, "geometry": geometry,
             "cache_class": cache_class,
             "raw_payload_bytes": sum(array.nbytes for pair in matrices for array in pair),
             "timings": {"prefill": prefill_timing, "device_to_cpu_words": copy_timing},
@@ -456,6 +468,21 @@ def capture(model, ids, device, chunk_tokens=512):
                        "device_to_cpu_words": copy_memory, "after_cache_release": memory_snapshot(device)},
             "chunk_tokens": chunk_tokens,
             "scope": "Full device KV capture with CPU export; no encoded-cache attention or offload"}
+    if prefill_observer is not None:
+        result["prefill_observer_scope"] = (
+            "Synchronous observer after every prefill chunk, before the next "
+            "chunk and final CPU export; observer work is included in prefill "
+            "timing. Complete raw device KV remains resident."
+        )
+        report = getattr(prefill_observer, "report", None)
+        if report is not None:
+            if not callable(report):
+                raise TypeError("prefill_observer.report must be callable")
+            recipes = report()
+            if not isinstance(recipes, dict):
+                raise TypeError("prefill_observer.report() must return a dict")
+            result["prefill_recipes"] = recipes
+    return result
 
 
 def _matrices_equal(left, right):

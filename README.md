@@ -2,7 +2,9 @@
 
 Benchmarks for storing a decoder recipe plus exact corrections instead of raw BF16 KV tensors. The default model is **Qwen/Qwen3-4B-Instruct-2507**, pinned to commit `cdbee75f17c01a7cc42f958dc650907174af0554`.
 
-The repository contains the readable implementations, tests, and a generated single-file runner. It compares exponent packing, field/entropy coding, learned dictionaries, fixed controls, temporal predictors, E8/coset residuals, hybrids, and binary residual predictors. `--preset all --grid` exposes **104 CPU reference variants and 23 native tensor variants**. The native packets use their own grouped bitpacking format; original Huffman/Deflate codecs still execute on CPU.
+The repository contains the readable implementations, tests, and a generated single-file runner. It compares exponent packing, field/entropy coding, learned dictionaries, fixed controls, temporal predictors, E8/coset residuals, hybrids, binary residual predictors, and prefill-derived recipes. `--preset all --grid` exposes **104 CPU reference variants and 31 native tensor variants**. The native packets use their own grouped bitpacking format; original Huffman/Deflate codecs still execute on CPU.
+
+The new [prefill recipe experiment](docs/prefill_recipes.md) derives per-channel centers, affine trends or an E8 template from each KV tile, with exact coset and matched residual controls. `--prefill-recipes` also constructs and verifies recipes directly from device KV between prefill chunks. Full raw model KV remains resident.
 
 ## Clone and install
 
@@ -25,7 +27,7 @@ python qwen_kv_gpu_bench.py --self-test
 
 **`requirements.txt` alone does not install PyTorch.** It contains the backend-independent packages. `requirements-cuda.txt` includes those packages and the NVIDIA CUDA build of Torch. If you already created the virtual environment and installed `requirements.txt`, keep that environment active and run the CUDA install command above; no model download is needed for the checks.
 
-The NVIDIA requirements select **Torch 2.11.0 with the CUDA 12.8 runtime**, a build available from the official CUDA wheel index. The NUC's driver 580 supports this runtime: `nvidia-smi` showing CUDA 13.0 describes driver capability and does not require a CUDA 13.0 Torch wheel. GPU execution still needs to be checked on the NUC.
+The NVIDIA requirements select **Torch 2.11.0 with the CUDA 12.8 runtime**, a build available from the official CUDA wheel index. The NUC's driver 580 supports this runtime: `nvidia-smi` showing CUDA 13.0 describes driver capability and does not require a CUDA 13.0 Torch wheel. The earlier A4500 smoke report is in `benchmark_results/qwen_smoke_a4500_20261019_081452`; the new prefill methods require a fresh target run.
 
 For Intel XPU or CPU, install the matching PyTorch build from the [official selector](https://pytorch.org/get-started/locally/), then run `python -m pip install -r requirements.txt`. A CUDA build is required for the NVIDIA benchmark; a CPU-only Torch installation cannot use the A4500.
 

@@ -4,6 +4,10 @@ Copy **`qwen_kv_gpu_bench.py`** to the target machine. It embeds the project cod
 
 This runner compares exact KV representations on **Qwen/Qwen3-4B-Instruct-2507**, pinned to revision `cdbee75f17c01a7cc42f958dc650907174af0554`. It fits its learned dictionaries from this checkpoint's own calibration KV; it does not reuse SmolLM dictionaries.
 
+Prefill-derived recipe update: eight new `native_prefill_*` methods compare zero, per-channel midpoint, endpoint-affine and E8-template predictors with exact cosets and matched circular residuals. Both native presets include them. Add `--prefill-recipes` to construct and verify selected recipes directly from device KV between prefill chunks, before CPU export. The transformer still retains full raw KV, and capture prefill time includes observer work. These are functional tensor implementations; new GPU timings require a target run. All recipe bytes count, and cosets alone do not reduce matched correction bit counts.
+
+For an initial comparison, run the smoke command with `--prefill-recipes --tile-tokens 16`, then repeat with `--tile-tokens 64` and a fresh output path. Use `--methods raw exponent_huffman_lower_deflate learned_entropy_l1` to omit the slower CPU binary controls. Check the `prefill_observer` rows separately from the repeated post-capture `native_packet` timing rows.
+
 Cache compatibility update: this revision reads modern `cache.layers[i].keys/values` storage and legacy cache interfaces. It no longer requires `to_legacy_cache()`, which newer Transformers versions removed. Capture metadata records the actual cache class; errors include the cache class and installed Transformers version. Existing installations can use the updated script without downgrading Transformers. Run `--doctor` to record the versions used by your experiment.
 
 ## Install and check the machine
