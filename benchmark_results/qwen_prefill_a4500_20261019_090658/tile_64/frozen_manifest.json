@@ -1,0 +1,239 @@
+{
+  "created_utc": "2026-10-19T15:59:48.383719+00:00",
+  "sha256": "c88cf1fdf853569e120b4839b8a2072f5bd2da18782d954e69bf9eb74cb5ee54",
+  "manifest": {
+    "model_identity": {
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+      "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95",
+      "local_model": false,
+      "local_weights_content_hashed": false,
+      "device": "cuda:0",
+      "dtype": "bfloat16",
+      "attention_backend": "sdpa",
+      "model_storage_bytes": 8044936448,
+      "parameter_count": 4022468096,
+      "load_seconds": 1.826176967471838,
+      "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+      "bf16_probe": {
+        "success": true,
+        "error": null,
+        "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support"
+      },
+      "config": {
+        "model_type": "qwen3",
+        "num_hidden_layers": 36,
+        "num_key_value_heads": 8,
+        "num_attention_heads": 32,
+        "head_dim": 128,
+        "hidden_size": 2560,
+        "max_position_embeddings": 262144
+      }
+    },
+    "source_sha256": "1e8be54809cb3611aa2b92edfb9ff75b532bbfe881adc232a8f65255457c2dbf",
+    "calibration_sha256": "53885945f023ece36e30feb39fec4c807dcc21c278a8b4da550bcc38773a6b4e",
+    "cpu_candidates": {
+      "raw": {
+        "kind": "raw",
+        "shuffle": false
+      },
+      "exponent_huffman_lower_deflate": {
+        "kind": "lower_control",
+        "strategy": "deflate"
+      },
+      "learned_entropy_l1": {
+        "kind": "residual",
+        "model": "learned64",
+        "assignment": "l1",
+        "correction": "best_entropy"
+      }
+    },
+    "native_candidates": [
+      {
+        "name": "native_raw_words",
+        "method": "raw",
+        "options": {}
+      },
+      {
+        "name": "native_exponent_group_bitpack",
+        "method": "exponent",
+        "options": {}
+      },
+      {
+        "name": "native_learned_residual_bitpack",
+        "method": "learned",
+        "options": {
+          "assignment": "radius"
+        }
+      },
+      {
+        "name": "native_e8_symbol_bitpack",
+        "method": "e8_symbol",
+        "options": {
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_learned_e8_residual_bitpack",
+        "method": "learned_e8",
+        "options": {
+          "step_log2": 10
+        }
+      },
+      {
+        "name": "native_binary_identity_d64_bf16_bitpack",
+        "method": "binary",
+        "options": {
+          "dimension": 64,
+          "transform": "identity",
+          "amplitude_precision": "bf16",
+          "assignment": "radius"
+        }
+      },
+      {
+        "name": "native_binary_dense_d64_bf16_bitpack",
+        "method": "binary",
+        "options": {
+          "dimension": 64,
+          "transform": "dense",
+          "amplitude_precision": "bf16",
+          "assignment": "radius"
+        }
+      },
+      {
+        "name": "native_binary_hadamard_d64_bf16_bitpack",
+        "method": "binary",
+        "options": {
+          "dimension": 64,
+          "transform": "hadamard",
+          "amplitude_precision": "bf16",
+          "assignment": "radius"
+        }
+      },
+      {
+        "name": "native_prefill_zero_coset",
+        "method": "prefill",
+        "options": {
+          "predictor": "zero",
+          "correction": "coset",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_zero_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "zero",
+          "correction": "residual",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_midpoint_coset",
+        "method": "prefill",
+        "options": {
+          "predictor": "midpoint",
+          "correction": "coset",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_midpoint_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "midpoint",
+          "correction": "residual",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_affine_coset",
+        "method": "prefill",
+        "options": {
+          "predictor": "affine",
+          "correction": "coset",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_affine_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "affine",
+          "correction": "residual",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_e8_coset",
+        "method": "prefill",
+        "options": {
+          "predictor": "e8",
+          "correction": "coset",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_e8_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "e8",
+          "correction": "residual",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      }
+    ],
+    "configuration": {
+      "doctor": false,
+      "self_test": false,
+      "list_methods": false,
+      "device": "cuda",
+      "model": "Qwen/Qwen3-4B-Instruct-2507",
+      "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "local_files_only": false,
+      "preset": "smoke",
+      "grid": false,
+      "native_preset": null,
+      "skip_native": false,
+      "methods": [
+        "raw",
+        "exponent_huffman_lower_deflate",
+        "learned_entropy_l1"
+      ],
+      "native_methods": null,
+      "lengths": [
+        2048
+      ],
+      "cases": 1,
+      "train_tokens": 512,
+      "dev_tokens": 512,
+      "chunk_tokens": 512,
+      "tile_tokens": 64,
+      "max_records": 144,
+      "full_cache": false,
+      "prefill_recipes": true,
+      "dev_records": 8,
+      "repeats": 3,
+      "measure_io": false,
+      "io_mib": 32,
+      "generation_steps": 2,
+      "calibration_samples": 1024,
+      "calibration_iterations": 8,
+      "seed": 71,
+      "threads": 4,
+      "memory_reserve_gib": 2.0,
+      "output": "runs/qwen_prefill_t64"
+    },
+    "selection_source": "Development only; all test candidates/settings fixed before test capture"
+  }
+}
