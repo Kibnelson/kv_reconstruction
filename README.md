@@ -12,6 +12,8 @@ The [local full-record diagnostic](benchmark_results/recipe_insights_review_2026
 
 The subsequent [Qwen A4500 review](docs/qwen_gpu_insights.md) finds 29.55–29.75% estimated savings across six TEST cases. It identifies metadata/index costs, validates a compact-index transformation, and separates measured results from proposed formats and the research needed for bounded GPU materialization.
 
+The [forward producer study](docs/producer_forward_study.md) adds **nine matched recipes** using real normalized hidden states, raw K projections and pre-RoPE keys. `--producer-study` builds and checks packets inside attention forward, then separately times post-capture replay. It tests whether producer information improves savings and restore speed after charging features, predictor state, replay sources and exact corrections. Tiny Qwen validation establishes functionality; a new A4500 run is needed for pretrained-model savings and speed.
+
 ## Clone and install
 
 ```bash

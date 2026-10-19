@@ -22,6 +22,7 @@ def parser():
     p.add_argument("--doctor", action="store_true", help="Probe hardware and dependencies without downloading a model")
     p.add_argument("--self-test", action="store_true", help="Run synthetic CPU correctness tests without downloading weights")
     p.add_argument("--list-methods", action="store_true")
+    p.add_argument("--producer-study", action="store_true", help="Run the separate forward-hook experiment; combine with --help for its options")
     p.add_argument("--device", default="auto", help="auto chooses CUDA then Intel XPU; CPU must be explicit; cuda:1 etc supported")
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--revision", default=None, help="Default model uses pinned commit; custom model defaults to its resolved main commit")
@@ -289,6 +290,11 @@ def _require_runtime_packages(p):
 
 
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if "--producer-study" in argv:
+        from .producer_study import main as producer_main
+        argv.remove("--producer-study")
+        return producer_main(argv)
     p = parser()
     args = p.parse_args(argv)
     _validate(args, p)

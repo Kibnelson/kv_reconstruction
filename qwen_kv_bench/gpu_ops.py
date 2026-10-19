@@ -312,7 +312,9 @@ def validate_packet(packet, check_header=True):
     elif not packet._header_verified:
         raise ValueError("native packet header has not been validated")
     meta = packet.metadata
-    if (meta.get("version") != 1 or meta.get("method") not in NATIVE_METHODS or
+    # Producer-study pair packets have a dedicated encoder/decoder and are not
+    # part of the legacy native_options/self-test method grid.
+    if (meta.get("version") != 1 or meta.get("method") not in (*NATIVE_METHODS, "producer_pair") or
             not isinstance(meta.get("shape"), list) or len(meta["shape"]) != 2 or
             any(not isinstance(n, int) or n < 0 for n in meta["shape"])):
         raise ValueError("invalid native packet descriptor")
@@ -697,6 +699,9 @@ def decode(packet, state=None):
     if meta["method"] == "prefill_dictionary":
         from .residual_dictionary import decode as decode_dictionary
         return decode_dictionary(packet, state)
+    if meta["method"] == "producer_pair":
+        from .producer_codec import decode as decode_producer
+        return decode_producer(packet, state)
     if meta["method"] != "prefill" and state.state_id != meta["state_id"]:
         raise ValueError("native state identity mismatch")
     method = meta["method"]

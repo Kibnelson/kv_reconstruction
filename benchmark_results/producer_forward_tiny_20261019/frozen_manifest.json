@@ -1,0 +1,3381 @@
+{
+  "manifest": {
+    "model_identity": {
+      "model_id": "local-random-tiny-qwen3-producer-study",
+      "tiny": true,
+      "seed": 71,
+      "config": {
+        "vocab_size": 97,
+        "max_position_embeddings": 160,
+        "hidden_size": 64,
+        "intermediate_size": 96,
+        "num_hidden_layers": 2,
+        "num_attention_heads": 4,
+        "use_sliding_window": false,
+        "sliding_window": null,
+        "max_window_layers": 28,
+        "num_key_value_heads": 2,
+        "head_dim": 16,
+        "hidden_act": "silu",
+        "initializer_range": 0.02,
+        "rms_norm_eps": 1e-06,
+        "use_cache": true,
+        "rope_theta": 10000.0,
+        "rope_scaling": null,
+        "attention_bias": false,
+        "attention_dropout": 0.0,
+        "layer_types": [
+          "full_attention",
+          "full_attention"
+        ],
+        "return_dict": true,
+        "output_hidden_states": false,
+        "torchscript": false,
+        "dtype": null,
+        "pruned_heads": {},
+        "tie_word_embeddings": false,
+        "chunk_size_feed_forward": 0,
+        "is_encoder_decoder": false,
+        "is_decoder": false,
+        "cross_attention_hidden_size": null,
+        "add_cross_attention": false,
+        "tie_encoder_decoder": false,
+        "architectures": null,
+        "finetuning_task": null,
+        "id2label": {
+          "0": "LABEL_0",
+          "1": "LABEL_1"
+        },
+        "label2id": {
+          "LABEL_0": 0,
+          "LABEL_1": 1
+        },
+        "task_specific_params": null,
+        "problem_type": null,
+        "tokenizer_class": null,
+        "prefix": null,
+        "bos_token_id": null,
+        "pad_token_id": null,
+        "eos_token_id": null,
+        "sep_token_id": null,
+        "decoder_start_token_id": null,
+        "max_length": 20,
+        "min_length": 0,
+        "do_sample": false,
+        "early_stopping": false,
+        "num_beams": 1,
+        "temperature": 1.0,
+        "top_k": 50,
+        "top_p": 1.0,
+        "typical_p": 1.0,
+        "repetition_penalty": 1.0,
+        "length_penalty": 1.0,
+        "no_repeat_ngram_size": 0,
+        "encoder_no_repeat_ngram_size": 0,
+        "bad_words_ids": null,
+        "num_return_sequences": 1,
+        "output_scores": false,
+        "return_dict_in_generate": false,
+        "forced_bos_token_id": null,
+        "forced_eos_token_id": null,
+        "remove_invalid_values": false,
+        "exponential_decay_length_penalty": null,
+        "suppress_tokens": null,
+        "begin_suppress_tokens": null,
+        "num_beam_groups": 1,
+        "diversity_penalty": 0.0,
+        "_name_or_path": "",
+        "transformers_version": "4.57.6",
+        "tf_legacy_loss": false,
+        "use_bfloat16": false,
+        "model_type": "qwen3",
+        "output_attentions": false
+      },
+      "dtype": "bfloat16",
+      "device": "cpu",
+      "model_storage_bytes": 148496,
+      "scope": "Random local weights; no pretrained checkpoint, tokenizer, quality or GPU performance claim"
+    },
+    "source_sha256": "d3c25aa73f2c4759f446f1461e8ab3a2279074b910c6248e676ad2fc0881963b",
+    "calibration": {
+      "frozen": {
+        "file": "calibration/producer_frozen.bin",
+        "model_id": "28361819177a361ae406de2609e86cfa4d1989aa561d666bea23671ab702a2ef",
+        "serialized_bytes": 15500,
+        "metadata": {
+          "config": {
+            "coefficient_fit": "float64 ridge lambda1.0, no intercept beyond frozen base",
+            "coefficient_fractional_bits": 8,
+            "coefficient_quantization": "round-nearest-even(weight*256), clip int16",
+            "exponent_base": "floor median of all TRAIN row exponents per layer/KV/channel",
+            "feature_quantization": "float32(hidden_selected/scales), round-nearest-even, clip[-127,127], int8",
+            "feature_scaling": "TRAIN maxabs/127 float32; zero maxabs uses1.0; floor at float32 tiny",
+            "feature_transform": "none",
+            "integer_rounding": "floor((sum+128)/256)",
+            "prediction_clamp": [
+              0,
+              255
+            ],
+            "rank": 0,
+            "requested_hidden_rank": 4,
+            "seed": 71,
+            "selector": "TRAIN normalized-hidden float64 variance; descending variance, ascending index ties",
+            "shared_features": "one int8 feature vector per token and layer, reused for K and V"
+          },
+          "format": "qwen_prefill_producer_models_v1",
+          "kind": "frozen",
+          "layer_schema": {
+            "layer_00": {
+              "channels": 32,
+              "head_dim": 16,
+              "hidden_channels": 64
+            },
+            "layer_01": {
+              "channels": 32,
+              "head_dim": 16,
+              "hidden_channels": 64
+            }
+          },
+          "model_identity": {
+            "config": {
+              "_name_or_path": "",
+              "add_cross_attention": false,
+              "architectures": null,
+              "attention_bias": false,
+              "attention_dropout": 0.0,
+              "bad_words_ids": null,
+              "begin_suppress_tokens": null,
+              "bos_token_id": null,
+              "chunk_size_feed_forward": 0,
+              "cross_attention_hidden_size": null,
+              "decoder_start_token_id": null,
+              "diversity_penalty": 0.0,
+              "do_sample": false,
+              "dtype": null,
+              "early_stopping": false,
+              "encoder_no_repeat_ngram_size": 0,
+              "eos_token_id": null,
+              "exponential_decay_length_penalty": null,
+              "finetuning_task": null,
+              "forced_bos_token_id": null,
+              "forced_eos_token_id": null,
+              "head_dim": 16,
+              "hidden_act": "silu",
+              "hidden_size": 64,
+              "id2label": {
+                "0": "LABEL_0",
+                "1": "LABEL_1"
+              },
+              "initializer_range": 0.02,
+              "intermediate_size": 96,
+              "is_decoder": false,
+              "is_encoder_decoder": false,
+              "label2id": {
+                "LABEL_0": 0,
+                "LABEL_1": 1
+              },
+              "layer_types": [
+                "full_attention",
+                "full_attention"
+              ],
+              "length_penalty": 1.0,
+              "max_length": 20,
+              "max_position_embeddings": 160,
+              "max_window_layers": 28,
+              "min_length": 0,
+              "model_type": "qwen3",
+              "no_repeat_ngram_size": 0,
+              "num_attention_heads": 4,
+              "num_beam_groups": 1,
+              "num_beams": 1,
+              "num_hidden_layers": 2,
+              "num_key_value_heads": 2,
+              "num_return_sequences": 1,
+              "output_attentions": false,
+              "output_hidden_states": false,
+              "output_scores": false,
+              "pad_token_id": null,
+              "prefix": null,
+              "problem_type": null,
+              "pruned_heads": {},
+              "remove_invalid_values": false,
+              "repetition_penalty": 1.0,
+              "return_dict": true,
+              "return_dict_in_generate": false,
+              "rms_norm_eps": 1e-06,
+              "rope_scaling": null,
+              "rope_theta": 10000.0,
+              "sep_token_id": null,
+              "sliding_window": null,
+              "suppress_tokens": null,
+              "task_specific_params": null,
+              "temperature": 1.0,
+              "tf_legacy_loss": false,
+              "tie_encoder_decoder": false,
+              "tie_word_embeddings": false,
+              "tokenizer_class": null,
+              "top_k": 50,
+              "top_p": 1.0,
+              "torchscript": false,
+              "transformers_version": "4.57.6",
+              "typical_p": 1.0,
+              "use_bfloat16": false,
+              "use_cache": true,
+              "use_sliding_window": false,
+              "vocab_size": 97
+            },
+            "device": "cpu",
+            "dtype": "bfloat16",
+            "model_id": "local-random-tiny-qwen3-producer-study",
+            "model_storage_bytes": 148496,
+            "scope": "Random local weights; no pretrained checkpoint, tokenizer, quality or GPU performance claim",
+            "seed": 71,
+            "tiny": true
+          },
+          "scope": "Three actual TRAIN producer captures only. Hidden recipe retains selected int8 features, never a full hidden state or transformer forward replay; exact exponent corrections remain required.",
+          "training_hashes": [
+            "6e23276fb6d1aab7aee9feb165acc3860e7743b4601ab8d904669a64835e46a3",
+            "522d403c8ff8db6c5ad175ec915086fdde8040d8b9fd08efb0cf2cbb0a57a719",
+            "badc0bd18c1ff1a6cd9b4da70677026fb7b9b391f155f51c4db75144ffa225f1"
+          ],
+          "training_only": true,
+          "training_record_sets": [
+            {
+              "name": "train_ferry_maintenance",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "54b014dfeb1308ec2b614309accd5c04d5658f32a511e8e09b6b1c941b26788f",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "d0a077e7b8e75f1f069bc7f35f6ee936f8a602f085d555f8e03d3c057020e7d6",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "9024ce2ac9ed5aed985468286ac846feb0ebd174c873d7ad4f77744d674610e7",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "fa68ad3a007d3a49a219169e5ebd96c8abc45a962bd4b3682b25a6d3d64ec48f",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "6e23276fb6d1aab7aee9feb165acc3860e7743b4601ab8d904669a64835e46a3",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "3aef2fbb2eb2484ecdc3301678920c17b0a1323c1f1da584e68147de85d287c3",
+                "name": "train_ferry_maintenance",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            },
+            {
+              "name": "train_python_bounded_ring",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "6baba87ec48781c0901319e9c38c54b128849e8d934895fdeb0d00dbf05583e6",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "683373863c43c32d8b8ad8c45f683a9a28c27e88f7d25aadeb3164bf04c0ee05",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "dddf8dd1a57842f8f6d2d7911f77dcd85f0f8ff332a344fbdeec1026006d9813",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "7e8464fcf8a8230fc7f28f3f1744c7e0b735b1b0c1e681b66b01d1c75bdbb20a",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "522d403c8ff8db6c5ad175ec915086fdde8040d8b9fd08efb0cf2cbb0a57a719",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "0fd793498db6ad55a3968b7ee916fe44c88b8bc1fb259fd9033c30d0be0d2eb8",
+                "name": "train_python_bounded_ring",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            },
+            {
+              "name": "train_seed_vault_records",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "c952ecb03d0233f0c86739fb782c2ac68ac72a47ff4f016d721323adfacf6af3",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "4d58d76ec3f938d826c17ec744e4781ed7d712995ebd4b4f6af73f8c69e255af",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "5b8c6390c9237816ed5b70e4607770d849f1bc786a1ee20e03454463a5bae59a",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "c807acea34035c6d8453c7d33ae9e37353e7fd2b49a9e05c876ed771c11d6e25",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "badc0bd18c1ff1a6cd9b4da70677026fb7b9b391f155f51c4db75144ffa225f1",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "3e75e1172fe991df8964231cf90dab97db34b80256a620fdc3ed82e9f085fb50",
+                "name": "train_seed_vault_records",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            }
+          ],
+          "training_stats": {}
+        }
+      },
+      "hidden": {
+        "file": "calibration/producer_hidden_r4.bin",
+        "model_id": "e4df32786909060c5a19ef17b5b5406c9860396ba986af855b3348efbb6792a2",
+        "serialized_bytes": 18423,
+        "metadata": {
+          "config": {
+            "coefficient_fit": "float64 ridge lambda1.0, no intercept beyond frozen base",
+            "coefficient_fractional_bits": 8,
+            "coefficient_quantization": "round-nearest-even(weight*256), clip int16",
+            "exponent_base": "floor median of all TRAIN row exponents per layer/KV/channel",
+            "feature_quantization": "float32(hidden_selected/scales), round-nearest-even, clip[-127,127], int8",
+            "feature_scaling": "TRAIN maxabs/127 float32; zero maxabs uses1.0; floor at float32 tiny",
+            "feature_transform": "signed",
+            "integer_rounding": "floor((sum+128)/256)",
+            "prediction_clamp": [
+              0,
+              255
+            ],
+            "rank": 4,
+            "requested_hidden_rank": 4,
+            "seed": 71,
+            "selector": "TRAIN normalized-hidden float64 variance; descending variance, ascending index ties",
+            "shared_features": "one int8 feature vector per token and layer, reused for K and V"
+          },
+          "format": "qwen_prefill_producer_models_v1",
+          "kind": "hidden",
+          "layer_schema": {
+            "layer_00": {
+              "channels": 32,
+              "head_dim": 16,
+              "hidden_channels": 64
+            },
+            "layer_01": {
+              "channels": 32,
+              "head_dim": 16,
+              "hidden_channels": 64
+            }
+          },
+          "model_identity": {
+            "config": {
+              "_name_or_path": "",
+              "add_cross_attention": false,
+              "architectures": null,
+              "attention_bias": false,
+              "attention_dropout": 0.0,
+              "bad_words_ids": null,
+              "begin_suppress_tokens": null,
+              "bos_token_id": null,
+              "chunk_size_feed_forward": 0,
+              "cross_attention_hidden_size": null,
+              "decoder_start_token_id": null,
+              "diversity_penalty": 0.0,
+              "do_sample": false,
+              "dtype": null,
+              "early_stopping": false,
+              "encoder_no_repeat_ngram_size": 0,
+              "eos_token_id": null,
+              "exponential_decay_length_penalty": null,
+              "finetuning_task": null,
+              "forced_bos_token_id": null,
+              "forced_eos_token_id": null,
+              "head_dim": 16,
+              "hidden_act": "silu",
+              "hidden_size": 64,
+              "id2label": {
+                "0": "LABEL_0",
+                "1": "LABEL_1"
+              },
+              "initializer_range": 0.02,
+              "intermediate_size": 96,
+              "is_decoder": false,
+              "is_encoder_decoder": false,
+              "label2id": {
+                "LABEL_0": 0,
+                "LABEL_1": 1
+              },
+              "layer_types": [
+                "full_attention",
+                "full_attention"
+              ],
+              "length_penalty": 1.0,
+              "max_length": 20,
+              "max_position_embeddings": 160,
+              "max_window_layers": 28,
+              "min_length": 0,
+              "model_type": "qwen3",
+              "no_repeat_ngram_size": 0,
+              "num_attention_heads": 4,
+              "num_beam_groups": 1,
+              "num_beams": 1,
+              "num_hidden_layers": 2,
+              "num_key_value_heads": 2,
+              "num_return_sequences": 1,
+              "output_attentions": false,
+              "output_hidden_states": false,
+              "output_scores": false,
+              "pad_token_id": null,
+              "prefix": null,
+              "problem_type": null,
+              "pruned_heads": {},
+              "remove_invalid_values": false,
+              "repetition_penalty": 1.0,
+              "return_dict": true,
+              "return_dict_in_generate": false,
+              "rms_norm_eps": 1e-06,
+              "rope_scaling": null,
+              "rope_theta": 10000.0,
+              "sep_token_id": null,
+              "sliding_window": null,
+              "suppress_tokens": null,
+              "task_specific_params": null,
+              "temperature": 1.0,
+              "tf_legacy_loss": false,
+              "tie_encoder_decoder": false,
+              "tie_word_embeddings": false,
+              "tokenizer_class": null,
+              "top_k": 50,
+              "top_p": 1.0,
+              "torchscript": false,
+              "transformers_version": "4.57.6",
+              "typical_p": 1.0,
+              "use_bfloat16": false,
+              "use_cache": true,
+              "use_sliding_window": false,
+              "vocab_size": 97
+            },
+            "device": "cpu",
+            "dtype": "bfloat16",
+            "model_id": "local-random-tiny-qwen3-producer-study",
+            "model_storage_bytes": 148496,
+            "scope": "Random local weights; no pretrained checkpoint, tokenizer, quality or GPU performance claim",
+            "seed": 71,
+            "tiny": true
+          },
+          "scope": "Three actual TRAIN producer captures only. Hidden recipe retains selected int8 features, never a full hidden state or transformer forward replay; exact exponent corrections remain required.",
+          "training_hashes": [
+            "6e23276fb6d1aab7aee9feb165acc3860e7743b4601ab8d904669a64835e46a3",
+            "522d403c8ff8db6c5ad175ec915086fdde8040d8b9fd08efb0cf2cbb0a57a719",
+            "badc0bd18c1ff1a6cd9b4da70677026fb7b9b391f155f51c4db75144ffa225f1"
+          ],
+          "training_only": true,
+          "training_record_sets": [
+            {
+              "name": "train_ferry_maintenance",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "54b014dfeb1308ec2b614309accd5c04d5658f32a511e8e09b6b1c941b26788f",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "d0a077e7b8e75f1f069bc7f35f6ee936f8a602f085d555f8e03d3c057020e7d6",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "9024ce2ac9ed5aed985468286ac846feb0ebd174c873d7ad4f77744d674610e7",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "fa68ad3a007d3a49a219169e5ebd96c8abc45a962bd4b3682b25a6d3d64ec48f",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "6e23276fb6d1aab7aee9feb165acc3860e7743b4601ab8d904669a64835e46a3",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "3aef2fbb2eb2484ecdc3301678920c17b0a1323c1f1da584e68147de85d287c3",
+                "name": "train_ferry_maintenance",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            },
+            {
+              "name": "train_python_bounded_ring",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "6baba87ec48781c0901319e9c38c54b128849e8d934895fdeb0d00dbf05583e6",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "683373863c43c32d8b8ad8c45f683a9a28c27e88f7d25aadeb3164bf04c0ee05",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "dddf8dd1a57842f8f6d2d7911f77dcd85f0f8ff332a344fbdeec1026006d9813",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "7e8464fcf8a8230fc7f28f3f1744c7e0b735b1b0c1e681b66b01d1c75bdbb20a",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "522d403c8ff8db6c5ad175ec915086fdde8040d8b9fd08efb0cf2cbb0a57a719",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "0fd793498db6ad55a3968b7ee916fe44c88b8bc1fb259fd9033c30d0be0d2eb8",
+                "name": "train_python_bounded_ring",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            },
+            {
+              "name": "train_seed_vault_records",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "c952ecb03d0233f0c86739fb782c2ac68ac72a47ff4f016d721323adfacf6af3",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "4d58d76ec3f938d826c17ec744e4781ed7d712995ebd4b4f6af73f8c69e255af",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "5b8c6390c9237816ed5b70e4607770d849f1bc786a1ee20e03454463a5bae59a",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "c807acea34035c6d8453c7d33ae9e37353e7fd2b49a9e05c876ed771c11d6e25",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "badc0bd18c1ff1a6cd9b4da70677026fb7b9b391f155f51c4db75144ffa225f1",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "3e75e1172fe991df8964231cf90dab97db34b80256a620fdc3ed82e9f085fb50",
+                "name": "train_seed_vault_records",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            }
+          ],
+          "training_stats": {
+            "layer_00": {
+              "K": {
+                "coefficient_clipped_values": 0,
+                "feature_transform": "signed",
+                "ridge_lambda": 1.0,
+                "training_mean_abs_exponent_error": 1.095703125
+              },
+              "V": {
+                "coefficient_clipped_values": 0,
+                "feature_transform": "signed",
+                "ridge_lambda": 1.0,
+                "training_mean_abs_exponent_error": 1.1471354166666667
+              },
+              "feature_scale_rule": "TRAIN max(abs(hidden))/127 in float32; zero columns use 1.0",
+              "selected_hidden_indices": [
+                42,
+                62,
+                26,
+                18
+              ],
+              "selected_hidden_variances": [
+                1.6717858959196341,
+                1.48719443505009,
+                1.4154144106137714,
+                1.374214350763295
+              ],
+              "training_feature_saturated_values": 5
+            },
+            "layer_01": {
+              "K": {
+                "coefficient_clipped_values": 0,
+                "feature_transform": "signed",
+                "ridge_lambda": 1.0,
+                "training_mean_abs_exponent_error": 1.1178385416666667
+              },
+              "V": {
+                "coefficient_clipped_values": 0,
+                "feature_transform": "signed",
+                "ridge_lambda": 1.0,
+                "training_mean_abs_exponent_error": 1.1451822916666667
+              },
+              "feature_scale_rule": "TRAIN max(abs(hidden))/127 in float32; zero columns use 1.0",
+              "selected_hidden_indices": [
+                5,
+                13,
+                56,
+                26
+              ],
+              "selected_hidden_variances": [
+                1.4364092794712633,
+                1.3735427378107694,
+                1.3486685980978008,
+                1.3119162271420162
+              ],
+              "training_feature_saturated_values": 4
+            }
+          }
+        }
+      },
+      "hidden_abs": {
+        "file": "calibration/producer_hidden_abs_r4.bin",
+        "model_id": "12769eae968df0b38addccfc9aac7be8fdd8becaf71e0cf9b2f3b16b5dda7c64",
+        "serialized_bytes": 18403,
+        "metadata": {
+          "config": {
+            "coefficient_fit": "float64 ridge lambda1.0, no intercept beyond frozen base",
+            "coefficient_fractional_bits": 8,
+            "coefficient_quantization": "round-nearest-even(weight*256), clip int16",
+            "exponent_base": "floor median of all TRAIN row exponents per layer/KV/channel",
+            "feature_quantization": "float32(hidden_selected/scales), round-nearest-even, clip[-127,127], int8",
+            "feature_scaling": "TRAIN maxabs/127 float32; zero maxabs uses1.0; floor at float32 tiny",
+            "feature_transform": "abs",
+            "integer_rounding": "floor((sum+128)/256)",
+            "prediction_clamp": [
+              0,
+              255
+            ],
+            "rank": 4,
+            "requested_hidden_rank": 4,
+            "seed": 71,
+            "selector": "TRAIN normalized-hidden float64 variance; descending variance, ascending index ties",
+            "shared_features": "one int8 feature vector per token and layer, reused for K and V"
+          },
+          "format": "qwen_prefill_producer_models_v1",
+          "kind": "hidden_abs",
+          "layer_schema": {
+            "layer_00": {
+              "channels": 32,
+              "head_dim": 16,
+              "hidden_channels": 64
+            },
+            "layer_01": {
+              "channels": 32,
+              "head_dim": 16,
+              "hidden_channels": 64
+            }
+          },
+          "model_identity": {
+            "config": {
+              "_name_or_path": "",
+              "add_cross_attention": false,
+              "architectures": null,
+              "attention_bias": false,
+              "attention_dropout": 0.0,
+              "bad_words_ids": null,
+              "begin_suppress_tokens": null,
+              "bos_token_id": null,
+              "chunk_size_feed_forward": 0,
+              "cross_attention_hidden_size": null,
+              "decoder_start_token_id": null,
+              "diversity_penalty": 0.0,
+              "do_sample": false,
+              "dtype": null,
+              "early_stopping": false,
+              "encoder_no_repeat_ngram_size": 0,
+              "eos_token_id": null,
+              "exponential_decay_length_penalty": null,
+              "finetuning_task": null,
+              "forced_bos_token_id": null,
+              "forced_eos_token_id": null,
+              "head_dim": 16,
+              "hidden_act": "silu",
+              "hidden_size": 64,
+              "id2label": {
+                "0": "LABEL_0",
+                "1": "LABEL_1"
+              },
+              "initializer_range": 0.02,
+              "intermediate_size": 96,
+              "is_decoder": false,
+              "is_encoder_decoder": false,
+              "label2id": {
+                "LABEL_0": 0,
+                "LABEL_1": 1
+              },
+              "layer_types": [
+                "full_attention",
+                "full_attention"
+              ],
+              "length_penalty": 1.0,
+              "max_length": 20,
+              "max_position_embeddings": 160,
+              "max_window_layers": 28,
+              "min_length": 0,
+              "model_type": "qwen3",
+              "no_repeat_ngram_size": 0,
+              "num_attention_heads": 4,
+              "num_beam_groups": 1,
+              "num_beams": 1,
+              "num_hidden_layers": 2,
+              "num_key_value_heads": 2,
+              "num_return_sequences": 1,
+              "output_attentions": false,
+              "output_hidden_states": false,
+              "output_scores": false,
+              "pad_token_id": null,
+              "prefix": null,
+              "problem_type": null,
+              "pruned_heads": {},
+              "remove_invalid_values": false,
+              "repetition_penalty": 1.0,
+              "return_dict": true,
+              "return_dict_in_generate": false,
+              "rms_norm_eps": 1e-06,
+              "rope_scaling": null,
+              "rope_theta": 10000.0,
+              "sep_token_id": null,
+              "sliding_window": null,
+              "suppress_tokens": null,
+              "task_specific_params": null,
+              "temperature": 1.0,
+              "tf_legacy_loss": false,
+              "tie_encoder_decoder": false,
+              "tie_word_embeddings": false,
+              "tokenizer_class": null,
+              "top_k": 50,
+              "top_p": 1.0,
+              "torchscript": false,
+              "transformers_version": "4.57.6",
+              "typical_p": 1.0,
+              "use_bfloat16": false,
+              "use_cache": true,
+              "use_sliding_window": false,
+              "vocab_size": 97
+            },
+            "device": "cpu",
+            "dtype": "bfloat16",
+            "model_id": "local-random-tiny-qwen3-producer-study",
+            "model_storage_bytes": 148496,
+            "scope": "Random local weights; no pretrained checkpoint, tokenizer, quality or GPU performance claim",
+            "seed": 71,
+            "tiny": true
+          },
+          "scope": "Three actual TRAIN producer captures only. Hidden recipe retains selected int8 features, never a full hidden state or transformer forward replay; exact exponent corrections remain required.",
+          "training_hashes": [
+            "6e23276fb6d1aab7aee9feb165acc3860e7743b4601ab8d904669a64835e46a3",
+            "522d403c8ff8db6c5ad175ec915086fdde8040d8b9fd08efb0cf2cbb0a57a719",
+            "badc0bd18c1ff1a6cd9b4da70677026fb7b9b391f155f51c4db75144ffa225f1"
+          ],
+          "training_only": true,
+          "training_record_sets": [
+            {
+              "name": "train_ferry_maintenance",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "54b014dfeb1308ec2b614309accd5c04d5658f32a511e8e09b6b1c941b26788f",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "d0a077e7b8e75f1f069bc7f35f6ee936f8a602f085d555f8e03d3c057020e7d6",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "9024ce2ac9ed5aed985468286ac846feb0ebd174c873d7ad4f77744d674610e7",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "fa68ad3a007d3a49a219169e5ebd96c8abc45a962bd4b3682b25a6d3d64ec48f",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "6e23276fb6d1aab7aee9feb165acc3860e7743b4601ab8d904669a64835e46a3",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "3aef2fbb2eb2484ecdc3301678920c17b0a1323c1f1da584e68147de85d287c3",
+                "name": "train_ferry_maintenance",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            },
+            {
+              "name": "train_python_bounded_ring",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "6baba87ec48781c0901319e9c38c54b128849e8d934895fdeb0d00dbf05583e6",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "683373863c43c32d8b8ad8c45f683a9a28c27e88f7d25aadeb3164bf04c0ee05",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "dddf8dd1a57842f8f6d2d7911f77dcd85f0f8ff332a344fbdeec1026006d9813",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "7e8464fcf8a8230fc7f28f3f1744c7e0b735b1b0c1e681b66b01d1c75bdbb20a",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "522d403c8ff8db6c5ad175ec915086fdde8040d8b9fd08efb0cf2cbb0a57a719",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "0fd793498db6ad55a3968b7ee916fe44c88b8bc1fb259fd9033c30d0be0d2eb8",
+                "name": "train_python_bounded_ring",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            },
+            {
+              "name": "train_seed_vault_records",
+              "records": [
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "c952ecb03d0233f0c86739fb782c2ac68ac72a47ff4f016d721323adfacf6af3",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 0,
+                  "sha256": "4d58d76ec3f938d826c17ec744e4781ed7d712995ebd4b4f6af73f8c69e255af",
+                  "start": 16,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "5b8c6390c9237816ed5b70e4607770d849f1bc786a1ee20e03454463a5bae59a",
+                  "start": 0,
+                  "tokens": 8
+                },
+                {
+                  "head_dim": 16,
+                  "layer": 1,
+                  "sha256": "c807acea34035c6d8453c7d33ae9e37353e7fd2b49a9e05c876ed771c11d6e25",
+                  "start": 24,
+                  "tokens": 8
+                }
+              ],
+              "sha256": "badc0bd18c1ff1a6cd9b4da70677026fb7b9b391f155f51c4db75144ffa225f1",
+              "split": "train",
+              "supplied_metadata": {
+                "input_ids_sha256": "3e75e1172fe991df8964231cf90dab97db34b80256a620fdc3ed82e9f085fb50",
+                "name": "train_seed_vault_records",
+                "producer_audit": {
+                  "all_stage_targets_exact": true,
+                  "channels": 32,
+                  "chunks_observed": 4,
+                  "copied_selected_and_context_bytes": 18624,
+                  "coverage": "sampled",
+                  "decoder_context_array_bytes": 96,
+                  "exported_cache_equals_hook_cache": true,
+                  "format": "qwen3_inside_forward_producer_capture_v1",
+                  "head_dim": 16,
+                  "hidden_size": 64,
+                  "hook_counts": {
+                    "root_post": 4,
+                    "root_pre": 4,
+                    "rotary": 4
+                  },
+                  "hooks_removed": true,
+                  "inner_stage_counts": {
+                    "0": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    },
+                    "1": {
+                      "attention_post": 4,
+                      "attention_pre": 4,
+                      "input_layernorm": 4,
+                      "k_norm": 4,
+                      "k_proj": 4,
+                      "v_proj": 4
+                    }
+                  },
+                  "k_rope_replay_equals_cache": true,
+                  "kv_heads": 2,
+                  "layers": 2,
+                  "logical_KV_records": 8,
+                  "on_tile_callback_count": 0,
+                  "on_tile_callback_wall_seconds": 0.0,
+                  "on_tile_enabled": false,
+                  "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+                  "raw_hidden_features_persisted": false,
+                  "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+                  "retained_public_selected_bytes": 14336,
+                  "rope_position_rule": "contiguous absolute positions starting at zero",
+                  "rope_stable": true,
+                  "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied.",
+                  "selected_records": [
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 0,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 16,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 0,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    },
+                    {
+                      "all_stage_targets_exact": true,
+                      "k_cache_export_mismatched_words": 0,
+                      "k_rope_replay_cache_mismatched_words": 0,
+                      "layer": 1,
+                      "selected_shapes": {
+                        "_k_replay": [
+                          8,
+                          32
+                        ],
+                        "_v_hook": [
+                          8,
+                          32
+                        ],
+                        "cos": [
+                          8,
+                          16
+                        ],
+                        "hidden": [
+                          8,
+                          64
+                        ],
+                        "k": [
+                          8,
+                          32
+                        ],
+                        "k_pre_rope": [
+                          8,
+                          32
+                        ],
+                        "k_proj": [
+                          8,
+                          32
+                        ],
+                        "sin": [
+                          8,
+                          16
+                        ],
+                        "v": [
+                          8,
+                          32
+                        ]
+                      },
+                      "start": 24,
+                      "tokens": 8,
+                      "v_cache_export_mismatched_words": 0,
+                      "v_hook_cache_mismatched_words": 0
+                    }
+                  ],
+                  "selected_tile_pairs": 4,
+                  "selected_tiles_ready_inside_attention": 4,
+                  "tile_tokens": 8,
+                  "total_tile_pairs": 8,
+                  "total_tokens": 32,
+                  "v_hook_equals_cache": true
+                },
+                "split": "train"
+              }
+            }
+          ],
+          "training_stats": {
+            "layer_00": {
+              "K": {
+                "coefficient_clipped_values": 0,
+                "feature_transform": "abs",
+                "ridge_lambda": 1.0,
+                "training_mean_abs_exponent_error": 1.1048177083333333
+              },
+              "V": {
+                "coefficient_clipped_values": 0,
+                "feature_transform": "abs",
+                "ridge_lambda": 1.0,
+                "training_mean_abs_exponent_error": 1.169921875
+              },
+              "feature_scale_rule": "TRAIN max(abs(hidden))/127 in float32; zero columns use 1.0",
+              "selected_hidden_indices": [
+                42,
+                62,
+                26,
+                18
+              ],
+              "selected_hidden_variances": [
+                1.6717858959196341,
+                1.48719443505009,
+                1.4154144106137714,
+                1.374214350763295
+              ],
+              "training_feature_saturated_values": 5
+            },
+            "layer_01": {
+              "K": {
+                "coefficient_clipped_values": 0,
+                "feature_transform": "abs",
+                "ridge_lambda": 1.0,
+                "training_mean_abs_exponent_error": 1.1328125
+              },
+              "V": {
+                "coefficient_clipped_values": 0,
+                "feature_transform": "abs",
+                "ridge_lambda": 1.0,
+                "training_mean_abs_exponent_error": 1.1419270833333333
+              },
+              "feature_scale_rule": "TRAIN max(abs(hidden))/127 in float32; zero columns use 1.0",
+              "selected_hidden_indices": [
+                5,
+                13,
+                56,
+                26
+              ],
+              "selected_hidden_variances": [
+                1.4364092794712633,
+                1.3735427378107694,
+                1.3486685980978008,
+                1.3119162271420162
+              ],
+              "training_feature_saturated_values": 4
+            }
+          }
+        }
+      }
+    },
+    "decoder_artifacts": {
+      "calibration/producer_frozen.bin": {
+        "bytes": 15500,
+        "sha256": "28361819177a361ae406de2609e86cfa4d1989aa561d666bea23671ab702a2ef"
+      },
+      "calibration/producer_hidden_r4.bin": {
+        "bytes": 18423,
+        "sha256": "e4df32786909060c5a19ef17b5b5406c9860396ba986af855b3348efbb6792a2"
+      },
+      "calibration/producer_hidden_abs_r4.bin": {
+        "bytes": 18403,
+        "sha256": "12769eae968df0b38addccfc9aac7be8fdd8becaf71e0cf9b2f3b16b5dda7c64"
+      },
+      "calibration/producer_state_e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.bin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "calibration/producer_state_28361819177a361ae406de2609e86cfa4d1989aa561d666bea23671ab702a2ef.bin": {
+        "bytes": 15500,
+        "sha256": "28361819177a361ae406de2609e86cfa4d1989aa561d666bea23671ab702a2ef"
+      },
+      "calibration/producer_state_e4df32786909060c5a19ef17b5b5406c9860396ba986af855b3348efbb6792a2.bin": {
+        "bytes": 18423,
+        "sha256": "e4df32786909060c5a19ef17b5b5406c9860396ba986af855b3348efbb6792a2"
+      },
+      "calibration/producer_state_12769eae968df0b38addccfc9aac7be8fdd8becaf71e0cf9b2f3b16b5dda7c64.bin": {
+        "bytes": 18403,
+        "sha256": "12769eae968df0b38addccfc9aac7be8fdd8becaf71e0cf9b2f3b16b5dda7c64"
+      },
+      "calibration/producer_state_6aa13e418dbf894330672b141883446deb72c7cbf14027dff4fcfca0ed0c510d.bin": {
+        "bytes": 294,
+        "sha256": "6aa13e418dbf894330672b141883446deb72c7cbf14027dff4fcfca0ed0c510d"
+      },
+      "calibration/producer_state_60be85dfd54b21a27840c5ac8d349a360de15dd269b18935be85d6c70d592750.bin": {
+        "bytes": 536,
+        "sha256": "60be85dfd54b21a27840c5ac8d349a360de15dd269b18935be85d6c70d592750"
+      }
+    },
+    "candidates": [
+      {
+        "name": "producer_kv_median",
+        "kind": "kv_median",
+        "method": "producer_pair"
+      },
+      {
+        "name": "producer_kv_fixed127",
+        "kind": "kv_fixed127",
+        "method": "producer_pair"
+      },
+      {
+        "name": "producer_frozen_exponent",
+        "kind": "frozen",
+        "method": "producer_pair"
+      },
+      {
+        "name": "producer_hidden_exponent",
+        "kind": "hidden",
+        "method": "producer_pair"
+      },
+      {
+        "name": "producer_hidden_abs_exponent",
+        "kind": "hidden_abs",
+        "method": "producer_pair"
+      },
+      {
+        "name": "producer_pre_rope_residual",
+        "kind": "pre_rope",
+        "correction": "residual",
+        "method": "producer_pair"
+      },
+      {
+        "name": "producer_pre_rope_coset",
+        "kind": "pre_rope",
+        "correction": "coset",
+        "method": "producer_pair"
+      },
+      {
+        "name": "producer_kproj_norm_rope_residual",
+        "kind": "kproj_norm_rope",
+        "correction": "residual",
+        "method": "producer_pair"
+      },
+      {
+        "name": "producer_kproj_norm_rope_coset",
+        "kind": "kproj_norm_rope",
+        "correction": "coset",
+        "method": "producer_pair"
+      }
+    ],
+    "configuration": {
+      "device": "cpu",
+      "model": "Qwen/Qwen3-4B-Instruct-2507",
+      "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+      "local_files_only": false,
+      "tiny": true,
+      "lengths": [
+        64,
+        96
+      ],
+      "cases": 3,
+      "train_tokens": 32,
+      "dev_tokens": 24,
+      "chunk_tokens": 8,
+      "tile_tokens": 8,
+      "max_tiles": 4,
+      "rank": 4,
+      "repeats": 1,
+      "sample_pairs": 2,
+      "generation_steps": 2,
+      "skip_inline": false,
+      "threads": 4,
+      "seed": 71,
+      "output": "/workspace/scratch/724d38606f5c/producer_hooks_portable_tiny_final"
+    },
+    "selection_source": "TRAIN-only fits; fixed recipes and DEV representatives before fresh TEST captures"
+  },
+  "sha256": "ce73d6fcd9a1553a9159e18315b65fe7c76638e423b190e4933357161479ccc3"
+}

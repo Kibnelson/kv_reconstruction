@@ -8,6 +8,16 @@ Prefill recipe insight update: `--native-preset insights` tests **33 native meth
 
 Add `--prefill-recipes` to construct and verify selected recipes directly from device KV between prefill chunks, before CPU export. The transformer still retains full raw KV, and capture prefill time includes all observer methods and verification work. Check `prefill_observer` separately from repeated post-capture `native_packet` measurements. New insight-method GPU results require a target run.
 
+For **actual forward intermediates**, use the separate `--producer-study` mode. It observes normalized hidden states, raw K projections, key normalization outputs and rotary metadata. Nine paired recipes compare static/KV-only controls with hidden-informed exponent prediction and normalization/RoPE replay using exact residual or coset corrections. By default, packets are constructed and checked inside attention forward; diagnostic CPU copies and device staging are explicit costs. Complete decoder state and side information count. See [the design, GPU command and push instructions](../docs/producer_forward_study.md).
+
+```bash
+python qwen_kv_gpu_bench.py --producer-study --device cuda \
+  --lengths 2048 8192 --cases 3 --tile-tokens 64 --max-tiles 72 \
+  --rank 8 --output runs/qwen_producer_hooks
+```
+
+This mode uses its own parser (`--producer-study --help`). `--max-tiles` counts K/V **pairs**; 72 pairs match 144 separate KV records in the earlier study. TRAIN-only models freeze before TEST. Reports separate inline verification from repeated post-capture timings, and compare their packet bytes and state identities. Three full-DEV continuations are checked; all measured pairs must reconstruct exactly. `--tiny --device cpu` uses random local Qwen weights without a download. No new pretrained-model savings or GPU speed claim follows from the tiny run.
+
 Cache compatibility update: this revision reads modern `cache.layers[i].keys/values` storage and legacy cache interfaces. It no longer requires `to_legacy_cache()`, which newer Transformers versions removed. Capture metadata records the actual cache class; errors include the cache class and installed Transformers version. Existing installations can use the updated script without downgrading Transformers. Run `--doctor` to record the versions used by your experiment.
 
 ## Install and check the machine
