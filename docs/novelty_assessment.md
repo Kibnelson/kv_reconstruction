@@ -33,7 +33,7 @@ Flash-Decoding already splits attention over KV chunks and combines partial resu
 
 The [A4500 conditional review](qwen_conditional_gpu_review.md) reports **33.3898% mean estimated reduction**, including complete state, for exponent Huffman plus sign coding. Exponent-only reaches 32.9038% with about half the decode cost. Every learned mean/anchor/latent method selects the existing tier fallback on every measured TEST and DEV record. Those generation checks therefore validate fallback restoration, not a successful retained learned representation.
 
-Current GPU decode/transfer costs do not demonstrate a migration speedup. The benchmark retains raw KV during capture and has no compact-resident attention, concurrency scheduler or partial-capacity admission. The new probability study has functional exact-stream coverage, but no submitted Qwen GPU result yet. The measured figures and validation limits are evidence about this implementation, rather than comparisons with published systems on matched hardware.
+Current GPU decode/transfer costs do not demonstrate a migration speedup. The benchmark retains raw KV during capture and has no compact-resident attention, concurrency scheduler or partial-capacity admission. The subsequent [Qwen probability smoke review](qwen_neural_gpu_review.md) confirms exact learned pages and complete DEV continuation, but its first-16-position TEST sample cannot establish whole-context rates. Shared neural estimates 25.47% savings with state versus 26.04% for its matched control, and CPU arithmetic decoding dominates restoration. The measured figures and validation limits are evidence about this implementation, rather than comparisons with published systems on matched hardware.
 
 ## The contribution worth testing next
 

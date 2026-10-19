@@ -1,0 +1,144 @@
+{
+  "format": "qwen_conditional_neural_comparison_v1",
+  "groups": [
+    {
+      "cases": 6,
+      "methods": [
+        {
+          "decode_ms_per_raw_MiB": 8.826825379704436,
+          "estimated_net_reduction_pct": 28.839031524128384,
+          "learned_packets_retained": false,
+          "method": "conditional_anchor_r32"
+        },
+        {
+          "decode_ms_per_raw_MiB": 8.788324892520905,
+          "estimated_net_reduction_pct": 30.30354148811764,
+          "learned_packets_retained": false,
+          "method": "conditional_anchor_r8"
+        },
+        {
+          "decode_ms_per_raw_MiB": 8.916035837804278,
+          "estimated_net_reduction_pct": 30.942212955819237,
+          "learned_packets_retained": null,
+          "method": "conditional_fast_pre_rope"
+        },
+        {
+          "decode_ms_per_raw_MiB": 10.654869411761561,
+          "estimated_net_reduction_pct": 32.90383922005141,
+          "learned_packets_retained": null,
+          "method": "conditional_huffman_exponent"
+        },
+        {
+          "decode_ms_per_raw_MiB": 21.80405248266955,
+          "estimated_net_reduction_pct": 33.38977036376794,
+          "learned_packets_retained": null,
+          "method": "conditional_huffman_exponent_sign"
+        },
+        {
+          "decode_ms_per_raw_MiB": 8.935009827837348,
+          "estimated_net_reduction_pct": 26.361733136905563,
+          "learned_packets_retained": false,
+          "method": "conditional_latent_r32"
+        },
+        {
+          "decode_ms_per_raw_MiB": 8.850671040515104,
+          "estimated_net_reduction_pct": 29.658162055744064,
+          "learned_packets_retained": false,
+          "method": "conditional_latent_r8"
+        },
+        {
+          "decode_ms_per_raw_MiB": 8.973647452269992,
+          "estimated_net_reduction_pct": 30.843811854720116,
+          "learned_packets_retained": false,
+          "method": "conditional_mean_predictor"
+        },
+        {
+          "decode_ms_per_raw_MiB": 4.782636029024919,
+          "estimated_net_reduction_pct": -0.8448149594995624,
+          "learned_packets_retained": null,
+          "method": "conditional_raw_fullword"
+        },
+        {
+          "decode_ms_per_raw_MiB": 0.22608879953622818,
+          "estimated_net_reduction_pct": -0.1645462380515217,
+          "learned_packets_retained": null,
+          "method": "conditional_raw_pair"
+        },
+        {
+          "decode_ms_per_raw_MiB": 20.153893623501062,
+          "estimated_net_reduction_pct": 31.32964974200284,
+          "learned_packets_retained": null,
+          "method": "conditional_tier_sign"
+        },
+        {
+          "decode_ms_per_raw_MiB": 8.172308250019947,
+          "estimated_net_reduction_pct": 30.379577505367774,
+          "learned_packets_retained": null,
+          "method": "frontier_cost_final_raw8"
+        },
+        {
+          "decode_ms_per_raw_MiB": 7.363270580147703,
+          "estimated_net_reduction_pct": 29.84312738257426,
+          "learned_packets_retained": null,
+          "method": "producer_frozen_exponent"
+        }
+      ],
+      "name": "conditional_13",
+      "result_commit": "2fc0c9f20c3607fad89a94567ae5c96de51f8a23",
+      "scope": "Six TEST-case arithmetic means; sampled layer/tile addresses; repeated device-resident decode microbenchmarks.",
+      "tile_tokens": 64
+    },
+    {
+      "cases": 1,
+      "context_tokens": 2048,
+      "measured_token_positions": 16,
+      "methods": [
+        {
+          "charged_state_bytes": 85450,
+          "decode_ms_per_raw_MiB": 35.5851509504848,
+          "estimated_net_reduction_pct": 26.040370596779717,
+          "learned_packets_retained": false,
+          "method": "frozen_exponent_control",
+          "sample_container_bytes": 1744259,
+          "sample_packet_reduction_pct": 26.068666246202255,
+          "sample_raw_bytes": 2359296
+        },
+        {
+          "charged_state_bytes": 479022719,
+          "decode_ms_per_raw_MiB": 3396.6093841526244,
+          "estimated_net_reduction_pct": -128.84449395868512,
+          "learned_packets_retained": true,
+          "method": "neural_per_layer",
+          "sample_container_bytes": 1656754,
+          "sample_packet_reduction_pct": 29.777611626519096,
+          "sample_raw_bytes": 2359296
+        },
+        {
+          "charged_state_bytes": 14843667,
+          "decode_ms_per_raw_MiB": 3318.2745857371224,
+          "estimated_net_reduction_pct": 25.47178698910607,
+          "learned_packets_retained": true,
+          "method": "neural_shared",
+          "sample_container_bytes": 1642375,
+          "sample_packet_reduction_pct": 30.387073092990452,
+          "sample_raw_bytes": 2359296
+        }
+      ],
+      "name": "neural_smoke_3",
+      "result_commit": "460c2366ddf383d060417f32eb14da434b99e45a",
+      "scope": "First16token all-layer chain; one functional synchronized decode. Full-cache sizes extrapolate128x; shared system/chat prefix creates TRAIN/TEST overlap risk.",
+      "selected_token_starts": [
+        0
+      ],
+      "tile_tokens": 16
+    }
+  ],
+  "limitations": [
+    "Different sampled addresses, page sizes, framing and decoder timing protocols across studies.",
+    "No representative neural full-context TEST compression result yet.",
+    "No measured concurrent admission, compact-resident attention or serving capacity result."
+  ],
+  "paired_comparisons_only_within_each_group": true,
+  "pooled_ranking_supported": false,
+  "savings_additive": false
+}

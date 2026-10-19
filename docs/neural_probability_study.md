@@ -4,6 +4,8 @@ The supplied Approach 2 code suggests a useful next experiment: use the already 
 
 This experiment tests that idea on actual Qwen captures, including complete decoder state and a real CPU arithmetic stream. It does not establish a Qwen 40% saving, cheap GPU restoration, independent decoding of arbitrary layers, or a novelty claim.
 
+The [A4500 smoke review](qwen_neural_gpu_review.md) now confirms exact learned pages and complete 128-token DEV continuation in both modes. Shared neural has 30.39% sampled packet savings and 25.47% estimated net savings with state; its matched control estimates 26.04%. TEST sizing covers only the first 16 positions, and CPU arithmetic decoding dominates restoration. The review compares all current conditional tracks, explains the sampling limits and supplies a shared-only position-coverage command before increasing training.
+
 ## Audit of the supplied archive
 
 Archive SHA256: `3af509d9f6d181ba6f097f7746f2e29e68d74153ed4e6ae55ece9c2a6866a5cc`.
@@ -64,7 +66,7 @@ The proposed information flow is:
 3. Encode layer zero of each selected token tile with an independent exact anchor codec.
 4. Actually decode that anchor. Use its reconstructed words to generate layer one's probabilities, encode layer one, and actually decode it.
 5. Continue through every layer in that tile. Every conditioning input comes from a decoded prerequisite, rather than the original capture.
-6. Persist an indexed cache container and reopen it for reconstruction. The decoder receives the container, frozen state and its execution contract; it does not receive the original target words or precomputed per-value predictions.
+6. Serialize an indexed cache container to bytes and reopen those bytes for reconstruction. The decoder receives the container, frozen state and its execution contract; it does not receive the original target words or precomputed per-value predictions. Current container roundtrips happen in memory, rather than through file-backed, separate-process replay.
 
 The first port follows the cheap source configuration: `inputs=prev1`, one logistic component, width 512, no stored activation code, and no same-layer K-to-V network. More mixture components, `prev2` and `vk=1` remain separate possible experiments rather than being silently included.
 
@@ -113,7 +115,7 @@ Headline full-cache estimates scale the **complete sampled container/raw-byte de
 
 `estimated_full_container_bytes = sampled_container_bytes * full_raw_bytes / sampled_raw_bytes`.
 
-Complete charged state is then added once, without scaling it. Actual selected containers are persisted and reopened, but this extrapolation is not a serialized full cache. Scaling a fixed header can overcount its full-cache contribution; unequal tail lengths and unrepresentative selected tiles can bias the estimated density in either direction. Treat these figures as provisional until full coverage is measured, and distinguish them from actual selected-container bytes.
+Complete charged state is then added once, without scaling it. Actual selected containers are serialized and reopened in memory, but this extrapolation is not a serialized full cache. Scaling a fixed header can overcount its full-cache contribution; unequal tail lengths and unrepresentative selected tiles can bias the estimated density in either direction. Treat these figures as provisional until full coverage is measured, and distinguish them from actual selected-container bytes.
 
 ## Commands for the NUC
 
