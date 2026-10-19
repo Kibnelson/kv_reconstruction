@@ -1,6 +1,6 @@
 # Four conditional KV experiments: exact rates and decision metadata
 
-The [A4500 frontier review](qwen_frontier_gpu_review.md) measured 30.76% mean estimated savings, including complete state. The remaining gap to 40% is 1.48 bits per original BF16 value. This preset tests four ways to change that payload. It includes all outcomes and explicit controls; no new Qwen GPU savings are claimed before the next target-machine run.
+The [A4500 frontier review](qwen_frontier_gpu_review.md) measured 30.76% mean estimated savings, including complete state. This preset tests four ways to change that payload. The subsequent [A4500 conditional review](qwen_conditional_gpu_review.md) finds 33.39% mean estimated savings for exponent Huffman plus separate sign coding, and 32.90% for exponent-only at roughly half its decode cost. Learned anchor and prefill-feature candidates always fall back to tier coding. The 40% target and capacity-bounded serving benefits remain unconfirmed; the review explains the remaining 1.06-bit gap, correction-format failure and workspace costs.
 
 ## Fixed comparisons
 

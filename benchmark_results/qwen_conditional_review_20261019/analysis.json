@@ -1,0 +1,5251 @@
+{
+  "actual_training_rows_per_layer": {
+    "0": 384,
+    "1": 384,
+    "2": 384,
+    "3": 384,
+    "4": 384,
+    "5": 384,
+    "6": 384,
+    "7": 384,
+    "8": 384,
+    "9": 384,
+    "10": 384,
+    "11": 384,
+    "12": 384,
+    "13": 384,
+    "14": 384,
+    "15": 384,
+    "16": 384,
+    "17": 384,
+    "18": 384,
+    "19": 384,
+    "20": 384,
+    "21": 384,
+    "22": 384,
+    "23": 384,
+    "24": 384,
+    "25": 384,
+    "26": 384,
+    "27": 384,
+    "28": 384,
+    "29": 384,
+    "30": 384,
+    "31": 384,
+    "32": 384,
+    "33": 384,
+    "34": 384,
+    "35": 384
+  },
+  "averaging": "Unweighted arithmetic mean of the six TEST cases. Cases of different lengths sharing one synthetic fixture are correlated. Full-cache sizes remain sampled estimates.",
+  "benchmark_release": "efc74fe7477bcf524752d06d3aafe537a026f867",
+  "caveats": [
+    "All learned QwenDEV/TEST packets use fallback; successful adaptive continuation is not proof of a retained learned decoder path on this checkpoint.",
+    "Runtime differs from priorfrontier run: use matched within-run controls.",
+    "Full rawKV is retained duringcapture; noactual compact-residentattention or partialcapacityadmission.",
+    "The beststorage incrementalcodec usesstandard entropy ingredients; prefill informationcollectionalone doesnotestablishnovelty."
+  ],
+  "configuration": {
+    "cases": 3,
+    "chunk_tokens": 512,
+    "dev_tokens": 512,
+    "device": "cuda",
+    "generation_steps": 2,
+    "lengths": [
+      2048,
+      8192
+    ],
+    "local_files_only": false,
+    "max_tiles": 72,
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "output": "runs/qwen_conditional_4ideas",
+    "producer_preset": "conditional",
+    "rank": 8,
+    "repeats": 3,
+    "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "sample_pairs": 16,
+    "seed": 71,
+    "skip_inline": false,
+    "threads": 4,
+    "tile_tokens": 64,
+    "tiny": false,
+    "train_tokens": 512
+  },
+  "elapsed_seconds": 1215.759559996426,
+  "environment": {
+    "accelerators": [
+      {
+        "available": true,
+        "backend": "cuda",
+        "devices": [
+          {
+            "index": 0,
+            "memory": {
+              "allocated_bytes": 0,
+              "device": "cuda:0",
+              "free_device_bytes": 20645937152,
+              "peak_allocated_bytes": 0,
+              "peak_reserved_bytes": 0,
+              "reserved_bytes": 0,
+              "total_device_bytes": 20993015808
+            },
+            "name": "NVIDIA RTX A4500",
+            "reported_bf16_support": true
+          }
+        ]
+      },
+      {
+        "available": false,
+        "backend": "xpu",
+        "devices": []
+      }
+    ],
+    "bf16_probe": {
+      "error": null,
+      "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+      "success": true
+    },
+    "host_available_memory_bytes": 63187177472,
+    "machine": "x86_64",
+    "memory": {
+      "allocated_bytes": 0,
+      "device": "cuda:0",
+      "free_device_bytes": 20645937152,
+      "peak_allocated_bytes": 0,
+      "peak_reserved_bytes": 0,
+      "reserved_bytes": 0,
+      "total_device_bytes": 20993015808
+    },
+    "model_download_performed": false,
+    "native_codec_capability_note": "Native E8 and binary predictors currently use float64. Some Intel/XPU devices may support BF16 while rejecting those float64 operations. An auxiliary probe failure does not veto other BF16 model/native format runs; report unsupported methods separately. These compact probes do not establish complete codec support or performance.",
+    "operation_probes": {
+      "float64_pointwise": {
+        "error": null,
+        "scope": "float64 device allocation, multiply/add, rounding and equality",
+        "success": true
+      },
+      "int64_bitwise": {
+        "error": null,
+        "scope": "int64 device allocation, shifts, XOR, AND and equality",
+        "success": true
+      },
+      "uint16_view_copy": {
+        "error": null,
+        "scope": "uint16/BF16 bit reinterpretation, device clone and copy to CPU",
+        "success": true
+      }
+    },
+    "platform": "Linux-6.8.0-111-generic-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "requested_device": "cuda:0",
+    "selected_device": "cuda:0",
+    "selection_error": null,
+    "torch_cuda_build": "13.0",
+    "torch_hip_build": null,
+    "versions": {
+      "numpy": "2.5.2",
+      "safetensors": "0.8.0",
+      "torch": "2.14.0",
+      "transformers": "5.17.0"
+    }
+  },
+  "format": "qwen_conditional_gpu_review_v1",
+  "latency_break_even": {
+    "conditional_fast_pre_rope__versus__conditional_raw_pair": {
+      "cases": [
+        {
+          "break_even_MiB_per_second": 36.048892597789674,
+          "case": "test_pottery_kiln_diary_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.00863019097596407,
+          "wire_MiB_saved_per_raw_MiB": 0.3111088275909424
+        },
+        {
+          "break_even_MiB_per_second": 34.332076131236285,
+          "case": "test_python_dependency_walk_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.009053316432982683,
+          "wire_MiB_saved_per_raw_MiB": 0.310819149017334
+        },
+        {
+          "break_even_MiB_per_second": 35.87209017176506,
+          "case": "test_museum_loan_register_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.00866653211414814,
+          "wire_MiB_saved_per_raw_MiB": 0.3108866214752197
+        },
+        {
+          "break_even_MiB_per_second": 36.122077398738206,
+          "case": "test_pottery_kiln_diary_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.008588185533881187,
+          "wire_MiB_saved_per_raw_MiB": 0.3102231025695801
+        },
+        {
+          "break_even_MiB_per_second": 35.975877066693315,
+          "case": "test_python_dependency_walk_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.008619786240160465,
+          "wire_MiB_saved_per_raw_MiB": 0.3101043701171875
+        },
+        {
+          "break_even_MiB_per_second": 36.1477484559931,
+          "case": "test_museum_loan_register_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.008581670932471752,
+          "wire_MiB_saved_per_raw_MiB": 0.3102080821990967
+        }
+      ],
+      "maximum_MiB_per_second": 36.1477484559931,
+      "mean_MiB_per_second": 35.74979363703594,
+      "minimum_MiB_per_second": 34.332076131236285,
+      "ratio_of_mean_saved_to_mean_extra_decode": 35.737658406963384
+    },
+    "conditional_huffman_exponent__versus__conditional_fast_pre_rope": {
+      "cases": [
+        {
+          "break_even_MiB_per_second": 12.266232423983457,
+          "case": "test_pottery_kiln_diary_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.0016602878458797932,
+          "wire_MiB_saved_per_raw_MiB": 0.020365476608276367
+        },
+        {
+          "break_even_MiB_per_second": 15.647425983247265,
+          "case": "test_python_dependency_walk_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.001314534805715084,
+          "wire_MiB_saved_per_raw_MiB": 0.0205690860748291
+        },
+        {
+          "break_even_MiB_per_second": 12.192341134760847,
+          "case": "test_museum_loan_register_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.001674124039709568,
+          "wire_MiB_saved_per_raw_MiB": 0.02041149139404297
+        },
+        {
+          "break_even_MiB_per_second": 11.836793816830003,
+          "case": "test_pottery_kiln_diary_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.0017423974350094795,
+          "wire_MiB_saved_per_raw_MiB": 0.020624399185180664
+        },
+        {
+          "break_even_MiB_per_second": 12.016072921442248,
+          "case": "test_python_dependency_walk_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.001726718619465828,
+          "wire_MiB_saved_per_raw_MiB": 0.020748376846313477
+        },
+        {
+          "break_even_MiB_per_second": 8.889489313947095,
+          "case": "test_museum_loan_register_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.002314938697963953,
+          "wire_MiB_saved_per_raw_MiB": 0.020578622817993164
+        }
+      ],
+      "maximum_MiB_per_second": 15.647425983247265,
+      "mean_MiB_per_second": 12.141392599035152,
+      "minimum_MiB_per_second": 8.889489313947095,
+      "ratio_of_mean_saved_to_mean_extra_decode": 11.818023182635788
+    },
+    "conditional_huffman_exponent__versus__conditional_raw_pair": {
+      "cases": [
+        {
+          "break_even_MiB_per_second": 32.211747377157,
+          "case": "test_pottery_kiln_diary_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.010290478821843863,
+          "wire_MiB_saved_per_raw_MiB": 0.33147430419921875
+        },
+        {
+          "break_even_MiB_per_second": 31.96305844505794,
+          "case": "test_python_dependency_walk_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.010367851238697767,
+          "wire_MiB_saved_per_raw_MiB": 0.3313882350921631
+        },
+        {
+          "break_even_MiB_per_second": 32.03840336047417,
+          "case": "test_museum_loan_register_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.010340656153857708,
+          "wire_MiB_saved_per_raw_MiB": 0.3312981128692627
+        },
+        {
+          "break_even_MiB_per_second": 32.0260243541985,
+          "case": "test_pottery_kiln_diary_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.010330582968890667,
+          "wire_MiB_saved_per_raw_MiB": 0.33084750175476074
+        },
+        {
+          "break_even_MiB_per_second": 31.977247529698747,
+          "case": "test_python_dependency_walk_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.010346504859626293,
+          "wire_MiB_saved_per_raw_MiB": 0.330852746963501
+        },
+        {
+          "break_even_MiB_per_second": 30.356846416995413,
+          "case": "test_museum_loan_register_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.010896609630435705,
+          "wire_MiB_saved_per_raw_MiB": 0.33078670501708984
+        }
+      ],
+      "maximum_MiB_per_second": 32.211747377157,
+      "mean_MiB_per_second": 31.76222124726363,
+      "minimum_MiB_per_second": 30.356846416995413,
+      "ratio_of_mean_saved_to_mean_extra_decode": 31.749439040634517
+    },
+    "conditional_huffman_exponent_sign__versus__conditional_huffman_exponent": {
+      "cases": [
+        {
+          "break_even_MiB_per_second": 0.378268667906521,
+          "case": "test_pottery_kiln_diary_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.011289106216281652,
+          "wire_MiB_saved_per_raw_MiB": 0.004270315170288086
+        },
+        {
+          "break_even_MiB_per_second": 0.32277500968181855,
+          "case": "test_python_dependency_walk_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.011253371369093657,
+          "wire_MiB_saved_per_raw_MiB": 0.0036323070526123047
+        },
+        {
+          "break_even_MiB_per_second": 0.3392714911241426,
+          "case": "test_museum_loan_register_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.01127822371199727,
+          "wire_MiB_saved_per_raw_MiB": 0.0038263797760009766
+        },
+        {
+          "break_even_MiB_per_second": 0.46384974504335,
+          "case": "test_pottery_kiln_diary_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.011204163078218699,
+          "wire_MiB_saved_per_raw_MiB": 0.005197048187255859
+        },
+        {
+          "break_even_MiB_per_second": 0.3879618491877377,
+          "case": "test_python_dependency_walk_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.011161913629621267,
+          "wire_MiB_saved_per_raw_MiB": 0.00433039665222168
+        },
+        {
+          "break_even_MiB_per_second": 0.43897273532118253,
+          "case": "test_museum_loan_register_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.010708320420235395,
+          "wire_MiB_saved_per_raw_MiB": 0.004700660705566406
+        }
+      ],
+      "maximum_MiB_per_second": 0.46384974504335,
+      "mean_MiB_per_second": 0.3885165830441254,
+      "minimum_MiB_per_second": 0.32277500968181855,
+      "ratio_of_mean_saved_to_mean_extra_decode": 0.38802704764495605
+    },
+    "producer_frozen_exponent__versus__conditional_raw_pair": {
+      "cases": [
+        {
+          "break_even_MiB_per_second": 42.193450010658154,
+          "case": "test_pottery_kiln_diary_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.007121572270989418,
+          "wire_MiB_saved_per_raw_MiB": 0.30048370361328125
+        },
+        {
+          "break_even_MiB_per_second": 41.71641869713928,
+          "case": "test_python_dependency_walk_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.00720026483759284,
+          "wire_MiB_saved_per_raw_MiB": 0.3003692626953125
+        },
+        {
+          "break_even_MiB_per_second": 42.41862452044743,
+          "case": "test_museum_loan_register_2048",
+          "extra_decode_seconds_per_raw_MiB": 0.0070810141041874886,
+          "wire_MiB_saved_per_raw_MiB": 0.3003668785095215
+        },
+        {
+          "break_even_MiB_per_second": 41.402883800814735,
+          "case": "test_pottery_kiln_diary_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.0072222207672894,
+          "wire_MiB_saved_per_raw_MiB": 0.29902076721191406
+        },
+        {
+          "break_even_MiB_per_second": 42.11639953440921,
+          "case": "test_python_dependency_walk_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.007099474780261517,
+          "wire_MiB_saved_per_raw_MiB": 0.29900431632995605
+        },
+        {
+          "break_even_MiB_per_second": 42.12410555833515,
+          "case": "test_museum_loan_register_8192",
+          "extra_decode_seconds_per_raw_MiB": 0.007098543923348188,
+          "wire_MiB_saved_per_raw_MiB": 0.29901981353759766
+        }
+      ],
+      "maximum_MiB_per_second": 42.41862452044743,
+      "mean_MiB_per_second": 41.99531368696733,
+      "minimum_MiB_per_second": 41.402883800814735,
+      "ratio_of_mean_saved_to_mean_extra_decode": 41.99287611399275
+    }
+  },
+  "latency_caveats": [
+    "Break-even uses actual matched repeated-sample packet bytes and extra isolated decode wall time, assumes common linear external link bandwidth and already resident decoder state; excludes encoding, cold state transfer, allocator/transfer differences, overlap and serving effects.",
+    "Per-field pageable packet transfer+decode timings are actual microbenchmark paths; raw packet has fewer fields. These timings are not TTFT, TPOT, migration service or large-transfer link bandwidth.",
+    "Isolated per-record allocation peaks include output tensors and exclude already resident state/input packet/staged producer tensors.",
+    "All TEST sizes are sampled whole-cache estimates; the benchmark retains full raw KV during capture."
+  ],
+  "methods": {
+    "conditional_anchor_r32": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__lower": 4.0,
+        "K__primary": 1.0,
+        "K__rare": 0.04599338107638889,
+        "K__rare_offsets": 0.03125,
+        "K__secondary": 0.334795492666739,
+        "K__secondary_offsets": 0.03125,
+        "V__lower": 4.0,
+        "V__primary": 1.0,
+        "V__rare": 0.058521412037037035,
+        "V__rare_offsets": 0.03125,
+        "V__secondary": 0.41035192984121815,
+        "V__secondary_offsets": 0.03125,
+        "complete_decoder_state": 0.3440941704644097,
+        "header": 0.06650896425600406,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 8.855831809341908,
+        "mean": 8.826825379704436,
+        "minimum": 8.794821798801422
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 11.588867611355251,
+        "mean": 11.38575495613946,
+        "minimum": 11.18354426489936
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 21.14812129487594,
+        "mean": 20.94574793483372,
+        "minimum": 20.72412624127335
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.9888676113552517,
+        "mean": 1.7857549561394592,
+        "minimum": 1.583544264899361
+      },
+      "name": "conditional_anchor_r32",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 9.905730839818716,
+        "mean": 9.882175285990039,
+        "minimum": 9.855593089014292
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 30.102848344378998,
+        "mean": 28.839031524128384,
+        "minimum": 27.56957742902968
+      },
+      "spec": {
+        "fallback": true,
+        "family": "anchor",
+        "kind": "predictor",
+        "method": "conditional_pair",
+        "model": "conditional_anchor_r32",
+        "name": "conditional_anchor_r32",
+        "rank": 32
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "tier": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 4.76708984375,
+          "mean": 4.76708984375,
+          "minimum": 4.76708984375
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 8.855831809341908,
+          "mean": 8.826825379704436,
+          "minimum": 8.794821798801422
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 22.6318359375,
+          "mean": 22.6318359375,
+          "minimum": 22.6318359375
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 21.14812129487594,
+          "mean": 20.94574793483372,
+          "minimum": 20.72412624127335
+        },
+        "predictor_fallback_counts": {
+          "True": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.6915180683135986,
+          "mean": 0.6910632451375326,
+          "minimum": 0.69051194190979
+        },
+        "savings_percent": {
+          "maximum": 30.102848344378998,
+          "mean": 28.839031524128384,
+          "minimum": 27.56957742902968
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.5808799631065793,
+          "mean": 0.5716143382920159,
+          "minimum": 0.5553001537919044
+        },
+        "state_bytes": {
+          "maximum": 10391296,
+          "mean": 10391296,
+          "minimum": 10391296
+        },
+        "state_resident_bytes": {
+          "maximum": 10391296,
+          "mean": 10391296,
+          "minimum": 10391296
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 9.905730839818716,
+          "mean": 9.882175285990039,
+          "minimum": 9.855593089014292
+        }
+      }
+    },
+    "conditional_anchor_r8": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__lower": 4.0,
+        "K__primary": 1.0,
+        "K__rare": 0.04599338107638889,
+        "K__rare_offsets": 0.03125,
+        "K__secondary": 0.334795492666739,
+        "K__secondary_offsets": 0.03125,
+        "V__lower": 4.0,
+        "V__primary": 1.0,
+        "V__rare": 0.058521412037037035,
+        "V__rare_offsets": 0.03125,
+        "V__secondary": 0.41035192984121815,
+        "V__secondary_offsets": 0.03125,
+        "complete_decoder_state": 0.10983361138237847,
+        "header": 0.06644792909975406,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 8.833696134388447,
+        "mean": 8.788324892520905,
+        "minimum": 8.74420441687107
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 11.213989681667751,
+        "mean": 11.151433361901178,
+        "minimum": 11.089779006110298
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 21.044884187479813,
+        "mean": 20.93691377107192,
+        "minimum": 20.831637601885532
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.6139896816677517,
+        "mean": 1.551433361901178,
+        "minimum": 1.4897790061102985
+      },
+      "name": "conditional_anchor_r8",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 9.895546361804008,
+        "mean": 9.839154003808895,
+        "minimum": 9.785107802599669
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 30.68888121181064,
+        "mean": 30.30354148811764,
+        "minimum": 29.912564489576553
+      },
+      "spec": {
+        "fallback": true,
+        "family": "anchor",
+        "kind": "predictor",
+        "method": "conditional_pair",
+        "model": "conditional_anchor_r8",
+        "name": "conditional_anchor_r8",
+        "rank": 8
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "tier": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 4.76708984375,
+          "mean": 4.76708984375,
+          "minimum": 4.76708984375
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 8.833696134388447,
+          "mean": 8.788324892520905,
+          "minimum": 8.74420441687107
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 22.62890625,
+          "mean": 22.62890625,
+          "minimum": 22.62890625
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 21.044884187479813,
+          "mean": 20.93691377107192,
+          "minimum": 20.831637601885532
+        },
+        "predictor_fallback_counts": {
+          "True": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.691514253616333,
+          "mean": 0.691059430440267,
+          "minimum": 0.6905081272125244
+        },
+        "savings_percent": {
+          "maximum": 30.68888121181064,
+          "mean": 30.30354148811764,
+          "minimum": 29.912564489576553
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.5739073579510053,
+          "mean": 0.5713290776367541,
+          "minimum": 0.5658248232470618
+        },
+        "state_bytes": {
+          "maximum": 3316864,
+          "mean": 3316864,
+          "minimum": 3316864
+        },
+        "state_resident_bytes": {
+          "maximum": 3316864,
+          "mean": 3316864,
+          "minimum": 3316864
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 9.895546361804008,
+          "mean": 9.839154003808895,
+          "minimum": 9.785107802599669
+        }
+      }
+    },
+    "conditional_fast_pre_rope": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__lower": 4.0,
+        "K__primary": 1.0,
+        "K__rare": 0.04599338107638889,
+        "K__rare_offsets": 0.03125,
+        "K__secondary": 0.334795492666739,
+        "K__secondary_offsets": 0.03125,
+        "V__lower": 4.0,
+        "V__primary": 1.0,
+        "V__rare": 0.058521412037037035,
+        "V__rare_offsets": 0.03125,
+        "V__secondary": 0.41035192984121815,
+        "V__secondary_offsets": 0.03125,
+        "complete_decoder_state": 0.007707211706373426,
+        "header": 0.06638689394350406,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 9.27793188020587,
+        "mean": 8.916035837804278,
+        "minimum": 8.808073122054338
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 11.053901116053263,
+        "mean": 11.049245927068922,
+        "minimum": 11.045417255825466
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 13.348131440579891,
+        "mean": 13.175092982473197,
+        "minimum": 13.0204228270385
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.453901116053263,
+        "mean": 1.4492459270689224,
+        "minimum": 1.4454172558254665
+      },
+      "name": "conditional_fast_pre_rope",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 10.440359823405743,
+        "mean": 9.990684300040206,
+        "minimum": 9.855986572802067
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 30.966142151090835,
+        "mean": 30.942212955819237,
+        "minimum": 30.913118024667106
+      },
+      "spec": {
+        "family": "control",
+        "kind": "tier",
+        "method": "conditional_pair",
+        "name": "conditional_fast_pre_rope"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "tier": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 4.76708984375,
+          "mean": 4.76708984375,
+          "minimum": 4.76708984375
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 9.27793188020587,
+          "mean": 8.916035837804278,
+          "minimum": 8.808073122054338
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 4.712890625,
+          "mean": 4.710611979166667,
+          "minimum": 4.70947265625
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 13.348131440579891,
+          "mean": 13.175092982473197,
+          "minimum": 13.0204228270385
+        },
+        "predictor_fallback_counts": {
+          "None": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.6915104389190674,
+          "mean": 0.6910556157430013,
+          "minimum": 0.6905043125152588
+        },
+        "savings_percent": {
+          "maximum": 30.966142151090835,
+          "mean": 30.942212955819237,
+          "minimum": 30.913118024667106
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.574480431775252,
+          "mean": 0.5680913002126746,
+          "minimum": 0.5563906290464931
+        },
+        "state_bytes": {
+          "maximum": 232750,
+          "mean": 232750,
+          "minimum": 232750
+        },
+        "state_resident_bytes": {
+          "maximum": 73984,
+          "mean": 73984,
+          "minimum": 73984
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 10.440359823405743,
+          "mean": 9.990684300040206,
+          "minimum": 9.855986572802067
+        }
+      }
+    },
+    "conditional_huffman_exponent": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__exp_huff__checksum": 0.000244140625,
+        "K__exp_huff__payload": 1.2814708285861545,
+        "K__lower": 4.0,
+        "V__exp_huff__checksum": 0.000244140625,
+        "V__exp_huff__payload": 1.3496162979691118,
+        "V__lower": 4.0,
+        "complete_decoder_state": 0.023833016554514565,
+        "header": 0.0794876946343316,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 11.123011820018291,
+        "mean": 10.654869411761561,
+        "minimum": 10.516177862882614
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 10.746256351470947,
+        "mean": 10.735385724791774,
+        "minimum": 10.724701311853197
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 10.83455327898264,
+        "mean": 10.727376090707603,
+        "minimum": 10.613105880717436
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.1462563514709476,
+        "mean": 1.1353857247917745,
+        "minimum": 1.1247013118531974
+      },
+      "name": "conditional_huffman_exponent",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 12.087970972061157,
+        "mean": 11.521119313935438,
+        "minimum": 11.372149921953678
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 32.97061680091752,
+        "mean": 32.90383922005141,
+        "minimum": 32.83589780330658
+      },
+      "spec": {
+        "family": "exponent",
+        "kind": "huffman",
+        "method": "conditional_pair",
+        "name": "conditional_huffman_exponent"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "entropy": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 13.53564453125,
+          "mean": 13.522786458333334,
+          "minimum": 13.5078125
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 11.123011820018291,
+          "mean": 10.654869411761561,
+          "minimum": 10.516177862882614
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 4.93603515625,
+          "mean": 4.935709635416667,
+          "minimum": 4.935546875
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 10.83455327898264,
+          "mean": 10.727376090707603,
+          "minimum": 10.613105880717436
+        },
+        "predictor_fallback_counts": {
+          "None": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.670828104019165,
+          "mean": 0.6705060402552286,
+          "minimum": 0.6701388359069824
+        },
+        "savings_percent": {
+          "maximum": 32.97061680091752,
+          "mean": 32.90383922005141,
+          "minimum": 32.83589780330658
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.5716207540697522,
+          "mean": 0.5613129965409085,
+          "minimum": 0.5506891757249832
+        },
+        "state_bytes": {
+          "maximum": 719733,
+          "mean": 719733,
+          "minimum": 719733
+        },
+        "state_resident_bytes": {
+          "maximum": 406784,
+          "mean": 406784,
+          "minimum": 406784
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 12.087970972061157,
+          "mean": 11.521119313935438,
+          "minimum": 11.372149921953678
+        }
+      }
+    },
+    "conditional_huffman_exponent_sign": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__exp_huff__checksum": 0.000244140625,
+        "K__exp_huff__payload": 1.2814708285861545,
+        "K__mantissa7": 3.5,
+        "K__sign_huff__checksum": 0.000244140625,
+        "K__sign_huff__payload": 0.3730598732277199,
+        "K__sign_seed": 0.0078125,
+        "V__exp_huff__checksum": 0.000244140625,
+        "V__exp_huff__payload": 1.3496162979691118,
+        "V__mantissa7": 3.5,
+        "V__sign_huff__checksum": 0.000244140625,
+        "V__sign_huff__payload": 0.4722256130642361,
+        "V__sign_seed": 0.0078125,
+        "complete_decoder_state": 0.02383321523666382,
+        "header": 0.14033974541558158,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 21.84583805501461,
+        "mean": 21.80405248266955,
+        "minimum": 21.73574920743704
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 10.680282751719156,
+        "mean": 10.65763674179713,
+        "minimum": 10.631165014372932
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 21.605551863710087,
+        "mean": 21.529997992156833,
+        "minimum": 21.468391538494163
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.0802827517191567,
+        "mean": 1.05763674179713,
+        "minimum": 1.0311650143729327
+      },
+      "name": "conditional_huffman_exponent_sign",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 23.018548265099525,
+        "mean": 22.9633916169405,
+        "minimum": 22.905650548636913
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 33.555218660169174,
+        "mean": 33.38977036376794,
+        "minimum": 33.24823280175527
+      },
+      "spec": {
+        "family": "sign",
+        "kind": "huffman_sign",
+        "method": "conditional_pair",
+        "name": "conditional_huffman_exponent_sign"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "entropy": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 15.57861328125,
+          "mean": 15.57861328125,
+          "minimum": 15.57861328125
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 21.84583805501461,
+          "mean": 21.80405248266955,
+          "minimum": 21.73574920743704
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 9.931640625,
+          "mean": 9.931315104166666,
+          "minimum": 9.93115234375
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 21.605551863710087,
+          "mean": 21.529997992156833,
+          "minimum": 21.468391538494163
+        },
+        "predictor_fallback_counts": {
+          "None": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.6665925979614258,
+          "mean": 0.6661798556645712,
+          "minimum": 0.6655702590942383
+        },
+        "savings_percent": {
+          "maximum": 33.555218660169174,
+          "mean": 33.38977036376794,
+          "minimum": 33.24823280175527
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.5737735579411188,
+          "mean": 0.5690788470760539,
+          "minimum": 0.5579140658179919
+        },
+        "state_bytes": {
+          "maximum": 719739,
+          "mean": 719739,
+          "minimum": 719739
+        },
+        "state_resident_bytes": {
+          "maximum": 417024,
+          "mean": 417024,
+          "minimum": 417024
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 23.018548265099525,
+          "mean": 22.9633916169405,
+          "minimum": 22.905650548636913
+        }
+      }
+    },
+    "conditional_latent_r32": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__lower": 4.0,
+        "K__primary": 1.0,
+        "K__rare": 0.04599338107638889,
+        "K__rare_offsets": 0.03125,
+        "K__secondary": 0.334795492666739,
+        "K__secondary_offsets": 0.03125,
+        "V__lower": 4.0,
+        "V__primary": 1.0,
+        "V__rare": 0.058521412037037035,
+        "V__rare_offsets": 0.03125,
+        "V__secondary": 0.41035192984121815,
+        "V__secondary_offsets": 0.03125,
+        "complete_decoder_state": 0.7404619124200609,
+        "header": 0.06650896425600406,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 9.239746257662773,
+        "mean": 8.935009827837348,
+        "minimum": 8.79872078076005
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 12.223055998484293,
+        "mean": 11.78212269809511,
+        "minimum": 11.34209136168162
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 21.69899507943127,
+        "mean": 21.273043437826413,
+        "minimum": 20.957699562940334
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 2.6230559984842934,
+        "mean": 2.18212269809511,
+        "minimum": 1.74209136168162
+      },
+      "name": "conditional_latent_r32",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 10.430596303194761,
+        "mean": 10.024260186279813,
+        "minimum": 9.858517441898584
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 29.111928989489876,
+        "mean": 26.361733136905563,
+        "minimum": 23.605900009473167
+      },
+      "spec": {
+        "fallback": true,
+        "family": "latent",
+        "kind": "predictor",
+        "method": "conditional_pair",
+        "model": "conditional_latent_r32",
+        "name": "conditional_latent_r32",
+        "rank": 32
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "tier": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 4.76708984375,
+          "mean": 4.76708984375,
+          "minimum": 4.76708984375
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 9.239746257662773,
+          "mean": 8.935009827837348,
+          "minimum": 8.79872078076005
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 22.6435546875,
+          "mean": 22.6435546875,
+          "minimum": 22.6435546875
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 21.69899507943127,
+          "mean": 21.273043437826413,
+          "minimum": 20.957699562940334
+        },
+        "predictor_fallback_counts": {
+          "True": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.6915180683135986,
+          "mean": 0.6910632451375326,
+          "minimum": 0.69051194190979
+        },
+        "savings_percent": {
+          "maximum": 29.111928989489876,
+          "mean": 26.361733136905563,
+          "minimum": 23.605900009473167
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.8243742502397962,
+          "mean": 0.8080721729331547,
+          "minimum": 0.7932804938819673
+        },
+        "state_bytes": {
+          "maximum": 22361201,
+          "mean": 22361201,
+          "minimum": 22361201
+        },
+        "state_resident_bytes": {
+          "maximum": 21971200,
+          "mean": 21971200,
+          "minimum": 21971200
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 10.430596303194761,
+          "mean": 10.024260186279813,
+          "minimum": 9.858517441898584
+        }
+      }
+    },
+    "conditional_latent_r8": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__lower": 4.0,
+        "K__primary": 1.0,
+        "K__rare": 0.04599338107638889,
+        "K__rare_offsets": 0.03125,
+        "K__secondary": 0.334795492666739,
+        "K__secondary_offsets": 0.03125,
+        "V__lower": 4.0,
+        "V__primary": 1.0,
+        "V__rare": 0.058521412037037035,
+        "V__rare_offsets": 0.03125,
+        "V__secondary": 0.41035192984121815,
+        "V__secondary_offsets": 0.03125,
+        "complete_decoder_state": 0.21309432056215075,
+        "header": 0.06644792909975406,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 8.918457198888063,
+        "mean": 8.850671040515104,
+        "minimum": 8.800015319138765
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 11.379206816355387,
+        "mean": 11.25469407108095,
+        "minimum": 11.131083289782206
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 21.264593944781357,
+        "mean": 21.126533996451784,
+        "minimum": 20.98384178760979
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.7792068163553871,
+        "mean": 1.65469407108095,
+        "minimum": 1.531083289782206
+      },
+      "name": "conditional_latent_r8",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 9.982771705836058,
+        "mean": 9.917009544248382,
+        "minimum": 9.877718985080719
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 30.430729438861214,
+        "mean": 29.658162055744064,
+        "minimum": 28.87995739777883
+      },
+      "spec": {
+        "fallback": true,
+        "family": "latent",
+        "kind": "predictor",
+        "method": "conditional_pair",
+        "model": "conditional_latent_r8",
+        "name": "conditional_latent_r8",
+        "rank": 8
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "tier": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 4.76708984375,
+          "mean": 4.76708984375,
+          "minimum": 4.76708984375
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 8.918457198888063,
+          "mean": 8.850671040515104,
+          "minimum": 8.800015319138765
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 22.6376953125,
+          "mean": 22.6376953125,
+          "minimum": 22.6376953125
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 21.264593944781357,
+          "mean": 21.126533996451784,
+          "minimum": 20.98384178760979
+        },
+        "predictor_fallback_counts": {
+          "True": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.691514253616333,
+          "mean": 0.691059430440267,
+          "minimum": 0.6905081272125244
+        },
+        "savings_percent": {
+          "maximum": 30.430729438861214,
+          "mean": 29.658162055744064,
+          "minimum": 28.87995739777883
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.8130839301480187,
+          "mean": 0.8030225419335895,
+          "minimum": 0.7879205255044831
+        },
+        "state_bytes": {
+          "maximum": 6435233,
+          "mean": 6435233,
+          "minimum": 6435233
+        },
+        "state_resident_bytes": {
+          "maximum": 6045952,
+          "mean": 6045952,
+          "minimum": 6045952
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 9.982771705836058,
+          "mean": 9.917009544248382,
+          "minimum": 9.877718985080719
+        }
+      }
+    },
+    "conditional_mean_predictor": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__lower": 4.0,
+        "K__primary": 1.0,
+        "K__rare": 0.04599338107638889,
+        "K__rare_offsets": 0.03125,
+        "K__secondary": 0.334795492666739,
+        "K__secondary_offsets": 0.03125,
+        "V__lower": 4.0,
+        "V__primary": 1.0,
+        "V__rare": 0.058521412037037035,
+        "V__rare_offsets": 0.03125,
+        "V__secondary": 0.41035192984121815,
+        "V__secondary_offsets": 0.03125,
+        "complete_decoder_state": 0.023390352725982666,
+        "header": 0.06644792909975406,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 9.37992474064231,
+        "mean": 8.973647452269992,
+        "minimum": 8.850784506648779
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 11.075680467817518,
+        "mean": 11.064990103244781,
+        "minimum": 11.05520170264774
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 20.15124095810784,
+        "mean": 20.07660568105402,
+        "minimum": 20.00038915624221
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.4756804678175186,
+        "mean": 1.4649901032447818,
+        "minimum": 1.4552017026477397
+      },
+      "name": "conditional_mean_predictor",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 10.538307949900627,
+        "mean": 10.04706408518056,
+        "minimum": 9.908388834446669
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 30.90498935845163,
+        "mean": 30.843811854720116,
+        "minimum": 30.77699707614051
+      },
+      "spec": {
+        "fallback": true,
+        "family": "control",
+        "kind": "mean",
+        "method": "conditional_pair",
+        "model": "conditional_mean",
+        "name": "conditional_mean_predictor"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "tier": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 4.76708984375,
+          "mean": 4.76708984375,
+          "minimum": 4.76708984375
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 9.37992474064231,
+          "mean": 8.973647452269992,
+          "minimum": 8.850784506648779
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 22.6357421875,
+          "mean": 22.6357421875,
+          "minimum": 22.6357421875
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 20.15124095810784,
+          "mean": 20.07660568105402,
+          "minimum": 20.00038915624221
+        },
+        "predictor_fallback_counts": {
+          "True": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.691514253616333,
+          "mean": 0.691059430440267,
+          "minimum": 0.6905081272125244
+        },
+        "savings_percent": {
+          "maximum": 30.90498935845163,
+          "mean": 30.843811854720116,
+          "minimum": 30.77699707614051
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.574212521314621,
+          "mean": 0.5629707852171527,
+          "minimum": 0.5562337529328134
+        },
+        "state_bytes": {
+          "maximum": 706365,
+          "mean": 706365,
+          "minimum": 706365
+        },
+        "state_resident_bytes": {
+          "maximum": 368896,
+          "mean": 368896,
+          "minimum": 368896
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 10.538307949900627,
+          "mean": 10.04706408518056,
+          "minimum": 9.908388834446669
+        }
+      }
+    },
+    "conditional_raw_fullword": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__correction": 8.0,
+        "K__correction_widths": 0.0390625,
+        "V__correction": 8.0,
+        "V__correction_widths": 0.0390625,
+        "complete_decoder_state": 0.007707741525438097,
+        "header": 0.0488480461968316,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 4.786972422152758,
+        "mean": 4.782636029024919,
+        "minimum": 4.776579327881336
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 16.139782693650986,
+        "mean": 16.135170393519928,
+        "minimum": 16.130558093388874
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 11.547935609188345,
+        "mean": 11.017246396039372,
+        "minimum": 10.851357132196426
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 6.539782693650986,
+        "mean": 6.53517039351993,
+        "minimum": 6.5305580933888745
+      },
+      "name": "conditional_raw_fullword",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 5.5536990985274315,
+        "mean": 5.544197978451848,
+        "minimum": 5.537290591746569
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": -0.8159880836804634,
+        "mean": -0.8448149594995624,
+        "minimum": -0.8736418353186615
+      },
+      "spec": {
+        "fallback": false,
+        "family": "control",
+        "kind": "zero",
+        "method": "conditional_pair",
+        "name": "conditional_raw_fullword"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "predicted": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 34.15576171875,
+          "mean": 34.15576171875,
+          "minimum": 34.15576171875
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 4.786972422152758,
+          "mean": 4.782636029024919,
+          "minimum": 4.776579327881336
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 22.6357421875,
+          "mean": 22.6357421875,
+          "minimum": 22.6357421875
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 11.547935609188345,
+          "mean": 11.017246396039372,
+          "minimum": 10.851357132196426
+        },
+        "predictor_fallback_counts": {
+          "False": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 1.0079357624053955,
+          "mean": 1.0079349279403687,
+          "minimum": 1.0079340934753418
+        },
+        "savings_percent": {
+          "maximum": -0.8159880836804634,
+          "mean": -0.8448149594995624,
+          "minimum": -0.8736418353186615
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.5735578015446663,
+          "mean": 0.5616121752946466,
+          "minimum": 0.5491713268889321
+        },
+        "state_bytes": {
+          "maximum": 232766,
+          "mean": 232766,
+          "minimum": 232766
+        },
+        "state_resident_bytes": {
+          "maximum": 73984,
+          "mean": 73984,
+          "minimum": 73984
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 5.5536990985274315,
+          "mean": 5.544197978451848,
+          "minimum": 5.537290591746569
+        }
+      }
+    },
+    "conditional_raw_pair": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "complete_decoder_state": 0.0,
+        "final_K": 8.0,
+        "final_V": 8.0,
+        "header": 0.0258377922905816,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 0.22790906950831413,
+        "mean": 0.22608879953622818,
+        "minimum": 0.22457633167505264
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 16.02633974287245,
+        "mean": 16.02632739808824,
+        "minimum": 16.026315053304035
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 0.6199869223766856,
+        "mean": 0.589955201441491,
+        "minimum": 0.5794105430444082
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 6.426339742872452,
+        "mean": 6.426327398088244,
+        "minimum": 6.426315053304036
+      },
+      "name": "conditional_raw_pair",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 0.6854827515780926,
+        "mean": 0.6683600756029288,
+        "minimum": 0.6622332148253918
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": -0.16446908315022046,
+        "mean": -0.1645462380515217,
+        "minimum": -0.1646233929528229
+      },
+      "spec": {
+        "family": "control",
+        "kind": "raw_pair",
+        "method": "conditional_pair",
+        "name": "conditional_raw_pair"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "raw_pair": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 0.25,
+          "mean": 0.25,
+          "minimum": 0.25
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 0.22790906950831413,
+          "mean": 0.22608879953622818,
+          "minimum": 0.22457633167505264
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 0.25048828125,
+          "mean": 0.25048828125,
+          "minimum": 0.25048828125
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 0.6199869223766856,
+          "mean": 0.589955201441491,
+          "minimum": 0.5794105430444082
+        },
+        "predictor_fallback_counts": {
+          "None": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 1.0016148090362549,
+          "mean": 1.001613974571228,
+          "minimum": 1.0016131401062012
+        },
+        "savings_percent": {
+          "maximum": -0.16446908315022046,
+          "mean": -0.1645462380515217,
+          "minimum": -0.1646233929528229
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.42539141658279633,
+          "mean": 0.4080543984417562,
+          "minimum": 0.3964905109670427
+        },
+        "state_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "minimum": 0
+        },
+        "state_resident_bytes": {
+          "maximum": 0,
+          "mean": 0,
+          "minimum": 0
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 0.6854827515780926,
+          "mean": 0.6683600756029288,
+          "minimum": 0.6622332148253918
+        }
+      }
+    },
+    "conditional_tier_sign": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__mantissa7": 3.5,
+        "K__primary": 1.0,
+        "K__rare": 0.04599338107638889,
+        "K__rare_offsets": 0.03125,
+        "K__secondary": 0.334795492666739,
+        "K__secondary_offsets": 0.03125,
+        "K__sign_huff__checksum": 0.000244140625,
+        "K__sign_huff__payload": 0.3730598732277199,
+        "K__sign_seed": 0.0078125,
+        "V__mantissa7": 3.5,
+        "V__primary": 1.0,
+        "V__rare": 0.058521412037037035,
+        "V__rare_offsets": 0.03125,
+        "V__secondary": 0.41035192984121815,
+        "V__secondary_offsets": 0.03125,
+        "V__sign_huff__checksum": 0.000244140625,
+        "V__sign_huff__payload": 0.4722256130642361,
+        "V__sign_seed": 0.0078125,
+        "complete_decoder_state": 0.023832718531290688,
+        "header": 0.12687273378725406,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 20.258006174117327,
+        "mean": 20.153893623501062,
+        "minimum": 20.009810104966164
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 11.009987089369032,
+        "mean": 10.987256041279545,
+        "minimum": 10.961415025922987
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 24.61026691728168,
+        "mean": 24.29717160002501,
+        "minimum": 24.14235824512111
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.4099870893690323,
+        "mean": 1.3872560412795458,
+        "minimum": 1.3614150259229874
+      },
+      "name": "conditional_tier_sign",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 21.714402362704277,
+        "mean": 21.553052278856438,
+        "minimum": 21.38753840699792
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 31.49115608798133,
+        "mean": 31.32964974200284,
+        "minimum": 31.18758069144355
+      },
+      "spec": {
+        "family": "sign",
+        "kind": "tier_sign",
+        "method": "conditional_pair",
+        "name": "conditional_tier_sign"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "entropy": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 15.57861328125,
+          "mean": 15.57861328125,
+          "minimum": 15.57861328125
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 20.258006174117327,
+          "mean": 20.153893623501062,
+          "minimum": 20.009810104966164
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 9.43505859375,
+          "mean": 9.434733072916666,
+          "minimum": 9.4345703125
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 24.61026691728168,
+          "mean": 24.29717160002501,
+          "minimum": 24.14235824512111
+        },
+        "predictor_fallback_counts": {
+          "None": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.687157154083252,
+          "mean": 0.68670654296875,
+          "minimum": 0.6861717700958252
+        },
+        "savings_percent": {
+          "maximum": 31.49115608798133,
+          "mean": 31.32964974200284,
+          "minimum": 31.18758069144355
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.5752302499281036,
+          "mean": 0.5647877265733702,
+          "minimum": 0.5555004916257329
+        },
+        "state_bytes": {
+          "maximum": 719724,
+          "mean": 719724,
+          "minimum": 719724
+        },
+        "state_resident_bytes": {
+          "maximum": 84224,
+          "mean": 84224,
+          "minimum": 84224
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 21.714402362704277,
+          "mean": 21.553052278856438,
+          "minimum": 21.38753840699792
+        }
+      }
+    },
+    "frontier_cost_final_raw8": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__lower__lower_raw": 4.0,
+        "K__primary": 1.0,
+        "K__rare": 0.052907590512876156,
+        "K__rare_offsets": 0.03125,
+        "K__secondary": 0.38852691650390625,
+        "K__secondary_offsets": 0.03125,
+        "V__lower__lower_raw": 4.0,
+        "V__primary": 1.0,
+        "V__rare": 0.058521412037037035,
+        "V__rare_offsets": 0.03125,
+        "V__secondary": 0.41035192984121815,
+        "V__secondary_offsets": 0.03125,
+        "complete_decoder_state": 0.0076556868023342555,
+        "header": 0.09581445764612269,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 8.351168595254421,
+        "mean": 8.172308250019947,
+        "minimum": 8.057329803705215
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 11.15154692861769,
+        "mean": 11.139267599141156,
+        "minimum": 11.128484196133083
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 19.5734358082215,
+        "mean": 19.360292944367284,
+        "minimum": 19.142982446485096
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.5515469286176895,
+        "mean": 1.5392675991411566,
+        "minimum": 1.5284841961330837
+      },
+      "name": "frontier_cost_final_raw8",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 9.567665867507458,
+        "mean": 9.302945885186395,
+        "minimum": 9.169430006295443
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 30.446973774168228,
+        "mean": 30.379577505367774,
+        "minimum": 30.302831696139442
+      },
+      "spec": {
+        "family": "control",
+        "head_shifts": false,
+        "lower_mode": "raw8",
+        "method": "frontier_pair",
+        "name": "frontier_cost_final_raw8",
+        "primary_mode": "auto_plane",
+        "source": "final"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "legacy": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 4.75439453125,
+          "mean": 4.75439453125,
+          "minimum": 4.75439453125
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 8.351168595254421,
+          "mean": 8.172308250019947,
+          "minimum": 8.057329803705215
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 9.8017578125,
+          "mean": 9.8017578125,
+          "minimum": 9.8017578125
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 19.5734358082215,
+          "mean": 19.360292944367284,
+          "minimum": 19.142982446485096
+        },
+        "predictor_fallback_counts": {
+          "None": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.6972112655639648,
+          "mean": 0.696513851483663,
+          "minimum": 0.6957571506500244
+        },
+        "savings_percent": {
+          "maximum": 30.446973774168228,
+          "mean": 30.379577505367774,
+          "minimum": 30.302831696139442
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.5094890172282854,
+          "mean": 0.5023321136832237,
+          "minimum": 0.4956374565760295
+        },
+        "state_bytes": {
+          "maximum": 231194,
+          "mean": 231194,
+          "minimum": 231194
+        },
+        "state_resident_bytes": {
+          "maximum": 73728,
+          "mean": 73728,
+          "minimum": 73728
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 9.567665867507458,
+          "mean": 9.302945885186395,
+          "minimum": 9.169430006295443
+        }
+      }
+    },
+    "producer_frozen_exponent": {
+      "cases": 6,
+      "component_bits_per_word_mean": {
+        "K__lower": 4.0,
+        "K__primary": 1.0,
+        "K__rare": 0.052302042643229164,
+        "K__rare_offsets": 0.062744140625,
+        "K__secondary": 0.39609160246672453,
+        "K__secondary_offsets": 0.062744140625,
+        "V__lower": 4.0,
+        "V__primary": 1.0,
+        "V__rare": 0.05661349826388889,
+        "V__rare_offsets": 0.062744140625,
+        "V__secondary": 0.41225800690827547,
+        "V__secondary_offsets": 0.062744140625,
+        "complete_decoder_state": 0.007070402304331461,
+        "header": 0.04929789790400752,
+        "outer_cache_framing": 0.0004896057976616754
+      },
+      "decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 7.450129836797714,
+        "mean": 7.363270580147703,
+        "minimum": 7.305590435862541
+      },
+      "effective_bits_per_word": {
+        "count": 6,
+        "maximum": 11.237363908025953,
+        "mean": 11.225099618788118,
+        "minimum": 11.213508976830376
+      },
+      "encode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 7.833260939353043,
+        "mean": 7.711567364081189,
+        "minimum": 7.580484884480636
+      },
+      "gap_bits_to_40_percent": {
+        "count": 6,
+        "maximum": 1.6373639080259537,
+        "mean": 1.6250996187881188,
+        "minimum": 1.613508976830376
+      },
+      "name": "producer_frozen_exponent",
+      "packet_transfer_then_decode_ms_per_raw_MiB": {
+        "count": 6,
+        "maximum": 8.509994018822908,
+        "mean": 8.374576534455022,
+        "minimum": 8.300535380840302
+      },
+      "savings_including_state_percent": {
+        "count": 6,
+        "maximum": 29.91556889481015,
+        "mean": 29.84312738257426,
+        "minimum": 29.76647557483779
+      },
+      "spec": {
+        "family": "control",
+        "kind": "frozen",
+        "method": "producer_pair",
+        "name": "producer_frozen_exponent"
+      },
+      "timing_and_workspace": {
+        "chosen_coder_counts": {
+          "legacy": 432
+        },
+        "decode_isolated_peak_MiB": {
+          "maximum": 5.25439453125,
+          "mean": 5.25439453125,
+          "minimum": 5.25439453125
+        },
+        "decode_ms_per_raw_MiB": {
+          "maximum": 7.450129836797714,
+          "mean": 7.363270580147703,
+          "minimum": 7.305590435862541
+        },
+        "encode_isolated_peak_MiB": {
+          "maximum": 5.2099609375,
+          "mean": 5.209309895833333,
+          "minimum": 5.20849609375
+        },
+        "encode_ms_per_raw_MiB": {
+          "maximum": 7.833260939353043,
+          "mean": 7.711567364081189,
+          "minimum": 7.580484884480636
+        },
+        "predictor_fallback_counts": {
+          "None": 432
+        },
+        "sample_wire_bytes_per_raw_byte": {
+          "maximum": 0.7026104927062988,
+          "mean": 0.7019031842549642,
+          "minimum": 0.7011294364929199
+        },
+        "savings_percent": {
+          "maximum": 29.91556889481015,
+          "mean": 29.84312738257426,
+          "minimum": 29.76647557483779
+        },
+        "staging_ms_per_raw_MiB": {
+          "maximum": 0.4874800021449725,
+          "mean": 0.47426781168690435,
+          "minimum": 0.46485703852441573
+        },
+        "state_bytes": {
+          "maximum": 213519,
+          "mean": 213519,
+          "minimum": 213519
+        },
+        "state_resident_bytes": {
+          "maximum": 73728,
+          "mean": 73728,
+          "minimum": 73728
+        },
+        "transfer_decode_ms_per_raw_MiB": {
+          "maximum": 8.509994018822908,
+          "mean": 8.374576534455022,
+          "minimum": 8.300535380840302
+        }
+      }
+    }
+  },
+  "model_identity": {
+    "attention_backend": "sdpa",
+    "bf16_probe": {
+      "error": null,
+      "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+      "success": true
+    },
+    "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+    "device": "cuda:0",
+    "dtype": "bfloat16",
+    "load_seconds": 1.8261737767606974,
+    "local_model": false,
+    "local_weights_content_hashed": false,
+    "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+    "model_storage_bytes": 8044936704,
+    "parameter_count": 4022468096,
+    "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+    "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "runtime_config_sha256": "9287d9f0c6eb154192a0fd200e6dfa87058083c18bee74864e5a4ff07debc1af"
+  },
+  "next_experiments": [
+    "Conditional probability/field corrections rather than full-word group64 maximum width.",
+    "Run published fifth probability study with complete weights and previous-layer dependencies.",
+    "Bounded-workspace fused/substream GPU decoder, keeping raw and tier transfer controls.",
+    "Vary actual fitted TRAIN rows separately from TEST sampling and use fresh held-out data."
+  ],
+  "predictors": {
+    "conditional_anchor_r32": {
+      "candidate_bits_per_word": {
+        "predicted": 16.126912576180917,
+        "raw": 16.02333535088433,
+        "tier": 11.041171179877388
+      },
+      "charged_state_bytes": 10391296,
+      "chosen_coder_counts": {
+        "tier": 432
+      },
+      "correction_width16_percent": 99.96796461640211,
+      "correction_width_histogram": {
+        "0": 0,
+        "1": 0,
+        "10": 113,
+        "11": 49,
+        "12": 3,
+        "13": 0,
+        "14": 0,
+        "15": 0,
+        "16": 870633,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 11,
+        "9": 103
+      },
+      "dev_tier_fallback_records": 288,
+      "exponent_match_percent": 28.783051172892254,
+      "per_layer": [
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128265380859375,
+            "raw": 16.023223876953125,
+            "tier": 11.228561401367188
+          },
+          "layer": 0,
+          "min_predicted_minus_tier_bytes": 79917,
+          "predicted_over_tier_ratio": 1.436360794971972,
+          "quality": {
+            "exponent_matches": 0.2997252146402995,
+            "sign_matches": 0.7062784830729166,
+            "word_matches": 0.018636703491210938
+          },
+          "records": 12,
+          "width16_fraction": 0.999917328042328
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.124008178710938,
+            "raw": 16.023239135742188,
+            "tier": 11.048431396484375
+          },
+          "layer": 1,
+          "min_predicted_minus_tier_bytes": 82172,
+          "predicted_over_tier_ratio": 1.4593934288121315,
+          "quality": {
+            "exponent_matches": 0.3201363881429036,
+            "sign_matches": 0.7413063049316406,
+            "word_matches": 0.01848157246907552
+          },
+          "records": 12,
+          "width16_fraction": 0.9991319444444444
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.1287841796875,
+            "raw": 16.02325439453125,
+            "tier": 11.0865478515625
+          },
+          "layer": 2,
+          "min_predicted_minus_tier_bytes": 81171,
+          "predicted_over_tier_ratio": 1.454806707699761,
+          "quality": {
+            "exponent_matches": 0.27370770772298175,
+            "sign_matches": 0.7015374501546224,
+            "word_matches": 0.017595291137695312
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128799438476562,
+            "raw": 16.023269653320312,
+            "tier": 11.024759928385416
+          },
+          "layer": 3,
+          "min_predicted_minus_tier_bytes": 82682,
+          "predicted_over_tier_ratio": 1.4629615105676623,
+          "quality": {
+            "exponent_matches": 0.298431396484375,
+            "sign_matches": 0.7258040110270182,
+            "word_matches": 0.018014272054036457
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128799438476562,
+            "raw": 16.023269653320312,
+            "tier": 11.074849446614584
+          },
+          "layer": 4,
+          "min_predicted_minus_tier_bytes": 81695,
+          "predicted_over_tier_ratio": 1.4563448032611312,
+          "quality": {
+            "exponent_matches": 0.27752240498860675,
+            "sign_matches": 0.7044874827067057,
+            "word_matches": 0.017697652180989582
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.063100179036457,
+            "raw": 16.023284912109375,
+            "tier": 11.003952026367188
+          },
+          "layer": 5,
+          "min_predicted_minus_tier_bytes": 82323,
+          "predicted_over_tier_ratio": 1.4597573799437475,
+          "quality": {
+            "exponent_matches": 0.3237355550130208,
+            "sign_matches": 0.740197499593099,
+            "word_matches": 0.018759409586588543
+          },
+          "records": 12,
+          "width16_fraction": 0.9894179894179894
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128814697265625,
+            "raw": 16.023284912109375,
+            "tier": 11.05419921875
+          },
+          "layer": 6,
+          "min_predicted_minus_tier_bytes": 82780,
+          "predicted_over_tier_ratio": 1.4590667653164893,
+          "quality": {
+            "exponent_matches": 0.29877281188964844,
+            "sign_matches": 0.7240238189697266,
+            "word_matches": 0.018072128295898438
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128814697265625,
+            "raw": 16.023284912109375,
+            "tier": 11.006362915039062
+          },
+          "layer": 7,
+          "min_predicted_minus_tier_bytes": 83632,
+          "predicted_over_tier_ratio": 1.465408220841715,
+          "quality": {
+            "exponent_matches": 0.2963644663492839,
+            "sign_matches": 0.7161407470703125,
+            "word_matches": 0.01794751485188802
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128814697265625,
+            "raw": 16.023284912109375,
+            "tier": 11.046213785807291
+          },
+          "layer": 8,
+          "min_predicted_minus_tier_bytes": 82832,
+          "predicted_over_tier_ratio": 1.460121541191671,
+          "quality": {
+            "exponent_matches": 0.29137293497721356,
+            "sign_matches": 0.7193094889322916,
+            "word_matches": 0.017913818359375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128814697265625,
+            "raw": 16.023284912109375,
+            "tier": 11.021474202473959
+          },
+          "layer": 9,
+          "min_predicted_minus_tier_bytes": 83201,
+          "predicted_over_tier_ratio": 1.4633990336469904,
+          "quality": {
+            "exponent_matches": 0.2780927022298177,
+            "sign_matches": 0.7014242808024088,
+            "word_matches": 0.017554601033528645
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.031728108723959
+          },
+          "layer": 10,
+          "min_predicted_minus_tier_bytes": 83303,
+          "predicted_over_tier_ratio": 1.4620457313896371,
+          "quality": {
+            "exponent_matches": 0.29884592692057294,
+            "sign_matches": 0.7333933512369791,
+            "word_matches": 0.018059412638346355
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.028594970703125
+          },
+          "layer": 11,
+          "min_predicted_minus_tier_bytes": 83350,
+          "predicted_over_tier_ratio": 1.4624610872061652,
+          "quality": {
+            "exponent_matches": 0.2905158996582031,
+            "sign_matches": 0.722991943359375,
+            "word_matches": 0.017780303955078125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.003321329752604
+          },
+          "layer": 12,
+          "min_predicted_minus_tier_bytes": 83646,
+          "predicted_over_tier_ratio": 1.4658202289884026,
+          "quality": {
+            "exponent_matches": 0.27665074666341144,
+            "sign_matches": 0.734734853108724,
+            "word_matches": 0.017655690511067707
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.008494059244791
+          },
+          "layer": 13,
+          "min_predicted_minus_tier_bytes": 83457,
+          "predicted_over_tier_ratio": 1.4651314616158695,
+          "quality": {
+            "exponent_matches": 0.28734588623046875,
+            "sign_matches": 0.7224693298339844,
+            "word_matches": 0.017704010009765625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.014022827148438
+          },
+          "layer": 14,
+          "min_predicted_minus_tier_bytes": 83239,
+          "predicted_over_tier_ratio": 1.4643960017455997,
+          "quality": {
+            "exponent_matches": 0.3132928212483724,
+            "sign_matches": 0.7524954477945963,
+            "word_matches": 0.018163681030273438
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.016403198242188
+          },
+          "layer": 15,
+          "min_predicted_minus_tier_bytes": 83336,
+          "predicted_over_tier_ratio": 1.4640795821438812,
+          "quality": {
+            "exponent_matches": 0.30674298604329425,
+            "sign_matches": 0.7518564860026041,
+            "word_matches": 0.017974217732747395
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.059687296549479
+          },
+          "layer": 16,
+          "min_predicted_minus_tier_bytes": 81982,
+          "predicted_over_tier_ratio": 1.4583496403413687,
+          "quality": {
+            "exponent_matches": 0.2818616231282552,
+            "sign_matches": 0.7083231608072916,
+            "word_matches": 0.017628987630208332
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.046396891276041
+          },
+          "layer": 17,
+          "min_predicted_minus_tier_bytes": 82389,
+          "predicted_over_tier_ratio": 1.4601042448464645,
+          "quality": {
+            "exponent_matches": 0.3046302795410156,
+            "sign_matches": 0.7470734914143881,
+            "word_matches": 0.017907460530598957
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.072128295898438
+          },
+          "layer": 18,
+          "min_predicted_minus_tier_bytes": 81789,
+          "predicted_over_tier_ratio": 1.4567109917960153,
+          "quality": {
+            "exponent_matches": 0.2829596201578776,
+            "sign_matches": 0.7379608154296875,
+            "word_matches": 0.017630894978841145
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.016993204752604
+          },
+          "layer": 19,
+          "min_predicted_minus_tier_bytes": 83184,
+          "predicted_over_tier_ratio": 1.4640011744995105,
+          "quality": {
+            "exponent_matches": 0.2982228597005208,
+            "sign_matches": 0.7314434051513672,
+            "word_matches": 0.0178985595703125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.047236124674479
+          },
+          "layer": 20,
+          "min_predicted_minus_tier_bytes": 82322,
+          "predicted_over_tier_ratio": 1.459993324048389,
+          "quality": {
+            "exponent_matches": 0.27413495381673175,
+            "sign_matches": 0.7161871592203776,
+            "word_matches": 0.01751708984375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.034784952799479
+          },
+          "layer": 21,
+          "min_predicted_minus_tier_bytes": 82895,
+          "predicted_over_tier_ratio": 1.4616407170779622,
+          "quality": {
+            "exponent_matches": 0.30090777079264325,
+            "sign_matches": 0.7407245635986328,
+            "word_matches": 0.017967859903971355
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.043680826822916
+          },
+          "layer": 22,
+          "min_predicted_minus_tier_bytes": 83041,
+          "predicted_over_tier_ratio": 1.4604633404505,
+          "quality": {
+            "exponent_matches": 0.2946707407633464,
+            "sign_matches": 0.7316557566324869,
+            "word_matches": 0.017889658610026043
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.051462809244791
+          },
+          "layer": 23,
+          "min_predicted_minus_tier_bytes": 82391,
+          "predicted_over_tier_ratio": 1.4594349426501951,
+          "quality": {
+            "exponent_matches": 0.2526556650797526,
+            "sign_matches": 0.7335357666015625,
+            "word_matches": 0.01738421122233073
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.037521362304688
+          },
+          "layer": 24,
+          "min_predicted_minus_tier_bytes": 82833,
+          "predicted_over_tier_ratio": 1.4612783488052201,
+          "quality": {
+            "exponent_matches": 0.273586908976237,
+            "sign_matches": 0.72564697265625,
+            "word_matches": 0.017494837443033855
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.03656005859375
+          },
+          "layer": 25,
+          "min_predicted_minus_tier_bytes": 83122,
+          "predicted_over_tier_ratio": 1.4614056287087374,
+          "quality": {
+            "exponent_matches": 0.2977104187011719,
+            "sign_matches": 0.7280877431233724,
+            "word_matches": 0.017845789591471355
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.05181884765625
+          },
+          "layer": 26,
+          "min_predicted_minus_tier_bytes": 82571,
+          "predicted_over_tier_ratio": 1.4593879264164178,
+          "quality": {
+            "exponent_matches": 0.28711891174316406,
+            "sign_matches": 0.7182992299397787,
+            "word_matches": 0.01769256591796875
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.015914916992188
+          },
+          "layer": 27,
+          "min_predicted_minus_tier_bytes": 83543,
+          "predicted_over_tier_ratio": 1.464144477580516,
+          "quality": {
+            "exponent_matches": 0.3012377421061198,
+            "sign_matches": 0.7364552815755209,
+            "word_matches": 0.01795514424641927
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128952026367188,
+            "raw": 16.023361206054688,
+            "tier": 11.030685424804688
+          },
+          "layer": 28,
+          "min_predicted_minus_tier_bytes": 83269,
+          "predicted_over_tier_ratio": 1.462189465588243,
+          "quality": {
+            "exponent_matches": 0.30361684163411456,
+            "sign_matches": 0.7351182301839193,
+            "word_matches": 0.018021265665690105
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129013061523438,
+            "raw": 16.023361206054688,
+            "tier": 11.050511678059896
+          },
+          "layer": 29,
+          "min_predicted_minus_tier_bytes": 82815,
+          "predicted_over_tier_ratio": 1.4595716045933502,
+          "quality": {
+            "exponent_matches": 0.2714576721191406,
+            "sign_matches": 0.7073968251546224,
+            "word_matches": 0.017524083455403645
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129013061523438,
+            "raw": 16.023361206054688,
+            "tier": 11.049977620442709
+          },
+          "layer": 30,
+          "min_predicted_minus_tier_bytes": 83058,
+          "predicted_over_tier_ratio": 1.4596421473003165,
+          "quality": {
+            "exponent_matches": 0.272705078125,
+            "sign_matches": 0.7012863159179688,
+            "word_matches": 0.017592112223307293
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129013061523438,
+            "raw": 16.023361206054688,
+            "tier": 11.049123128255209
+          },
+          "layer": 31,
+          "min_predicted_minus_tier_bytes": 83046,
+          "predicted_over_tier_ratio": 1.4597550298156923,
+          "quality": {
+            "exponent_matches": 0.2644952138264974,
+            "sign_matches": 0.6992225646972656,
+            "word_matches": 0.017425537109375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128952026367188,
+            "raw": 16.023361206054688,
+            "tier": 11.006245930989584
+          },
+          "layer": 32,
+          "min_predicted_minus_tier_bytes": 83633,
+          "predicted_over_tier_ratio": 1.4654362738664533,
+          "quality": {
+            "exponent_matches": 0.2618815104166667,
+            "sign_matches": 0.7216262817382812,
+            "word_matches": 0.01745287577311198
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128952026367188,
+            "raw": 16.023361206054688,
+            "tier": 11.057291666666666
+          },
+          "layer": 33,
+          "min_predicted_minus_tier_bytes": 82944,
+          "predicted_over_tier_ratio": 1.4586711206135186,
+          "quality": {
+            "exponent_matches": 0.252841313680013,
+            "sign_matches": 0.6971925099690756,
+            "word_matches": 0.017229715983072918
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.128890991210938,
+            "raw": 16.023361206054688,
+            "tier": 11.019643147786459
+          },
+          "layer": 34,
+          "min_predicted_minus_tier_bytes": 83326,
+          "predicted_over_tier_ratio": 1.4636491195679768,
+          "quality": {
+            "exponent_matches": 0.2558555603027344,
+            "sign_matches": 0.7072906494140625,
+            "word_matches": 0.017381032307942707
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129013061523438,
+            "raw": 16.023361206054688,
+            "tier": 11.006581624348959
+          },
+          "layer": 35,
+          "min_predicted_minus_tier_bytes": 83369,
+          "predicted_over_tier_ratio": 1.4653971243753414,
+          "quality": {
+            "exponent_matches": 0.2980918884277344,
+            "sign_matches": 0.7296021779378256,
+            "word_matches": 0.018105824788411457
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        }
+      ],
+      "sign_match_percent": 72.36827744377985,
+      "test_records": 432,
+      "word_match_percent": 1.7820994059244792
+    },
+    "conditional_anchor_r8": {
+      "candidate_bits_per_word": {
+        "predicted": 16.128124802200883,
+        "raw": 16.02327431572808,
+        "tier": 11.041110144721138
+      },
+      "charged_state_bytes": 3316864,
+      "chosen_coder_counts": {
+        "tier": 432
+      },
+      "correction_width16_percent": 99.9734477124183,
+      "correction_width_histogram": {
+        "0": 0,
+        "1": 0,
+        "10": 119,
+        "11": 46,
+        "12": 4,
+        "13": 0,
+        "14": 0,
+        "15": 0,
+        "16": 881046,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 2,
+        "9": 63
+      },
+      "dev_tier_fallback_records": 288,
+      "exponent_match_percent": 24.032825893825954,
+      "per_layer": [
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129608154296875,
+            "raw": 16.023162841796875,
+            "tier": 11.228500366210938
+          },
+          "layer": 0,
+          "min_predicted_minus_tier_bytes": 79980,
+          "predicted_over_tier_ratio": 1.4364881888265741,
+          "quality": {
+            "exponent_matches": 0.24106788635253906,
+            "sign_matches": 0.6798966725667318,
+            "word_matches": 0.006099700927734375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127466837565105,
+            "raw": 16.023178100585938,
+            "tier": 11.048370361328125
+          },
+          "layer": 1,
+          "min_predicted_minus_tier_bytes": 82371,
+          "predicted_over_tier_ratio": 1.4597145379933136,
+          "quality": {
+            "exponent_matches": 0.2683308919270833,
+            "sign_matches": 0.7097899119059244,
+            "word_matches": 0.0063584645589192705
+          },
+          "records": 12,
+          "width16_fraction": 0.9995915032679739
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129638671875,
+            "raw": 16.023193359375,
+            "tier": 11.08648681640625
+          },
+          "layer": 2,
+          "min_predicted_minus_tier_bytes": 81186,
+          "predicted_over_tier_ratio": 1.454891792051354,
+          "quality": {
+            "exponent_matches": 0.22902997334798178,
+            "sign_matches": 0.6856409708658854,
+            "word_matches": 0.0055586496988932295
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129653930664062,
+            "raw": 16.023208618164062,
+            "tier": 11.024698893229166
+          },
+          "layer": 3,
+          "min_predicted_minus_tier_bytes": 82697,
+          "predicted_over_tier_ratio": 1.4630471169212713,
+          "quality": {
+            "exponent_matches": 0.250979741414388,
+            "sign_matches": 0.7003364562988281,
+            "word_matches": 0.005978902180989583
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129653930664062,
+            "raw": 16.023208618164062,
+            "tier": 11.074788411458334
+          },
+          "layer": 4,
+          "min_predicted_minus_tier_bytes": 81710,
+          "predicted_over_tier_ratio": 1.4564299859648606,
+          "quality": {
+            "exponent_matches": 0.22689183553059897,
+            "sign_matches": 0.6814034779866537,
+            "word_matches": 0.0055955251057942705
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.074371337890625,
+            "raw": 16.023223876953125,
+            "tier": 11.003890991210938
+          },
+          "layer": 5,
+          "min_predicted_minus_tier_bytes": 82783,
+          "predicted_over_tier_ratio": 1.4607897652502735,
+          "quality": {
+            "exponent_matches": 0.2857920328776042,
+            "sign_matches": 0.7233066558837891,
+            "word_matches": 0.006683349609375
+          },
+          "records": 12,
+          "width16_fraction": 0.990890522875817
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129465738932293,
+            "raw": 16.023223876953125,
+            "tier": 11.05413818359375
+          },
+          "layer": 6,
+          "min_predicted_minus_tier_bytes": 82755,
+          "predicted_over_tier_ratio": 1.4591337172599492,
+          "quality": {
+            "exponent_matches": 0.2528565724690755,
+            "sign_matches": 0.6974468231201172,
+            "word_matches": 0.0059757232666015625
+          },
+          "records": 12,
+          "width16_fraction": 0.9999591503267974
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129669189453125,
+            "raw": 16.023223876953125,
+            "tier": 11.006301879882812
+          },
+          "layer": 7,
+          "min_predicted_minus_tier_bytes": 83647,
+          "predicted_over_tier_ratio": 1.4654939838543537,
+          "quality": {
+            "exponent_matches": 0.23909568786621094,
+            "sign_matches": 0.6818326314290365,
+            "word_matches": 0.0056158701578776045
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129669189453125,
+            "raw": 16.023223876953125,
+            "tier": 11.046152750651041
+          },
+          "layer": 8,
+          "min_predicted_minus_tier_bytes": 82847,
+          "predicted_over_tier_ratio": 1.4602069655883103,
+          "quality": {
+            "exponent_matches": 0.24197069803873697,
+            "sign_matches": 0.6864452362060547,
+            "word_matches": 0.0056883494059244795
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129669189453125,
+            "raw": 16.023223876953125,
+            "tier": 11.021413167317709
+          },
+          "layer": 9,
+          "min_predicted_minus_tier_bytes": 83216,
+          "predicted_over_tier_ratio": 1.463484667944684,
+          "quality": {
+            "exponent_matches": 0.21179580688476562,
+            "sign_matches": 0.6610444386800131,
+            "word_matches": 0.0051619211832682295
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.031667073567709
+          },
+          "layer": 10,
+          "min_predicted_minus_tier_bytes": 83318,
+          "predicted_over_tier_ratio": 1.4621312786030243,
+          "quality": {
+            "exponent_matches": 0.2559655507405599,
+            "sign_matches": 0.7100569407145182,
+            "word_matches": 0.0059541066487630205
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.028533935546875
+          },
+          "layer": 11,
+          "min_predicted_minus_tier_bytes": 83365,
+          "predicted_over_tier_ratio": 1.4625466610216862,
+          "quality": {
+            "exponent_matches": 0.22905476888020834,
+            "sign_matches": 0.673773447672526,
+            "word_matches": 0.005502065022786458
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.003260294596354
+          },
+          "layer": 12,
+          "min_predicted_minus_tier_bytes": 83661,
+          "predicted_over_tier_ratio": 1.4659060179935646,
+          "quality": {
+            "exponent_matches": 0.24890772501627603,
+            "sign_matches": 0.7056140899658203,
+            "word_matches": 0.005727132161458333
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.008433024088541
+          },
+          "layer": 13,
+          "min_predicted_minus_tier_bytes": 83472,
+          "predicted_over_tier_ratio": 1.4652172064910138,
+          "quality": {
+            "exponent_matches": 0.2290325164794922,
+            "sign_matches": 0.6813373565673828,
+            "word_matches": 0.0054429372151692705
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.013961791992188
+          },
+          "layer": 14,
+          "min_predicted_minus_tier_bytes": 83254,
+          "predicted_over_tier_ratio": 1.4644816995030554,
+          "quality": {
+            "exponent_matches": 0.2512900034586589,
+            "sign_matches": 0.7093105316162109,
+            "word_matches": 0.0057290395100911455
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.016342163085938
+          },
+          "layer": 15,
+          "min_predicted_minus_tier_bytes": 83351,
+          "predicted_over_tier_ratio": 1.4641652596309804,
+          "quality": {
+            "exponent_matches": 0.256072998046875,
+            "sign_matches": 0.7074921925862631,
+            "word_matches": 0.00568389892578125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.059626261393229
+          },
+          "layer": 16,
+          "min_predicted_minus_tier_bytes": 81997,
+          "predicted_over_tier_ratio": 1.458434950890149,
+          "quality": {
+            "exponent_matches": 0.2443688710530599,
+            "sign_matches": 0.6920140584309896,
+            "word_matches": 0.005617777506510417
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.046335856119791
+          },
+          "layer": 17,
+          "min_predicted_minus_tier_bytes": 82404,
+          "predicted_over_tier_ratio": 1.4601896677315294,
+          "quality": {
+            "exponent_matches": 0.2430884043375651,
+            "sign_matches": 0.7022711435953776,
+            "word_matches": 0.005574544270833333
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.072067260742188
+          },
+          "layer": 18,
+          "min_predicted_minus_tier_bytes": 81804,
+          "predicted_over_tier_ratio": 1.4567961974534844,
+          "quality": {
+            "exponent_matches": 0.23651250203450522,
+            "sign_matches": 0.6806691487630209,
+            "word_matches": 0.005457560221354167
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.016932169596354
+          },
+          "layer": 19,
+          "min_predicted_minus_tier_bytes": 83199,
+          "predicted_over_tier_ratio": 1.464086846963805,
+          "quality": {
+            "exponent_matches": 0.23162206013997397,
+            "sign_matches": 0.7047500610351562,
+            "word_matches": 0.005472819010416667
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.047175089518229
+          },
+          "layer": 20,
+          "min_predicted_minus_tier_bytes": 82337,
+          "predicted_over_tier_ratio": 1.4600787398312034,
+          "quality": {
+            "exponent_matches": 0.23551623026529947,
+            "sign_matches": 0.7029533386230469,
+            "word_matches": 0.0054747263590494795
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.034723917643229
+          },
+          "layer": 21,
+          "min_predicted_minus_tier_bytes": 82910,
+          "predicted_over_tier_ratio": 1.4617262383528116,
+          "quality": {
+            "exponent_matches": 0.24610265096028647,
+            "sign_matches": 0.7048085530598959,
+            "word_matches": 0.0055789947509765625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.043619791666666
+          },
+          "layer": 22,
+          "min_predicted_minus_tier_bytes": 83056,
+          "predicted_over_tier_ratio": 1.4605487863290691,
+          "quality": {
+            "exponent_matches": 0.21714909871419272,
+            "sign_matches": 0.6812203725179037,
+            "word_matches": 0.0052890777587890625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.051401774088541
+          },
+          "layer": 23,
+          "min_predicted_minus_tier_bytes": 82406,
+          "predicted_over_tier_ratio": 1.4595203226813034,
+          "quality": {
+            "exponent_matches": 0.2542031606038411,
+            "sign_matches": 0.7082843780517578,
+            "word_matches": 0.005807240804036458
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.037460327148438
+          },
+          "layer": 24,
+          "min_predicted_minus_tier_bytes": 82848,
+          "predicted_over_tier_ratio": 1.461363846873786,
+          "quality": {
+            "exponent_matches": 0.2393468221028646,
+            "sign_matches": 0.6992454528808594,
+            "word_matches": 0.0054518381754557295
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.0364990234375
+          },
+          "layer": 25,
+          "min_predicted_minus_tier_bytes": 83137,
+          "predicted_over_tier_ratio": 1.461491134928272,
+          "quality": {
+            "exponent_matches": 0.2524375915527344,
+            "sign_matches": 0.6995983123779297,
+            "word_matches": 0.005687713623046875
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.0517578125
+          },
+          "layer": 26,
+          "min_predicted_minus_tier_bytes": 82586,
+          "predicted_over_tier_ratio": 1.4594733034373066,
+          "quality": {
+            "exponent_matches": 0.23636690775553384,
+            "sign_matches": 0.6897443135579427,
+            "word_matches": 0.005484263102213542
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.015853881835938
+          },
+          "layer": 27,
+          "min_predicted_minus_tier_bytes": 83558,
+          "predicted_over_tier_ratio": 1.464230159224861,
+          "quality": {
+            "exponent_matches": 0.25294939676920575,
+            "sign_matches": 0.7061042785644531,
+            "word_matches": 0.0057811737060546875
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.030624389648438
+          },
+          "layer": 28,
+          "min_predicted_minus_tier_bytes": 83283,
+          "predicted_over_tier_ratio": 1.4622694884375913,
+          "quality": {
+            "exponent_matches": 0.2561607360839844,
+            "sign_matches": 0.6993974049886068,
+            "word_matches": 0.0058498382568359375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.050450642903646
+          },
+          "layer": 29,
+          "min_predicted_minus_tier_bytes": 82828,
+          "predicted_over_tier_ratio": 1.4596459460914928,
+          "quality": {
+            "exponent_matches": 0.22071329752604166,
+            "sign_matches": 0.6777267456054688,
+            "word_matches": 0.0053259531656901045
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129806518554688,
+            "raw": 16.023300170898438,
+            "tier": 11.049916585286459
+          },
+          "layer": 30,
+          "min_predicted_minus_tier_bytes": 83072,
+          "predicted_over_tier_ratio": 1.459722016366383,
+          "quality": {
+            "exponent_matches": 0.24078941345214844,
+            "sign_matches": 0.6930656433105469,
+            "word_matches": 0.005736033121744792
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129806518554688,
+            "raw": 16.023300170898438,
+            "tier": 11.049062093098959
+          },
+          "layer": 31,
+          "min_predicted_minus_tier_bytes": 83060,
+          "predicted_over_tier_ratio": 1.4598349056820912,
+          "quality": {
+            "exponent_matches": 0.22446632385253906,
+            "sign_matches": 0.677886962890625,
+            "word_matches": 0.005441029866536458
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129806518554688,
+            "raw": 16.023300170898438,
+            "tier": 11.006184895833334
+          },
+          "layer": 32,
+          "min_predicted_minus_tier_bytes": 83648,
+          "predicted_over_tier_ratio": 1.4655220379462306,
+          "quality": {
+            "exponent_matches": 0.23227945963541666,
+            "sign_matches": 0.6995010375976562,
+            "word_matches": 0.005560557047526042
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.057230631510416
+          },
+          "layer": 33,
+          "min_predicted_minus_tier_bytes": 82958,
+          "predicted_over_tier_ratio": 1.4587509314884495,
+          "quality": {
+            "exponent_matches": 0.20267168680826822,
+            "sign_matches": 0.6637865702311198,
+            "word_matches": 0.0051008860270182295
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129745483398438,
+            "raw": 16.023300170898438,
+            "tier": 11.019582112630209
+          },
+          "layer": 34,
+          "min_predicted_minus_tier_bytes": 83341,
+          "predicted_over_tier_ratio": 1.4637347694801568,
+          "quality": {
+            "exponent_matches": 0.22434679667154947,
+            "sign_matches": 0.6854438781738281,
+            "word_matches": 0.0054696400960286455
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.129806518554688,
+            "raw": 16.023300170898438,
+            "tier": 11.006520589192709
+          },
+          "layer": 35,
+          "min_predicted_minus_tier_bytes": 83383,
+          "predicted_over_tier_ratio": 1.465477340258876,
+          "quality": {
+            "exponent_matches": 0.24259122212727866,
+            "sign_matches": 0.6976915995279948,
+            "word_matches": 0.0057608286539713545
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        }
+      ],
+      "sign_match_percent": 69.33580857736094,
+      "test_records": 432,
+      "word_match_percent": 0.5657725863986545
+    },
+    "conditional_latent_r32": {
+      "candidate_bits_per_word": {
+        "predicted": 16.374177862096715,
+        "raw": 16.02333535088433,
+        "tier": 11.041171179877388
+      },
+      "charged_state_bytes": 22361201,
+      "chosen_coder_counts": {
+        "tier": 432
+      },
+      "correction_width16_percent": 99.91353352864583,
+      "correction_width_histogram": {
+        "0": 0,
+        "1": 0,
+        "10": 362,
+        "11": 87,
+        "12": 9,
+        "13": 0,
+        "14": 0,
+        "15": 0,
+        "16": 883971,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 1,
+        "8": 55,
+        "9": 251
+      },
+      "dev_tier_fallback_records": 288,
+      "exponent_match_percent": 29.178073671129013,
+      "per_layer": [
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.350575764973957,
+            "raw": 16.023223876953125,
+            "tier": 11.228561401367188
+          },
+          "layer": 0,
+          "min_predicted_minus_tier_bytes": 83276,
+          "predicted_over_tier_ratio": 1.456159447369911,
+          "quality": {
+            "exponent_matches": 0.3038616180419922,
+            "sign_matches": 0.7375443776448568,
+            "word_matches": 0.003902435302734375
+          },
+          "records": 12,
+          "width16_fraction": 0.9951171875
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.372848510742188,
+            "raw": 16.023239135742188,
+            "tier": 11.048431396484375
+          },
+          "layer": 1,
+          "min_predicted_minus_tier_bytes": 86313,
+          "predicted_over_tier_ratio": 1.4819161130829892,
+          "quality": {
+            "exponent_matches": 0.3287652333577474,
+            "sign_matches": 0.7717189788818359,
+            "word_matches": 0.0035228729248046875
+          },
+          "records": 12,
+          "width16_fraction": 0.9988199869791666
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.37896728515625,
+            "raw": 16.02325439453125,
+            "tier": 11.0865478515625
+          },
+          "layer": 2,
+          "min_predicted_minus_tier_bytes": 85240,
+          "predicted_over_tier_ratio": 1.4773730745091995,
+          "quality": {
+            "exponent_matches": 0.2817757924397786,
+            "sign_matches": 0.7477149963378906,
+            "word_matches": 0.0024363199869791665
+          },
+          "records": 12,
+          "width16_fraction": 0.9998779296875
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.37877909342448,
+            "raw": 16.023269653320312,
+            "tier": 11.024759928385416
+          },
+          "layer": 3,
+          "min_predicted_minus_tier_bytes": 86791,
+          "predicted_over_tier_ratio": 1.4856358959122624,
+          "quality": {
+            "exponent_matches": 0.3061676025390625,
+            "sign_matches": 0.7661107381184896,
+            "word_matches": 0.002964655558268229
+          },
+          "records": 12,
+          "width16_fraction": 0.9998372395833334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379592895507812,
+            "raw": 16.023269653320312,
+            "tier": 11.074849446614584
+          },
+          "layer": 4,
+          "min_predicted_minus_tier_bytes": 85804,
+          "predicted_over_tier_ratio": 1.478990118508095,
+          "quality": {
+            "exponent_matches": 0.2682946523030599,
+            "sign_matches": 0.7367293039957682,
+            "word_matches": 0.002326329549153646
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.223765055338543,
+            "raw": 16.023284912109375,
+            "tier": 11.003952026367188
+          },
+          "layer": 5,
+          "min_predicted_minus_tier_bytes": 85112,
+          "predicted_over_tier_ratio": 1.4743580321382597,
+          "quality": {
+            "exponent_matches": 0.32696278889973956,
+            "sign_matches": 0.7731895446777344,
+            "word_matches": 0.0037250518798828125
+          },
+          "records": 12,
+          "width16_fraction": 0.9760335286458334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379608154296875,
+            "raw": 16.023284912109375,
+            "tier": 11.05419921875
+          },
+          "layer": 6,
+          "min_predicted_minus_tier_bytes": 86889,
+          "predicted_over_tier_ratio": 1.481754384027563,
+          "quality": {
+            "exponent_matches": 0.22850608825683594,
+            "sign_matches": 0.7370745340983073,
+            "word_matches": 0.0017579396565755208
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.378265380859375,
+            "raw": 16.023284912109375,
+            "tier": 11.006362915039062
+          },
+          "layer": 7,
+          "min_predicted_minus_tier_bytes": 87693,
+          "predicted_over_tier_ratio": 1.488072445665058,
+          "quality": {
+            "exponent_matches": 0.29008928934733075,
+            "sign_matches": 0.7604490915934244,
+            "word_matches": 0.002703984578450521
+          },
+          "records": 12,
+          "width16_fraction": 0.999755859375
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379608154296875,
+            "raw": 16.023284912109375,
+            "tier": 11.046213785807291
+          },
+          "layer": 8,
+          "min_predicted_minus_tier_bytes": 86941,
+          "predicted_over_tier_ratio": 1.48282556103904,
+          "quality": {
+            "exponent_matches": 0.28551355997721356,
+            "sign_matches": 0.7486362457275391,
+            "word_matches": 0.0025380452473958335
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379608154296875,
+            "raw": 16.023284912109375,
+            "tier": 11.021474202473959
+          },
+          "layer": 9,
+          "min_predicted_minus_tier_bytes": 87310,
+          "predicted_over_tier_ratio": 1.4861540165489107,
+          "quality": {
+            "exponent_matches": 0.26516977945963544,
+            "sign_matches": 0.7556273142496744,
+            "word_matches": 0.0020459493001302085
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379480997721355,
+            "raw": 16.023361206054688,
+            "tier": 11.031728108723959
+          },
+          "layer": 10,
+          "min_predicted_minus_tier_bytes": 87412,
+          "predicted_over_tier_ratio": 1.4847611214029433,
+          "quality": {
+            "exponent_matches": 0.2979564666748047,
+            "sign_matches": 0.7614370981852213,
+            "word_matches": 0.002709070841471354
+          },
+          "records": 12,
+          "width16_fraction": 0.9999593098958334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.028594970703125
+          },
+          "layer": 11,
+          "min_predicted_minus_tier_bytes": 87459,
+          "predicted_over_tier_ratio": 1.485201378031739,
+          "quality": {
+            "exponent_matches": 0.2949968973795573,
+            "sign_matches": 0.7588990529378256,
+            "word_matches": 0.0026226043701171875
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.003321329752604
+          },
+          "layer": 12,
+          "min_predicted_minus_tier_bytes": 87755,
+          "predicted_over_tier_ratio": 1.4886127522198302,
+          "quality": {
+            "exponent_matches": 0.3159936269124349,
+            "sign_matches": 0.7790985107421875,
+            "word_matches": 0.0028476715087890625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.008494059244791
+          },
+          "layer": 13,
+          "min_predicted_minus_tier_bytes": 87566,
+          "predicted_over_tier_ratio": 1.4879132749757664,
+          "quality": {
+            "exponent_matches": 0.3075555165608724,
+            "sign_matches": 0.7707977294921875,
+            "word_matches": 0.002625147501627604
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.014022827148438
+          },
+          "layer": 14,
+          "min_predicted_minus_tier_bytes": 87348,
+          "predicted_over_tier_ratio": 1.4871663791968857,
+          "quality": {
+            "exponent_matches": 0.2902475992838542,
+            "sign_matches": 0.7744242350260416,
+            "word_matches": 0.002394994099934896
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.016403198242188
+          },
+          "layer": 15,
+          "min_predicted_minus_tier_bytes": 87445,
+          "predicted_over_tier_ratio": 1.4868450394821953,
+          "quality": {
+            "exponent_matches": 0.32153956095377606,
+            "sign_matches": 0.7822354634602865,
+            "word_matches": 0.0029296875
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.059687296549479
+          },
+          "layer": 16,
+          "min_predicted_minus_tier_bytes": 86091,
+          "predicted_over_tier_ratio": 1.481026000920704,
+          "quality": {
+            "exponent_matches": 0.29535802205403644,
+            "sign_matches": 0.7552420298258463,
+            "word_matches": 0.002444585164388021
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.046396891276041
+          },
+          "layer": 17,
+          "min_predicted_minus_tier_bytes": 86498,
+          "predicted_over_tier_ratio": 1.482807888351191,
+          "quality": {
+            "exponent_matches": 0.301822026570638,
+            "sign_matches": 0.7684535980224609,
+            "word_matches": 0.002541224161783854
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.072128295898438
+          },
+          "layer": 18,
+          "min_predicted_minus_tier_bytes": 85898,
+          "predicted_over_tier_ratio": 1.479361872487504,
+          "quality": {
+            "exponent_matches": 0.26453399658203125,
+            "sign_matches": 0.7540537516276041,
+            "word_matches": 0.002009709676106771
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.37878926595052,
+            "raw": 16.023361206054688,
+            "tier": 11.016993204752604
+          },
+          "layer": 19,
+          "min_predicted_minus_tier_bytes": 87260,
+          "predicted_over_tier_ratio": 1.4866841579683374,
+          "quality": {
+            "exponent_matches": 0.31517601013183594,
+            "sign_matches": 0.7696221669514974,
+            "word_matches": 0.0028317769368489585
+          },
+          "records": 12,
+          "width16_fraction": 0.9998372395833334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.047236124674479
+          },
+          "layer": 20,
+          "min_predicted_minus_tier_bytes": 86431,
+          "predicted_over_tier_ratio": 1.4826952428089641,
+          "quality": {
+            "exponent_matches": 0.3001594543457031,
+            "sign_matches": 0.765082041422526,
+            "word_matches": 0.002497990926106771
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379480997721355,
+            "raw": 16.023361206054688,
+            "tier": 11.034784952799479
+          },
+          "layer": 21,
+          "min_predicted_minus_tier_bytes": 87004,
+          "predicted_over_tier_ratio": 1.4843498144987364,
+          "quality": {
+            "exponent_matches": 0.27195167541503906,
+            "sign_matches": 0.7569522857666016,
+            "word_matches": 0.0021184285481770835
+          },
+          "records": 12,
+          "width16_fraction": 0.9999593098958334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379480997721355,
+            "raw": 16.023361206054688,
+            "tier": 11.043680826822916
+          },
+          "layer": 22,
+          "min_predicted_minus_tier_bytes": 87150,
+          "predicted_over_tier_ratio": 1.4831541453044201,
+          "quality": {
+            "exponent_matches": 0.3099047342936198,
+            "sign_matches": 0.7680988311767578,
+            "word_matches": 0.0026728312174479165
+          },
+          "records": 12,
+          "width16_fraction": 0.9999593098958334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.051462809244791
+          },
+          "layer": 23,
+          "min_predicted_minus_tier_bytes": 86500,
+          "predicted_over_tier_ratio": 1.4821281789538505,
+          "quality": {
+            "exponent_matches": 0.301998774210612,
+            "sign_matches": 0.7594470977783203,
+            "word_matches": 0.0025660196940104165
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.037521362304688
+          },
+          "layer": 24,
+          "min_predicted_minus_tier_bytes": 86942,
+          "predicted_over_tier_ratio": 1.4840002488404724,
+          "quality": {
+            "exponent_matches": 0.3003406524658203,
+            "sign_matches": 0.7574030558268229,
+            "word_matches": 0.0025469462076822915
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.03656005859375
+          },
+          "layer": 25,
+          "min_predicted_minus_tier_bytes": 87231,
+          "predicted_over_tier_ratio": 1.4841295078612786,
+          "quality": {
+            "exponent_matches": 0.275115966796875,
+            "sign_matches": 0.7541205088297526,
+            "word_matches": 0.0021998087565104165
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.05181884765625
+          },
+          "layer": 26,
+          "min_predicted_minus_tier_bytes": 86680,
+          "predicted_over_tier_ratio": 1.4820804316491138,
+          "quality": {
+            "exponent_matches": 0.281280517578125,
+            "sign_matches": 0.7403437296549479,
+            "word_matches": 0.0022252400716145835
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379440307617188,
+            "raw": 16.023361206054688,
+            "tier": 11.015914916992188
+          },
+          "layer": 27,
+          "min_predicted_minus_tier_bytes": 87652,
+          "predicted_over_tier_ratio": 1.4868887814621456,
+          "quality": {
+            "exponent_matches": 0.300656000773112,
+            "sign_matches": 0.7591660817464193,
+            "word_matches": 0.0025952657063802085
+          },
+          "records": 12,
+          "width16_fraction": 0.9999593098958334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.030685424804688
+          },
+          "layer": 28,
+          "min_predicted_minus_tier_bytes": 87377,
+          "predicted_over_tier_ratio": 1.4849199136265108,
+          "quality": {
+            "exponent_matches": 0.3012523651123047,
+            "sign_matches": 0.7528705596923828,
+            "word_matches": 0.0027179718017578125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.37927754720052,
+            "raw": 16.023361206054688,
+            "tier": 11.050511678059896
+          },
+          "layer": 29,
+          "min_predicted_minus_tier_bytes": 86922,
+          "predicted_over_tier_ratio": 1.482218925637675,
+          "quality": {
+            "exponent_matches": 0.27608172098795575,
+            "sign_matches": 0.7312323252360026,
+            "word_matches": 0.0021953582763671875
+          },
+          "records": 12,
+          "width16_fraction": 0.9999186197916666
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.049977620442709
+          },
+          "layer": 30,
+          "min_predicted_minus_tier_bytes": 87165,
+          "predicted_over_tier_ratio": 1.4823273866129285,
+          "quality": {
+            "exponent_matches": 0.2813733418782552,
+            "sign_matches": 0.7376149495442709,
+            "word_matches": 0.0023975372314453125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379440307617188,
+            "raw": 16.023361206054688,
+            "tier": 11.049123128255209
+          },
+          "layer": 31,
+          "min_predicted_minus_tier_bytes": 87153,
+          "predicted_over_tier_ratio": 1.4824199275805972,
+          "quality": {
+            "exponent_matches": 0.2775351206461589,
+            "sign_matches": 0.7296358744303385,
+            "word_matches": 0.002292633056640625
+          },
+          "records": 12,
+          "width16_fraction": 0.9999593098958334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.37952168782552,
+            "raw": 16.023361206054688,
+            "tier": 11.006245930989584
+          },
+          "layer": 32,
+          "min_predicted_minus_tier_bytes": 87741,
+          "predicted_over_tier_ratio": 1.4882024071174667,
+          "quality": {
+            "exponent_matches": 0.29562123616536456,
+            "sign_matches": 0.7516943613688151,
+            "word_matches": 0.002575556437174479
+          },
+          "records": 12,
+          "width16_fraction": 0.9999593098958334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.057291666666666
+          },
+          "layer": 33,
+          "min_predicted_minus_tier_bytes": 87052,
+          "predicted_over_tier_ratio": 1.4813468742640132,
+          "quality": {
+            "exponent_matches": 0.26421483357747394,
+            "sign_matches": 0.7216599782307943,
+            "word_matches": 0.0020008087158203125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379236857096355,
+            "raw": 16.023361206054688,
+            "tier": 11.019643147786459
+          },
+          "layer": 34,
+          "min_predicted_minus_tier_bytes": 87435,
+          "predicted_over_tier_ratio": 1.4863672659297038,
+          "quality": {
+            "exponent_matches": 0.2653064727783203,
+            "sign_matches": 0.7355779012044271,
+            "word_matches": 0.0022176106770833335
+          },
+          "records": 12,
+          "width16_fraction": 0.9999186197916666
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.379684448242188,
+            "raw": 16.023361206054688,
+            "tier": 11.006581624348959
+          },
+          "layer": 35,
+          "min_predicted_minus_tier_bytes": 87476,
+          "predicted_over_tier_ratio": 1.4881718054956095,
+          "quality": {
+            "exponent_matches": 0.31102752685546875,
+            "sign_matches": 0.7602945963541666,
+            "word_matches": 0.0030123392740885415
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        }
+      ],
+      "sign_match_percent": 75.52848038850007,
+      "test_records": 432,
+      "word_match_percent": 0.2575344509548611
+    },
+    "conditional_latent_r8": {
+      "candidate_bits_per_word": {
+        "predicted": 16.189015282524956,
+        "raw": 16.02327431572808,
+        "tier": 11.041110144721138
+      },
+      "charged_state_bytes": 6435233,
+      "chosen_coder_counts": {
+        "tier": 432
+      },
+      "correction_width16_percent": 99.95151095920139,
+      "correction_width_histogram": {
+        "0": 0,
+        "1": 0,
+        "10": 176,
+        "11": 83,
+        "12": 6,
+        "13": 0,
+        "14": 0,
+        "15": 0,
+        "16": 884307,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 30,
+        "9": 134
+      },
+      "dev_tier_fallback_records": 288,
+      "exponent_match_percent": 25.806326336330837,
+      "per_layer": [
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.189076741536457,
+            "raw": 16.023162841796875,
+            "tier": 11.228500366210938
+          },
+          "layer": 0,
+          "min_predicted_minus_tier_bytes": 80961,
+          "predicted_over_tier_ratio": 1.4417844069590096,
+          "quality": {
+            "exponent_matches": 0.24386024475097656,
+            "sign_matches": 0.6912059783935547,
+            "word_matches": 0.002337773640950521
+          },
+          "records": 12,
+          "width16_fraction": 0.9994303385416666
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.188807169596355,
+            "raw": 16.023178100585938,
+            "tier": 11.048370361328125
+          },
+          "layer": 1,
+          "min_predicted_minus_tier_bytes": 83336,
+          "predicted_over_tier_ratio": 1.465266518061429,
+          "quality": {
+            "exponent_matches": 0.25401051839192706,
+            "sign_matches": 0.7206344604492188,
+            "word_matches": 0.0023663838704427085
+          },
+          "records": 12,
+          "width16_fraction": 0.9994303385416666
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.19195556640625,
+            "raw": 16.023193359375,
+            "tier": 11.08648681640625
+          },
+          "layer": 2,
+          "min_predicted_minus_tier_bytes": 82207,
+          "predicted_over_tier_ratio": 1.460512769694067,
+          "quality": {
+            "exponent_matches": 0.23630269368489584,
+            "sign_matches": 0.7054595947265625,
+            "word_matches": 0.0018698374430338542
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.19152323404948,
+            "raw": 16.023208618164062,
+            "tier": 11.024698893229166
+          },
+          "layer": 3,
+          "min_predicted_minus_tier_bytes": 83718,
+          "predicted_over_tier_ratio": 1.4686589983871146,
+          "quality": {
+            "exponent_matches": 0.2622241973876953,
+            "sign_matches": 0.7254250844319662,
+            "word_matches": 0.0023485819498697915
+          },
+          "records": 12,
+          "width16_fraction": 0.9999186197916666
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.191970825195312,
+            "raw": 16.023208618164062,
+            "tier": 11.074788411458334
+          },
+          "layer": 4,
+          "min_predicted_minus_tier_bytes": 82731,
+          "predicted_over_tier_ratio": 1.4620569011000315,
+          "quality": {
+            "exponent_matches": 0.23461532592773438,
+            "sign_matches": 0.7031116485595703,
+            "word_matches": 0.001834869384765625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.090504964192707,
+            "raw": 16.023223876953125,
+            "tier": 11.003890991210938
+          },
+          "layer": 5,
+          "min_predicted_minus_tier_bytes": 82671,
+          "predicted_over_tier_ratio": 1.4622559399256652,
+          "quality": {
+            "exponent_matches": 0.26825523376464844,
+            "sign_matches": 0.7370783487955729,
+            "word_matches": 0.002765655517578125
+          },
+          "records": 12,
+          "width16_fraction": 0.9839274088541666
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.191986083984375,
+            "raw": 16.023223876953125,
+            "tier": 11.05413818359375
+          },
+          "layer": 6,
+          "min_predicted_minus_tier_bytes": 83816,
+          "predicted_over_tier_ratio": 1.4647895489506435,
+          "quality": {
+            "exponent_matches": 0.25617726643880206,
+            "sign_matches": 0.7146561940511068,
+            "word_matches": 0.002150853474934896
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.191335042317707,
+            "raw": 16.023223876953125,
+            "tier": 11.006301879882812
+          },
+          "layer": 7,
+          "min_predicted_minus_tier_bytes": 84668,
+          "predicted_over_tier_ratio": 1.4710967606578225,
+          "quality": {
+            "exponent_matches": 0.27614911397298175,
+            "sign_matches": 0.7311147054036459,
+            "word_matches": 0.00244903564453125
+          },
+          "records": 12,
+          "width16_fraction": 0.9998779296875
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.191986083984375,
+            "raw": 16.023223876953125,
+            "tier": 11.046152750651041
+          },
+          "layer": 8,
+          "min_predicted_minus_tier_bytes": 83868,
+          "predicted_over_tier_ratio": 1.4658484677418613,
+          "quality": {
+            "exponent_matches": 0.24616877237955728,
+            "sign_matches": 0.7124347686767578,
+            "word_matches": 0.001953760782877604
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.191986083984375,
+            "raw": 16.023223876953125,
+            "tier": 11.021413167317709
+          },
+          "layer": 9,
+          "min_predicted_minus_tier_bytes": 84237,
+          "predicted_over_tier_ratio": 1.4691388334845479,
+          "quality": {
+            "exponent_matches": 0.2584819793701172,
+            "sign_matches": 0.7270329793294271,
+            "word_matches": 0.0020389556884765625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.031667073567709
+          },
+          "layer": 10,
+          "min_predicted_minus_tier_bytes": 84339,
+          "predicted_over_tier_ratio": 1.4677801886105213,
+          "quality": {
+            "exponent_matches": 0.2638924916585286,
+            "sign_matches": 0.7293777465820312,
+            "word_matches": 0.002255121866861979
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.028533935546875
+          },
+          "layer": 11,
+          "min_predicted_minus_tier_bytes": 84386,
+          "predicted_over_tier_ratio": 1.468197175849445,
+          "quality": {
+            "exponent_matches": 0.2616386413574219,
+            "sign_matches": 0.7254511515299479,
+            "word_matches": 0.0020739237467447915
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.003260294596354
+          },
+          "layer": 12,
+          "min_predicted_minus_tier_bytes": 84682,
+          "predicted_over_tier_ratio": 1.4715695116184362,
+          "quality": {
+            "exponent_matches": 0.27660687764485675,
+            "sign_matches": 0.7399241129557291,
+            "word_matches": 0.002323786417643229
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.008433024088541
+          },
+          "layer": 13,
+          "min_predicted_minus_tier_bytes": 84493,
+          "predicted_over_tier_ratio": 1.4708780389087512,
+          "quality": {
+            "exponent_matches": 0.27350807189941406,
+            "sign_matches": 0.7367738087972006,
+            "word_matches": 0.002216974894205729
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.013961791992188
+          },
+          "layer": 14,
+          "min_predicted_minus_tier_bytes": 84275,
+          "predicted_over_tier_ratio": 1.4701396903067423,
+          "quality": {
+            "exponent_matches": 0.2802817026774089,
+            "sign_matches": 0.7394091288248698,
+            "word_matches": 0.0023956298828125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.016342163085938
+          },
+          "layer": 15,
+          "min_predicted_minus_tier_bytes": 84372,
+          "predicted_over_tier_ratio": 1.4698220278766203,
+          "quality": {
+            "exponent_matches": 0.27979087829589844,
+            "sign_matches": 0.7417405446370443,
+            "word_matches": 0.0022455851236979165
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.059626261393229
+          },
+          "layer": 16,
+          "min_predicted_minus_tier_bytes": 83018,
+          "predicted_over_tier_ratio": 1.4640695802219543,
+          "quality": {
+            "exponent_matches": 0.25759124755859375,
+            "sign_matches": 0.7166970570882162,
+            "word_matches": 0.0019429524739583333
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.046335856119791
+          },
+          "layer": 17,
+          "min_predicted_minus_tier_bytes": 83425,
+          "predicted_over_tier_ratio": 1.4658310763708227,
+          "quality": {
+            "exponent_matches": 0.2665367126464844,
+            "sign_matches": 0.7311236063639323,
+            "word_matches": 0.0019855499267578125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.072067260742188
+          },
+          "layer": 18,
+          "min_predicted_minus_tier_bytes": 82825,
+          "predicted_over_tier_ratio": 1.4624244954997043,
+          "quality": {
+            "exponent_matches": 0.255398432413737,
+            "sign_matches": 0.7159379323323568,
+            "word_matches": 0.001888275146484375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.191858927408855,
+            "raw": 16.023300170898438,
+            "tier": 11.016932169596354
+          },
+          "layer": 19,
+          "min_predicted_minus_tier_bytes": 84220,
+          "predicted_over_tier_ratio": 1.4697248451881957,
+          "quality": {
+            "exponent_matches": 0.27865346272786456,
+            "sign_matches": 0.7339159647623698,
+            "word_matches": 0.0023053487141927085
+          },
+          "records": 12,
+          "width16_fraction": 0.9999593098958334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.047175089518229
+          },
+          "layer": 20,
+          "min_predicted_minus_tier_bytes": 83358,
+          "predicted_over_tier_ratio": 1.4657197199031475,
+          "quality": {
+            "exponent_matches": 0.2636464436848958,
+            "sign_matches": 0.7311045328776041,
+            "word_matches": 0.0019849141438802085
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.034723917643229
+          },
+          "layer": 21,
+          "min_predicted_minus_tier_bytes": 83931,
+          "predicted_over_tier_ratio": 1.4673735834967723,
+          "quality": {
+            "exponent_matches": 0.2605202992757161,
+            "sign_matches": 0.7224502563476562,
+            "word_matches": 0.0020268758138020835
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.043619791666666
+          },
+          "layer": 22,
+          "min_predicted_minus_tier_bytes": 84077,
+          "predicted_over_tier_ratio": 1.4661915824146672,
+          "quality": {
+            "exponent_matches": 0.2742665608723958,
+            "sign_matches": 0.7366809844970703,
+            "word_matches": 0.002200444539388021
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.051401774088541
+          },
+          "layer": 23,
+          "min_predicted_minus_tier_bytes": 83427,
+          "predicted_over_tier_ratio": 1.4651591453216457,
+          "quality": {
+            "exponent_matches": 0.2613976796468099,
+            "sign_matches": 0.7228507995605469,
+            "word_matches": 0.002032597859700521
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.037460327148438
+          },
+          "layer": 24,
+          "min_predicted_minus_tier_bytes": 83869,
+          "predicted_over_tier_ratio": 1.4670097919267409,
+          "quality": {
+            "exponent_matches": 0.2567342122395833,
+            "sign_matches": 0.7207069396972656,
+            "word_matches": 0.0019582112630208335
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.0364990234375
+          },
+          "layer": 25,
+          "min_predicted_minus_tier_bytes": 84158,
+          "predicted_over_tier_ratio": 1.4671375717556492,
+          "quality": {
+            "exponent_matches": 0.2617632548014323,
+            "sign_matches": 0.7223478953043619,
+            "word_matches": 0.0020968119303385415
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.0517578125
+          },
+          "layer": 26,
+          "min_predicted_minus_tier_bytes": 83607,
+          "predicted_over_tier_ratio": 1.4651119444198992,
+          "quality": {
+            "exponent_matches": 0.2426579793294271,
+            "sign_matches": 0.7029259999593099,
+            "word_matches": 0.0018113454182942708
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.015853881835938
+          },
+          "layer": 27,
+          "min_predicted_minus_tier_bytes": 84579,
+          "predicted_over_tier_ratio": 1.4698871782085645,
+          "quality": {
+            "exponent_matches": 0.2660058339436849,
+            "sign_matches": 0.7251065572102865,
+            "word_matches": 0.0021514892578125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.030624389648438
+          },
+          "layer": 28,
+          "min_predicted_minus_tier_bytes": 84304,
+          "predicted_over_tier_ratio": 1.4679189324155524,
+          "quality": {
+            "exponent_matches": 0.259036382039388,
+            "sign_matches": 0.7174453735351562,
+            "word_matches": 0.002070744832356771
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.050450642903646
+          },
+          "layer": 29,
+          "min_predicted_minus_tier_bytes": 83849,
+          "predicted_over_tier_ratio": 1.4652852540749433,
+          "quality": {
+            "exponent_matches": 0.2291100819905599,
+            "sign_matches": 0.6900971730550131,
+            "word_matches": 0.0016466776529947917
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.049916585286459
+          },
+          "layer": 30,
+          "min_predicted_minus_tier_bytes": 84092,
+          "predicted_over_tier_ratio": 1.4653560733200706,
+          "quality": {
+            "exponent_matches": 0.24656295776367188,
+            "sign_matches": 0.7064984639485677,
+            "word_matches": 0.001949310302734375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.049062093098959
+          },
+          "layer": 31,
+          "min_predicted_minus_tier_bytes": 84080,
+          "predicted_over_tier_ratio": 1.4654693983521871,
+          "quality": {
+            "exponent_matches": 0.23974164326985678,
+            "sign_matches": 0.6950632731119791,
+            "word_matches": 0.001796722412109375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.006184895833334
+          },
+          "layer": 32,
+          "min_predicted_minus_tier_bytes": 84668,
+          "predicted_over_tier_ratio": 1.4711784811156132,
+          "quality": {
+            "exponent_matches": 0.25987815856933594,
+            "sign_matches": 0.7240403493245443,
+            "word_matches": 0.00214385986328125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.057230631510416
+          },
+          "layer": 33,
+          "min_predicted_minus_tier_bytes": 83979,
+          "predicted_over_tier_ratio": 1.464386781603908,
+          "quality": {
+            "exponent_matches": 0.21856244405110678,
+            "sign_matches": 0.6832675933837891,
+            "word_matches": 0.0014794667561848958
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.019582112630209
+          },
+          "layer": 34,
+          "min_predicted_minus_tier_bytes": 84362,
+          "predicted_over_tier_ratio": 1.4693898745371647,
+          "quality": {
+            "exponent_matches": 0.24551073710123697,
+            "sign_matches": 0.7048352559407552,
+            "word_matches": 0.001960118611653646
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.192062377929688,
+            "raw": 16.023300170898438,
+            "tier": 11.006520589192709
+          },
+          "layer": 35,
+          "min_predicted_minus_tier_bytes": 84403,
+          "predicted_over_tier_ratio": 1.4711336109095783,
+          "quality": {
+            "exponent_matches": 0.27473894755045575,
+            "sign_matches": 0.7276706695556641,
+            "word_matches": 0.002364476521809896
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        }
+      ],
+      "sign_match_percent": 71.97665815000181,
+      "test_records": 432,
+      "word_match_percent": 0.20950811880606193
+    },
+    "conditional_mean_predictor": {
+      "candidate_bits_per_word": {
+        "predicted": 16.126711951361763,
+        "raw": 16.02327431572808,
+        "tier": 11.041110144721138
+      },
+      "charged_state_bytes": 706365,
+      "chosen_coder_counts": {
+        "tier": 432
+      },
+      "correction_width16_percent": 99.9931052879051,
+      "correction_width_histogram": {
+        "0": 0,
+        "1": 0,
+        "10": 27,
+        "11": 29,
+        "12": 1,
+        "13": 0,
+        "14": 0,
+        "15": 0,
+        "16": 884675,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 4
+      },
+      "dev_tier_fallback_records": 288,
+      "exponent_match_percent": 18.53014628092448,
+      "per_layer": [
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.126983642578125,
+            "raw": 16.023162841796875,
+            "tier": 11.228500366210938
+          },
+          "layer": 0,
+          "min_predicted_minus_tier_bytes": 79937,
+          "predicted_over_tier_ratio": 1.4362544522069765,
+          "quality": {
+            "exponent_matches": 0.1666253407796224,
+            "sign_matches": 0.6328118642171224,
+            "word_matches": 0.0010471343994140625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.12549336751302,
+            "raw": 16.023178100585938,
+            "tier": 11.048370361328125
+          },
+          "layer": 1,
+          "min_predicted_minus_tier_bytes": 82328,
+          "predicted_over_tier_ratio": 1.4595359170756994,
+          "quality": {
+            "exponent_matches": 0.20141919453938803,
+            "sign_matches": 0.6643664042154948,
+            "word_matches": 0.0016981760660807292
+          },
+          "records": 12,
+          "width16_fraction": 0.9997151692708334
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.12701416015625,
+            "raw": 16.023193359375,
+            "tier": 11.08648681640625
+          },
+          "layer": 2,
+          "min_predicted_minus_tier_bytes": 81143,
+          "predicted_over_tier_ratio": 1.4546550613572926,
+          "quality": {
+            "exponent_matches": 0.17228062947591147,
+            "sign_matches": 0.6525344848632812,
+            "word_matches": 0.0010922749837239583
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127029418945312,
+            "raw": 16.023208618164062,
+            "tier": 11.024698893229166
+          },
+          "layer": 3,
+          "min_predicted_minus_tier_bytes": 82654,
+          "predicted_over_tier_ratio": 1.4628090594700731,
+          "quality": {
+            "exponent_matches": 0.18969853719075522,
+            "sign_matches": 0.6718088785807291,
+            "word_matches": 0.0013790130615234375
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127029418945312,
+            "raw": 16.023208618164062,
+            "tier": 11.074788411458334
+          },
+          "layer": 4,
+          "min_predicted_minus_tier_bytes": 81667,
+          "predicted_over_tier_ratio": 1.4561930052099026,
+          "quality": {
+            "exponent_matches": 0.16462198893229166,
+            "sign_matches": 0.6518739064534506,
+            "word_matches": 0.0010693868001302083
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.114756266276043,
+            "raw": 16.023223876953125,
+            "tier": 11.003890991210938
+          },
+          "layer": 5,
+          "min_predicted_minus_tier_bytes": 83455,
+          "predicted_over_tier_ratio": 1.4644598241792173,
+          "quality": {
+            "exponent_matches": 0.20386250813802084,
+            "sign_matches": 0.6807308197021484,
+            "word_matches": 0.0017668406168619792
+          },
+          "records": 12,
+          "width16_fraction": 0.997802734375
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127044677734375,
+            "raw": 16.023223876953125,
+            "tier": 11.05413818359375
+          },
+          "layer": 6,
+          "min_predicted_minus_tier_bytes": 82752,
+          "predicted_over_tier_ratio": 1.458914698720674,
+          "quality": {
+            "exponent_matches": 0.1710987091064453,
+            "sign_matches": 0.6566104888916016,
+            "word_matches": 0.0011234283447265625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127044677734375,
+            "raw": 16.023223876953125,
+            "tier": 11.006301879882812
+          },
+          "layer": 7,
+          "min_predicted_minus_tier_bytes": 83604,
+          "predicted_over_tier_ratio": 1.4652555284905637,
+          "quality": {
+            "exponent_matches": 0.19993019104003906,
+            "sign_matches": 0.6786518096923828,
+            "word_matches": 0.0014438629150390625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127044677734375,
+            "raw": 16.023223876953125,
+            "tier": 11.046152750651041
+          },
+          "layer": 8,
+          "min_predicted_minus_tier_bytes": 82804,
+          "predicted_over_tier_ratio": 1.459969370492715,
+          "quality": {
+            "exponent_matches": 0.17247899373372397,
+            "sign_matches": 0.6476414998372396,
+            "word_matches": 0.0010954538981119792
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127044677734375,
+            "raw": 16.023223876953125,
+            "tier": 11.021413167317709
+          },
+          "layer": 9,
+          "min_predicted_minus_tier_bytes": 83173,
+          "predicted_over_tier_ratio": 1.4632465395233185,
+          "quality": {
+            "exponent_matches": 0.17701276143391928,
+            "sign_matches": 0.6653156280517578,
+            "word_matches": 0.0010935465494791667
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.031667073567709
+          },
+          "layer": 10,
+          "min_predicted_minus_tier_bytes": 83275,
+          "predicted_over_tier_ratio": 1.4618933715214157,
+          "quality": {
+            "exponent_matches": 0.17317326863606772,
+            "sign_matches": 0.6530132293701172,
+            "word_matches": 0.0011679331461588542
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.028533935546875
+          },
+          "layer": 11,
+          "min_predicted_minus_tier_bytes": 83322,
+          "predicted_over_tier_ratio": 1.4623086863521526,
+          "quality": {
+            "exponent_matches": 0.1726531982421875,
+            "sign_matches": 0.6464023590087891,
+            "word_matches": 0.0010649363199869792
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.003260294596354
+          },
+          "layer": 12,
+          "min_predicted_minus_tier_bytes": 83618,
+          "predicted_over_tier_ratio": 1.4656674967145542,
+          "quality": {
+            "exponent_matches": 0.19675827026367188,
+            "sign_matches": 0.6656099955240885,
+            "word_matches": 0.0013739267985026042
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.008433024088541
+          },
+          "layer": 13,
+          "min_predicted_minus_tier_bytes": 83429,
+          "predicted_over_tier_ratio": 1.4649787972902668,
+          "quality": {
+            "exponent_matches": 0.18951924641927084,
+            "sign_matches": 0.6650435129801432,
+            "word_matches": 0.0012594858805338542
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.013961791992188
+          },
+          "layer": 14,
+          "min_predicted_minus_tier_bytes": 83211,
+          "predicted_over_tier_ratio": 1.4642434099785124,
+          "quality": {
+            "exponent_matches": 0.19385210673014322,
+            "sign_matches": 0.6690190633138021,
+            "word_matches": 0.00122833251953125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.016342163085938
+          },
+          "layer": 15,
+          "min_predicted_minus_tier_bytes": 83308,
+          "predicted_over_tier_ratio": 1.4639270215951699,
+          "quality": {
+            "exponent_matches": 0.19367154439290366,
+            "sign_matches": 0.6709734598795573,
+            "word_matches": 0.0012035369873046875
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.059626261393229
+          },
+          "layer": 16,
+          "min_predicted_minus_tier_bytes": 81954,
+          "predicted_over_tier_ratio": 1.4581976452473797,
+          "quality": {
+            "exponent_matches": 0.18337440490722656,
+            "sign_matches": 0.6472892761230469,
+            "word_matches": 0.0011412302652994792
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.046335856119791
+          },
+          "layer": 17,
+          "min_predicted_minus_tier_bytes": 82361,
+          "predicted_over_tier_ratio": 1.4599520765743408,
+          "quality": {
+            "exponent_matches": 0.1861292521158854,
+            "sign_matches": 0.6669896443684896,
+            "word_matches": 0.0010935465494791667
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.072067260742188
+          },
+          "layer": 18,
+          "min_predicted_minus_tier_bytes": 81761,
+          "predicted_over_tier_ratio": 1.456559158456435,
+          "quality": {
+            "exponent_matches": 0.17819595336914062,
+            "sign_matches": 0.6536280314127604,
+            "word_matches": 0.0010019938151041667
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.016932169596354
+          },
+          "layer": 19,
+          "min_predicted_minus_tier_bytes": 83156,
+          "predicted_over_tier_ratio": 1.4638486216867181,
+          "quality": {
+            "exponent_matches": 0.1943995157877604,
+            "sign_matches": 0.6716410319010416,
+            "word_matches": 0.0012868245442708333
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.047175089518229
+          },
+          "layer": 20,
+          "min_predicted_minus_tier_bytes": 82294,
+          "predicted_over_tier_ratio": 1.4598411667233742,
+          "quality": {
+            "exponent_matches": 0.18127886454264322,
+            "sign_matches": 0.6697076161702474,
+            "word_matches": 0.0010814666748046875
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.034723917643229
+          },
+          "layer": 21,
+          "min_predicted_minus_tier_bytes": 82867,
+          "predicted_over_tier_ratio": 1.4614883971763275,
+          "quality": {
+            "exponent_matches": 0.17922274271647134,
+            "sign_matches": 0.6666851043701172,
+            "word_matches": 0.0010401407877604167
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.043619791666666
+          },
+          "layer": 22,
+          "min_predicted_minus_tier_bytes": 83013,
+          "predicted_over_tier_ratio": 1.4603111367387844,
+          "quality": {
+            "exponent_matches": 0.19267400105794272,
+            "sign_matches": 0.6739648183186849,
+            "word_matches": 0.0012194315592447917
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.051401774088541
+          },
+          "layer": 23,
+          "min_predicted_minus_tier_bytes": 82363,
+          "predicted_over_tier_ratio": 1.4592828404349423,
+          "quality": {
+            "exponent_matches": 0.17900784810384116,
+            "sign_matches": 0.6650517781575521,
+            "word_matches": 0.0011374155680338542
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.037460327148438
+          },
+          "layer": 24,
+          "min_predicted_minus_tier_bytes": 82805,
+          "predicted_over_tier_ratio": 1.4611260646629367,
+          "quality": {
+            "exponent_matches": 0.1910069783528646,
+            "sign_matches": 0.6752872467041016,
+            "word_matches": 0.0011692047119140625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.0364990234375
+          },
+          "layer": 25,
+          "min_predicted_minus_tier_bytes": 83094,
+          "predicted_over_tier_ratio": 1.4612533320060612,
+          "quality": {
+            "exponent_matches": 0.19701703389485678,
+            "sign_matches": 0.673699696858724,
+            "word_matches": 0.0012620290120442708
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.0517578125
+          },
+          "layer": 26,
+          "min_predicted_minus_tier_bytes": 82543,
+          "predicted_over_tier_ratio": 1.4592358288415659,
+          "quality": {
+            "exponent_matches": 0.17883682250976562,
+            "sign_matches": 0.6543998718261719,
+            "word_matches": 0.0011157989501953125
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.015853881835938
+          },
+          "layer": 27,
+          "min_predicted_minus_tier_bytes": 83515,
+          "predicted_over_tier_ratio": 1.4639919106290733,
+          "quality": {
+            "exponent_matches": 0.19792683919270834,
+            "sign_matches": 0.6749986012776693,
+            "word_matches": 0.0013421376546223958
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.030624389648438
+          },
+          "layer": 28,
+          "min_predicted_minus_tier_bytes": 83240,
+          "predicted_over_tier_ratio": 1.4620315588675106,
+          "quality": {
+            "exponent_matches": 0.18985112508138022,
+            "sign_matches": 0.6687997182210287,
+            "word_matches": 0.0012880961100260417
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.050450642903646
+          },
+          "layer": 29,
+          "min_predicted_minus_tier_bytes": 82785,
+          "predicted_over_tier_ratio": 1.4594084434046286,
+          "quality": {
+            "exponent_matches": 0.170623779296875,
+            "sign_matches": 0.6536439259847006,
+            "word_matches": 0.0010496775309244792
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.049916585286459
+          },
+          "layer": 30,
+          "min_predicted_minus_tier_bytes": 83028,
+          "predicted_over_tier_ratio": 1.4594789786154396,
+          "quality": {
+            "exponent_matches": 0.1881128946940104,
+            "sign_matches": 0.6664040883382162,
+            "word_matches": 0.0011526743570963542
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.049062093098959
+          },
+          "layer": 31,
+          "min_predicted_minus_tier_bytes": 83016,
+          "predicted_over_tier_ratio": 1.4595918491355382,
+          "quality": {
+            "exponent_matches": 0.17696380615234375,
+            "sign_matches": 0.6579208374023438,
+            "word_matches": 0.0010693868001302083
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.006184895833334
+          },
+          "layer": 32,
+          "min_predicted_minus_tier_bytes": 83604,
+          "predicted_over_tier_ratio": 1.4652780345153944,
+          "quality": {
+            "exponent_matches": 0.20076878865559897,
+            "sign_matches": 0.6882470448811849,
+            "word_matches": 0.0013434092203776042
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.057230631510416
+          },
+          "layer": 33,
+          "min_predicted_minus_tier_bytes": 82915,
+          "predicted_over_tier_ratio": 1.458513574431677,
+          "quality": {
+            "exponent_matches": 0.16365750630696616,
+            "sign_matches": 0.6490052541097006,
+            "word_matches": 0.0010026295979817708
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.019582112630209
+          },
+          "layer": 34,
+          "min_predicted_minus_tier_bytes": 83298,
+          "predicted_over_tier_ratio": 1.4634966014904884,
+          "quality": {
+            "exponent_matches": 0.18936729431152344,
+            "sign_matches": 0.6692549387613932,
+            "word_matches": 0.001255035400390625
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        },
+        {
+          "candidate_bits_per_word": {
+            "predicted": 16.127120971679688,
+            "raw": 16.023300170898438,
+            "tier": 11.006520589192709
+          },
+          "layer": 35,
+          "min_predicted_minus_tier_bytes": 83339,
+          "predicted_over_tier_ratio": 1.4652333442700223,
+          "quality": {
+            "exponent_matches": 0.21378072102864584,
+            "sign_matches": 0.6827837626139323,
+            "word_matches": 0.0015379587809244792
+          },
+          "records": 12,
+          "width16_fraction": 1.0
+        }
+      ],
+      "sign_match_percent": 66.39391581217448,
+      "test_records": 432,
+      "word_match_percent": 0.12138154771592882
+    }
+  },
+  "result_commit": "2fc0c9f20c3607fad89a94567ae5c96de51f8a23",
+  "scope": "Audit and descriptive analysis of submitted A4500 records; no new GPU execution, TEST fitting, achieved40% result or compact-serving claim.",
+  "training_fit_wall_seconds": 20.802772246301174,
+  "winner_ledger": {
+    "bits_missing_to_40": 1.057636741797129,
+    "counterfactual_savings_without_headers_state_checksums_framing": 34.425014919704864,
+    "current_stored_bytes_reduction_needed_percent": 9.923745455212302,
+    "exponent_payload_bits": 2.631087126555266,
+    "exponent_plus_mantissa_bits": 9.631087126555267,
+    "headers_state_checksums_framing_bits": 0.1656391289499065,
+    "mantissa_bits": 7.0,
+    "scope": "Actual component ledger averaged over six sampled TEST cases; free-component calculations are counterfactual arithmetic, not implemented formats.",
+    "sign_payload_bits": 0.845285486291956,
+    "sign_seed_bits": 0.015625,
+    "total_bits_per_word": 10.657636741797129
+  }
+}
