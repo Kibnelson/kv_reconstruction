@@ -10,6 +10,8 @@ The new [prefill recipe experiment](docs/prefill_recipes.md) derives per-channel
 
 The [local full-record diagnostic](benchmark_results/recipe_insights_review_20261019/REVIEW.md) checks all 33 candidates on a reused small-model cache. Prefill exponent metadata saves 28.03% including all metadata, versus 22.77% for its fixed-bias control. These CPU size results guide the next Qwen GPU run; they do not establish GPU performance or serving gains.
 
+The subsequent [Qwen A4500 review](docs/qwen_gpu_insights.md) finds 29.55–29.75% estimated savings across six TEST cases. It identifies metadata/index costs, validates a compact-index transformation, and separates measured results from proposed formats and the research needed for bounded GPU materialization.
+
 ## Clone and install
 
 ```bash
