@@ -24,6 +24,8 @@ The [four-idea conditional study](docs/conditional_40_study.md) adds actual devi
 
 The [fifth learned-probability study](docs/neural_probability_study.md) adapts the supplied previous-layer neural predictor into an actual lossless arithmetic-coded format. `--neural-probability-study` compares per-layer networks with a shared network and a matched frozen-exponent control. Neural inference uses the selected device; entropy coding is a separately timed CPU reference. It counts all weights/normalizers, reopens complete indexed packets, and restores each layer from the previous layer's decoded KV. The supplied 42–46% figures are ideal probability rates on SmolLM, excluding weights; they are not yet Qwen stream results. This additional produced-KV experiment complements the prefill-hidden-metadata tracks.
 
+The [novelty assessment](docs/novelty_assessment.md) compares the current representation families with primary sources, including ExANS, SplitZip, AQUA-KV, Palu and learned exact entropy coding. Most broad ingredients are established; any contribution must come from a specific mechanism and a measured advantage, with original-BF16 exactness and capacity-bounded serving assessed separately.
+
 For result commits, use `python scripts/package_results.py RUN --destination benchmark_results/NAME`. It preserves the full report as verified `results.json.gz`, alongside the smaller reports and decoder state. Large frontier reports can exceed GitHub's raw-file limit. The [sharing and repair instructions](docs/frontier_40_study.md#repair-a-rejected-oversized-report-commit) explain how to amend a rejected unpublished commit.
 
 ## Clone and install
