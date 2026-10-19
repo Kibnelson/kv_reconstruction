@@ -53,6 +53,8 @@ Three comparisons would make the claim assessable:
 
 The immediate implementation goal remains higher savings with lower restore cost. Our current evidence does not justify calling any broad approach uniquely ours. It does justify continuing the controlled experiments and narrowing the claimed contribution to whatever mechanism actually wins.
 
+The subsequent [shared-neural position study](qwen_neural_positions_review.md) supplies a matched 8K size improvement: 32.20% estimated net savings versus 29.51% for its own control. It uses the same declared learned numerical shards as the smoke and primarily improves coverage and page framing, so it adds evidence for the representation rather than establishing a new algorithm. Restoration remains dominated by the CPU entropy reference.
+
 ## Primary sources and locations
 
 1. [SplitZip](https://arxiv.org/html/2605.01708v1), preprint, 2026, §3.2: common-exponent codes and exact escapes.

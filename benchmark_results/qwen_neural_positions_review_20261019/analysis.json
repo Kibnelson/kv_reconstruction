@@ -1,0 +1,2238 @@
+{
+  "actual_anchor_state_bytes": 85451,
+  "benchmark_status": "completed",
+  "config": {
+    "batch_tokens": 256,
+    "cases": 3,
+    "chunk_tokens": 512,
+    "dev_tokens": 128,
+    "device": "cuda",
+    "generation_steps": 2,
+    "lengths": [
+      2048,
+      8192
+    ],
+    "local_files_only": false,
+    "max_pairs": 144,
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "modes": [
+      "shared"
+    ],
+    "output": "runs/qwen_neural_shared_positions",
+    "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "seed": 71,
+    "shared_steps": null,
+    "steps": 200,
+    "threads": 4,
+    "tile_tokens": 64,
+    "tiny": false,
+    "train_tokens": 512,
+    "width": 512
+  },
+  "counts": {
+    "dev_checks": 1,
+    "generation_steps": 2,
+    "neural_logged_roundtrip_pair_checks": 936,
+    "test_cases": 6,
+    "test_independent_decode_pair_checks": 864,
+    "test_rows": 12
+  },
+  "dev_checks": [
+    {
+      "actual_container_bytes": 12522825,
+      "actual_payload_reduction_pct": 33.65168571472168,
+      "all_logits_and_tokens_and_appended_KV_exact": true,
+      "complete_prefix_tokens": 128,
+      "complete_raw_cache_bytes": 18874368,
+      "continuation_cpu_decode_and_rebuild_seconds": 116.58393144793808,
+      "coverage": "full",
+      "generation_steps": 2,
+      "max_abs_logit_difference": 0.0,
+      "mode": "shared",
+      "records": 72,
+      "scope": "Measured complete DEV correctness check with fully restored raw model KV; not encoded-resident attention or a TEST compression score.",
+      "stages": {
+        "encode": {
+          "anchor_decode_device_event_seconds": 0.0,
+          "anchor_encode_device_event_seconds": 0.011722400426864624,
+          "anchor_encode_wall_seconds": 0.011831449344754219,
+          "anchor_packet_to_cpu_seconds": 0.000614384189248085,
+          "anchor_restore_wall_seconds": 0.0,
+          "cpu_entropy_decode_seconds": 0.0,
+          "cpu_entropy_encode_seconds": 51.843204190954566,
+          "input_staging_device_event_seconds": 0.008397216022014618,
+          "input_staging_wall_seconds": 0.011777829378843307,
+          "named_disjoint_stage_wall_seconds": 51.94583910703659,
+          "neural_prediction_device_event_seconds": 0.05745657628774642,
+          "neural_prediction_wall_seconds": 0.05883452109992504,
+          "prediction_output_to_cpu_device_event_seconds": 0.018390911981463424,
+          "prediction_output_to_cpu_wall_seconds": 0.01957673206925392,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "immediate_verification_decode": {
+          "anchor_decode_device_event_seconds": 0.004349759817123413,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.005307324230670929,
+          "cpu_entropy_decode_seconds": 55.45493379421532,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.008019552007317542,
+          "input_staging_wall_seconds": 0.011160878464579582,
+          "named_disjoint_stage_wall_seconds": 55.5474186129868,
+          "neural_prediction_device_event_seconds": 0.05574633592367171,
+          "neural_prediction_wall_seconds": 0.05706747993826866,
+          "prediction_output_to_cpu_device_event_seconds": 0.017800256162881858,
+          "prediction_output_to_cpu_wall_seconds": 0.01894913613796234,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "independent_decode": null,
+        "ledger": {
+          "actual_complete_container_bytes": 12522825,
+          "actual_neural_entropy_bytes": 12047708,
+          "all_page_and_container_framing_bytes": 101763,
+          "anchor_packet_bytes": 373354,
+          "arithmetic_termination_guard_and_byte_padding_bits": 4783.379621595144,
+          "cdf_rounding_delta_bits": -1.7232232242822647,
+          "ideal_interval_bits": 96376882.34360163,
+          "ideal_interval_reduction_on_neural_targets_pct": 34.34845900971438,
+          "integer_cdf_bits": 96376880.6203784,
+          "neural_target_raw_bytes": 18350080,
+          "scope": "Ideal and integer-CDF bit sums apply only to neural target layers. Actual complete container bytes additionally include the independent layer-zero anchor, descriptors, CRC framing and index. Complete decoder state is charged separately."
+        }
+      }
+    }
+  ],
+  "elapsed_wall_seconds": 2302.2964376788586,
+  "environment": {
+    "accelerators": [
+      {
+        "available": true,
+        "backend": "cuda",
+        "devices": [
+          {
+            "index": 0,
+            "memory": {
+              "allocated_bytes": 0,
+              "device": "cuda:0",
+              "free_device_bytes": 20645937152,
+              "peak_allocated_bytes": 0,
+              "peak_reserved_bytes": 0,
+              "reserved_bytes": 0,
+              "total_device_bytes": 20993015808
+            },
+            "name": "NVIDIA RTX A4500",
+            "reported_bf16_support": true
+          }
+        ]
+      },
+      {
+        "available": false,
+        "backend": "xpu",
+        "devices": []
+      }
+    ],
+    "host_available_memory_bytes": 63283326976,
+    "machine": "x86_64",
+    "memory": {
+      "allocated_bytes": 0,
+      "device": "cuda:0",
+      "free_device_bytes": 20645937152,
+      "peak_allocated_bytes": 0,
+      "peak_reserved_bytes": 0,
+      "reserved_bytes": 0,
+      "total_device_bytes": 20993015808
+    },
+    "model_download_performed": false,
+    "platform": "Linux-6.8.0-111-generic-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "requested_device": "cuda:0",
+    "selected_device": "cuda:0",
+    "selection_error": null,
+    "torch_cuda_build": "13.0",
+    "torch_hip_build": null,
+    "versions": {
+      "numpy": "2.5.2",
+      "safetensors": "0.8.0",
+      "torch": "2.14.0",
+      "transformers": "5.17.0"
+    }
+  },
+  "format": "neural_results_independent_review_v1",
+  "identities": {
+    "embedded_payload_sha256": "d08cecc624d5b358e1f2d767e7631048695cb33a17d714c4146c5e6950191e16",
+    "package_manifest_files": 6,
+    "source_files": 168,
+    "sources_sha256": "41ca4b8adf1642a7f98913345c475efaa06814adae3ce689055f4063c6747c18",
+    "uncompressed_results_sha256": "68154db31fd80dce1be09682d8eea82c4ca5901a6c370a1524188bfb935d0cd8"
+  },
+  "limitations": [
+    "Source, package and report consistency checks do not independently reproduce omitted raw KV or neural weights.",
+    "The reported TEST selection may contain only the first tile of a common system/chat prefix; it need not represent held-out document body or later context positions.",
+    "Full-cache and concurrent shared-state reductions are arithmetic estimates, not full serialized-cache, memory-capacity or concurrent-serving measurements.",
+    "KV containers are serialized and reopened in memory by the benchmark; no durable packet files or cross-process replay artifacts are exported in the normal reports package.",
+    "Neural inference is device-specific FP32 with prediction hashes; cross-device/software restart determinism is not established.",
+    "GPU neural prediction and CPU entropy stages do not constitute a GPU entropy codec, compact attention implementation or serving latency result."
+  ],
+  "model_identity": {
+    "attention_backend": "sdpa",
+    "bf16_probe": {
+      "error": null,
+      "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+      "success": true
+    },
+    "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+    "device": "cuda:0",
+    "dtype": "bfloat16",
+    "load_seconds": 1.9640495963394642,
+    "local_model": false,
+    "local_weights_content_hashed": false,
+    "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+    "model_storage_bytes": 8044936704,
+    "parameter_count": 4022468096,
+    "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+    "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "runtime_config_sha256": "9287d9f0c6eb154192a0fd200e6dfa87058083c18bee74864e5a4ff07debc1af"
+  },
+  "models": [
+    {
+      "complete_float32_state_bytes": 14727424,
+      "declared_artifact_files": 38,
+      "declared_serialized_bytes": 14758219,
+      "independently_available_artifact_files": 0,
+      "independently_verified_complete_neural_weights": false,
+      "name": "shared",
+      "scope": "TRAIN/provenance/declared sums verified from reports. Omitted neural artifact bytes cannot be independently rehashed or replayed.",
+      "total_optimizer_updates": 7000,
+      "trainable_parameters": 3430912
+    }
+  ],
+  "source_package": "/workspace/scratch/724d38606f5c/kv_reconstruction_repo/benchmark_results/qwen_neural_shared_positions_a4500",
+  "test_rows": [
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 89542056
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -156269496
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_pottery_kiln_diary",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 0,
+      "charged_total_state_bytes": 85451,
+      "complete_sample_packet_bytes": 26555979,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 1,
+          "estimated_payload_bytes": 212447832,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 212447832
+          },
+          "estimated_total_bytes": 212533283,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 212533283
+          },
+          "net_reduction_exact": {
+            "denominator": 301989888,
+            "numerator": 89456605
+          },
+          "net_reduction_fraction": 0.29622384243541294,
+          "net_reduction_pct": 29.622384243541294,
+          "raw_bytes": 301989888,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 4,
+          "estimated_payload_bytes": 849791328,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 849791328
+          },
+          "estimated_total_bytes": 849876779,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 849876779
+          },
+          "net_reduction_exact": {
+            "denominator": 1207959552,
+            "numerator": 358082773
+          },
+          "net_reduction_fraction": 0.29643606228960884,
+          "net_reduction_pct": 29.643606228960884,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 16,
+          "estimated_payload_bytes": 3399165312,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3399165312
+          },
+          "estimated_total_bytes": 3399250763,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3399250763
+          },
+          "net_reduction_exact": {
+            "denominator": 4831838208,
+            "numerator": 1432587445
+          },
+          "net_reduction_fraction": 0.29648911725315785,
+          "net_reduction_pct": 29.648911725315784,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 64,
+          "estimated_payload_bytes": 13596661248,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13596661248
+          },
+          "estimated_total_bytes": 13596746699,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13596746699
+          },
+          "net_reduction_exact": {
+            "denominator": 19327352832,
+            "numerator": 5730606133
+          },
+          "net_reduction_fraction": 0.2965023809940451,
+          "net_reduction_pct": 29.650238099404508,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 212447832.0,
+      "estimated_net_single_cache_reduction_pct": 29.622384243541294,
+      "frozen_control_wall_seconds": {
+        "decode": 0.33857364393770695,
+        "encode": 0.34596638195216656
+      },
+      "full_context_tokens": 2048,
+      "full_raw_cache_bytes": 301989888,
+      "measured_sample_payload_reduction_pct": 29.65068022410075,
+      "method": "frozen_exponent_control",
+      "raw_sample_bytes": 37748736,
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 103422200
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -86868776
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_pottery_kiln_diary",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 14758219,
+      "charged_total_state_bytes": 14843670,
+      "complete_sample_packet_bytes": 24820961,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 1,
+          "estimated_payload_bytes": 198567688,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 198567688
+          },
+          "estimated_total_bytes": 213411358,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 213411358
+          },
+          "net_reduction_exact": {
+            "denominator": 150994944,
+            "numerator": 44289265
+          },
+          "net_reduction_fraction": 0.29331621196534896,
+          "net_reduction_pct": 29.331621196534897,
+          "raw_bytes": 301989888,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 4,
+          "estimated_payload_bytes": 794270752,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 794270752
+          },
+          "estimated_total_bytes": 809114422,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 809114422
+          },
+          "net_reduction_exact": {
+            "denominator": 603979776,
+            "numerator": 199422565
+          },
+          "net_reduction_fraction": 0.3301808651950624,
+          "net_reduction_pct": 33.01808651950624,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 16,
+          "estimated_payload_bytes": 3177083008,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3177083008
+          },
+          "estimated_total_bytes": 3191926678,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3191926678
+          },
+          "net_reduction_exact": {
+            "denominator": 2415919104,
+            "numerator": 819955765
+          },
+          "net_reduction_fraction": 0.33939702850249076,
+          "net_reduction_pct": 33.93970285024908,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 64,
+          "estimated_payload_bytes": 12708332032,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12708332032
+          },
+          "estimated_total_bytes": 12723175702,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12723175702
+          },
+          "net_reduction_exact": {
+            "denominator": 9663676416,
+            "numerator": 3302088565
+          },
+          "net_reduction_fraction": 0.34170106932934785,
+          "net_reduction_pct": 34.170106932934786,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "encode_verify_and_independent_decode_wall_seconds": 329.35413657687604,
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 198567688.0,
+      "estimated_net_single_cache_reduction_pct": 29.331621196534897,
+      "full_context_tokens": 2048,
+      "full_raw_cache_bytes": 301989888,
+      "independent_packet_decode_wall_seconds": 115.0611356087029,
+      "measured_sample_payload_reduction_pct": 34.246908293830025,
+      "method": "neural_shared",
+      "raw_sample_bytes": 37748736,
+      "records_measured": 144,
+      "records_total": 1152,
+      "sampled_fraction_of_full_raw_cache": 0.125,
+      "selected_tile_starts": [
+        0,
+        640,
+        1280,
+        1984
+      ],
+      "selected_tokens_per_layer": 256,
+      "stages": {
+        "encode": {
+          "anchor_decode_device_event_seconds": 0.0,
+          "anchor_encode_device_event_seconds": 0.009312479972839354,
+          "anchor_encode_wall_seconds": 0.009488342329859734,
+          "anchor_packet_to_cpu_seconds": 0.001172548159956932,
+          "anchor_restore_wall_seconds": 0.0,
+          "cpu_entropy_decode_seconds": 0.0,
+          "cpu_entropy_encode_seconds": 103.12106664851308,
+          "input_staging_device_event_seconds": 0.016564896088093528,
+          "input_staging_wall_seconds": 0.02307051606476307,
+          "named_disjoint_stage_wall_seconds": 103.30981582775712,
+          "neural_prediction_device_event_seconds": 0.11393286377191547,
+          "neural_prediction_wall_seconds": 0.11662575416266918,
+          "prediction_output_to_cpu_device_event_seconds": 0.03608544003963469,
+          "prediction_output_to_cpu_wall_seconds": 0.038392018526792526,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "immediate_verification_decode": {
+          "anchor_decode_device_event_seconds": 0.00798905599117279,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.009771710261702538,
+          "cpu_entropy_decode_seconds": 110.31761818565428,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.016340768039226537,
+          "input_staging_wall_seconds": 0.02260708436369896,
+          "named_disjoint_stage_wall_seconds": 110.50300480239093,
+          "neural_prediction_device_event_seconds": 0.11222646385431292,
+          "neural_prediction_wall_seconds": 0.11485550925135612,
+          "prediction_output_to_cpu_device_event_seconds": 0.03583158403635025,
+          "prediction_output_to_cpu_wall_seconds": 0.038152312859892845,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "independent_decode": {
+          "anchor_decode_device_event_seconds": 0.008710143804550171,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.011263497173786163,
+          "cpu_entropy_decode_seconds": 114.67949991673231,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.016078912027180196,
+          "input_staging_wall_seconds": 0.022398268803954124,
+          "named_disjoint_stage_wall_seconds": 114.86586351133883,
+          "neural_prediction_device_event_seconds": 0.11197100764513018,
+          "neural_prediction_wall_seconds": 0.11465353891253471,
+          "prediction_output_to_cpu_device_event_seconds": 0.035733088061213496,
+          "prediction_output_to_cpu_wall_seconds": 0.038048289716243744,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "ledger": {
+          "actual_complete_container_bytes": 24820961,
+          "actual_neural_entropy_bytes": 23869119,
+          "all_page_and_container_framing_bytes": 203830,
+          "anchor_packet_bytes": 748012,
+          "arithmetic_termination_guard_and_byte_padding_bits": 9611.217846095562,
+          "cdf_rounding_delta_bits": 0.17558351159095764,
+          "ideal_interval_bits": 190943340.6065704,
+          "ideal_interval_reduction_on_neural_targets_pct": 34.96508577667973,
+          "integer_cdf_bits": 190943340.7821539,
+          "neural_target_raw_bytes": 36700160,
+          "scope": "Ideal and integer-CDF bit sums apply only to neural target layers. Actual complete container bytes additionally include the independent layer-zero anchor, descriptors, CRC framing and index. Complete decoder state is charged separately."
+        }
+      },
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 89512224
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -156418656
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_python_dependency_walk",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 0,
+      "charged_total_state_bytes": 85451,
+      "complete_sample_packet_bytes": 26559708,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 1,
+          "estimated_payload_bytes": 212477664,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 212477664
+          },
+          "estimated_total_bytes": 212563115,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 212563115
+          },
+          "net_reduction_exact": {
+            "denominator": 301989888,
+            "numerator": 89426773
+          },
+          "net_reduction_fraction": 0.2961250576708052,
+          "net_reduction_pct": 29.61250576708052,
+          "raw_bytes": 301989888,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 4,
+          "estimated_payload_bytes": 849910656,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 849910656
+          },
+          "estimated_total_bytes": 849996107,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 849996107
+          },
+          "net_reduction_exact": {
+            "denominator": 1207959552,
+            "numerator": 357963445
+          },
+          "net_reduction_fraction": 0.2963372775250011,
+          "net_reduction_pct": 29.63372775250011,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 16,
+          "estimated_payload_bytes": 3399642624,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3399642624
+          },
+          "estimated_total_bytes": 3399728075,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3399728075
+          },
+          "net_reduction_exact": {
+            "denominator": 4831838208,
+            "numerator": 1432110133
+          },
+          "net_reduction_fraction": 0.29639033248855007,
+          "net_reduction_pct": 29.639033248855007,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 64,
+          "estimated_payload_bytes": 13598570496,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13598570496
+          },
+          "estimated_total_bytes": 13598655947,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13598655947
+          },
+          "net_reduction_exact": {
+            "denominator": 19327352832,
+            "numerator": 5728696885
+          },
+          "net_reduction_fraction": 0.29640359622943735,
+          "net_reduction_pct": 29.640359622943734,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 212477664.0,
+      "estimated_net_single_cache_reduction_pct": 29.61250576708052,
+      "frozen_control_wall_seconds": {
+        "decode": 0.3383419122546911,
+        "encode": 0.3461226560175419
+      },
+      "full_context_tokens": 2048,
+      "full_raw_cache_bytes": 301989888,
+      "measured_sample_payload_reduction_pct": 29.640801747639973,
+      "method": "frozen_exponent_control",
+      "raw_sample_bytes": 37748736,
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 103057960
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -88689976
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_python_dependency_walk",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 14758219,
+      "charged_total_state_bytes": 14843670,
+      "complete_sample_packet_bytes": 24866491,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 1,
+          "estimated_payload_bytes": 198931928,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 198931928
+          },
+          "estimated_total_bytes": 213775598,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 213775598
+          },
+          "net_reduction_exact": {
+            "denominator": 150994944,
+            "numerator": 44107145
+          },
+          "net_reduction_fraction": 0.2921100788646274,
+          "net_reduction_pct": 29.211007886462742,
+          "raw_bytes": 301989888,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 4,
+          "estimated_payload_bytes": 795727712,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 795727712
+          },
+          "estimated_total_bytes": 810571382,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 810571382
+          },
+          "net_reduction_exact": {
+            "denominator": 603979776,
+            "numerator": 198694085
+          },
+          "net_reduction_fraction": 0.32897473209434086,
+          "net_reduction_pct": 32.89747320943408,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 16,
+          "estimated_payload_bytes": 3182910848,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3182910848
+          },
+          "estimated_total_bytes": 3197754518,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3197754518
+          },
+          "net_reduction_exact": {
+            "denominator": 2415919104,
+            "numerator": 817041845
+          },
+          "net_reduction_fraction": 0.3381908954017692,
+          "net_reduction_pct": 33.81908954017692,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 64,
+          "estimated_payload_bytes": 12731643392,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12731643392
+          },
+          "estimated_total_bytes": 12746487062,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12746487062
+          },
+          "net_reduction_exact": {
+            "denominator": 9663676416,
+            "numerator": 3290432885
+          },
+          "net_reduction_fraction": 0.3404949362286263,
+          "net_reduction_pct": 34.04949362286263,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "encode_verify_and_independent_decode_wall_seconds": 328.1859308946878,
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 198931928.0,
+      "estimated_net_single_cache_reduction_pct": 29.211007886462742,
+      "full_context_tokens": 2048,
+      "full_raw_cache_bytes": 301989888,
+      "independent_packet_decode_wall_seconds": 114.75799820385873,
+      "measured_sample_payload_reduction_pct": 34.126294983757866,
+      "method": "neural_shared",
+      "raw_sample_bytes": 37748736,
+      "records_measured": 144,
+      "records_total": 1152,
+      "sampled_fraction_of_full_raw_cache": 0.125,
+      "selected_tile_starts": [
+        0,
+        640,
+        1280,
+        1984
+      ],
+      "selected_tokens_per_layer": 256,
+      "stages": {
+        "encode": {
+          "anchor_decode_device_event_seconds": 0.0,
+          "anchor_encode_device_event_seconds": 0.009477855920791626,
+          "anchor_encode_wall_seconds": 0.009675558656454086,
+          "anchor_packet_to_cpu_seconds": 0.0011803284287452698,
+          "anchor_restore_wall_seconds": 0.0,
+          "cpu_entropy_decode_seconds": 0.0,
+          "cpu_entropy_encode_seconds": 102.64480706490576,
+          "input_staging_device_event_seconds": 0.016195487976074223,
+          "input_staging_wall_seconds": 0.02266022190451622,
+          "named_disjoint_stage_wall_seconds": 102.83177294954658,
+          "neural_prediction_device_event_seconds": 0.11236758434772495,
+          "neural_prediction_wall_seconds": 0.1150349248200655,
+          "prediction_output_to_cpu_device_event_seconds": 0.036083584055304534,
+          "prediction_output_to_cpu_wall_seconds": 0.0384148508310318,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "immediate_verification_decode": {
+          "anchor_decode_device_event_seconds": 0.008060639977455139,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.00984678789973259,
+          "cpu_entropy_decode_seconds": 109.93432423472404,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.015780319996178148,
+          "input_staging_wall_seconds": 0.021869545802474022,
+          "named_disjoint_stage_wall_seconds": 110.11654549464583,
+          "neural_prediction_device_event_seconds": 0.10989833599328999,
+          "neural_prediction_wall_seconds": 0.11251996830105782,
+          "prediction_output_to_cpu_device_event_seconds": 0.035700224071741116,
+          "prediction_output_to_cpu_wall_seconds": 0.03798495791852474,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "independent_decode": {
+          "anchor_decode_device_event_seconds": 0.00863385581970215,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.011101150885224342,
+          "cpu_entropy_decode_seconds": 114.3742194250226,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.01628422401845456,
+          "input_staging_wall_seconds": 0.022664576768875122,
+          "named_disjoint_stage_wall_seconds": 114.56230601854622,
+          "neural_prediction_device_event_seconds": 0.11317827188968659,
+          "neural_prediction_wall_seconds": 0.11587442457675934,
+          "prediction_output_to_cpu_device_event_seconds": 0.03607971207797528,
+          "prediction_output_to_cpu_wall_seconds": 0.038446441292762756,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "ledger": {
+          "actual_complete_container_bytes": 24866491,
+          "actual_neural_entropy_bytes": 23915750,
+          "all_page_and_container_framing_bytes": 203842,
+          "anchor_packet_bytes": 746899,
+          "arithmetic_termination_guard_and_byte_padding_bits": 9605.631230831146,
+          "cdf_rounding_delta_bits": 0.8248839378356934,
+          "ideal_interval_bits": 191316393.54388523,
+          "ideal_interval_reduction_on_neural_targets_pct": 34.83802470347362,
+          "integer_cdf_bits": 191316394.36876917,
+          "neural_target_raw_bytes": 36700160,
+          "scope": "Ideal and integer-CDF bit sums apply only to neural target layers. Actual complete container bytes additionally include the independent layer-zero anchor, descriptors, CRC framing and index. Complete decoder state is charged separately."
+        }
+      },
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 89505232
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -156453616
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_museum_loan_register",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 0,
+      "charged_total_state_bytes": 85451,
+      "complete_sample_packet_bytes": 26560582,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 1,
+          "estimated_payload_bytes": 212484656,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 212484656
+          },
+          "estimated_total_bytes": 212570107,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 212570107
+          },
+          "net_reduction_exact": {
+            "denominator": 301989888,
+            "numerator": 89419781
+          },
+          "net_reduction_fraction": 0.2961019045776791,
+          "net_reduction_pct": 29.61019045776791,
+          "raw_bytes": 301989888,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 4,
+          "estimated_payload_bytes": 849938624,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 849938624
+          },
+          "estimated_total_bytes": 850024075,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 850024075
+          },
+          "net_reduction_exact": {
+            "denominator": 1207959552,
+            "numerator": 357935477
+          },
+          "net_reduction_fraction": 0.296314124431875,
+          "net_reduction_pct": 29.6314124431875,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 16,
+          "estimated_payload_bytes": 3399754496,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3399754496
+          },
+          "estimated_total_bytes": 3399839947,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3399839947
+          },
+          "net_reduction_exact": {
+            "denominator": 4831838208,
+            "numerator": 1431998261
+          },
+          "net_reduction_fraction": 0.296367179395424,
+          "net_reduction_pct": 29.6367179395424,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 64,
+          "estimated_payload_bytes": 13599017984,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13599017984
+          },
+          "estimated_total_bytes": 13599103435,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13599103435
+          },
+          "net_reduction_exact": {
+            "denominator": 19327352832,
+            "numerator": 5728249397
+          },
+          "net_reduction_fraction": 0.29638044313631123,
+          "net_reduction_pct": 29.638044313631124,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 212484656.0,
+      "estimated_net_single_cache_reduction_pct": 29.61019045776791,
+      "frozen_control_wall_seconds": {
+        "decode": 0.34510927461087704,
+        "encode": 0.3533056639134884
+      },
+      "full_context_tokens": 2048,
+      "full_raw_cache_bytes": 301989888,
+      "measured_sample_payload_reduction_pct": 29.638486438327366,
+      "method": "frozen_exponent_control",
+      "raw_sample_bytes": 37748736,
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 103216184
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -87898856
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_museum_loan_register",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 14758219,
+      "charged_total_state_bytes": 14843670,
+      "complete_sample_packet_bytes": 24846713,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 1,
+          "estimated_payload_bytes": 198773704,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 198773704
+          },
+          "estimated_total_bytes": 213617374,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 213617374
+          },
+          "net_reduction_exact": {
+            "denominator": 150994944,
+            "numerator": 44186257
+          },
+          "net_reduction_fraction": 0.2926340169376797,
+          "net_reduction_pct": 29.26340169376797,
+          "raw_bytes": 301989888,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 4,
+          "estimated_payload_bytes": 795094816,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 795094816
+          },
+          "estimated_total_bytes": 809938486,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 809938486
+          },
+          "net_reduction_exact": {
+            "denominator": 603979776,
+            "numerator": 199010533
+          },
+          "net_reduction_fraction": 0.32949867016739315,
+          "net_reduction_pct": 32.94986701673932,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 16,
+          "estimated_payload_bytes": 3180379264,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3180379264
+          },
+          "estimated_total_bytes": 3195222934,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3195222934
+          },
+          "net_reduction_exact": {
+            "denominator": 2415919104,
+            "numerator": 818307637
+          },
+          "net_reduction_fraction": 0.3387148334748215,
+          "net_reduction_pct": 33.871483347482155,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 64,
+          "estimated_payload_bytes": 12721517056,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12721517056
+          },
+          "estimated_total_bytes": 12736360726,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12736360726
+          },
+          "net_reduction_exact": {
+            "denominator": 9663676416,
+            "numerator": 3295496053
+          },
+          "net_reduction_fraction": 0.3410188743016786,
+          "net_reduction_pct": 34.101887430167864,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "encode_verify_and_independent_decode_wall_seconds": 325.9299017805606,
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 198773704.0,
+      "estimated_net_single_cache_reduction_pct": 29.26340169376797,
+      "full_context_tokens": 2048,
+      "full_raw_cache_bytes": 301989888,
+      "independent_packet_decode_wall_seconds": 113.75747578591108,
+      "measured_sample_payload_reduction_pct": 34.178688791063095,
+      "method": "neural_shared",
+      "raw_sample_bytes": 37748736,
+      "records_measured": 144,
+      "records_total": 1152,
+      "sampled_fraction_of_full_raw_cache": 0.125,
+      "selected_tile_starts": [
+        0,
+        640,
+        1280,
+        1984
+      ],
+      "selected_tokens_per_layer": 256,
+      "stages": {
+        "encode": {
+          "anchor_decode_device_event_seconds": 0.0,
+          "anchor_encode_device_event_seconds": 0.009486624002456666,
+          "anchor_encode_wall_seconds": 0.00967928022146225,
+          "anchor_packet_to_cpu_seconds": 0.001170419156551361,
+          "anchor_restore_wall_seconds": 0.0,
+          "cpu_entropy_decode_seconds": 0.0,
+          "cpu_entropy_encode_seconds": 101.72552972100675,
+          "input_staging_device_event_seconds": 0.01625065597891807,
+          "input_staging_wall_seconds": 0.022647155448794365,
+          "named_disjoint_stage_wall_seconds": 101.91318248584867,
+          "neural_prediction_device_event_seconds": 0.11322454375028614,
+          "neural_prediction_wall_seconds": 0.11588903144001961,
+          "prediction_output_to_cpu_device_event_seconds": 0.03595407992601395,
+          "prediction_output_to_cpu_wall_seconds": 0.038266878575086594,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "immediate_verification_decode": {
+          "anchor_decode_device_event_seconds": 0.008011840105056763,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.009835140779614449,
+          "cpu_entropy_decode_seconds": 109.59057451970875,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.016576288059353843,
+          "input_staging_wall_seconds": 0.023013174533843994,
+          "named_disjoint_stage_wall_seconds": 109.77917278371751,
+          "neural_prediction_device_event_seconds": 0.11430086410045623,
+          "neural_prediction_wall_seconds": 0.11694745160639286,
+          "prediction_output_to_cpu_device_event_seconds": 0.03648143999278545,
+          "prediction_output_to_cpu_wall_seconds": 0.03880249708890915,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "independent_decode": {
+          "anchor_decode_device_event_seconds": 0.008773856163024903,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.011328667402267456,
+          "cpu_entropy_decode_seconds": 113.37630954384804,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.01596297599375248,
+          "input_staging_wall_seconds": 0.02220018208026886,
+          "named_disjoint_stage_wall_seconds": 113.56255269609392,
+          "neural_prediction_device_event_seconds": 0.11223696011304855,
+          "neural_prediction_wall_seconds": 0.11487962305545807,
+          "prediction_output_to_cpu_device_event_seconds": 0.03555145597457887,
+          "prediction_output_to_cpu_wall_seconds": 0.03783467970788479,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "ledger": {
+          "actual_complete_container_bytes": 24846713,
+          "actual_neural_entropy_bytes": 23895401,
+          "all_page_and_container_framing_bytes": 203803,
+          "anchor_packet_bytes": 747509,
+          "arithmetic_termination_guard_and_byte_padding_bits": 9601.398510038853,
+          "cdf_rounding_delta_bits": 0.5532177090644836,
+          "ideal_interval_bits": 191153606.04827225,
+          "ideal_interval_reduction_on_neural_targets_pct": 34.89346979404441,
+          "integer_cdf_bits": 191153606.60148996,
+          "neural_target_raw_bytes": 36700160,
+          "scope": "Ideal and integer-CDF bit sums apply only to neural target layers. Actual complete container bytes additionally include the independent layer-zero anchor, descriptors, CRC framing and index. Complete decoder state is charged separately."
+        }
+      },
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 356691456
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -632461824
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_pottery_kiln_diary",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 0,
+      "charged_total_state_bytes": 85451,
+      "complete_sample_packet_bytes": 26602128,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 1,
+          "estimated_payload_bytes": 851268096,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 851268096
+          },
+          "estimated_total_bytes": 851353547,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 851353547
+          },
+          "net_reduction_exact": {
+            "denominator": 1207959552,
+            "numerator": 356606005
+          },
+          "net_reduction_fraction": 0.29521353128883576,
+          "net_reduction_pct": 29.521353128883575,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 4,
+          "estimated_payload_bytes": 3405072384,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3405072384
+          },
+          "estimated_total_bytes": 3405157835,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3405157835
+          },
+          "net_reduction_exact": {
+            "denominator": 4831838208,
+            "numerator": 1426680373
+          },
+          "net_reduction_fraction": 0.2952665862523847,
+          "net_reduction_pct": 29.526658625238472,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 16,
+          "estimated_payload_bytes": 13620289536,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13620289536
+          },
+          "estimated_total_bytes": 13620374987,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13620374987
+          },
+          "net_reduction_exact": {
+            "denominator": 19327352832,
+            "numerator": 5706977845
+          },
+          "net_reduction_fraction": 0.29527984999327195,
+          "net_reduction_pct": 29.527984999327195,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 64,
+          "estimated_payload_bytes": 54481158144,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 54481158144
+          },
+          "estimated_total_bytes": 54481243595,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 54481243595
+          },
+          "net_reduction_exact": {
+            "denominator": 77309411328,
+            "numerator": 22828167733
+          },
+          "net_reduction_fraction": 0.2952831659284938,
+          "net_reduction_pct": 29.52831659284938,
+          "raw_bytes": 77309411328,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 851268096.0,
+      "estimated_net_single_cache_reduction_pct": 29.521353128883575,
+      "frozen_control_wall_seconds": {
+        "decode": 0.341962244361639,
+        "encode": 0.3500230684876442
+      },
+      "full_context_tokens": 8192,
+      "full_raw_cache_bytes": 1207959552,
+      "measured_sample_payload_reduction_pct": 29.528427124023438,
+      "method": "frozen_exponent_control",
+      "raw_sample_bytes": 37748736,
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 404425312
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -393792544
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_pottery_kiln_diary",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 14758219,
+      "charged_total_state_bytes": 14843670,
+      "complete_sample_packet_bytes": 25110445,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 1,
+          "estimated_payload_bytes": 803534240,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 803534240
+          },
+          "estimated_total_bytes": 818377910,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 818377910
+          },
+          "net_reduction_exact": {
+            "denominator": 603979776,
+            "numerator": 194790821
+          },
+          "net_reduction_fraction": 0.3225121580892139,
+          "net_reduction_pct": 32.25121580892139,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 4,
+          "estimated_payload_bytes": 3214136960,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3214136960
+          },
+          "estimated_total_bytes": 3228980630,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3228980630
+          },
+          "net_reduction_exact": {
+            "denominator": 2415919104,
+            "numerator": 801428789
+          },
+          "net_reduction_fraction": 0.33172832139664227,
+          "net_reduction_pct": 33.17283213966422,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 16,
+          "estimated_payload_bytes": 12856547840,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12856547840
+          },
+          "estimated_total_bytes": 12871391510,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12871391510
+          },
+          "net_reduction_exact": {
+            "denominator": 9663676416,
+            "numerator": 3227980661
+          },
+          "net_reduction_fraction": 0.33403236222349936,
+          "net_reduction_pct": 33.40323622234993,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 64,
+          "estimated_payload_bytes": 51426191360,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 51426191360
+          },
+          "estimated_total_bytes": 51441035030,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 51441035030
+          },
+          "net_reduction_exact": {
+            "denominator": 38654705664,
+            "numerator": 12934188149
+          },
+          "net_reduction_fraction": 0.33460837243021363,
+          "net_reduction_pct": 33.46083724302136,
+          "raw_bytes": 77309411328,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "encode_verify_and_independent_decode_wall_seconds": 329.64085209555924,
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 803534240.0,
+      "estimated_net_single_cache_reduction_pct": 32.25121580892139,
+      "full_context_tokens": 8192,
+      "full_raw_cache_bytes": 1207959552,
+      "independent_packet_decode_wall_seconds": 115.84938888810575,
+      "measured_sample_payload_reduction_pct": 33.48003758324517,
+      "method": "neural_shared",
+      "raw_sample_bytes": 37748736,
+      "records_measured": 144,
+      "records_total": 4608,
+      "sampled_fraction_of_full_raw_cache": 0.03125,
+      "selected_tile_starts": [
+        0,
+        2688,
+        5376,
+        8128
+      ],
+      "selected_tokens_per_layer": 256,
+      "stages": {
+        "encode": {
+          "anchor_decode_device_event_seconds": 0.0,
+          "anchor_encode_device_event_seconds": 0.009260159969329834,
+          "anchor_encode_wall_seconds": 0.009429797530174255,
+          "anchor_packet_to_cpu_seconds": 0.0011801738291978836,
+          "anchor_restore_wall_seconds": 0.0,
+          "cpu_entropy_decode_seconds": 0.0,
+          "cpu_entropy_encode_seconds": 102.81636738218367,
+          "input_staging_device_event_seconds": 0.016274495981633663,
+          "input_staging_wall_seconds": 0.022669784724712372,
+          "named_disjoint_stage_wall_seconds": 103.0039379298687,
+          "neural_prediction_device_event_seconds": 0.11327311968803412,
+          "neural_prediction_wall_seconds": 0.11592717655003071,
+          "prediction_output_to_cpu_device_event_seconds": 0.03604099193215372,
+          "prediction_output_to_cpu_wall_seconds": 0.0383636150509119,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "immediate_verification_decode": {
+          "anchor_decode_device_event_seconds": 0.007941823959350586,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.009719263762235641,
+          "cpu_entropy_decode_seconds": 110.1190443392843,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.016557343997061245,
+          "input_staging_wall_seconds": 0.02292710542678833,
+          "named_disjoint_stage_wall_seconds": 110.30673734657466,
+          "neural_prediction_device_event_seconds": 0.11371772778034207,
+          "neural_prediction_wall_seconds": 0.11634600162506104,
+          "prediction_output_to_cpu_device_event_seconds": 0.036396255865693075,
+          "prediction_output_to_cpu_wall_seconds": 0.038700636476278305,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "independent_decode": {
+          "anchor_decode_device_event_seconds": 0.008820735931396486,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.011408431455492973,
+          "cpu_entropy_decode_seconds": 115.46850169077516,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.015861152037978166,
+          "input_staging_wall_seconds": 0.02207299880683422,
+          "named_disjoint_stage_wall_seconds": 115.65422012843192,
+          "neural_prediction_device_event_seconds": 0.11187334412336353,
+          "neural_prediction_wall_seconds": 0.11451884545385838,
+          "prediction_output_to_cpu_device_event_seconds": 0.035443616062402726,
+          "prediction_output_to_cpu_wall_seconds": 0.037718161940574646,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "ledger": {
+          "actual_complete_container_bytes": 25110445,
+          "actual_neural_entropy_bytes": 24157830,
+          "all_page_and_container_framing_bytes": 203847,
+          "anchor_packet_bytes": 748768,
+          "arithmetic_termination_guard_and_byte_padding_bits": 9637.436609476805,
+          "cdf_rounding_delta_bits": 1.7197276055812836,
+          "ideal_interval_bits": 193253000.84366292,
+          "ideal_interval_reduction_on_neural_targets_pct": 34.17842018820119,
+          "integer_cdf_bits": 193253002.56339052,
+          "neural_target_raw_bytes": 36700160,
+          "scope": "Ideal and integer-CDF bit sums apply only to neural target layers. Actual complete container bytes additionally include the independent layer-zero anchor, descriptors, CRC framing and index. Complete decoder state is charged separately."
+        }
+      },
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 356609632
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -632870944
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_python_dependency_walk",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 0,
+      "charged_total_state_bytes": 85451,
+      "complete_sample_packet_bytes": 26604685,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 1,
+          "estimated_payload_bytes": 851349920,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 851349920
+          },
+          "estimated_total_bytes": 851435371,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 851435371
+          },
+          "net_reduction_exact": {
+            "denominator": 1207959552,
+            "numerator": 356524181
+          },
+          "net_reduction_fraction": 0.29514579392141765,
+          "net_reduction_pct": 29.514579392141766,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 4,
+          "estimated_payload_bytes": 3405399680,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3405399680
+          },
+          "estimated_total_bytes": 3405485131,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3405485131
+          },
+          "net_reduction_exact": {
+            "denominator": 4831838208,
+            "numerator": 1426353077
+          },
+          "net_reduction_fraction": 0.2951988488849666,
+          "net_reduction_pct": 29.519884888496662,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 16,
+          "estimated_payload_bytes": 13621598720,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13621598720
+          },
+          "estimated_total_bytes": 13621684171,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13621684171
+          },
+          "net_reduction_exact": {
+            "denominator": 19327352832,
+            "numerator": 5705668661
+          },
+          "net_reduction_fraction": 0.2952121126258539,
+          "net_reduction_pct": 29.52121126258539,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 64,
+          "estimated_payload_bytes": 54486394880,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 54486394880
+          },
+          "estimated_total_bytes": 54486480331,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 54486480331
+          },
+          "net_reduction_exact": {
+            "denominator": 77309411328,
+            "numerator": 22822930997
+          },
+          "net_reduction_fraction": 0.2952154285610757,
+          "net_reduction_pct": 29.52154285610757,
+          "raw_bytes": 77309411328,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 851349920.0,
+      "estimated_net_single_cache_reduction_pct": 29.514579392141766,
+      "frozen_control_wall_seconds": {
+        "decode": 0.3402203153818846,
+        "encode": 0.3488615769892931
+      },
+      "full_context_tokens": 8192,
+      "full_raw_cache_bytes": 1207959552,
+      "measured_sample_payload_reduction_pct": 29.52165338728163,
+      "method": "frozen_exponent_control",
+      "raw_sample_bytes": 37748736,
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 403127680
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -400280704
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_python_dependency_walk",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 14758219,
+      "charged_total_state_bytes": 14843670,
+      "complete_sample_packet_bytes": 25150996,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 1,
+          "estimated_payload_bytes": 804831872,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 804831872
+          },
+          "estimated_total_bytes": 819675542,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 819675542
+          },
+          "net_reduction_exact": {
+            "denominator": 603979776,
+            "numerator": 194142005
+          },
+          "net_reduction_fraction": 0.32143792344464195,
+          "net_reduction_pct": 32.143792344464195,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 4,
+          "estimated_payload_bytes": 3219327488,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3219327488
+          },
+          "estimated_total_bytes": 3234171158,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3234171158
+          },
+          "net_reduction_exact": {
+            "denominator": 2415919104,
+            "numerator": 798833525
+          },
+          "net_reduction_fraction": 0.3306540867520703,
+          "net_reduction_pct": 33.06540867520703,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 16,
+          "estimated_payload_bytes": 12877309952,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12877309952
+          },
+          "estimated_total_bytes": 12892153622,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12892153622
+          },
+          "net_reduction_exact": {
+            "denominator": 9663676416,
+            "numerator": 3217599605
+          },
+          "net_reduction_fraction": 0.3329581275789274,
+          "net_reduction_pct": 33.29581275789274,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 64,
+          "estimated_payload_bytes": 51509239808,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 51509239808
+          },
+          "estimated_total_bytes": 51524083478,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 51524083478
+          },
+          "net_reduction_exact": {
+            "denominator": 38654705664,
+            "numerator": 12892663925
+          },
+          "net_reduction_fraction": 0.33353413778564167,
+          "net_reduction_pct": 33.35341377856417,
+          "raw_bytes": 77309411328,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "encode_verify_and_independent_decode_wall_seconds": 328.029625819996,
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 804831872.0,
+      "estimated_net_single_cache_reduction_pct": 32.143792344464195,
+      "full_context_tokens": 8192,
+      "full_raw_cache_bytes": 1207959552,
+      "independent_packet_decode_wall_seconds": 114.72553723864257,
+      "measured_sample_payload_reduction_pct": 33.37261411878798,
+      "method": "neural_shared",
+      "raw_sample_bytes": 37748736,
+      "records_measured": 144,
+      "records_total": 4608,
+      "sampled_fraction_of_full_raw_cache": 0.03125,
+      "selected_tile_starts": [
+        0,
+        2688,
+        5376,
+        8128
+      ],
+      "selected_tokens_per_layer": 256,
+      "stages": {
+        "encode": {
+          "anchor_decode_device_event_seconds": 0.0,
+          "anchor_encode_device_event_seconds": 0.009230303764343263,
+          "anchor_encode_wall_seconds": 0.009388979524374008,
+          "anchor_packet_to_cpu_seconds": 0.0011842884123325348,
+          "anchor_restore_wall_seconds": 0.0,
+          "cpu_entropy_decode_seconds": 0.0,
+          "cpu_entropy_encode_seconds": 101.89725301042199,
+          "input_staging_device_event_seconds": 0.0160402239523828,
+          "input_staging_wall_seconds": 0.02239111438393593,
+          "named_disjoint_stage_wall_seconds": 102.08352430723608,
+          "neural_prediction_device_event_seconds": 0.112226272046566,
+          "neural_prediction_wall_seconds": 0.11490201018750668,
+          "prediction_output_to_cpu_device_event_seconds": 0.036106144025921834,
+          "prediction_output_to_cpu_wall_seconds": 0.038404904305934906,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "immediate_verification_decode": {
+          "anchor_decode_device_event_seconds": 0.008074144124984741,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.00982568971812725,
+          "cpu_entropy_decode_seconds": 110.55029383674264,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.016271968021988874,
+          "input_staging_wall_seconds": 0.022632233798503876,
+          "named_disjoint_stage_wall_seconds": 110.73629258573055,
+          "neural_prediction_device_event_seconds": 0.11230096006393434,
+          "neural_prediction_wall_seconds": 0.11493261903524399,
+          "prediction_output_to_cpu_device_event_seconds": 0.03630348791182039,
+          "prediction_output_to_cpu_wall_seconds": 0.03860820643603802,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "independent_decode": {
+          "anchor_decode_device_event_seconds": 0.008853984117507934,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.011452622711658478,
+          "cpu_entropy_decode_seconds": 114.34454032406211,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.015916864018887276,
+          "input_staging_wall_seconds": 0.022142115980386734,
+          "named_disjoint_stage_wall_seconds": 114.53043410368264,
+          "neural_prediction_device_event_seconds": 0.11183446383476256,
+          "neural_prediction_wall_seconds": 0.1144548300653696,
+          "prediction_output_to_cpu_device_event_seconds": 0.035576768040657035,
+          "prediction_output_to_cpu_wall_seconds": 0.0378442108631134,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "ledger": {
+          "actual_complete_container_bytes": 25150996,
+          "actual_neural_entropy_bytes": 24199668,
+          "all_page_and_container_framing_bytes": 203873,
+          "anchor_packet_bytes": 747455,
+          "arithmetic_termination_guard_and_byte_padding_bits": 9577.108698695898,
+          "cdf_rounding_delta_bits": 3.835328459739685,
+          "ideal_interval_bits": 193587763.05597284,
+          "ideal_interval_reduction_on_neural_targets_pct": 34.064400858207144,
+          "integer_cdf_bits": 193587766.8913013,
+          "neural_target_raw_bytes": 36700160,
+          "scope": "Ideal and integer-CDF bit sums apply only to neural target layers. Actual complete container bytes additionally include the independent layer-zero anchor, descriptors, CRC framing and index. Complete decoder state is charged separately."
+        }
+      },
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 356484736
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -633495424
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_museum_loan_register",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 0,
+      "charged_total_state_bytes": 85451,
+      "complete_sample_packet_bytes": 26608588,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 1,
+          "estimated_payload_bytes": 851474816,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 851474816
+          },
+          "estimated_total_bytes": 851560267,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 851560267
+          },
+          "net_reduction_exact": {
+            "denominator": 1207959552,
+            "numerator": 356399285
+          },
+          "net_reduction_fraction": 0.29504239973094726,
+          "net_reduction_pct": 29.504239973094727,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 4,
+          "estimated_payload_bytes": 3405899264,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3405899264
+          },
+          "estimated_total_bytes": 3405984715,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3405984715
+          },
+          "net_reduction_exact": {
+            "denominator": 4831838208,
+            "numerator": 1425853493
+          },
+          "net_reduction_fraction": 0.2950954546944963,
+          "net_reduction_pct": 29.509545469449627,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 16,
+          "estimated_payload_bytes": 13623597056,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13623597056
+          },
+          "estimated_total_bytes": 13623682507,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 13623682507
+          },
+          "net_reduction_exact": {
+            "denominator": 19327352832,
+            "numerator": 5703670325
+          },
+          "net_reduction_fraction": 0.2951087184353835,
+          "net_reduction_pct": 29.51087184353835,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 85451,
+          "contexts": 64,
+          "estimated_payload_bytes": 54494388224,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 54494388224
+          },
+          "estimated_total_bytes": 54494473675,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 54494473675
+          },
+          "net_reduction_exact": {
+            "denominator": 77309411328,
+            "numerator": 22814937653
+          },
+          "net_reduction_fraction": 0.2951120343706053,
+          "net_reduction_pct": 29.51120343706053,
+          "raw_bytes": 77309411328,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 851474816.0,
+      "estimated_net_single_cache_reduction_pct": 29.504239973094727,
+      "frozen_control_wall_seconds": {
+        "decode": 0.3382600136101246,
+        "encode": 0.34665149822831154
+      },
+      "full_context_tokens": 8192,
+      "full_raw_cache_bytes": 1207959552,
+      "measured_sample_payload_reduction_pct": 29.511313968234592,
+      "method": "frozen_exponent_control",
+      "raw_sample_bytes": 37748736,
+      "status": "ok"
+    },
+    {
+      "break_even_estimates": {
+        "per_context_payload_saving_bytes_exact": {
+          "denominator": 1,
+          "numerator": 403980640
+        },
+        "per_context_target_margin_bytes_exact": {
+          "denominator": 5,
+          "numerator": -396015904
+        },
+        "positive_reduction_contexts": 1,
+        "positive_reduction_rule": "strictly greater than zero",
+        "scope": "ESTIMATE: identical payload ratio and compatible shared decoder state",
+        "target_reduction_contexts": null,
+        "target_reduction_exact": {
+          "denominator": 5,
+          "numerator": 2
+        },
+        "target_reduction_fraction": 0.4,
+        "target_reduction_pct": 40.0,
+        "target_reduction_rule": "greater than or equal to target"
+      },
+      "case": "test_museum_loan_register",
+      "charged_anchor_state_bytes": 85451,
+      "charged_neural_state_bytes": 14758219,
+      "charged_total_state_bytes": 14843670,
+      "complete_sample_packet_bytes": 25124341,
+      "concurrency_estimates": [
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 1,
+          "estimated_payload_bytes": 803978912,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 803978912
+          },
+          "estimated_total_bytes": 818822582,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 818822582
+          },
+          "net_reduction_exact": {
+            "denominator": 603979776,
+            "numerator": 194568485
+          },
+          "net_reduction_fraction": 0.3221440398030811,
+          "net_reduction_pct": 32.214403980308106,
+          "raw_bytes": 1207959552,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 4,
+          "estimated_payload_bytes": 3215915648,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3215915648
+          },
+          "estimated_total_bytes": 3230759318,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 3230759318
+          },
+          "net_reduction_exact": {
+            "denominator": 2415919104,
+            "numerator": 800539445
+          },
+          "net_reduction_fraction": 0.33136020311050945,
+          "net_reduction_pct": 33.13602031105094,
+          "raw_bytes": 4831838208,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 16,
+          "estimated_payload_bytes": 12863662592,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12863662592
+          },
+          "estimated_total_bytes": 12878506262,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 12878506262
+          },
+          "net_reduction_exact": {
+            "denominator": 9663676416,
+            "numerator": 3224423285
+          },
+          "net_reduction_fraction": 0.33366424393736654,
+          "net_reduction_pct": 33.36642439373665,
+          "raw_bytes": 19327352832,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        },
+        {
+          "charged_state_bytes": 14843670,
+          "contexts": 64,
+          "estimated_payload_bytes": 51454650368,
+          "estimated_payload_bytes_exact": {
+            "denominator": 1,
+            "numerator": 51454650368
+          },
+          "estimated_total_bytes": 51469494038,
+          "estimated_total_bytes_exact": {
+            "denominator": 1,
+            "numerator": 51469494038
+          },
+          "net_reduction_exact": {
+            "denominator": 38654705664,
+            "numerator": 12919958645
+          },
+          "net_reduction_fraction": 0.3342402541440808,
+          "net_reduction_pct": 33.42402541440808,
+          "raw_bytes": 77309411328,
+          "scope": "ESTIMATE: decoder state shared once across compatible contexts"
+        }
+      ],
+      "encode_verify_and_independent_decode_wall_seconds": 328.2402022667229,
+      "estimate_scope": "ESTIMATE: complete sampled-container/raw density scaled to full cache; full decoder state charged once. No concurrent serving or GPU capacity result.",
+      "estimated_full_packet_bytes": 803978912.0,
+      "estimated_net_single_cache_reduction_pct": 32.214403980308106,
+      "full_context_tokens": 8192,
+      "full_raw_cache_bytes": 1207959552,
+      "independent_packet_decode_wall_seconds": 114.83149797469378,
+      "measured_sample_payload_reduction_pct": 33.44322575463189,
+      "method": "neural_shared",
+      "raw_sample_bytes": 37748736,
+      "records_measured": 144,
+      "records_total": 4608,
+      "sampled_fraction_of_full_raw_cache": 0.03125,
+      "selected_tile_starts": [
+        0,
+        2688,
+        5376,
+        8128
+      ],
+      "selected_tokens_per_layer": 256,
+      "stages": {
+        "encode": {
+          "anchor_decode_device_event_seconds": 0.0,
+          "anchor_encode_device_event_seconds": 0.009607680082321168,
+          "anchor_encode_wall_seconds": 0.009815355762839317,
+          "anchor_packet_to_cpu_seconds": 0.0012179594486951828,
+          "anchor_restore_wall_seconds": 0.0,
+          "cpu_entropy_decode_seconds": 0.0,
+          "cpu_entropy_encode_seconds": 101.99647451005876,
+          "input_staging_device_event_seconds": 0.016253279969096177,
+          "input_staging_wall_seconds": 0.02265876904129982,
+          "named_disjoint_stage_wall_seconds": 102.1850907523185,
+          "neural_prediction_device_event_seconds": 0.11384451162815096,
+          "neural_prediction_wall_seconds": 0.11651106551289558,
+          "prediction_output_to_cpu_device_event_seconds": 0.03611667200922966,
+          "prediction_output_to_cpu_wall_seconds": 0.038413092494010925,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "immediate_verification_decode": {
+          "anchor_decode_device_event_seconds": 0.008065823793411255,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.009857764467597008,
+          "cpu_entropy_decode_seconds": 110.55928860977292,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.016310879997909068,
+          "input_staging_wall_seconds": 0.022654926404356956,
+          "named_disjoint_stage_wall_seconds": 110.74592276290059,
+          "neural_prediction_device_event_seconds": 0.11311894398927688,
+          "neural_prediction_wall_seconds": 0.1157503966242075,
+          "prediction_output_to_cpu_device_event_seconds": 0.036107583969831464,
+          "prediction_output_to_cpu_wall_seconds": 0.03837106563150883,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "independent_decode": {
+          "anchor_decode_device_event_seconds": 0.008658975839614868,
+          "anchor_encode_device_event_seconds": 0.0,
+          "anchor_encode_wall_seconds": 0.0,
+          "anchor_packet_to_cpu_seconds": 0.0,
+          "anchor_restore_wall_seconds": 0.011136475950479507,
+          "cpu_entropy_decode_seconds": 114.44881448894739,
+          "cpu_entropy_encode_seconds": 0.0,
+          "input_staging_device_event_seconds": 0.016083007965236908,
+          "input_staging_wall_seconds": 0.022407373413443565,
+          "named_disjoint_stage_wall_seconds": 114.63549075834453,
+          "neural_prediction_device_event_seconds": 0.11260672032833102,
+          "neural_prediction_wall_seconds": 0.11522074788808823,
+          "prediction_output_to_cpu_device_event_seconds": 0.03564057593047619,
+          "prediction_output_to_cpu_wall_seconds": 0.03791167214512825,
+          "scope": "One-pass diagnostic stage sums. Metadata, hashing, indexing and other Python overhead are additional; GPU event and wall columns overlap and must not be summed together."
+        },
+        "ledger": {
+          "actual_complete_container_bytes": 25124341,
+          "actual_neural_entropy_bytes": 24172583,
+          "all_page_and_container_framing_bytes": 203872,
+          "anchor_packet_bytes": 747886,
+          "arithmetic_termination_guard_and_byte_padding_bits": 9551.672867953777,
+          "cdf_rounding_delta_bits": 0.8653486371040344,
+          "ideal_interval_bits": 193371111.4617834,
+          "ideal_interval_reduction_on_neural_targets_pct": 34.138191951416765,
+          "integer_cdf_bits": 193371112.32713205,
+          "neural_target_raw_bytes": 36700160,
+          "scope": "Ideal and integer-CDF bit sums apply only to neural target layers. Actual complete container bytes additionally include the independent layer-zero anchor, descriptors, CRC framing and index. Complete decoder state is charged separately."
+        }
+      },
+      "status": "ok"
+    }
+  ],
+  "training_budget": {
+    "per_layer_aggregate_updates": 7000,
+    "per_layer_updates_each": 200,
+    "rule": "By default the shared network receives the same total number of layer-labelled minibatch updates as all per-layer networks combined. Shared layer allocation is random; realized counts are logged. --shared-steps explicitly changes this budget.",
+    "shared_aggregate_updates": 7000
+  },
+  "training_wall_seconds": 24.18259547278285,
+  "validation_status": "passed"
+}

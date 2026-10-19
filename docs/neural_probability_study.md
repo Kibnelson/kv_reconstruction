@@ -6,6 +6,8 @@ This experiment tests that idea on actual Qwen captures, including complete deco
 
 The [A4500 smoke review](qwen_neural_gpu_review.md) now confirms exact learned pages and complete 128-token DEV continuation in both modes. Shared neural has 30.39% sampled packet savings and 25.47% estimated net savings with state; its matched control estimates 26.04%. TEST sizing covers only the first 16 positions, and CPU arithmetic decoding dominates restoration. The review compares all current conditional tracks, explains the sampling limits and supplies a shared-only position-coverage command before increasing training.
 
+The subsequent [position-coverage review](qwen_neural_positions_review.md) measures four 64-token chains per case. Shared neural estimates 29.27% net savings at 2K versus 29.62% for its matched control, and **32.20% at 8K versus 29.51%**. These rates include complete state but still extrapolate sampled pages. The same declared numerical model and a controlled DEV layout comparison separate coverage/header changes from learning improvements. All 100 artifact audit checks pass; no 40% or serving-speed result is established.
+
 ## Audit of the supplied archive
 
 Archive SHA256: `3af509d9f6d181ba6f097f7746f2e29e68d74153ed4e6ae55ece9c2a6866a5cc`.

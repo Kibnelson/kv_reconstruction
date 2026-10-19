@@ -26,6 +26,8 @@ The [fifth learned-probability study](docs/neural_probability_study.md) adapts t
 
 The [novelty assessment](docs/novelty_assessment.md) compares the current representation families with primary sources, including ExANS, SplitZip, AQUA-KV, Palu and learned exact entropy coding. Most broad ingredients are established; any contribution must come from a specific mechanism and a measured advantage, with original-BF16 exactness and capacity-bounded serving assessed separately.
 
+The [shared-neural context-position review](docs/qwen_neural_positions_review.md) now checks four positions in each of six TEST cases. At 8K, shared neural estimates **32.20% net reduction versus 29.51%** for its matched frozen control; at 2K it still loses slightly after state. Declared numerical shards match the prefix smoke, and a same-DEV comparison attributes almost all tile-size improvement to smaller headers. All 100 audit checks pass. The remaining 40% gap is primarily a probability-model problem; CPU arithmetic still takes 99.67% of restore time.
+
 For result commits, use `python scripts/package_results.py RUN --destination benchmark_results/NAME`. It preserves the full report as verified `results.json.gz`, alongside the smaller reports and decoder state. Large frontier reports can exceed GitHub's raw-file limit. The [sharing and repair instructions](docs/frontier_40_study.md#repair-a-rejected-oversized-report-commit) explain how to amend a rejected unpublished commit.
 
 ## Clone and install

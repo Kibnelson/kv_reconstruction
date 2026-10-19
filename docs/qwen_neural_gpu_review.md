@@ -2,6 +2,8 @@
 
 **Both neural modes now reconstruct real Qwen KV exactly and pass complete 128-token DEV continuation checks. Neither establishes 40% reduction or a restoration speedup.** The shared model is the useful neural candidate to investigate further: it uses much less state than the per-layer collection and produces a slightly smaller stream in this smoke. Its estimated single-context saving still loses to its matched frozen control after state is counted.
 
+The follow-up [shared context-position study](qwen_neural_positions_review.md) is now reviewed: four positions per context remove the prefix-only limitation, and the 8K state-inclusive estimate beats its matched control by 2.69 percentage points. The measured rates below remain the original smoke's results.
+
 Results: [package at `460c236`](https://github.com/Kibnelson/kv_reconstruction/tree/460c2366ddf383d060417f32eb14da434b99e45a/benchmark_results/qwen_neural_probability_smoke_v2_a4500). The [reproducible audit](../scripts/review_neural_results.py), [validation](../benchmark_results/qwen_neural_review_20261019/validation.json) and [analysis](../benchmark_results/qwen_neural_review_20261019/analysis.json) record the checks and arithmetic. This review audits submitted artifacts and matching source; it is not an independent Qwen GPU rerun.
 
 ## What the smoke actually measures
