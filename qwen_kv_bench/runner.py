@@ -291,6 +291,10 @@ def _require_runtime_packages(p):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if "--neural-probability-study" in argv:
+        from .neural_study import main as neural_main
+        argv.remove("--neural-probability-study")
+        return neural_main(argv)
     if "--producer-study" in argv:
         from .producer_study import main as producer_main
         argv.remove("--producer-study")

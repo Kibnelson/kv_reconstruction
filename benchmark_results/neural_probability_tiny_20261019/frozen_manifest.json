@@ -1,0 +1,996 @@
+{
+  "model_identity": {
+    "model_id": "local-random-tiny-qwen3-producer-study",
+    "tiny": true,
+    "seed": 71,
+    "config": {
+      "vocab_size": 97,
+      "max_position_embeddings": 96,
+      "hidden_size": 64,
+      "intermediate_size": 96,
+      "num_hidden_layers": 2,
+      "num_attention_heads": 4,
+      "use_sliding_window": false,
+      "sliding_window": null,
+      "max_window_layers": 28,
+      "num_key_value_heads": 2,
+      "head_dim": 16,
+      "hidden_act": "silu",
+      "initializer_range": 0.02,
+      "rms_norm_eps": 1e-06,
+      "use_cache": true,
+      "rope_theta": 10000.0,
+      "rope_scaling": null,
+      "attention_bias": false,
+      "attention_dropout": 0.0,
+      "layer_types": [
+        "full_attention",
+        "full_attention"
+      ],
+      "return_dict": true,
+      "output_hidden_states": false,
+      "torchscript": false,
+      "dtype": null,
+      "pruned_heads": {},
+      "tie_word_embeddings": false,
+      "chunk_size_feed_forward": 0,
+      "is_encoder_decoder": false,
+      "is_decoder": false,
+      "cross_attention_hidden_size": null,
+      "add_cross_attention": false,
+      "tie_encoder_decoder": false,
+      "architectures": null,
+      "finetuning_task": null,
+      "id2label": {
+        "0": "LABEL_0",
+        "1": "LABEL_1"
+      },
+      "label2id": {
+        "LABEL_0": 0,
+        "LABEL_1": 1
+      },
+      "task_specific_params": null,
+      "problem_type": null,
+      "tokenizer_class": null,
+      "prefix": null,
+      "bos_token_id": null,
+      "pad_token_id": null,
+      "eos_token_id": null,
+      "sep_token_id": null,
+      "decoder_start_token_id": null,
+      "max_length": 20,
+      "min_length": 0,
+      "do_sample": false,
+      "early_stopping": false,
+      "num_beams": 1,
+      "temperature": 1.0,
+      "top_k": 50,
+      "top_p": 1.0,
+      "typical_p": 1.0,
+      "repetition_penalty": 1.0,
+      "length_penalty": 1.0,
+      "no_repeat_ngram_size": 0,
+      "encoder_no_repeat_ngram_size": 0,
+      "bad_words_ids": null,
+      "num_return_sequences": 1,
+      "output_scores": false,
+      "return_dict_in_generate": false,
+      "forced_bos_token_id": null,
+      "forced_eos_token_id": null,
+      "remove_invalid_values": false,
+      "exponential_decay_length_penalty": null,
+      "suppress_tokens": null,
+      "begin_suppress_tokens": null,
+      "num_beam_groups": 1,
+      "diversity_penalty": 0.0,
+      "_name_or_path": "",
+      "transformers_version": "4.57.6",
+      "tf_legacy_loss": false,
+      "use_bfloat16": false,
+      "model_type": "qwen3",
+      "output_attentions": false
+    },
+    "dtype": "bfloat16",
+    "device": "cpu",
+    "model_storage_bytes": 148496,
+    "scope": "Random local weights; no pretrained checkpoint, tokenizer, quality or GPU performance claim"
+  },
+  "source_sha256": "a110cf984dddaa4b5b07e3ea290c21d5a7699f6d8710055fad98b0ab4178bfc2",
+  "training_kv_sha256": [
+    "6b6ddf3209736736327c34a3c231fc6bf4d05e091d2d3bcd81e0e82e172552bc",
+    "d002c84c5bfa78b16319a0e91d35dca53f9126eba720679d36f3e0f666d9e30c",
+    "a92a136671a8c8f596ed9830f62feae5f4c04e8300d7e2fb0a6764914ac6b663"
+  ],
+  "models": {
+    "per_layer": {
+      "model_id": "f677c0ea1991c2fd51f7f317764845d048cd4fcd451bacdac645926912551099",
+      "state_bytes": 24269,
+      "parameter_count": 3488,
+      "files": [
+        {
+          "file": "models/neural_per_layer.json",
+          "bytes": 8269,
+          "sha256": "f677c0ea1991c2fd51f7f317764845d048cd4fcd451bacdac645926912551099"
+        },
+        {
+          "file": "models/neural_per_layer_global.npkv",
+          "bytes": 197,
+          "sha256": "8bc4490d3af44b44d424df3eb8cf4c0e3f29d26cf06c11b0ff6f04e989f1821f"
+        },
+        {
+          "file": "models/neural_per_layer_net_01.npkv",
+          "bytes": 14463,
+          "sha256": "139702d29a592a5a40e4868cfa0ba1e047f4d52b3ccd0abb491c9cd3b07fa5c9"
+        },
+        {
+          "file": "models/neural_per_layer_norm_01.npkv",
+          "bytes": 1340,
+          "sha256": "a96e4b3758b76fec8ee692c2ddac5b1f9365a192fd3c943889f7b4bc37582b08"
+        }
+      ],
+      "metadata": {
+        "compute": {
+          "complete_float32_state_values": 3720,
+          "network_MACs_per_KV_value": 52.0,
+          "network_MACs_per_token": 3328,
+          "scope": "Dense-layer MAC counts only; GELU, normalization, RoPE, probability CDF and entropy coding add work. Full codec state includes every normalizer and explicit inverse frequency.",
+          "trainable_parameter_count": 3488
+        },
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "condition_V_on_current_K": false,
+          "inputs": "previous-layer exact final post-RoPE K and V",
+          "log_scale_clamp": [
+            -30.0,
+            30.0
+          ],
+          "mixture_components": 1,
+          "normalizer_rule": "TRAIN mean/std float64 accumulation then float32; +1e-6 scales; split-half K-pair RMS ties actual rotated coordinate pairs",
+          "rope_layout": "split-half",
+          "rope_scaling": 1.0,
+          "shared_rule": null,
+          "source_port": "Torch adaptation of supplied approach2_improve.py M=1/prev1/vk=0/z=0; Qwen split-half RoPE replaces Smol adjacent pairs; disclosed log-scale clamp; no numerical reproduction claim",
+          "stored_latent": false,
+          "target_dtype": "BF16 word intervals",
+          "training_objective": "mean max(0, -log2(logistic density * BF16 ULP)); density/bin-width approximation, not exact interval likelihood or actual compressed bytes",
+          "weight_dtype": "float32"
+        },
+        "format": "qwen_previous_layer_logistic_models_v1",
+        "geometry": {
+          "channels": 32,
+          "head_dim": 16,
+          "layers": 2,
+          "width": 16
+        },
+        "mode": "per_layer",
+        "model_identity": {
+          "config": {
+            "_name_or_path": "",
+            "add_cross_attention": false,
+            "architectures": null,
+            "attention_bias": false,
+            "attention_dropout": 0.0,
+            "bad_words_ids": null,
+            "begin_suppress_tokens": null,
+            "bos_token_id": null,
+            "chunk_size_feed_forward": 0,
+            "cross_attention_hidden_size": null,
+            "decoder_start_token_id": null,
+            "diversity_penalty": 0.0,
+            "do_sample": false,
+            "dtype": null,
+            "early_stopping": false,
+            "encoder_no_repeat_ngram_size": 0,
+            "eos_token_id": null,
+            "exponential_decay_length_penalty": null,
+            "finetuning_task": null,
+            "forced_bos_token_id": null,
+            "forced_eos_token_id": null,
+            "head_dim": 16,
+            "hidden_act": "silu",
+            "hidden_size": 64,
+            "id2label": {
+              "0": "LABEL_0",
+              "1": "LABEL_1"
+            },
+            "initializer_range": 0.02,
+            "intermediate_size": 96,
+            "is_decoder": false,
+            "is_encoder_decoder": false,
+            "label2id": {
+              "LABEL_0": 0,
+              "LABEL_1": 1
+            },
+            "layer_types": [
+              "full_attention",
+              "full_attention"
+            ],
+            "length_penalty": 1.0,
+            "max_length": 20,
+            "max_position_embeddings": 96,
+            "max_window_layers": 28,
+            "min_length": 0,
+            "model_type": "qwen3",
+            "no_repeat_ngram_size": 0,
+            "num_attention_heads": 4,
+            "num_beam_groups": 1,
+            "num_beams": 1,
+            "num_hidden_layers": 2,
+            "num_key_value_heads": 2,
+            "num_return_sequences": 1,
+            "output_attentions": false,
+            "output_hidden_states": false,
+            "output_scores": false,
+            "pad_token_id": null,
+            "prefix": null,
+            "problem_type": null,
+            "pruned_heads": {},
+            "remove_invalid_values": false,
+            "repetition_penalty": 1.0,
+            "return_dict": true,
+            "return_dict_in_generate": false,
+            "rms_norm_eps": 1e-06,
+            "rope_scaling": null,
+            "rope_theta": 10000.0,
+            "sep_token_id": null,
+            "sliding_window": null,
+            "suppress_tokens": null,
+            "task_specific_params": null,
+            "temperature": 1.0,
+            "tf_legacy_loss": false,
+            "tie_encoder_decoder": false,
+            "tie_word_embeddings": false,
+            "tokenizer_class": null,
+            "top_k": 50,
+            "top_p": 1.0,
+            "torchscript": false,
+            "transformers_version": "4.57.6",
+            "typical_p": 1.0,
+            "use_bfloat16": false,
+            "use_cache": true,
+            "use_sliding_window": false,
+            "vocab_size": 97
+          },
+          "device": "cpu",
+          "dtype": "bfloat16",
+          "model_id": "local-random-tiny-qwen3-producer-study",
+          "model_storage_bytes": 148496,
+          "scope": "Random local weights; no pretrained checkpoint, tokenizer, quality or GPU performance claim",
+          "seed": 71,
+          "tiny": true
+        },
+        "scope": "Learned probability model only; complete weights/normalizers/RoPE state are charged. Exact entropy stream roundtrips and continuation must be measured separately. Layer0 uses a separate anchor codec.",
+        "training": {
+          "batch_tokens": 256,
+          "budget_note": "Per-layer mode performs (layers-1)*steps updates; shared mode performs steps total. These are explicitly unequal training budgets.",
+          "learning_rate": "1e-3*0.5*(1+cos(pi*update/steps))",
+          "networks": {
+            "net_01": {
+              "checkpoints": [
+                {
+                  "capture": 2,
+                  "density_proxy_bits_per_value": 37.509830474853516,
+                  "learning_rate": 0.0005,
+                  "sampled_layer": 1,
+                  "tokens": 32,
+                  "update": 1,
+                  "window_start": 0
+                },
+                {
+                  "capture": 2,
+                  "density_proxy_bits_per_value": 34.79126739501953,
+                  "learning_rate": 0.0,
+                  "sampled_layer": 1,
+                  "tokens": 32,
+                  "update": 2,
+                  "window_start": 0
+                }
+              ],
+              "final_batch_loss": 34.79126739501953,
+              "final_mean_last_100_batch_losses": 36.15054893493652,
+              "initial_batch_loss": 37.509830474853516,
+              "optimizer_updates": 2,
+              "scope": "TRAIN density/bin-width proxy only; initial/final losses use sampled batches, not a fixed validation set",
+              "updates_by_layer": {
+                "1": 2
+              }
+            }
+          },
+          "optimizer": "Adam betas=(0.9,0.999),eps=1e-8",
+          "runtime": {
+            "autocast_enabled": false,
+            "cpu_threads": 4,
+            "cuda_build": null,
+            "cuda_matmul_allow_tf32": false,
+            "cudnn_allow_tf32": true,
+            "deterministic_algorithms": false,
+            "device_type": "cpu",
+            "float32_matmul_precision": "highest",
+            "rule": "previous-layer-FP32-GELU-tanh-logistic-split-half-RoPE-v1",
+            "torch_git_version": "70d99e998b4955e0049d13a98d77ae1b14db1f45",
+            "torch_version": "2.11.0+cpu"
+          },
+          "sampling": "uniform capture, uniform target layer in shared mode, uniform valid consecutive token window including final possible window",
+          "seed": 71,
+          "steps_per_network": 2,
+          "total_optimizer_updates": 2
+        },
+        "training_captures": [
+          {
+            "metadata": {
+              "geometry": {
+                "columns": 32,
+                "head_dim": 16,
+                "kv_heads": 2,
+                "layers": 2,
+                "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+                "tokens": 32
+              },
+              "input_ids_sha256": "3aef2fbb2eb2484ecdc3301678920c17b0a1323c1f1da584e68147de85d287c3",
+              "kv_words_sha256": "6b6ddf3209736736327c34a3c231fc6bf4d05e091d2d3bcd81e0e82e172552bc",
+              "name": "train_ferry_maintenance",
+              "split": "train",
+              "timings": {
+                "device_to_cpu_words": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "synchronized": true,
+                  "wall_seconds": 0.003071895000175573
+                },
+                "prefill": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "observer_included": false,
+                  "synchronized": true,
+                  "wall_seconds": 0.03371369999877061
+                }
+              },
+              "tokens": 32
+            },
+            "sha256": "40077d1cfc72c1fca99a0e3dd40c50f218483d23d09bf6d2847f65623fd820c9",
+            "split": "train",
+            "tokens": 32
+          },
+          {
+            "metadata": {
+              "geometry": {
+                "columns": 32,
+                "head_dim": 16,
+                "kv_heads": 2,
+                "layers": 2,
+                "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+                "tokens": 32
+              },
+              "input_ids_sha256": "0fd793498db6ad55a3968b7ee916fe44c88b8bc1fb259fd9033c30d0be0d2eb8",
+              "kv_words_sha256": "d002c84c5bfa78b16319a0e91d35dca53f9126eba720679d36f3e0f666d9e30c",
+              "name": "train_python_bounded_ring",
+              "split": "train",
+              "timings": {
+                "device_to_cpu_words": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "synchronized": true,
+                  "wall_seconds": 0.0024958439971669577
+                },
+                "prefill": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "observer_included": false,
+                  "synchronized": true,
+                  "wall_seconds": 0.022376786997483578
+                }
+              },
+              "tokens": 32
+            },
+            "sha256": "6132e6352bee8ee30fe1ddc1b22f91b5baa3911003a326994e8ce3856a0484ba",
+            "split": "train",
+            "tokens": 32
+          },
+          {
+            "metadata": {
+              "geometry": {
+                "columns": 32,
+                "head_dim": 16,
+                "kv_heads": 2,
+                "layers": 2,
+                "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+                "tokens": 32
+              },
+              "input_ids_sha256": "3e75e1172fe991df8964231cf90dab97db34b80256a620fdc3ed82e9f085fb50",
+              "kv_words_sha256": "a92a136671a8c8f596ed9830f62feae5f4c04e8300d7e2fb0a6764914ac6b663",
+              "name": "train_seed_vault_records",
+              "split": "train",
+              "timings": {
+                "device_to_cpu_words": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "synchronized": true,
+                  "wall_seconds": 0.003236002998164622
+                },
+                "prefill": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "observer_included": false,
+                  "synchronized": true,
+                  "wall_seconds": 0.02473273899886408
+                }
+              },
+              "tokens": 32
+            },
+            "sha256": "023b5b3e83691fe550fc1efd60af55e2f8231c897d71e753a7ace0c46efb87f6",
+            "split": "train",
+            "tokens": 32
+          }
+        ],
+        "training_hashes": [
+          "40077d1cfc72c1fca99a0e3dd40c50f218483d23d09bf6d2847f65623fd820c9",
+          "6132e6352bee8ee30fe1ddc1b22f91b5baa3911003a326994e8ce3856a0484ba",
+          "023b5b3e83691fe550fc1efd60af55e2f8231c897d71e753a7ace0c46efb87f6"
+        ],
+        "training_only": true
+      },
+      "share_package_scope": "Full neural artifacts remain in run/models. The normal reports package omits models/; all their bytes are nevertheless charged."
+    },
+    "shared": {
+      "model_id": "acb355e9eb77b2aede3af4755010e6917d0fe17f2675f4fb4d1bf2e49dce6c75",
+      "state_bytes": 24404,
+      "parameter_count": 3504,
+      "files": [
+        {
+          "file": "models/neural_shared.json",
+          "bytes": 8340,
+          "sha256": "acb355e9eb77b2aede3af4755010e6917d0fe17f2675f4fb4d1bf2e49dce6c75"
+        },
+        {
+          "file": "models/neural_shared_global.npkv",
+          "bytes": 197,
+          "sha256": "8bc4490d3af44b44d424df3eb8cf4c0e3f29d26cf06c11b0ff6f04e989f1821f"
+        },
+        {
+          "file": "models/neural_shared_norm_01.npkv",
+          "bytes": 1340,
+          "sha256": "a96e4b3758b76fec8ee692c2ddac5b1f9365a192fd3c943889f7b4bc37582b08"
+        },
+        {
+          "file": "models/neural_shared_shared.npkv",
+          "bytes": 14527,
+          "sha256": "307669643d46d8639291027955ed171c460374a9dc9d6ebe5b100cffd594562b"
+        }
+      ],
+      "metadata": {
+        "compute": {
+          "complete_float32_state_values": 3736,
+          "network_MACs_per_KV_value": 52.25,
+          "network_MACs_per_token": 3344,
+          "scope": "Dense-layer MAC counts only; GELU, normalization, RoPE, probability CDF and entropy coding add work. Full codec state includes every normalizer and explicit inverse frequency.",
+          "trainable_parameter_count": 3504
+        },
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "condition_V_on_current_K": false,
+          "inputs": "previous-layer exact final post-RoPE K and V",
+          "log_scale_clamp": [
+            -30.0,
+            30.0
+          ],
+          "mixture_components": 1,
+          "normalizer_rule": "TRAIN mean/std float64 accumulation then float32; +1e-6 scales; split-half K-pair RMS ties actual rotated coordinate pairs",
+          "rope_layout": "split-half",
+          "rope_scaling": 1.0,
+          "shared_rule": "one MLP with (layers-1)-dimensional target-layer one-hot and separate per-layer TRAIN normalizers",
+          "source_port": "Torch adaptation of supplied approach2_improve.py M=1/prev1/vk=0/z=0; Qwen split-half RoPE replaces Smol adjacent pairs; disclosed log-scale clamp; no numerical reproduction claim",
+          "stored_latent": false,
+          "target_dtype": "BF16 word intervals",
+          "training_objective": "mean max(0, -log2(logistic density * BF16 ULP)); density/bin-width approximation, not exact interval likelihood or actual compressed bytes",
+          "weight_dtype": "float32"
+        },
+        "format": "qwen_previous_layer_logistic_models_v1",
+        "geometry": {
+          "channels": 32,
+          "head_dim": 16,
+          "layers": 2,
+          "width": 16
+        },
+        "mode": "shared",
+        "model_identity": {
+          "config": {
+            "_name_or_path": "",
+            "add_cross_attention": false,
+            "architectures": null,
+            "attention_bias": false,
+            "attention_dropout": 0.0,
+            "bad_words_ids": null,
+            "begin_suppress_tokens": null,
+            "bos_token_id": null,
+            "chunk_size_feed_forward": 0,
+            "cross_attention_hidden_size": null,
+            "decoder_start_token_id": null,
+            "diversity_penalty": 0.0,
+            "do_sample": false,
+            "dtype": null,
+            "early_stopping": false,
+            "encoder_no_repeat_ngram_size": 0,
+            "eos_token_id": null,
+            "exponential_decay_length_penalty": null,
+            "finetuning_task": null,
+            "forced_bos_token_id": null,
+            "forced_eos_token_id": null,
+            "head_dim": 16,
+            "hidden_act": "silu",
+            "hidden_size": 64,
+            "id2label": {
+              "0": "LABEL_0",
+              "1": "LABEL_1"
+            },
+            "initializer_range": 0.02,
+            "intermediate_size": 96,
+            "is_decoder": false,
+            "is_encoder_decoder": false,
+            "label2id": {
+              "LABEL_0": 0,
+              "LABEL_1": 1
+            },
+            "layer_types": [
+              "full_attention",
+              "full_attention"
+            ],
+            "length_penalty": 1.0,
+            "max_length": 20,
+            "max_position_embeddings": 96,
+            "max_window_layers": 28,
+            "min_length": 0,
+            "model_type": "qwen3",
+            "no_repeat_ngram_size": 0,
+            "num_attention_heads": 4,
+            "num_beam_groups": 1,
+            "num_beams": 1,
+            "num_hidden_layers": 2,
+            "num_key_value_heads": 2,
+            "num_return_sequences": 1,
+            "output_attentions": false,
+            "output_hidden_states": false,
+            "output_scores": false,
+            "pad_token_id": null,
+            "prefix": null,
+            "problem_type": null,
+            "pruned_heads": {},
+            "remove_invalid_values": false,
+            "repetition_penalty": 1.0,
+            "return_dict": true,
+            "return_dict_in_generate": false,
+            "rms_norm_eps": 1e-06,
+            "rope_scaling": null,
+            "rope_theta": 10000.0,
+            "sep_token_id": null,
+            "sliding_window": null,
+            "suppress_tokens": null,
+            "task_specific_params": null,
+            "temperature": 1.0,
+            "tf_legacy_loss": false,
+            "tie_encoder_decoder": false,
+            "tie_word_embeddings": false,
+            "tokenizer_class": null,
+            "top_k": 50,
+            "top_p": 1.0,
+            "torchscript": false,
+            "transformers_version": "4.57.6",
+            "typical_p": 1.0,
+            "use_bfloat16": false,
+            "use_cache": true,
+            "use_sliding_window": false,
+            "vocab_size": 97
+          },
+          "device": "cpu",
+          "dtype": "bfloat16",
+          "model_id": "local-random-tiny-qwen3-producer-study",
+          "model_storage_bytes": 148496,
+          "scope": "Random local weights; no pretrained checkpoint, tokenizer, quality or GPU performance claim",
+          "seed": 71,
+          "tiny": true
+        },
+        "scope": "Learned probability model only; complete weights/normalizers/RoPE state are charged. Exact entropy stream roundtrips and continuation must be measured separately. Layer0 uses a separate anchor codec.",
+        "training": {
+          "batch_tokens": 256,
+          "budget_note": "Per-layer mode performs (layers-1)*steps updates; shared mode performs steps total. These are explicitly unequal training budgets.",
+          "learning_rate": "1e-3*0.5*(1+cos(pi*update/steps))",
+          "networks": {
+            "shared": {
+              "checkpoints": [
+                {
+                  "capture": 2,
+                  "density_proxy_bits_per_value": 20.5484676361084,
+                  "learning_rate": 0.0005,
+                  "sampled_layer": 1,
+                  "tokens": 32,
+                  "update": 1,
+                  "window_start": 0
+                },
+                {
+                  "capture": 2,
+                  "density_proxy_bits_per_value": 19.8564453125,
+                  "learning_rate": 0.0,
+                  "sampled_layer": 1,
+                  "tokens": 32,
+                  "update": 2,
+                  "window_start": 0
+                }
+              ],
+              "final_batch_loss": 19.8564453125,
+              "final_mean_last_100_batch_losses": 20.2024564743042,
+              "initial_batch_loss": 20.5484676361084,
+              "optimizer_updates": 2,
+              "scope": "TRAIN density/bin-width proxy only; initial/final losses use sampled batches, not a fixed validation set",
+              "updates_by_layer": {
+                "1": 2
+              }
+            }
+          },
+          "optimizer": "Adam betas=(0.9,0.999),eps=1e-8",
+          "runtime": {
+            "autocast_enabled": false,
+            "cpu_threads": 4,
+            "cuda_build": null,
+            "cuda_matmul_allow_tf32": false,
+            "cudnn_allow_tf32": true,
+            "deterministic_algorithms": false,
+            "device_type": "cpu",
+            "float32_matmul_precision": "highest",
+            "rule": "previous-layer-FP32-GELU-tanh-logistic-split-half-RoPE-v1",
+            "torch_git_version": "70d99e998b4955e0049d13a98d77ae1b14db1f45",
+            "torch_version": "2.11.0+cpu"
+          },
+          "sampling": "uniform capture, uniform target layer in shared mode, uniform valid consecutive token window including final possible window",
+          "seed": 71,
+          "steps_per_network": 2,
+          "total_optimizer_updates": 2
+        },
+        "training_captures": [
+          {
+            "metadata": {
+              "geometry": {
+                "columns": 32,
+                "head_dim": 16,
+                "kv_heads": 2,
+                "layers": 2,
+                "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+                "tokens": 32
+              },
+              "input_ids_sha256": "3aef2fbb2eb2484ecdc3301678920c17b0a1323c1f1da584e68147de85d287c3",
+              "kv_words_sha256": "6b6ddf3209736736327c34a3c231fc6bf4d05e091d2d3bcd81e0e82e172552bc",
+              "name": "train_ferry_maintenance",
+              "split": "train",
+              "timings": {
+                "device_to_cpu_words": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "synchronized": true,
+                  "wall_seconds": 0.003071895000175573
+                },
+                "prefill": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "observer_included": false,
+                  "synchronized": true,
+                  "wall_seconds": 0.03371369999877061
+                }
+              },
+              "tokens": 32
+            },
+            "sha256": "40077d1cfc72c1fca99a0e3dd40c50f218483d23d09bf6d2847f65623fd820c9",
+            "split": "train",
+            "tokens": 32
+          },
+          {
+            "metadata": {
+              "geometry": {
+                "columns": 32,
+                "head_dim": 16,
+                "kv_heads": 2,
+                "layers": 2,
+                "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+                "tokens": 32
+              },
+              "input_ids_sha256": "0fd793498db6ad55a3968b7ee916fe44c88b8bc1fb259fd9033c30d0be0d2eb8",
+              "kv_words_sha256": "d002c84c5bfa78b16319a0e91d35dca53f9126eba720679d36f3e0f666d9e30c",
+              "name": "train_python_bounded_ring",
+              "split": "train",
+              "timings": {
+                "device_to_cpu_words": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "synchronized": true,
+                  "wall_seconds": 0.0024958439971669577
+                },
+                "prefill": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "observer_included": false,
+                  "synchronized": true,
+                  "wall_seconds": 0.022376786997483578
+                }
+              },
+              "tokens": 32
+            },
+            "sha256": "6132e6352bee8ee30fe1ddc1b22f91b5baa3911003a326994e8ce3856a0484ba",
+            "split": "train",
+            "tokens": 32
+          },
+          {
+            "metadata": {
+              "geometry": {
+                "columns": 32,
+                "head_dim": 16,
+                "kv_heads": 2,
+                "layers": 2,
+                "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+                "tokens": 32
+              },
+              "input_ids_sha256": "3e75e1172fe991df8964231cf90dab97db34b80256a620fdc3ed82e9f085fb50",
+              "kv_words_sha256": "a92a136671a8c8f596ed9830f62feae5f4c04e8300d7e2fb0a6764914ac6b663",
+              "name": "train_seed_vault_records",
+              "split": "train",
+              "timings": {
+                "device_to_cpu_words": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "synchronized": true,
+                  "wall_seconds": 0.003236002998164622
+                },
+                "prefill": {
+                  "device": "cpu",
+                  "device_event_seconds": null,
+                  "observer_included": false,
+                  "synchronized": true,
+                  "wall_seconds": 0.02473273899886408
+                }
+              },
+              "tokens": 32
+            },
+            "sha256": "023b5b3e83691fe550fc1efd60af55e2f8231c897d71e753a7ace0c46efb87f6",
+            "split": "train",
+            "tokens": 32
+          }
+        ],
+        "training_hashes": [
+          "40077d1cfc72c1fca99a0e3dd40c50f218483d23d09bf6d2847f65623fd820c9",
+          "6132e6352bee8ee30fe1ddc1b22f91b5baa3911003a326994e8ce3856a0484ba",
+          "023b5b3e83691fe550fc1efd60af55e2f8231c897d71e753a7ace0c46efb87f6"
+        ],
+        "training_only": true
+      },
+      "share_package_scope": "Full neural artifacts remain in run/models. The normal reports package omits models/; all their bytes are nevertheless charged."
+    }
+  },
+  "anchor_state": {
+    "state_id": "ecf9407e3aba0f60e80109fb611fe55c330c36ce4f0197154313284201f38814",
+    "serialized_bytes": 5196,
+    "physical_tensor_bytes": 128,
+    "charged_bytes": 5196,
+    "accounting": "maximum of full serialized state and distinct device tensor storage",
+    "decoder_state_metadata": {
+      "kind": "frozen",
+      "model_id": "7da40637cd06e9d31d5e3ed59e48f6353bec0ba173690e03dad97357eb820a4e",
+      "config": {
+        "feature_transform": "none"
+      },
+      "training_metadata": {
+        "format": "neural_reference_frozen_exponent_v1",
+        "training_only": true,
+        "training_metadata": [
+          {
+            "name": "train_ferry_maintenance",
+            "split": "train",
+            "tokens": 32,
+            "input_ids_sha256": "3aef2fbb2eb2484ecdc3301678920c17b0a1323c1f1da584e68147de85d287c3",
+            "kv_words_sha256": "6b6ddf3209736736327c34a3c231fc6bf4d05e091d2d3bcd81e0e82e172552bc",
+            "geometry": {
+              "layers": 2,
+              "kv_heads": 2,
+              "tokens": 32,
+              "head_dim": 16,
+              "columns": 32,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads"
+            },
+            "timings": {
+              "prefill": {
+                "wall_seconds": 0.03371369999877061,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true,
+                "observer_included": false
+              },
+              "device_to_cpu_words": {
+                "wall_seconds": 0.003071895000175573,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true
+              }
+            }
+          },
+          {
+            "name": "train_python_bounded_ring",
+            "split": "train",
+            "tokens": 32,
+            "input_ids_sha256": "0fd793498db6ad55a3968b7ee916fe44c88b8bc1fb259fd9033c30d0be0d2eb8",
+            "kv_words_sha256": "d002c84c5bfa78b16319a0e91d35dca53f9126eba720679d36f3e0f666d9e30c",
+            "geometry": {
+              "layers": 2,
+              "kv_heads": 2,
+              "tokens": 32,
+              "head_dim": 16,
+              "columns": 32,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads"
+            },
+            "timings": {
+              "prefill": {
+                "wall_seconds": 0.022376786997483578,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true,
+                "observer_included": false
+              },
+              "device_to_cpu_words": {
+                "wall_seconds": 0.0024958439971669577,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true
+              }
+            }
+          },
+          {
+            "name": "train_seed_vault_records",
+            "split": "train",
+            "tokens": 32,
+            "input_ids_sha256": "3e75e1172fe991df8964231cf90dab97db34b80256a620fdc3ed82e9f085fb50",
+            "kv_words_sha256": "a92a136671a8c8f596ed9830f62feae5f4c04e8300d7e2fb0a6764914ac6b663",
+            "geometry": {
+              "layers": 2,
+              "kv_heads": 2,
+              "tokens": 32,
+              "head_dim": 16,
+              "columns": 32,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads"
+            },
+            "timings": {
+              "prefill": {
+                "wall_seconds": 0.02473273899886408,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true,
+                "observer_included": false
+              },
+              "device_to_cpu_words": {
+                "wall_seconds": 0.003236002998164622,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true
+              }
+            }
+          }
+        ],
+        "model_identity": {
+          "model_id": "local-random-tiny-qwen3-producer-study",
+          "tiny": true,
+          "seed": 71,
+          "config": {
+            "vocab_size": 97,
+            "max_position_embeddings": 96,
+            "hidden_size": 64,
+            "intermediate_size": 96,
+            "num_hidden_layers": 2,
+            "num_attention_heads": 4,
+            "use_sliding_window": false,
+            "sliding_window": null,
+            "max_window_layers": 28,
+            "num_key_value_heads": 2,
+            "head_dim": 16,
+            "hidden_act": "silu",
+            "initializer_range": 0.02,
+            "rms_norm_eps": 1e-06,
+            "use_cache": true,
+            "rope_theta": 10000.0,
+            "rope_scaling": null,
+            "attention_bias": false,
+            "attention_dropout": 0.0,
+            "layer_types": [
+              "full_attention",
+              "full_attention"
+            ],
+            "return_dict": true,
+            "output_hidden_states": false,
+            "torchscript": false,
+            "dtype": null,
+            "pruned_heads": {},
+            "tie_word_embeddings": false,
+            "chunk_size_feed_forward": 0,
+            "is_encoder_decoder": false,
+            "is_decoder": false,
+            "cross_attention_hidden_size": null,
+            "add_cross_attention": false,
+            "tie_encoder_decoder": false,
+            "architectures": null,
+            "finetuning_task": null,
+            "id2label": {
+              "0": "LABEL_0",
+              "1": "LABEL_1"
+            },
+            "label2id": {
+              "LABEL_0": 0,
+              "LABEL_1": 1
+            },
+            "task_specific_params": null,
+            "problem_type": null,
+            "tokenizer_class": null,
+            "prefix": null,
+            "bos_token_id": null,
+            "pad_token_id": null,
+            "eos_token_id": null,
+            "sep_token_id": null,
+            "decoder_start_token_id": null,
+            "max_length": 20,
+            "min_length": 0,
+            "do_sample": false,
+            "early_stopping": false,
+            "num_beams": 1,
+            "temperature": 1.0,
+            "top_k": 50,
+            "top_p": 1.0,
+            "typical_p": 1.0,
+            "repetition_penalty": 1.0,
+            "length_penalty": 1.0,
+            "no_repeat_ngram_size": 0,
+            "encoder_no_repeat_ngram_size": 0,
+            "bad_words_ids": null,
+            "num_return_sequences": 1,
+            "output_scores": false,
+            "return_dict_in_generate": false,
+            "forced_bos_token_id": null,
+            "forced_eos_token_id": null,
+            "remove_invalid_values": false,
+            "exponential_decay_length_penalty": null,
+            "suppress_tokens": null,
+            "begin_suppress_tokens": null,
+            "num_beam_groups": 1,
+            "diversity_penalty": 0.0,
+            "_name_or_path": "",
+            "transformers_version": "4.57.6",
+            "tf_legacy_loss": false,
+            "use_bfloat16": false,
+            "model_type": "qwen3",
+            "output_attentions": false
+          },
+          "dtype": "bfloat16",
+          "device": "cpu",
+          "model_storage_bytes": 148496,
+          "scope": "Random local weights; no pretrained checkpoint, tokenizer, quality or GPU performance claim"
+        },
+        "training_kv_sha256": [
+          "6b6ddf3209736736327c34a3c231fc6bf4d05e091d2d3bcd81e0e82e172552bc",
+          "d002c84c5bfa78b16319a0e91d35dca53f9126eba720679d36f3e0f666d9e30c",
+          "a92a136671a8c8f596ed9830f62feae5f4c04e8300d7e2fb0a6764914ac6b663"
+        ],
+        "rule": "floor of per-channel TRAIN exponent median; produced KV only"
+      },
+      "layer_geometry": {
+        "layer_00": {
+          "channels": 32,
+          "feature_rank": 0,
+          "maximum_hidden_index": -1
+        },
+        "layer_01": {
+          "channels": 32,
+          "feature_rank": 0,
+          "maximum_hidden_index": -1
+        }
+      }
+    },
+    "file": "calibration/neural_anchor_state.bin"
+  },
+  "training_budget": {
+    "per_layer_updates_each": 2,
+    "per_layer_aggregate_updates": 2,
+    "shared_aggregate_updates": 2,
+    "rule": "By default the shared network receives the same total number of layer-labelled minibatch updates as all per-layer networks combined. Shared layer allocation is random; realized counts are logged. --shared-steps explicitly changes this budget."
+  },
+  "protocol": "All fits/hyperparameters frozen before DEV/TEST. Both requested modes are reported; TEST never selects a mode."
+}
