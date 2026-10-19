@@ -2,6 +2,7 @@
 import contextlib
 import hashlib
 import io
+import importlib.util
 from types import SimpleNamespace
 import unittest
 from unittest import mock
@@ -12,6 +13,32 @@ from qwen_kv_bench import runner
 
 
 class RunnerTests(unittest.TestCase):
+    def test_missing_torch_stops_before_self_test_discovery(self):
+        original = importlib.util.find_spec
+        stderr = io.StringIO()
+        def absent_torch(name, *args, **kwargs):
+            return None if name == "torch" else original(name, *args, **kwargs)
+        with mock.patch.object(importlib.util, "find_spec", side_effect=absent_torch), \
+             mock.patch("unittest.TestLoader.discover") as discover, \
+             contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as result:
+                runner.main(["--self-test"])
+        self.assertEqual(result.exception.code, 2)
+        discover.assert_not_called()
+        self.assertIn("torch", stderr.getvalue())
+        self.assertIn("python -m pip install torch", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_missing_torch_keeps_doctor_available(self):
+        from qwen_kv_bench import model_runtime
+        report = dict(selected_device=None, selection_error="PyTorch is not installed")
+        stdout = io.StringIO()
+        with mock.patch.object(runner, "_require_runtime_packages", side_effect=AssertionError("doctor must remain available")), \
+             mock.patch.object(model_runtime, "doctor", return_value=report), \
+             contextlib.redirect_stdout(stdout):
+            self.assertEqual(runner.main(["--doctor"]), 2)
+        self.assertIn("PyTorch is not installed", stdout.getvalue())
+
     def test_identical_nonfinite_logits_cannot_pass_generation(self):
         report = {"generation_checks": [], "warnings": []}
         args = SimpleNamespace(generation_steps=1, dev_tokens=16, tile_tokens=16)

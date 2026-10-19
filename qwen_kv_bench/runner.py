@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import gc
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -251,6 +252,23 @@ def _validate(args, p):
         p.error("--grid requires --preset all")
 
 
+def _require_runtime_packages(p):
+    """Stop before test discovery/codec imports when setup is incomplete."""
+    missing = [name for name in ("torch", "transformers")
+               if importlib.util.find_spec(name) is None]
+    if not missing:
+        return
+    message = ("Missing required package(s) in this Python environment: "
+               + ", ".join(missing) + f"\nPython: {sys.executable}")
+    if "torch" in missing:
+        message += ("\nInstall PyTorch inside the active environment before running tests."
+                    "\nFor NVIDIA CUDA: python -m pip install torch --index-url https://download.pytorch.org/whl/cu128"
+                    "\nFor Intel XPU or CPU builds, follow --instructions.")
+    if "transformers" in missing:
+        message += "\nInstall Transformers: python -m pip install transformers==4.57.6"
+    p.error(message)
+
+
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
@@ -265,6 +283,7 @@ def main(argv=None):
             d["qwen_BF16_preflight"] = _capacity(runtime.select_device(args.device), args, max(args.train_tokens, args.dev_tokens, min(args.lengths)))
         print(json.dumps(d, indent=2))
         return 0 if d.get("selected_device") and d.get("bf16_probe", {}).get("success") else 2
+    _require_runtime_packages(p)
     if args.self_test:
         import unittest
         suite = unittest.defaultTestLoader.discover(str(Path(__file__).parent), pattern="test_*.py", top_level_dir=str(Path(__file__).parent))

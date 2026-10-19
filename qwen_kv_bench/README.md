@@ -8,17 +8,27 @@ Cache compatibility update: this revision reads modern `cache.layers[i].keys/val
 
 ## Install and check the machine
 
-Use Python 3.12 in a virtual environment. Install **the PyTorch build appropriate to the actual accelerator** using the [official installation selector](https://pytorch.org/get-started/locally/). An NVIDIA GPU needs a compatible CUDA build and driver. Intel GPU support uses the XPU build and Intel GPU drivers; see [PyTorch's Intel GPU guide](https://docs.pytorch.org/docs/2.14/notes/get_start_xpu.html). A NUC model name alone does not establish accelerator support. Older Intel integrated GPUs are not universally supported.
+Use Python 3.12 in a virtual environment. **PyTorch must be installed before `--doctor`, `--self-test`, or a model run.** Installing only NumPy/Transformers, or the repository's `requirements.txt`, does not install Torch.
+
+The following complete setup is for the **NVIDIA RTX A4500 NUC** and works with just the copied standalone script:
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-# Install PyTorch for your hardware using the official instructions above.
+python -m pip install --upgrade pip
+python -m pip install torch==2.11.0+cu128 --index-url https://download.pytorch.org/whl/cu128
 python -m pip install numpy==2.3.5 transformers==4.57.6 safetensors
-python qwen_kv_gpu_bench.py --doctor
+python -c "import torch; print('Torch:', torch.__version__, 'CUDA runtime:', torch.version.cuda); assert torch.cuda.is_available(), 'CUDA is unavailable'; print('GPU:', torch.cuda.get_device_name(0))"
+python qwen_kv_gpu_bench.py --doctor --device cuda
 python qwen_kv_gpu_bench.py --self-test
 python qwen_kv_gpu_bench.py --list-methods
 ```
+
+With a repository checkout, `python -m pip install -r requirements-cuda.txt` replaces the two package-install commands above. If the environment already exists, activate it and run the installation/check commands; there is no need to recreate it or download model weights again.
+
+This selects an available **Torch 2.11.0 CUDA 12.8** wheel for the A4500 and driver 580. The CUDA 13.0 value in `nvidia-smi` is driver capability; it does not require installing a CUDA 13.0 Torch wheel. CUDA execution remains to be validated on the target NUC.
+
+For other hardware, install **the PyTorch build appropriate to the actual accelerator** using the [official installation selector](https://pytorch.org/get-started/locally/), then install NumPy, Transformers and safetensors as above. Intel GPU support uses the XPU build and Intel GPU drivers; see [PyTorch's Intel GPU guide](https://docs.pytorch.org/docs/2.14/notes/get_start_xpu.html). A NUC model name alone does not establish accelerator support. Older Intel integrated GPUs are not universally supported. A CPU-only Torch build supports the functional tests but cannot run the NVIDIA GPU benchmark.
 
 On Windows, activate with `.venv\Scripts\activate` instead. `--doctor` and `--self-test` do not download language-model weights. The self-test exercises CPU functional correctness; it does not validate a GPU driver or GPU performance.
 

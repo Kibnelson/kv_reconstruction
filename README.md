@@ -13,13 +13,21 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-Install the PyTorch build appropriate for your accelerator from the [official selector](https://pytorch.org/get-started/locally/), then install the remaining packages:
+For the **NVIDIA RTX A4500 NUC**, install the complete CUDA environment before running checks:
 
 ```bash
-python -m pip install -r requirements.txt
-python qwen_kv_gpu_bench.py --doctor
+python -m pip install --upgrade pip
+python -m pip install -r requirements-cuda.txt
+python -c "import torch; print('Torch:', torch.__version__, 'CUDA runtime:', torch.version.cuda); assert torch.cuda.is_available(), 'CUDA is unavailable'; print('GPU:', torch.cuda.get_device_name(0))"
+python qwen_kv_gpu_bench.py --doctor --device cuda
 python qwen_kv_gpu_bench.py --self-test
 ```
+
+**`requirements.txt` alone does not install PyTorch.** It contains the backend-independent packages. `requirements-cuda.txt` includes those packages and the NVIDIA CUDA build of Torch. If you already created the virtual environment and installed `requirements.txt`, keep that environment active and run the CUDA install command above; no model download is needed for the checks.
+
+The NVIDIA requirements select **Torch 2.11.0 with the CUDA 12.8 runtime**, a build available from the official CUDA wheel index. The NUC's driver 580 supports this runtime: `nvidia-smi` showing CUDA 13.0 describes driver capability and does not require a CUDA 13.0 Torch wheel. GPU execution still needs to be checked on the NUC.
+
+For Intel XPU or CPU, install the matching PyTorch build from the [official selector](https://pytorch.org/get-started/locally/), then run `python -m pip install -r requirements.txt`. A CUDA build is required for the NVIDIA benchmark; a CPU-only Torch installation cannot use the A4500.
 
 The requirements file pins Transformers 4.57.6 as a reproducible baseline. **An existing Transformers 5 installation does not need to be downgraded:** cache capture, exact restoration, and continued generation are also tested with 5.20.1. Use your working environment directly and run `--doctor` to record its versions. CPU functional checks do not establish GPU performance.
 
