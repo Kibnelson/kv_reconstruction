@@ -58,7 +58,8 @@ def _parser():
                    help="Shared network updates; default steps*(layers-1) matches the per-layer aggregate update budget")
     p.add_argument("--batch-tokens", type=int, default=256)
     p.add_argument("--train-tokens", type=int)
-    p.add_argument("--dev-tokens", type=int)
+    p.add_argument("--dev-tokens", type=int,
+                   help="Complete chat-template DEV prefix; default 128 (8 synthetic tokens with --tiny)")
     p.add_argument("--lengths", nargs="+", type=int)
     p.add_argument("--cases", type=int, choices=(1, 2, 3), default=3)
     p.add_argument("--chunk-tokens", type=int)
@@ -74,7 +75,7 @@ def _parser():
 
 def _defaults(args):
     values = dict(width=16 if args.tiny else 512, steps=2 if args.tiny else 2000,
-                  train_tokens=32 if args.tiny else 2048, dev_tokens=8 if args.tiny else 64,
+                  train_tokens=32 if args.tiny else 2048, dev_tokens=8 if args.tiny else 128,
                   lengths=[16, 24] if args.tiny else [2048, 8192], chunk_tokens=8 if args.tiny else 512)
     for key, default in values.items():
         if getattr(args, key) is None:
@@ -83,6 +84,37 @@ def _defaults(args):
         args.device = "cpu"
     if args.revision is None and args.model == runtime.DEFAULT_MODEL:
         args.revision = runtime.DEFAULT_REVISION
+
+
+def _preflight_inputs(tokenizer, args):
+    """Validate every requested prompt budget without any forward pass or fit.
+
+    The same offset-aware builder used by capture preserves fixed content.
+    Tokenizing DEV/TEST here validates configuration only; no activations,
+    probability statistics or selection decisions are derived from them.
+    """
+    if args.tiny:
+        return dict(status="passed", kind="synthetic", prompts=[])
+    jobs = [(fixture, args.train_tokens, "--train-tokens") for fixture in TRAIN]
+    jobs.append((DEV[0], args.dev_tokens, "--dev-tokens"))
+    jobs.extend((fixture, length, "--lengths")
+                for length in args.lengths for fixture in TEST[:args.cases])
+    prompts = []
+    for fixture, tokens, argument in jobs:
+        try:
+            ids = build_input_ids(tokenizer, fixture, tokens)
+        except ValueError as error:
+            raise ValueError(
+                f"Input preflight failed for {argument}={tokens} "
+                f"({fixture['split']}/{fixture['name']}): {error}. "
+                f"Increase {argument} if the token budget is too small; "
+                "the fixed chat content is never truncated."
+            ) from error
+        prompts.append(dict(split=fixture["split"], name=fixture["name"],
+                            argument=argument, target_tokens=tokens,
+                            input_ids_sha256=_hash(ids)))
+    return dict(status="passed", kind="chat_template", prompts=prompts,
+                scope="Tokenizer-only validation of all requested lengths before model weights, TRAIN capture and fitting; exact requested sizes, fixed chat content preserved.")
 
 
 def _capture(model, tokenizer, fixture, tokens, device, args):
@@ -276,11 +308,20 @@ def main(argv=None):
         _note("Loading model for learned probability study on " + str(device))
         if args.tiny:
             from .producer_study import _tiny
+            report["input_preflight"] = _preflight_inputs(None, args)
             model, tokenizer, identity = _tiny(device, args)
         else:
-            model, tokenizer, identity = runtime.load_model(args.model, args.revision, device, args.local_files_only)
+            def validate_inputs(tokenizer):
+                _note("Validating all TRAIN/DEV/TEST token budgets before loading weights")
+                report["input_preflight"] = _preflight_inputs(tokenizer, args)
+                _note(f"Input preflight passed: {len(report['input_preflight']['prompts'])} prompts")
+            model, tokenizer, identity = runtime.load_model(args.model, args.revision, device,
+                args.local_files_only, tokenizer_validator=validate_inputs)
         report["model_identity"] = identity
         head_dim = int(model.config.head_dim)
+        configured_layers = int(model.config.num_hidden_layers)
+        if args.max_pairs < configured_layers:
+            raise ValueError(f"--max-pairs {args.max_pairs} must cover all {configured_layers} layers")
         inv, rope_scale = _rope(model)
         rope_signature = (inv.tobytes(), rope_scale)
         train_captures, training_metadata = [], []

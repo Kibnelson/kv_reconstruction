@@ -253,8 +253,12 @@ def model_storage_bytes(model):
 
 
 def load_model(model_id=DEFAULT_MODEL, revision=DEFAULT_REVISION, device="auto",
-               local_files_only=False):
-    """Return (BF16 model, tokenizer, provenance); capability check comes first."""
+               local_files_only=False, *, tokenizer_validator=None):
+    """Return (BF16 model, tokenizer, provenance); capability check comes first.
+
+    Optional tokenizer-only validation runs after resolving the pinned tokenizer
+    and before downloading/loading model weights or allocating model tensors.
+    """
     device = select_device(device)
     probe = _bf16_probe(device)
     if not probe["success"]:
@@ -279,6 +283,8 @@ def load_model(model_id=DEFAULT_MODEL, revision=DEFAULT_REVISION, device="auto",
         kwargs["revision"] = resolved
     start = time.perf_counter()
     tokenizer = AutoTokenizer.from_pretrained(str(model_id), **kwargs)
+    if tokenizer_validator is not None:
+        tokenizer_validator(tokenizer)
     model = AutoModelForCausalLM.from_pretrained(str(model_id), config=config,
                 dtype=torch.bfloat16, attn_implementation="sdpa", **kwargs).eval()
     model.to(device)

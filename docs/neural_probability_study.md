@@ -122,11 +122,11 @@ After pulling the code and activating the existing environment, start with the s
 ```bash
 python qwen_kv_gpu_bench.py --neural-probability-study \
   --device cuda --width 512 --steps 200 \
-  --train-tokens 512 --dev-tokens 16 \
+  --train-tokens 512 --dev-tokens 128 \
   --lengths 2048 --cases 1 \
   --tile-tokens 16 --max-pairs 36 \
   --modes per_layer shared \
-  --output runs/qwen_neural_probability_smoke
+  --output runs/qwen_neural_probability_smoke_v2
 ```
 
 Then run the planned fifth experiment:
@@ -134,7 +134,7 @@ Then run the planned fifth experiment:
 ```bash
 python qwen_kv_gpu_bench.py --neural-probability-study \
   --device cuda --width 512 --steps 2000 \
-  --train-tokens 2048 --dev-tokens 64 \
+  --train-tokens 2048 --dev-tokens 128 \
   --lengths 2048 8192 --cases 3 \
   --tile-tokens 64 --max-pairs 72 \
   --modes per_layer shared \
@@ -143,7 +143,25 @@ python qwen_kv_gpu_bench.py --neural-probability-study \
 
 Use a fresh output directory for each run. Actual CPU arithmetic coding and all-layer prerequisite reconstruction may be slow; these commands carry no runtime promise. The smoke configuration checks the protocol and exactness, not whether shorter training achieves the larger experiment's coding quality.
 
+The earlier smoke command used `--dev-tokens 16`, and the earlier full command/default used 64. Both are below the pinned Qwen DEV fixture's 71 fixed template/user tokens. The corrected commands/default use **128 complete prefix tokens**, without removing the question, needle or assistant marker. Before loading weights or capturing TRAIN, the runner now checks every requested TRAIN/DEV/TEST budget with the real pinned tokenizer. Invalid explicit sizes fail with the fixture and argument named; they are not silently enlarged. `--tiny` continues to use synthetic token IDs and supports its small budgets. Reports record the preflight prompt identities and lengths. The earlier failed run's fitted artifacts are retained, but this change does not implement model resumption across runs.
+
+The [fix validation](../benchmark_results/neural_dev_budget_fix_validation_20261019.json) records 47 relevant tests on Transformers 4.57.6, 18 on 5.20.1, 12 packaging/build checks, and a completed standalone tiny-model run with exact caches and two identical continuation steps for both neural modes. These are CPU functional checks; pretrained Qwen CUDA results still require the command above.
+
 With the default shared-budget rule, the smoke command also trains the shared network for 7,000 updates, matching 35 per-layer networks at 200 each. A deliberately shorter shared trial can set `--shared-steps`, but its report must disclose the changed training budget.
+
+For comparison with the earlier 13 conditional candidates, use each run's matched frozen control and show complete state, payload, restoration time and sampling scope separately. The neural run samples complete all-layer tile chains; the conditional run samples layer/tile pairs across its cache. Equal `--max-pairs 72` and `--max-tiles 72` therefore do not identify the same addresses. Their aggregate estimates can be reviewed together, but they are not a paired codec ablation. Neural CPU-reference wall timings also differ from the conditional study's repeated device microbenchmarks.
+
+After a completed run, package its reports for review:
+
+```bash
+python scripts/package_results.py runs/qwen_neural_probability_smoke_v2 \
+  --destination benchmark_results/qwen_neural_probability_smoke_v2_a4500
+git add -f benchmark_results/qwen_neural_probability_smoke_v2_a4500
+git commit -m "Add A4500 neural probability smoke results"
+git push origin main
+```
+
+For the larger run, substitute `qwen_neural_probability` in both paths. Preserve the local `models/` directory; the reports package records its costs and hashes while omitting the large neural weights.
 
 ## Evidence needed before retaining the approach
 

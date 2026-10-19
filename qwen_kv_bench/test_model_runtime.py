@@ -155,6 +155,39 @@ class ModelRuntimeTests(unittest.TestCase):
             self.assertIsNone(identity["resolved_commit"])
             self.assertFalse(identity["local_weights_content_hashed"])
 
+    def test_tokenizer_validation_precedes_weights_and_propagates_failure(self):
+        config = Qwen3Config(hidden_size=16, num_attention_heads=2,
+                             num_key_value_heads=1, head_dim=16, num_hidden_layers=1,
+                             intermediate_size=24, vocab_size=17)
+        model = Qwen3ForCausalLM(config).to(torch.bfloat16).eval()
+        tokenizer = object()
+        with tempfile.TemporaryDirectory() as directory:
+            config.save_pretrained(directory)
+            for fail in (False, True):
+                with self.subTest(invalid_inputs=fail):
+                    stages = []
+                    def validate(actual):
+                        self.assertIs(actual, tokenizer)
+                        stages.append("validate")
+                        if fail:
+                            raise ValueError("invalid DEV token budget")
+                    def load_weights(*args, **kwargs):
+                        stages.append("weights")
+                        return model
+                    with mock.patch("transformers.AutoTokenizer.from_pretrained", return_value=tokenizer), \
+                         mock.patch("transformers.AutoModelForCausalLM.from_pretrained", side_effect=load_weights) as loader:
+                        if fail:
+                            with self.assertRaisesRegex(ValueError, "invalid DEV"):
+                                runtime.load_model(directory, revision=None, device="cpu", local_files_only=True,
+                                                   tokenizer_validator=validate)
+                            loader.assert_not_called()
+                            self.assertEqual(stages, ["validate"])
+                        else:
+                            result = runtime.load_model(directory, revision=None, device="cpu", local_files_only=True,
+                                                        tokenizer_validator=validate)
+                            self.assertIs(result[1], tokenizer)
+                            self.assertEqual(stages, ["validate", "weights"])
+
 
 if __name__ == "__main__":
     unittest.main()

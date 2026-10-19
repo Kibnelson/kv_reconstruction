@@ -1,0 +1,133 @@
+{
+  "bug": "Non-tiny DEV budgets 16/64 cannot preserve the observed 71 fixed Qwen template/user tokens. Failure happened after neural fitting.",
+  "changed_file_identities": {
+    "docs/neural_probability_study.md": {
+      "bytes": 19100,
+      "sha256": "8a0cf1b126f26efb60f63de8f7273b5542aed772d61433c49196c710b42413d3"
+    },
+    "qwen_kv_bench/README.md": {
+      "bytes": 19593,
+      "sha256": "a3361b04c6d05cd3e730305b6801f5fe049ae46da942b174bf8f54d4991bf62a"
+    },
+    "qwen_kv_bench/model_runtime.py": {
+      "bytes": 29204,
+      "sha256": "340e162efffac90ae3909fe28b40506e591beca058ed009a566f82a57b1cc46f"
+    },
+    "qwen_kv_bench/neural_study.py": {
+      "bytes": 29081,
+      "sha256": "83fd918d5e8c378af3aec6363e677e46527baef0a25e3349f390362cac18b65a"
+    },
+    "qwen_kv_bench/test_model_runtime.py": {
+      "bytes": 11033,
+      "sha256": "6d5d5c009227ffcd9a1f4c1f2dc5998cda9817738f418f38399f8329ad36b8c7"
+    },
+    "qwen_kv_bench/test_neural_study.py": {
+      "bytes": 7744,
+      "sha256": "597b53fa4ea3623d978d2a57078baec6dda84a2e6a26df5581f143cfcc09b683"
+    },
+    "qwen_kv_gpu_bench.py": {
+      "bytes": 803820,
+      "sha256": "f35a5c1c86bbdb45cf10ae55c32dd004344a4ddb28d6c980d19268c27670662a"
+    }
+  },
+  "date_utc": "2026-10-19",
+  "fix": [
+    "Non-tiny DEV default and commands now use 128 tokens. Explicit requested sizes stay exact.",
+    "Pinned-tokenizer preflight checks all TRAIN/DEV/TEST budgets before model weight loading, captures and fitting.",
+    "Tiny synthetic inputs keep their small budgets. Standalone runner regenerated."
+  ],
+  "format": "neural_dev_budget_fix_validation_v1",
+  "regression_checks": [
+    "Invalid DEV and TEST sizes stop before weights, KV capture and fit.",
+    "Valid jobs preserve wrapper, question, optional needle and assistant marker.",
+    "Tokenizer callback succeeds before weight load and propagates failures."
+  ],
+  "scope": "CPU regression and random tiny-model functional evidence only. The pinned pretrained Qwen tokenizer/model and CUDA compression performance were not independently rerun here; the corrected A4500 command is required.",
+  "standalone_tiny": {
+    "command": "python qwen_kv_gpu_bench.py --neural-probability-study --tiny --device cpu --steps 2 --width 16 --train-tokens 24 --dev-tokens 9 --lengths 17 --cases 1 --tile-tokens 8 --max-pairs 6 --generation-steps 2 --chunk-tokens 7 --output runs/neural_dev_budget_fix_tiny_20261019",
+    "generation_checks": [
+      {
+        "bitwise_appended_kv": true,
+        "bitwise_logits": true,
+        "complete_prefix_tokens": 9,
+        "finite_logits": true,
+        "mode": "per_layer",
+        "steps": 2,
+        "tokens_equal": true
+      },
+      {
+        "bitwise_appended_kv": true,
+        "bitwise_logits": true,
+        "complete_prefix_tokens": 9,
+        "finite_logits": true,
+        "mode": "shared",
+        "steps": 2,
+        "tokens_equal": true
+      }
+    ],
+    "input_preflight": {
+      "kind": "synthetic",
+      "prompts": [],
+      "status": "passed"
+    },
+    "results_sha256": "6cad475b3cab49632cc2f47126acb47fa6c862b93ba816db76c33752415b4e67",
+    "rows": [
+      {
+        "case": "test_pottery_kiln_diary",
+        "method": "frozen_exponent_control",
+        "status": "ok"
+      },
+      {
+        "case": "test_pottery_kiln_diary",
+        "method": "neural_per_layer",
+        "status": "ok"
+      },
+      {
+        "case": "test_pottery_kiln_diary",
+        "method": "neural_shared",
+        "status": "ok"
+      }
+    ],
+    "source_sha256": "41ca4b8adf1642a7f98913345c475efaa06814adae3ce689055f4063c6747c18",
+    "status": "completed"
+  },
+  "test_runs": [
+    {
+      "errors": 0,
+      "failures": 0,
+      "modules": [
+        "test_neural_study",
+        "test_neural_probability",
+        "test_neural_chain",
+        "test_neural_accounting",
+        "test_model_runtime",
+        "test_fixtures"
+      ],
+      "tests": 47,
+      "torch": "2.11.0+cpu",
+      "transformers": "4.57.6"
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "modules": [
+        "test_model_runtime",
+        "test_neural_study"
+      ],
+      "tests": 18,
+      "torch": "2.14.1+cpu",
+      "transformers": "5.20.1"
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "modules": [
+        "tests/test_standalone_build.py",
+        "tests/test_package_results.py"
+      ],
+      "tests": 12,
+      "torch": "2.11.0+cpu",
+      "transformers": "4.57.6"
+    }
+  ]
+}
