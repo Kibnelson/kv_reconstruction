@@ -42,6 +42,7 @@ def _parser():
     p.add_argument("--revision", default=None)
     p.add_argument("--local-files-only", action="store_true")
     p.add_argument("--tiny", action="store_true", help="No-download random tiny Qwen; functionality only")
+    p.add_argument("--producer-preset", choices=("baseline", "frontier"), default="baseline")
     p.add_argument("--lengths", nargs="+", type=int)
     p.add_argument("--cases", type=int, choices=(1, 2, 3), default=3)
     p.add_argument("--train-tokens", type=int)
@@ -97,6 +98,9 @@ def _capture(model, tokenizer, fixture, tokens, device, args, maximum, inline=No
                          on_tile=inline) as hooks:
         captured = runtime.capture(model, ids, device, args.chunk_tokens)
     records, audit, context = hooks.finalize(captured["matrices"])
+    captured["timings"]["prefill"].update(producer_hooks_included=True,
+        inline_producer_recipes_included=inline is not None,
+        scope="Instrumented model forward includes producer hooks, diagnostic CPU copies and optional inline recipes; no uninstrumented prefill baseline is measured.")
     for record in records:
         record["split"] = fixture["split"]
     captured["input_ids_sha256"] = _digest(ids)
@@ -149,13 +153,20 @@ def _state_file(state, codec, output, known):
     return info
 
 
+def _codec_or_default(codec):
+    if codec is None:
+        from . import producer_codec as codec
+    return codec
+
+
 class _Inline:
     """Bounded verification callback; recipes are built before attention returns."""
-    def __init__(self, specs, models, device):
+    def __init__(self, specs, models, device, codec=None):
         self.specs, self.models, self.device = specs, models, device
+        self.codec = _codec_or_default(codec)
         self.states, self.metrics = {}, {}
     def __call__(self, record, context):
-        from . import producer_codec as codec
+        codec = self.codec
         for spec in self.specs:
             name = spec["name"]
             row = self.metrics.setdefault(name, dict(name=name, status="ok", records_checked=0,
@@ -192,8 +203,8 @@ class _Inline:
             scope="Recipe encoding and exact verification execute inside attention producer callbacks before its forward returns. Hook diagnostics first copy selected features to CPU; preparation stages them back to the selected device. Instrumented prefill includes state preparation, all recipes, synchronization and verification. Packets are discarded; full raw KV remains resident. This is neither zero-copy nor fused encoding, nor the overhead of deploying one recipe.")
 
 
-def _measure(records, captured, spec, models, context, device, args, output, state_files):
-    from . import producer_codec as codec
+def _measure(records, captured, spec, models, context, device, args, output, state_files, codec=None):
+    codec = _codec_or_default(codec)
     state = codec.make_state(spec, models, context, device)
     state_info = _state_file(state, codec, output, state_files)
     count = len(records)
@@ -224,6 +235,8 @@ def _measure(records, captured, spec, models, context, device, args, output, sta
         traces.append(dict(ordinal=index, layer=record["layer"], start=record["start"], tokens=record["tokens"],
             raw_bytes=nraw, serialized_bytes=size, component_bytes=parts,
             encode_seconds=encode["wall_seconds"], decode_seconds=decode["wall_seconds"]))
+        if getattr(args, "producer_preset", "baseline") == "frontier" and hasattr(codec, "describe"):
+            traces[-1]["recipe_diagnostics"] = codec.describe(packet)
         if index in selected:
             samples.append((g.packet_to_cpu(packet), record))
         del packet, pair, prepared
@@ -257,6 +270,12 @@ def _measure(records, captured, spec, models, context, device, args, output, sta
         one_pass_total_wall_seconds=time.perf_counter() - started, record_diagnostics=traces,
         byte_accounting="Actual paired K/V packet fields plus calculated 32-byte cache header and 8*(pair_count+1) index. Complete decoder state charged once under its reported max(serialized,resident) contract. Sampled full-cache estimates scale inner record bytes by total/measured; outer container is not persisted.",
         scope="Producer features observed during actual forward, exported to CPU, then replay encoded on the selected device. Needed-input H2D staging and encode are reported separately when prepare_record is available. Full raw capture remains necessary; no compact attention or serving gain.")
+    full_stored = (estimated if count != total else serialized) + charged
+    effective_bits = 16 * full_stored / full_raw
+    result["effective_bits_per_BF16_word_including_state"] = effective_bits
+    result["target_40_percent"] = dict(target_bits_per_word=9.6, effective_bits_per_word=effective_bits,
+        gap_bits_per_word=effective_bits - 9.6, met=effective_bits <= 9.6,
+        size_is_estimated=count != total, scope="Actual packet/state accounting, extrapolated only where flagged; entropy diagnostics cannot satisfy this target.")
     raw_sample = sum(record["k"].nbytes + record["v"].nbytes for _, record in samples)
     sample_times = []; restore_times = []
     for repeat in range(args.repeats + 1):
@@ -289,9 +308,9 @@ def _measure(records, captured, spec, models, context, device, args, output, sta
     return result
 
 
-def _generation(model, captured, records, specs, models, context, device, args, output, state_files):
-    from . import producer_codec as codec
-    wanted = ("producer_kv_median", "producer_hidden_exponent", "producer_pre_rope_coset")
+def _generation(model, captured, records, specs, models, context, device, args, output, state_files, codec=None):
+    codec = _codec_or_default(codec)
+    wanted = codec.generation_representatives() if hasattr(codec, "generation_representatives") else ("producer_kv_median", "producer_hidden_exponent", "producer_pre_rope_coset")
     results = []
     for name in wanted:
         row = dict(name=name, track="producer_pair", context_tokens=args.dev_tokens,
@@ -300,8 +319,8 @@ def _generation(model, captured, records, specs, models, context, device, args, 
         if args.generation_steps == 0:
             row.update(status="skipped", reason="--generation-steps 0")
             continue
-        spec = next(spec for spec in specs if spec["name"] == name)
         try:
+            spec = next(spec for spec in specs if spec["name"] == name)
             _note("Full DEV continuation: " + name)
             state = codec.make_state(spec, models, context, device)
             _state_file(state, codec, output, state_files)
@@ -335,9 +354,11 @@ def _summary(report):
     cases = []
     lines = ["# Forward producer metadata study", "", f"Status: **{report['status']}**", "",
         "Default callbacks build and verify recipes inside actual attention forward, using diagnostic CPU copies staged back to the selected device. Repeated codec timings separately replay captured features after prefill. All payload/state bytes count; full raw KV remains required. CPU tiny runs establish functionality only. No compact attention, concurrency or latency gain is inferred.", "",
-        "| Split | Case | Method | Status | Savings incl. state | Records | Decode ms/raw MiB |", "|---|---|---|---|---:|---:|---:|"]
+        "| Split | Case | Method | Status | Savings incl. state | Delta vs frozen, pp | Bits/word incl. state | 40% target | Records | Decode ms/raw MiB |", "|---|---|---|---|---:|---:|---:|---|---:|---:|"]
     for case in report["cases"]:
         entries = []
+        frozen = next((r.get("measurement") for r in case["results"] if r["name"] == "producer_frozen_exponent" and r["status"] == "ok"), None)
+        baseline = (frozen.get("estimated_full_savings_including_state_percent") if frozen.get("size_is_estimated") else frozen.get("savings_including_state_percent")) if frozen else None
         for row in case["results"]:
             m = row.get("measurement") or {}
             saving = m.get("estimated_full_savings_including_state_percent") if m.get("size_is_estimated") else m.get("savings_including_state_percent")
@@ -348,10 +369,17 @@ def _summary(report):
                 decoder_state_bytes=m.get("decoder_state_bytes"), component_bytes=m.get("component_bytes"),
                 raw_payload_bytes=m.get("raw_payload_bytes"), input_staging_seconds_total=m.get("input_staging_seconds_total"),
                 encode_seconds_total=m.get("encode_seconds_total"), decode_seconds_total=m.get("decode_seconds_total"),
+                effective_bits_per_BF16_word_including_state=m.get("effective_bits_per_BF16_word_including_state"),
+                gain_vs_frozen_percentage_points=saving - baseline if saving is not None and baseline is not None else None,
+                target_40_percent=m.get("target_40_percent"),
                 producer_encode_including_feature_staging_seconds=m.get("producer_encode_including_feature_staging_seconds")))
             number = "—" if saving is None else f"{saving:.3f}%" + (" estimated" if m.get("size_is_estimated") else " measured")
             decode = "—" if ms is None else f"{ms:.3f}"
-            lines.append(f"| {case['split']} | {case['name']} | {row['name']} | {row['status']} | {number} | {m.get('records_measured', '—')}/{m.get('records_total', '—')} | {decode} |")
+            gain = "—" if saving is None or baseline is None else f"{saving - baseline:+.3f}"
+            bits = m.get("effective_bits_per_BF16_word_including_state")
+            ledger = "—" if bits is None else f"{bits:.4f}"
+            target = "—" if bits is None else "yes (estimated)" if bits <= 9.6 and m.get("size_is_estimated") else "yes" if bits <= 9.6 else "no"
+            lines.append(f"| {case['split']} | {case['name']} | {row['name']} | {row['status']} | {number} | {gain} | {ledger} | {target} | {m.get('records_measured', '—')}/{m.get('records_total', '—')} | {decode} |")
         cases.append(dict(name=case["name"], split=case["split"], tokens=case["tokens"], methods=entries,
             scope="All fixed candidate outcomes; no TEST-selected policy or pooled DEV/TEST ranking"))
     lines += ["", "Continuation checks use complete DEV coverage and compare exact logits, tokens and appended KV. Hook auditing and producer feature copies are included in instrumented prefill capture; that duration is not production overhead for one deployed recipe.", ""]
@@ -401,7 +429,10 @@ def main(argv=None):
     write_json(output / "source_manifest.json", report["source_manifest"])
     save()
     try:
-        from . import producer_codec as codec, producer_models
+        if args.producer_preset == "frontier":
+            from . import frontier_codec as codec, frontier_models as model_api
+        else:
+            from . import producer_codec as codec, producer_models as model_api
         device = runtime.select_device(args.device)
         torch.set_num_threads(args.threads); torch.manual_seed(args.seed); np.random.seed(args.seed)
         if device.type == "cuda":
@@ -422,7 +453,7 @@ def main(argv=None):
             training.append(records)
             metadata.append(dict(name=fixture["name"], split="train", input_ids_sha256=captured["input_ids_sha256"], producer_audit=captured["producer_audit"]))
         _note("Fitting producer predictors from TRAIN only")
-        models = producer_models.fit(training, output / "calibration", rank=args.rank,
+        models = model_api.fit(training, output / "calibration", rank=args.rank,
             training_metadata=metadata, model_identity=identity, seed=args.seed)
         report["calibration"] = {}
         for name, value in models.items():
@@ -436,24 +467,31 @@ def main(argv=None):
                 serialized_bytes=value.state_bytes, metadata=value.metadata)
         del training, records, captured
         _note("Producer DEV: complete coverage for continuation")
-        inline = None if args.skip_inline else _Inline(specs, models, device)
+        inline = None if args.skip_inline else _Inline(specs, models, device, codec)
         captured, records, context = _capture(model, tokenizer, DEV[0], args.dev_tokens, device, args, None, inline)
         del inline
         dev = dict(name=DEV[0]["name"], split="dev", tokens=args.dev_tokens, fixture=DEV[0],
             capture={k: v for k, v in captured.items() if k != "matrices"}, producer_context=_context_info(context), results=[])
         report["cases"].append(dev)
+        def diagnose(case, records):
+            if args.producer_preset == "frontier":
+                from .frontier_diagnostics import analyze
+                started_diagnostics = time.perf_counter()
+                case["frontier_diagnostics"] = analyze(records)
+                case["frontier_diagnostics_cpu_seconds"] = time.perf_counter() - started_diagnostics
+        diagnose(dev, records)
         def measure_case(case, captured, records, context):
             for spec in specs:
                 _note(case["split"].upper() + " producer recipe: " + spec["name"])
                 row = dict(name=spec["name"], track="producer_pair", spec=spec)
                 try:
-                    row.update(status="ok", measurement=_measure(records, captured, spec, models, context, device, args, output, state_files))
+                    row.update(status="ok", measurement=_measure(records, captured, spec, models, context, device, args, output, state_files, codec))
                 except Exception as error:
                     row.update(status="error", error=f"{type(error).__name__}: {error}")
                     _note(row["error"])
                 case["results"].append(row); save()
         measure_case(dev, captured, records, context)
-        report["generation_checks"] = _generation(model, captured, records, specs, models, context, device, args, output, state_files)
+        report["generation_checks"] = _generation(model, captured, records, specs, models, context, device, args, output, state_files, codec)
         del captured, records, context
         frozen = dict(model_identity=identity, source_sha256=report["source_manifest"]["sources_sha256"],
             calibration=report["calibration"], decoder_artifacts=state_files.copy(), candidates=specs,
@@ -466,11 +504,12 @@ def main(argv=None):
                 report["cases"].append(case)
                 try:
                     _note(f"Producer TEST: {fixture['name']}, {length} tokens")
-                    inline = None if args.skip_inline else _Inline(specs, models, device)
+                    inline = None if args.skip_inline else _Inline(specs, models, device, codec)
                     captured, records, context = _capture(model, tokenizer, fixture, length, device, args, args.max_tiles, inline)
                     del inline
                     case["capture"] = {k: v for k, v in captured.items() if k != "matrices"}
                     case["producer_context"] = _context_info(context)
+                    diagnose(case, records)
                     measure_case(case, captured, records, context)
                     case["status"] = "completed"; del captured, records, context
                 except Exception as error:

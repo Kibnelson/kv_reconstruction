@@ -16,6 +16,8 @@ The [forward producer study](docs/producer_forward_study.md) adds **nine matched
 
 The [A4500 producer-hook review](docs/qwen_producer_gpu_review.md) now validates all nine recipes on real Qwen KV. The frozen exponent control wins this sweep with 29.84% mean estimated savings and the lowest observed restore cost. Both upstream K replay paths need zero correction payload on all measured tiles, while hidden-feature predictors lose even before feature/state costs. The review records the evidence, metadata costs and next controlled combinations; no serving speedup or novelty is inferred.
 
+The [40% frontier sweep](docs/frontier_40_study.md) combines cost-trained channel bases, tiny per-head adjustments, verified zero-replay modes, compact indices, and adaptive primary/lower-bit coding in **16 matched candidates**. Run `--producer-study --producer-preset frontier`. Its state-inclusive 9.6-bit ledger separates actual codec results from entropy diagnostics and CPU size controls. The 40% goal remains unconfirmed on pretrained Qwen KV.
+
 ## Clone and install
 
 ```bash

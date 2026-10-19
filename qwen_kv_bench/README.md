@@ -18,6 +18,16 @@ python qwen_kv_gpu_bench.py --producer-study --device cuda \
 
 This mode uses its own parser (`--producer-study --help`). `--max-tiles` counts K/V **pairs**; 72 pairs match 144 separate KV records in the earlier study. TRAIN-only models freeze before TEST. Reports separate inline verification from repeated post-capture timings, and compare their packet bytes and state identities. Three full-DEV continuations are checked; all measured pairs must reconstruct exactly. `--tiny --device cpu` uses random local Qwen weights without a download. No new pretrained-model savings or GPU speed claim follows from the tiny run.
 
+The **frontier preset** adds the next combination study and a 40% reduction target:
+
+```bash
+python qwen_kv_gpu_bench.py --producer-study --producer-preset frontier \
+  --device cuda --lengths 2048 8192 --cases 3 \
+  --tile-tokens 64 --max-tiles 72 --output runs/qwen_frontier_40
+```
+
+Its 16 candidates combine source-specific TRAIN cost bases, optional small head shifts, exact zero-replay/fallback, compact stream indices, and adaptive primary/sign/mantissa coding. Five full-DEV continuations cover the candidate families. The report counts complete state and packet bytes against **9.6 bits per original BF16 value**. CPU entropy/size diagnostics are reported separately and cannot satisfy the target. No pretrained Qwen 40% result is established yet. See [the design, full command and results-push instructions](../docs/frontier_40_study.md).
+
 Cache compatibility update: this revision reads modern `cache.layers[i].keys/values` storage and legacy cache interfaces. It no longer requires `to_legacy_cache()`, which newer Transformers versions removed. Capture metadata records the actual cache class; errors include the cache class and installed Transformers version. Existing installations can use the updated script without downgrading Transformers. Run `--doctor` to record the versions used by your experiment.
 
 ## Install and check the machine
