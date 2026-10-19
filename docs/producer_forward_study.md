@@ -107,16 +107,14 @@ python qwen_kv_gpu_bench.py --producer-study --tiny --device cpu \
 To push reviewable GPU reports and small decoder artifacts after the run:
 
 ```bash
-mkdir -p benchmark_results/qwen_producer_hooks_a4500
-cp runs/qwen_producer_hooks/{results.json,results.csv,summary.md,producer_summary.json,source_manifest.json,frozen_manifest.json} \
-  benchmark_results/qwen_producer_hooks_a4500/
-cp -r runs/qwen_producer_hooks/calibration benchmark_results/qwen_producer_hooks_a4500/
+python scripts/package_results.py runs/qwen_producer_hooks \
+  --destination benchmark_results/qwen_producer_hooks_a4500
 git add benchmark_results/qwen_producer_hooks_a4500
 git commit -m "Add A4500 forward producer hook results"
 git push origin main
 ```
 
-The separate shareable ZIP is beside the run directory. Each output directory must be fresh or empty.
+The helper requires a fresh or empty destination and retains the complete JSON as a verified `results.json.gz`; the original run stays intact. The separate shareable ZIP is beside the run directory. Each output directory must be fresh or empty.
 
 ## What to improve after the measurements
 

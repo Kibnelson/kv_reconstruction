@@ -101,16 +101,34 @@ python qwen_kv_gpu_bench.py --producer-study --producer-preset frontier \
 To push the target results:
 
 ```bash
-mkdir -p benchmark_results/qwen_frontier_40_a4500
-cp runs/qwen_frontier_40/{results.json,results.csv,summary.md,producer_summary.json,source_manifest.json,frozen_manifest.json} \
-  benchmark_results/qwen_frontier_40_a4500/
-cp -r runs/qwen_frontier_40/calibration benchmark_results/qwen_frontier_40_a4500/
+python scripts/package_results.py runs/qwen_frontier_40 \
+  --destination benchmark_results/qwen_frontier_40_a4500
 git add -f benchmark_results/qwen_frontier_40_a4500
 git commit -m "Add A4500 exact KV frontier results"
 git push origin main
 ```
 
 The ZIP also contains verified reports/state and excludes raw activations, raw KV and full model weights.
+
+The packaging destination must be fresh or empty. The helper stores the complete report as `results.json.gz`, verifies lossless decompression by SHA256, and copies the smaller reports and decoder artifacts. The original raw report stays in the run directory. This avoids GitHub's per-file limit; compression changes the report packaging, not any measured KV byte count. Reviewers can open it with `gzip.open(path, 'rt')` or decompress a local copy.
+
+### Repair a rejected oversized-report commit
+
+If `main` is ahead by exactly one unpublished result commit and GitHub rejected `results.json`, replace that file in the commit. Keep the original run directory intact:
+
+```bash
+cd ~/kv_reconstruction
+gzip -c benchmark_results/qwen_frontier_40_a4500/results.json \
+  > benchmark_results/qwen_frontier_40_a4500/results.json.gz && \
+gzip -t benchmark_results/qwen_frontier_40_a4500/results.json.gz && \
+git rm --cached -- benchmark_results/qwen_frontier_40_a4500/results.json && \
+git add -f -- benchmark_results/qwen_frontier_40_a4500/results.json.gz && \
+git commit --amend --no-edit && \
+git pull --rebase origin main && \
+git push origin main
+```
+
+`--cached` removes only the Git entry and keeps the raw working copy. Stage the `.gz` file explicitly during this repair. A separate removal commit would leave the oversized blob in the history being pushed. This repair needs neither a forced push nor a benchmark rerun.
 
 ## How to choose the next step
 

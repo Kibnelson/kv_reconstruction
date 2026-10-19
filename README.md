@@ -18,6 +18,8 @@ The [A4500 producer-hook review](docs/qwen_producer_gpu_review.md) now validates
 
 The [40% frontier sweep](docs/frontier_40_study.md) combines cost-trained channel bases, tiny per-head adjustments, verified zero-replay modes, compact indices, and adaptive primary/lower-bit coding in **16 matched candidates**. Run `--producer-study --producer-preset frontier`. Its state-inclusive 9.6-bit ledger separates actual codec results from entropy diagnostics and CPU size controls. The 40% goal remains unconfirmed on pretrained Qwen KV.
 
+For result commits, use `python scripts/package_results.py RUN --destination benchmark_results/NAME`. It preserves the full report as verified `results.json.gz`, alongside the smaller reports and decoder state. Large frontier reports can exceed GitHub's raw-file limit. The [sharing and repair instructions](docs/frontier_40_study.md#repair-a-rejected-oversized-report-commit) explain how to amend a rejected unpublished commit.
+
 ## Clone and install
 
 ```bash
