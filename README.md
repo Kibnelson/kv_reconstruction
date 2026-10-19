@@ -1,0 +1,109 @@
+# Exact KV reconstruction experiments
+
+Benchmarks for storing a decoder recipe plus exact corrections instead of raw BF16 KV tensors. The default model is **Qwen/Qwen3-4B-Instruct-2507**, pinned to commit `cdbee75f17c01a7cc42f958dc650907174af0554`.
+
+The repository contains the readable implementations, tests, and a generated single-file runner. It compares exponent packing, field/entropy coding, learned dictionaries, fixed controls, temporal predictors, E8/coset residuals, hybrids, and binary residual predictors. `--preset all --grid` exposes **104 CPU reference variants and 23 native tensor variants**. The native packets use their own grouped bitpacking format; original Huffman/Deflate codecs still execute on CPU.
+
+## Clone and install
+
+```bash
+git clone https://github.com/Kibnelson/kv_reconstruction.git
+cd kv_reconstruction
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install the PyTorch build appropriate for your accelerator from the [official selector](https://pytorch.org/get-started/locally/), then install the remaining packages:
+
+```bash
+python -m pip install -r requirements.txt
+python qwen_kv_gpu_bench.py --doctor
+python qwen_kv_gpu_bench.py --self-test
+```
+
+The requirements file pins Transformers 4.57.6 as a reproducible baseline. **An existing Transformers 5 installation does not need to be downgraded:** cache capture, exact restoration, and continued generation are also tested with 5.20.1. Use your working environment directly and run `--doctor` to record its versions. CPU functional checks do not establish GPU performance.
+
+## Run on the NVIDIA NUC
+
+First run a small comparison on the RTX A4500:
+
+```bash
+python qwen_kv_gpu_bench.py --device cuda --preset smoke \
+  --lengths 2048 --cases 1 --output runs/qwen_smoke
+```
+
+Then run the wider comparison:
+
+```bash
+python qwen_kv_gpu_bench.py --device cuda --preset all --grid \
+  --lengths 4096 16384 --cases 3 --measure-io --output runs/qwen_all
+```
+
+The first run downloads the public model weights if they are not already cached. Existing Hugging Face weight caches are reused. Every output directory must be fresh or empty. Share the generated **`runs/qwen_all_results.zip`** to review the results. Reports include errors and unsupported methods as well as successful measurements.
+
+Default comparisons measure 72 evenly spaced records per test cache. **Full-cache size totals are estimates when sampling.** Add `--full-cache` to encode and check every record; Python CPU sweeps can take much longer. Repeated decode, transfer, and buffered I/O timings use a bounded sample even in full-cache mode. The outer cache header/index are calculated byte charges; a complete indexed cache container is not persisted.
+
+```bash
+python qwen_kv_gpu_bench.py --list-methods --preset all --grid
+python qwen_kv_gpu_bench.py --instructions
+```
+
+For a supported Intel GPU use `--device xpu`. Auto selection prefers CUDA, then XPU, and never silently falls back to CPU. Explicit `--device cpu` is available for functional checks. Native E8 and binary predictors currently require float64 operations, whose support varies on XPU devices.
+
+## Get updates
+
+```bash
+cd ~/kv_reconstruction
+git pull --ff-only
+python qwen_kv_gpu_bench.py --device cuda --preset smoke \
+  --lengths 2048 --cases 1 --output runs/qwen_smoke_after_update
+```
+
+This repository is the source for subsequent code changes. The standalone file embeds a source snapshot and can also be copied to another machine without a checkout. For development, run the checked-out modules directly:
+
+```bash
+python -m qwen_kv_bench.runner --doctor
+python -m qwen_kv_bench.runner --device cuda --preset smoke \
+  --lengths 2048 --cases 1 --output runs/source_smoke
+```
+
+After editing source, regenerate the portable file:
+
+```bash
+python scripts/build_standalone.py
+python scripts/build_standalone.py --check
+python qwen_kv_gpu_bench.py --self-test
+```
+
+Commit source changes and the regenerated runner together. Model weights, raw KV, local caches, environments, and run outputs are ignored by git.
+
+## Cache compatibility fix
+
+The original runner assumed `to_legacy_cache()`, which newer Transformers releases removed. The runtime now reads `cache.layers[i].keys` and `.values`, while preserving older cache interfaces. It rejects missing/uninitialized layers, retains explicit head-dimension checks, and records the cache class and dependency versions. The reported error after the first Qwen training capture is reproduced and covered by regression tests. It is separate from Hugging Face cache permission warnings.
+
+Local validation includes full functional suites on Transformers **4.57.6 and 5.20.1**, plus random BF16 Qwen3 chunked prefill and exact cache restoration. A separate test uses explicit `head_dim=128` even though `hidden_size / query_heads` differs, then checks three continued decode steps for identical logits, tokens, and appended KV. No model weights are needed for these synthetic model tests. CUDA/XPU execution must be checked on the target hardware.
+
+## Experimental scope
+
+The protocol fits dictionaries only on three training captures, chooses representative generation checks on a separate development capture, then freezes settings before fresh test captures. It counts complete correction/metadata bytes and decoder state. Equality is checked on BF16 words; generation comparisons also require finite logits.
+
+This is a representation and data-movement benchmark. It does not implement compact-resident attention, a high-concurrency scheduler, or partial-capacity admission. GPU native implementations are eager tensor reference code, not fused production kernels. Buffered I/O may hit the OS page cache. Compression ratios alone do not establish latency, throughput, or serving-capacity improvements. These experiments do not reproduce AQUA-KV, PackKV, or the published RaBitQ ANN system.
+
+See [the detailed benchmark guide](qwen_kv_bench/README.md) and [the method inventory](docs/methods.md).
+
+## Source map
+
+| Directory | Role |
+|---|---|
+| `qwen_kv_bench/` | Model capture, fresh calibration, registry, GPU packets, measurements, reports, tests |
+| `kv_smoke/` | Initial exact BF16 block and coset controls |
+| `kv_research/` | Learned dictionaries and original E8 representations |
+| `kv_stacked/` | Field/Huffman coding and complete-record wrappers |
+| `kv_coset_fields/` | Lower-field, temporal, and conditioned predictor controls |
+| `kv_residual/` | Exact residual coding, learned/E8 combinations |
+| `kv_combinations/` | Hybrid group and tile selection |
+| `kv_binary/` | Binary residual predictors and identity/dense/Hadamard controls |
+| `scripts/` | Reproducible standalone build tooling |
+| `tests/` | Packaging regression checks |
+
+Earlier experiment-driver files are retained as source for review. Some historical drivers expect datasets/checkpoints that are not included; use the current `qwen_kv_bench` entrypoints above for the portable experiment.
