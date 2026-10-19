@@ -28,7 +28,8 @@ def parser():
     p.add_argument("--local-files-only", action="store_true")
     p.add_argument("--preset", choices=("smoke", "main", "all"), default="all")
     p.add_argument("--grid", action="store_true", help="Expand CPU all preset from 68 to 104 parameter/control options")
-    p.add_argument("--native-preset", choices=("main", "all"), default=None)
+    p.add_argument("--native-preset", choices=("main", "all", "insights"), default=None)
+    p.add_argument("--recipe-diagnostics", action="store_true", help="Save matched record/component traces and incremental size analysis; automatic for insights")
     p.add_argument("--skip-native", action="store_true")
     p.add_argument("--methods", nargs="+", help="Optional exact CPU method names from --list-methods")
     p.add_argument("--native-methods", nargs="+", help="Optional exact native method names from --list-methods")
@@ -46,6 +47,7 @@ def parser():
     p.add_argument("--measure-io", action="store_true", help="Also benchmark buffered temporary-file write/fsync/read; reads may hit page cache")
     p.add_argument("--io-mib", type=float, default=32, help="Maximum timing sample encoded+raw bytes per method")
     p.add_argument("--generation-steps", type=int, default=2, help="Full development-prefix reconstruction check for one winner per track; 0 disables")
+    p.add_argument("--generation-methods", nargs="+", help="Explicit selected method names to check on the complete DEV prefix instead of one winner per track")
     p.add_argument("--calibration-samples", type=int, default=1024)
     p.add_argument("--calibration-iterations", type=int, default=8)
     p.add_argument("--seed", type=int, default=71)
@@ -93,14 +95,15 @@ def _source_manifest():
     return {"embedded_payload_sha256": os.environ.get("QWEN_KV_SOURCE_SHA256"), "files": files, "sources_sha256": digest_json(files)}
 
 
-def _capture_fixture(model, tokenizer, fixture, tokens, device, args, prefill_specs=None, max_records=None):
+def _capture_fixture(model, tokenizer, fixture, tokens, device, args, prefill_specs=None, max_records=None, artifacts=None):
     from .fixtures import build_input_ids
     from .model_runtime import capture
     ids = build_input_ids(tokenizer, fixture, tokens)
     observer = None
     if prefill_specs:
         from .prefill_observer import PrefillRecipeObserver
-        observer = PrefillRecipeObserver(prefill_specs, tokens, args.tile_tokens, device, max_records=max_records)
+        states = {s["name"]: _native_state(artifacts, s, device) for s in prefill_specs}
+        observer = PrefillRecipeObserver(prefill_specs, tokens, args.tile_tokens, device, max_records=max_records, states=states)
     result = capture(model, ids, device, args.chunk_tokens, prefill_observer=observer)
     result["input_ids_sha256"] = digest_json(ids)
     result["fixture_name"] = fixture["name"]
@@ -113,6 +116,9 @@ def _capture_metadata(capture):
 
 def _native_state(artifacts, spec, device):
     from .gpu_ops import make_state
+    if spec["method"] == "prefill_dictionary":
+        from .residual_dictionary import make_state as make_residual_state
+        return make_residual_state(artifacts.models[spec["recipe_model"]], device)
     model = artifacts.models.get("learned64") if spec["method"] in ("learned", "learned_e8", "binary") else None
     rotations = None
     if spec["method"] == "binary":
@@ -157,7 +163,8 @@ def _measure(matrices, adapters, native_specs, artifacts, device, args, output, 
         state = None
         try:
             state = _native_state(artifacts, spec, device)
-            row.update(status="ok", measurement=measure_native(matrices, spec, state, device, output, **kwargs))
+            row.update(status="ok", measurement=measure_native(matrices, spec, state, device, output,
+                       record_diagnostics=getattr(args, "recipe_diagnostics", False), **kwargs))
         except Exception as error:
             row.update(status=_status(error), error=f"{type(error).__name__}: {error}")
             note(row["status"] + ": " + row["error"])
@@ -217,13 +224,20 @@ def _generation(model, dev, dev_rows, adapters, native_specs, artifacts, device,
     def score(row):
         m = row["measurement"]
         return m.get("estimated_full_savings_including_state_percent") if m.get("size_is_estimated") else m.get("savings_including_state_percent", -1e30)
+    selections = []
+    explicit = getattr(args, "generation_methods", None)
     for track in ("cpu_reference", "native_packet"):
         candidates = [r for r in dev_rows if r["track"] == track and r["status"] == "ok"]
         if not candidates:
             continue
-        chosen = max(candidates, key=score)
+        if explicit:
+            selections.extend((track, r) for r in candidates if r["name"] in explicit)
+        else:
+            selections.append((track, max(candidates, key=score)))
+    for track, chosen in selections:
         row = dict(name=chosen["name"], track=track, context_tokens=args.dev_tokens,
-                   selection="Highest development estimated/full saving including full state; no test-set tuning")
+                   selection=("Explicit method selected before TEST; complete DEV prefix" if explicit else
+                              "Highest development estimated/full saving including full state; no test-set tuning"))
         state = callback = None
         try:
             note(f"Generation correctness: {row['name']} on complete {args.dev_tokens}-token DEV prefix")
@@ -306,9 +320,15 @@ def main(argv=None):
     if args.native_methods:
         selected = {s["name"]: s for s in native_specs}
         if set(args.native_methods) - set(selected):
-            p.error("Unknown native method; use --native-preset all --list-methods")
+            p.error("Unknown native method; use --native-preset all or insights --list-methods")
         native_specs = [selected[n] for n in args.native_methods]
-    prefill_specs = [s for s in native_specs if s["method"] == "prefill"] if args.prefill_recipes else []
+    from .recipe_sweep import PREFILL_METHODS
+    args.recipe_diagnostics = args.recipe_diagnostics or args.native_preset == "insights"
+    prefill_specs = [s for s in native_specs if s["method"] in PREFILL_METHODS] if args.prefill_recipes else []
+    if args.generation_methods:
+        unknown = set(args.generation_methods) - (set(specs) | {s["name"] for s in native_specs})
+        if unknown:
+            p.error(f"Generation method(s) not selected for measurement: {sorted(unknown)}")
     if args.prefill_recipes and not prefill_specs:
         p.error("--prefill-recipes requires at least one native_prefill_* method and cannot use --skip-native")
     if args.list_methods:
@@ -377,13 +397,17 @@ def main(argv=None):
         artifacts = train_calibration(train, output / "calibration", requirements,
                        seed=args.seed, max_samples_per_key=args.calibration_samples,
                        iterations=args.calibration_iterations, training_metadata=train_meta, model_identity=identity)
+        from .recipe_sweep import train_recipe_artifacts
+        train_recipe_artifacts(artifacts, native_specs, train, output / "calibration", tile_tokens=args.tile_tokens,
+                       seed=args.seed, max_samples_per_key=args.calibration_samples, iterations=args.calibration_iterations,
+                       training_metadata=train_meta, model_identity=identity)
         report["calibration"] = artifacts.metadata
         del train
         _release(device)
         adapters = build_registry(args.preset, artifacts, output, names=list(specs), grid=args.grid, expected_model_identity=identity)
         note("Development capture; choosing one representative generation check per track")
         dev = _capture_fixture(model, tokenizer, DEV[0], args.dev_tokens, device, args,
-                               prefill_specs=prefill_specs, max_records=args.dev_records)
+                               prefill_specs=prefill_specs, max_records=args.dev_records, artifacts=artifacts)
         dev_case = dict(name=DEV[0]["name"], split="dev", tokens=args.dev_tokens, fixture=DEV[0], capture=_capture_metadata(dev),
                         results=list(dev.get("prefill_recipes", {}).get("results", [])))
         report["cases"].append(dev_case)
@@ -391,6 +415,9 @@ def main(argv=None):
             dev_case["results"].append(row)
             save()
         _measure(dev["matrices"], adapters, native_specs, artifacts, device, args, output, args.dev_records, record_dev)
+        if args.recipe_diagnostics:
+            from .recipe_analysis import analyze_case
+            dev_case["recipe_analysis"] = analyze_case(dev_case)
         _generation(model, dev, dev_case["results"], adapters, native_specs, artifacts, device, args, report, save)
         del dev
         _release(device)
@@ -415,7 +442,7 @@ def main(argv=None):
                 try:
                     note(f"TEST capture: {fixture['name']}, {tokens} tokens")
                     captured = _capture_fixture(model, tokenizer, fixture, tokens, device, args,
-                        prefill_specs=prefill_specs, max_records=None if args.full_cache else args.max_records)
+                        prefill_specs=prefill_specs, max_records=None if args.full_cache else args.max_records, artifacts=artifacts)
                     case["capture"] = _capture_metadata(captured)
                     case["results"].extend(captured.get("prefill_recipes", {}).get("results", []))
                     case["status"] = "captured"
@@ -425,6 +452,11 @@ def main(argv=None):
                         save()
                     _measure(captured["matrices"], adapters, native_specs, artifacts, device, args, output,
                              None if args.full_cache else args.max_records, record_test)
+                    if args.recipe_diagnostics:
+                        from .recipe_analysis import analyze_case
+                        case["recipe_analysis"] = analyze_case(case)
+                        write_json(output / "recipe_analysis.json", {c["name"]: c["recipe_analysis"]
+                                   for c in report["cases"] if "recipe_analysis" in c})
                     case["status"] = "completed"
                 except Exception as error:
                     case.update(status=_status(error), error=f"{type(error).__name__}: {error}")

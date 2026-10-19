@@ -6,6 +6,20 @@ import torch
 from qwen_kv_bench import gpu_ops as g
 
 
+def _method_options(method):
+    """Use each family's declared representation contract in shared tests.
+
+    Existing families keep their defaults.  Residual dictionaries are 8D and
+    optimize actual bit width; exponent recipes use the prefill median rather
+    than the magnitude-codec default midpoint predictor.
+    """
+    if method == "prefill_dictionary":
+        return dict(group_size=8, assignment="bitcost")
+    if method == "prefill_exponent":
+        return dict(predictor="median", layout="time", segment_size=256)
+    return {}
+
+
 class NativePacketTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -19,6 +33,24 @@ class NativePacketTests(unittest.TestCase):
         report = g.self_test("cpu")
         self.assertEqual(set(report["methods"]), set(g.NATIVE_METHODS))
         self.assertTrue(all(row["exact"] for row in report["methods"].values()))
+
+    def test_incremental_sweep_names_and_residual_model_identities(self):
+        from qwen_kv_bench.recipe_sweep import insight_options
+        specs = insight_options()
+        self.assertEqual(len(specs), 33)
+        self.assertEqual(len({spec["name"] for spec in specs}), len(specs))
+        exponents = [spec for spec in specs if spec["method"] == "prefill_exponent"]
+        self.assertEqual({(spec["options"]["predictor"], spec["options"]["layout"]) for spec in exponents},
+            {("zero", "channel"), ("fixed127", "channel"), ("fixed127", "time"),
+             ("median", "channel"), ("median", "time"), ("affine", "channel"), ("affine", "time")})
+        dictionaries = [spec for spec in specs if spec["method"] == "prefill_dictionary"]
+        self.assertEqual({spec["recipe_model"] for spec in dictionaries},
+            {f"recipe_residual{count}_{layout}" for count in (16, 64) for layout in ("channel", "time")})
+        for spec in dictionaries:
+            self.assertEqual(spec["recipe_model"],
+                f"recipe_residual{spec['dictionary_size']}_{spec['options']['layout']}")
+            self.assertEqual(spec["options"]["group_size"], 8)
+            self.assertEqual(spec["options"]["assignment"], "bitcost")
 
     def test_group_bitpacking_full_signed_domain_and_fixed_tails(self):
         values = torch.arange(-32767, 32768, dtype=torch.int64)
@@ -37,16 +69,30 @@ class NativePacketTests(unittest.TestCase):
                 state = self.state()
                 for precision in (("bf16", "f32") if method == "binary" else ("bf16",)):
                     packet = g.encode(words, state, method=method, key="test", dimension=64,
-                        transform="hadamard", amplitude_precision=precision)
+                        transform="hadamard", amplitude_precision=precision, **_method_options(method))
                     self.assertTrue(torch.equal(g.decode(packet, state).to(torch.int32), words.to(torch.int32)))
                     self.assertEqual(packet.physical_nbytes, sum(packet.stats["component_bytes"].values()))
                     self.assertGreater(packet.header.numel(), 0)
+                    if method == "prefill_exponent":
+                        self.assertEqual(packet.metadata["state_id"], "no_learned_state")
+                        self.assertTrue({"sign_mantissa", "exponent_primary", "exponent_secondary",
+                            "exponent_rare", "secondary_offsets", "rare_offsets"} <= set(packet.fields))
+                        segments = (words.numel() + 255) // 256
+                        self.assertEqual(packet.fields["secondary_offsets"].numel(), 4 * (segments + 1))
+                        self.assertEqual(packet.fields["rare_offsets"].numel(), 4 * (segments + 1))
+                        self.assertEqual(packet.stats["prefill_recipe"]["external_state_bytes"], 0)
+                    if method == "prefill_dictionary":
+                        self.assertIn("residual_ids", packet.fields)
+                        self.assertEqual(packet.metadata["group_size"], 8)
+                        self.assertEqual(packet.metadata["assignment"], "bitcost")
+                        self.assertEqual(packet.metadata["model_id"], state.state_id)
                 if method == "binary":
                     self.assertEqual(state.physical_nbytes, 32 * 8 * 4 + 64 * 64 * 8)
         empty = torch.empty((0, 5), dtype=torch.uint16)
         for method in g.NATIVE_METHODS:
             state = self.state()
-            self.assertTrue(torch.equal(g.decode(g.encode(empty, state, method, key="test"), state), empty))
+            self.assertTrue(torch.equal(g.decode(g.encode(empty, state, method, key="test",
+                **_method_options(method)), state), empty))
 
     def test_e8_membership_idempotence_and_coordinate_parity_roundtrip(self):
         generator = torch.Generator().manual_seed(319)

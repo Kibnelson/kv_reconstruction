@@ -140,7 +140,6 @@ These use grouped bitpacking, a validated host launch descriptor, and device ten
 | `native_binary_dense_d64_bf16_bitpack` | binary | `{"amplitude_precision": "bf16", "assignment": "radius", "dimension": 64, "transform": "dense"}` |
 | `native_binary_hadamard_d64_f32_bitpack` | binary | `{"amplitude_precision": "f32", "assignment": "radius", "dimension": 64, "transform": "hadamard"}` |
 | `native_binary_hadamard_d64_bf16_bitpack` | binary | `{"amplitude_precision": "bf16", "assignment": "radius", "dimension": 64, "transform": "hadamard"}` |
-
 | `native_prefill_zero_coset` | prefill | `{"correction": "coset", "group_size": 8, "predictor": "zero", "step_log2": 6}` |
 | `native_prefill_zero_residual` | prefill | `{"correction": "residual", "group_size": 8, "predictor": "zero", "step_log2": 6}` |
 | `native_prefill_midpoint_coset` | prefill | `{"correction": "coset", "group_size": 8, "predictor": "midpoint", "step_log2": 6}` |
@@ -150,4 +149,63 @@ These use grouped bitpacking, a validated host launch descriptor, and device ten
 | `native_prefill_e8_coset` | prefill | `{"correction": "coset", "group_size": 8, "predictor": "e8", "step_log2": 6}` |
 | `native_prefill_e8_residual` | prefill | `{"correction": "residual", "group_size": 8, "predictor": "e8", "step_log2": 6}` |
 
-The list is generated from `candidate_specs("all", grid=True)` and `native_options("all")`. The default all preset omits the extra CPU parameter grid; main and smoke select smaller sets.
+The base inventory follows `candidate_specs("all", grid=True)` and
+`native_options("all")`. The default all preset omits the extra CPU parameter
+grid; main and smoke select smaller sets.
+
+## Incremental prefill insight preset
+
+`--native-preset insights` uses `recipe_sweep.insight_options()`: **33 methods**,
+consisting of the 16-method native main set above and these 17 additions. It is
+a targeted extension of main; the existing main/all sets are unchanged. Use
+`--native-preset insights --list-methods` for the exact executable inventory.
+
+| Additional name | Method | Change being tested |
+|---|---|---|
+| `native_prefill_midpoint_time_g8_residual` | `prefill` | Midpoint; errors grouped over time, eight values/group |
+| `native_prefill_midpoint_channel_g64_residual` | `prefill` | Midpoint; errors grouped over channels, 64 values/group |
+| `native_prefill_midpoint_time_g64_residual` | `prefill` | Midpoint; errors grouped over time, 64 values/group |
+| `native_prefill_affine_time_g8_residual` | `prefill` | Affine; errors grouped over time, eight values/group |
+| `native_prefill_affine_channel_g64_residual` | `prefill` | Affine; errors grouped over channels, 64 values/group |
+| `native_prefill_affine_time_g64_residual` | `prefill` | Affine; errors grouped over time, 64 values/group |
+| `native_prefill_exponent_zero_channel_tiered` | `prefill_exponent` | Zero exponent prediction; channel layout control |
+| `native_prefill_exponent_fixed127_channel_tiered` | `prefill_exponent` | Source-independent exponent-bias prediction; channel control |
+| `native_prefill_exponent_fixed127_time_tiered` | `prefill_exponent` | Source-independent exponent-bias prediction; time control |
+| `native_prefill_exponent_median_channel_tiered` | `prefill_exponent` | Tile-derived per-channel median exponent; channel layout |
+| `native_prefill_exponent_median_time_tiered` | `prefill_exponent` | Tile-derived per-channel median exponent; time layout |
+| `native_prefill_exponent_affine_channel_tiered` | `prefill_exponent` | Tile-derived exponent endpoints; channel layout |
+| `native_prefill_exponent_affine_time_tiered` | `prefill_exponent` | Tile-derived exponent endpoints; time layout |
+| `native_prefill_affine_dictionary16_channel_g8_residual` | `prefill_dictionary` | Affine + 16-entry TRAIN residual dictionary; channel layout |
+| `native_prefill_affine_dictionary64_channel_g8_residual` | `prefill_dictionary` | Affine + 64-entry TRAIN residual dictionary; channel layout |
+| `native_prefill_affine_dictionary16_time_g8_residual` | `prefill_dictionary` | Affine + 16-entry TRAIN residual dictionary; time layout |
+| `native_prefill_affine_dictionary64_time_g8_residual` | `prefill_dictionary` | Affine + 64-entry TRAIN residual dictionary; time layout |
+
+Magnitude layout variants preserve their predictor/sign streams and change
+correction grouping only. Their matched baseline is
+`native_prefill_<midpoint|affine>_residual` with channel layout and group size
+eight. Four-bit group widths, correction bits, tails, and headers all count.
+
+Exponent tiers preserve one sign/fraction byte per value. Exact exponent errors
+use 2-bit primary, 3-bit secondary and 9-bit rare streams, with uint32 offsets
+per 256-value segment. Prefill-derived median/affine predictors must beat the
+`fixed127` control after paying for their anchors. Channel/time layout preserves
+the tier histograms and bit totals; header spelling is not an entropy gain.
+
+The new dictionaries are fitted on affine **residuals**, separately for each
+layout, using the same three TRAIN captures only. IDs cost 0.5 or 0.75 bits per
+original value for 16 or 64 entries, followed by exact residual corrections.
+The larger of the full serialized state and physical device tensor state is
+charged once per cache; both are reported. Comparing dictionary capacities
+changes IDs, fitted state and corrections together, rather than isolating one
+coding change.
+
+`--prefill-recipes` observes device KV before CPU export; it retains the full
+raw transformer cache and includes all recipe/verification work in capture
+prefill time. `--recipe-diagnostics` (automatic with insights) records actual
+per-record sizes and timings. `recipe_analysis.json` provides matched increments
+and a stateless **size-only oracle**, charging one mode byte per selected record
+and full outer framing. That oracle is selection headroom, not an implemented
+online selector or a latency gain. Full-cache extrapolations remain labelled
+estimates when sampling. See [prefill_recipes.md](prefill_recipes.md) for commands,
+continuation checks, accounting, and result sharing. No new GPU savings are
+asserted by this inventory.

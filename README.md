@@ -6,6 +6,10 @@ The repository contains the readable implementations, tests, and a generated sin
 
 The new [prefill recipe experiment](docs/prefill_recipes.md) derives per-channel centers, affine trends or an E8 template from each KV tile, with exact coset and matched residual controls. `--prefill-recipes` also constructs and verifies recipes directly from device KV between prefill chunks. Full raw model KV remains resident.
 
+`--native-preset insights` adds a controlled **33-candidate sweep**: predictor-aligned layouts, prefill exponent recipes with exact escape streams, and dictionaries trained on the errors left by affine prediction. It records matched per-record increments, complete dictionary costs, and a size-only bound on adaptive selection. See the [GPU commands and interpretation guide](docs/prefill_recipes.md#matched-incremental-experiments). Prefill metadata is the design thread; any research contribution depends on measured improvements over the controls and prior work.
+
+The [local full-record diagnostic](benchmark_results/recipe_insights_review_20261019/REVIEW.md) checks all 33 candidates on a reused small-model cache. Prefill exponent metadata saves 28.03% including all metadata, versus 22.77% for its fixed-bias control. These CPU size results guide the next Qwen GPU run; they do not establish GPU performance or serving gains.
+
 ## Clone and install
 
 ```bash

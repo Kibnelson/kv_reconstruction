@@ -138,6 +138,58 @@ def _number(value, digits=3):
     return f"{value:.{digits}f}" if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else "—"
 
 
+def _recipe_summary(cases):
+    """Small case-local view; complete matched comparisons stay in JSON."""
+    available = [case for case in cases if isinstance(case.get("recipe_analysis"), dict)]
+    if not available:
+        return []
+    lines = ["### Incremental representation diagnostics", "",
+             "Each row shows the largest observed savings change within one comparison family for that case. This is a diagnostic summary of measured candidates, not a policy selected for deployment. All matched comparisons, record components, state charges, and normalized timings remain in results.json. Positive changes mean fewer stored bytes; DEV and TEST remain separate.", "",
+             "| Case | Comparison | Baseline | Candidate | Saving change, percentage points | Record wins / ties / losses |",
+             "|---|---|---|---|---:|---:|"]
+    labels = {"matched_layout": "Correction layout", "matched_group_size": "Correction group size",
+              "matched_predictor": "Predictor", "matched_correction": "Correction coding",
+              "matched_assignment": "Dictionary assignment", "add_frozen_residual_dictionary": "Add residual dictionary",
+              "exponent_baseline_comparison": "Exponent baseline; multiple mechanisms"}
+    for case in available:
+        analysis = case["recipe_analysis"]
+        groups = {}
+        for comparison in analysis.get("comparisons", []):
+            gain = comparison.get("full_cache_savings_gain_percentage_points")
+            if not isinstance(gain, (int, float)) or isinstance(gain, bool) or not math.isfinite(gain):
+                continue
+            family = comparison.get("comparison", "unspecified")
+            current = groups.get(family)
+            if current is None or gain > current["full_cache_savings_gain_percentage_points"]:
+                groups[family] = comparison
+        for family, comparison in sorted(groups.items()):
+            gain = _number(comparison["full_cache_savings_gain_percentage_points"])
+            gain += " estimated" if comparison.get("full_cache_size_is_estimated") else " measured"
+            counts = " / ".join(str(comparison.get(key, "—")) for key in ("record_wins", "record_ties", "record_losses"))
+            lines.append("| " + " | ".join(map(_cell, (case.get("name", ""), labels.get(family, family),
+                comparison.get("baseline", ""), comparison.get("candidate", ""), gain, counts))) + " |")
+        oracle = analysis.get("stateless_size_oracle") or {}
+        lines.append("")
+        if oracle.get("status") == "ok":
+            estimated = "estimated" if oracle.get("full_cache_size_is_estimated") else "measured"
+            lines.append(f"Case `{_cell(case.get('name', ''))}`: the **SIZE-ONLY stateless portfolio oracle** gives "
+                f"{_number(oracle.get('full_cache_savings_percent'))}% {estimated} savings, "
+                f"{_number(oracle.get('full_cache_savings_gain_over_best_fixed_percentage_points'))} percentage points "
+                "beyond its best fixed stateless candidate. This is an upper bound over separately encoded packet choices "
+                "under the declared byte contract, including one mode byte per record and calculated outer framing. "
+                "It is not an implemented selector, repacked cache, or latency result; stateful candidates are excluded.")
+        else:
+            lines.append(f"Case `{_cell(case.get('name', ''))}`: stateless size oracle unavailable: "
+                         + _cell(oracle.get("reason", "not reported")) + ".")
+        if analysis.get("skipped_comparisons"):
+            lines.append(f"{len(analysis['skipped_comparisons'])} unmatched comparison(s) were skipped; reasons remain in results.json.")
+        lines.append("")
+    lines += ["Record wins compare actual inner packet bytes and do not assign cache-wide state to individual records. "
+              "Exponent-tier channel/time layouts preserve the same correction histogram and tier bit totals; "
+              "small header differences do not establish an entropy improvement. Cross-family comparisons change multiple mechanisms.", ""]
+    return lines
+
+
 def _summary(report):
     statuses = Counter(result.get("status", "unknown") for case in report.get("cases", []) for result in case.get("results", []))
     environment = report.get("environment") or {}
@@ -147,7 +199,7 @@ def _summary(report):
              f"Selected device: `{_cell(environment.get('selected_device', 'not reported'))}`. Method results: "
              + ", ".join(f"{count} {_cell(status)}" for status, count in sorted(statuses.items())) + ".", "",
              "CPU-reference codecs retain their original CPU wire formats. Copying their encoded bytes to a device is staging; it does not create a GPU decoder. Tensor-native packets are separately named formats. `tensor_native_accelerator` reports actual device tensor execution; `tensor_native_cpu_functional` is a CPU functionality check and supplies no GPU performance evidence.", "",
-             "Full decoder state is included in the reported savings. Native packet state charges actual distinct tensor storage; original CPU formats charge their serialized decoder files. Those are different accounting contracts. Sampled full-cache estimates are labeled explicitly; they are not full-cache measurements. Development and TEST are separated below and never averaged.", ""]
+             "Full decoder state is included in the reported savings. Native packet rows identify whether their state charge covers actual tensor storage or complete serialized recipe state; original CPU formats charge their serialized decoder files. Those accounting contracts differ and are recorded explicitly. Sampled full-cache estimates are labeled; they are not full-cache measurements. Development and TEST are separated below and never averaged.", ""]
     splits = ["dev", "test"] + sorted({_split(case) for case in report.get("cases", [])} - {"dev", "test"})
     for split in splits:
         cases = [case for case in report.get("cases", []) if _split(case) == split]
@@ -178,10 +230,11 @@ def _summary(report):
         if skipped:
             lines += ["", *[f"- {_cell(case.get('name', ''))}: {_cell(case['error'])}" for case in skipped]]
         lines.append("")
+        lines += _recipe_summary(cases)
     checks = report.get("generation_checks") or []
     if any((case.get("capture") or {}).get("prefill_recipes", {}).get("enabled") for case in report.get("cases", [])):
         lines += ["## Recipes constructed during prefill", "",
-                  "Rows with track `prefill_observer` build recipes directly from returned device KV between prefill chunks, before CPU export. Their encode/decode totals cover selected records and one exact verification; they are not repeated restore latency samples. Post-capture `native_packet` rows measure the same method separately. Instrumented capture prefill time includes all observer work. Full raw KV remains resident and compact packets are discarded after verification; this does not establish reduced model-cache memory or compact attention.", ""]
+                  "Rows with track `prefill_observer` build recipes directly from returned device KV between prefill chunks, before CPU export. Their encode/decode totals cover selected records and one exact verification; they are not repeated restore latency samples. Post-capture `native_packet` rows measure the same method separately. Tile-only recipes need no external dictionary; residual-dictionary recipes also require the frozen TRAIN decoder state, charged once under the row's stated contract. Instrumented capture prefill time includes all observer work. Full raw KV remains resident and compact packets are discarded after verification; this does not establish reduced model-cache memory or compact attention.", ""]
     lines += ["## Model continuation checks", ""]
     if not checks:
         lines += ["No model continuation check is recorded yet. This report does not infer one from cache roundtrips.", ""]
@@ -215,7 +268,8 @@ def checkpoint(outputdir, report):
     return paths
 
 
-_MODEL_NAME = re.compile(r"(?:learned(?:16|64|256)|fixed64|lower(?:16|64)(?:_conditional)?)\.bin$")
+_MODEL_NAME = re.compile(r"(?:learned(?:16|64|256)|fixed64|lower(?:16|64)(?:_conditional)?|recipe_residual(?:16|64)_(?:channel|time)_t[0-9]+)\.bin$")
+_RESIDUAL_MODEL_NAME = re.compile(r"recipe_residual(?:16|64)_(?:channel|time)_t[0-9]+\.bin$")
 _TRANSFORM_NAME = re.compile(r"(?:identity|dense|hadamard)_d(?:8|32|64)_[0-9a-f]{16}\.bin$")
 
 
@@ -250,7 +304,8 @@ def bundle(outputdir):
             omitted.append({"file": relative, "reason": "state size/hash/format check failed"}); return
         files[relative] = dict(path=resolved, bytes=size, sha256=digest)
     for name, limit in (("results.json", 32 << 20), ("results.csv", 16 << 20), ("summary.md", 4 << 20),
-                        ("README.md", 1 << 20), ("source_manifest.json", 1 << 20), ("frozen_manifest.json", 4 << 20)):
+                        ("README.md", 1 << 20), ("source_manifest.json", 1 << 20), ("frozen_manifest.json", 4 << 20),
+                        ("recipe_analysis.json", 16 << 20)):
         if (output / name).is_file():
             include(name, limit)
     report_path = output / "results.json"
@@ -271,8 +326,16 @@ def bundle(outputdir):
             filename = entry.get("file", "")
             if Path(filename).name != filename or not _MODEL_NAME.fullmatch(filename):
                 omitted.append({"file": str(filename), "reason": "model name is not an approved calibration artifact"}); continue
+            residual = bool(_RESIDUAL_MODEL_NAME.fullmatch(filename))
+            if residual != (entry.get("family") == "prefill_residual"):
+                omitted.append({"file": str(filename), "reason": "calibration model filename and family disagree"}); continue
+            if residual and (not isinstance(entry.get("sha256"), str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"])
+                    or not isinstance(entry.get("serialized_bytes"), int)
+                    or isinstance(entry["serialized_bytes"], bool) or entry["serialized_bytes"] < 4):
+                omitted.append({"file": str(filename), "reason": "residual model hash or size missing or invalid"}); continue
             include(path.parent / filename, 8 << 20, entry.get("sha256"), entry.get("serialized_bytes"),
-                    b"LFLW" if entry.get("family") == "lower" else b"LKVW")
+                    b"RDKV" if residual else b"LFLW" if entry.get("family") == "lower" else b"LKVW")
     for case in report.get("cases", []):
         for row in case.get("results", []):
             info = (row.get("measurement") or {}).get("decoder_state_info") or {}

@@ -121,6 +121,98 @@ class ReportingTests(unittest.TestCase):
                 manifest = json.loads(zipped.read("bundle_manifest.json"))
                 self.assertTrue(any(row["file"] == "source_manifest.json" for row in manifest["omitted"]))
 
+    def test_incremental_summary_is_case_local_and_oracle_is_not_execution(self):
+        report = self.report()
+        case = report["cases"][1]
+        def comparison(candidate, gain, family="matched_layout"):
+            return dict(baseline="baseline", candidate=candidate, comparison=family,
+                full_cache_savings_gain_percentage_points=gain, full_cache_size_is_estimated=True,
+                record_wins=3, record_ties=1, record_losses=2)
+        case["recipe_analysis"] = dict(format="qwen_recipe_analysis_v1",
+            comparisons=[comparison("less-effective", .25), comparison("temporal", 1.5),
+                comparison("residual-dictionary", -.75, "add_frozen_residual_dictionary")],
+            skipped_comparisons=[dict(reason="mismatched records")],
+            stateless_size_oracle=dict(status="ok", full_cache_savings_percent=31.25,
+                full_cache_savings_gain_over_best_fixed_percentage_points=.5, full_cache_size_is_estimated=True))
+        case["capture"] = dict(prefill_recipes=dict(enabled=True))
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint(directory, report)
+            text = (Path(directory) / "summary.md").read_text()
+            dev, test = text.split("## TEST — frozen comparison", 1)
+            self.assertNotIn("Incremental representation diagnostics", dev)
+            self.assertIn("Incremental representation diagnostics", test)
+            self.assertIn("1.500 estimated", test)
+            self.assertIn("-0.750 estimated", test)
+            self.assertNotIn("less-effective", text)
+            self.assertIn("3 / 1 / 2", test)
+            self.assertIn("SIZE-ONLY stateless portfolio oracle", text)
+            self.assertIn("upper bound", text)
+            self.assertIn("not an implemented selector", text)
+            self.assertIn("1 unmatched comparison(s)", text)
+            self.assertIn("frozen TRAIN decoder state", text)
+            self.assertIn("same correction histogram", text)
+            self.assertIn("31.250% estimated", text)
+            self.assertIn("0.500 percentage points", text)
+
+    def test_incremental_summary_reports_unavailable_oracle(self):
+        report = self.report()
+        report["cases"][1]["recipe_analysis"] = dict(comparisons=[],
+            stateless_size_oracle=dict(status="unavailable", reason="record identities differ"))
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint(directory, report)
+            text = (Path(directory) / "summary.md").read_text()
+            self.assertIn("stateless size oracle unavailable: record identities differ", text)
+
+    def test_bundle_verified_residual_model_and_recipe_analysis(self):
+        from qwen_kv_bench import residual_dictionary as residual
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "run"; output.mkdir()
+            calibration = output / "calibration"
+            rng = np.random.default_rng(81)
+            caches = [{f"layer_00_{kind}": rng.integers(0, 65536, size=(8, 8), dtype=np.uint16)
+                       for kind in ("K", "V")} for _ in range(3)]
+            model = residual.train(caches, calibration, tile_tokens=8, layout="time", n_centroids=16,
+                iterations=1, max_samples_per_key=24, model_identity="test-source")
+            path = Path(model.path)
+            write_json(calibration / "calibration_manifest.json", dict(format="qwen_kv_calibration_v1",
+                calibration_namespace="qwen_kv_bench", models={path.stem: dict(file=path.name,
+                    family="prefill_residual", serialized_bytes=model.state_bytes, sha256=model.model_id)}))
+            checkpoint(output, self.report())
+            write_json(output / "recipe_analysis.json", {"format": "qwen_recipe_analysis_v1"})
+            archive = bundle(output)
+            with zipfile.ZipFile(archive) as zipped:
+                self.assertEqual(zipped.read("calibration/" + path.name), path.read_bytes())
+                self.assertIn("recipe_analysis.json", zipped.namelist())
+                manifest = json.loads(zipped.read("bundle_manifest.json"))
+                entry = next(row for row in manifest["files"] if row["file"] == "calibration/" + path.name)
+                self.assertEqual(entry["sha256"], model.model_id)
+                self.assertEqual(entry["bytes"], model.state_bytes)
+
+    def test_bundle_rejects_unverified_or_misnamed_residual_state(self):
+        cases = [
+            ("recipe_residual16_channel_t8.bin", "prefill_residual", b"LKVWbad", "valid", "state size/hash/format check failed"),
+            ("recipe_residual16_channel_t8.bin", "magnitude", b"RDKVvalid", "valid", "filename and family disagree"),
+            ("learned16.bin", "prefill_residual", b"RDKVvalid", "valid", "filename and family disagree"),
+            ("recipe_residual16_channel_t8.bin", "prefill_residual", b"RDKVvalid", "missing", "hash or size missing or invalid"),
+            ("recipe_residual16_channel_t8.bin", "prefill_residual", b"RDKVvalid", "wrong", "state size/hash/format check failed"),
+            ("recipe_residual4_channel_t8.bin", "prefill_residual", b"RDKVvalid", "valid", "not an approved calibration artifact"),
+        ]
+        for filename, family, data, verification, reason in cases:
+            with self.subTest(filename=filename, family=family, verification=verification), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "run"; output.mkdir()
+                calibration = output / "calibration"; calibration.mkdir()
+                (calibration / filename).write_bytes(data)
+                entry = dict(file=filename, family=family, serialized_bytes=len(data))
+                if verification != "missing":
+                    entry["sha256"] = hashlib.sha256(data).hexdigest() if verification == "valid" else "0" * 64
+                write_json(calibration / "calibration_manifest.json", dict(format="qwen_kv_calibration_v1",
+                    calibration_namespace="qwen_kv_bench", models={"candidate": entry}))
+                checkpoint(output, self.report())
+                with zipfile.ZipFile(bundle(output)) as zipped:
+                    self.assertNotIn("calibration/" + filename, zipped.namelist())
+                    manifest = json.loads(zipped.read("bundle_manifest.json"))
+                    self.assertTrue(any(reason in row["reason"] for row in manifest["omitted"]))
+
 
 if __name__ == "__main__":
     unittest.main()

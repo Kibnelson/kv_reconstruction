@@ -13,6 +13,40 @@ from qwen_kv_bench import runner
 
 
 class RunnerTests(unittest.TestCase):
+    def test_insights_and_explicit_generation_selection(self):
+        from qwen_kv_bench.gpu_ops import native_options
+        specs = native_options("insights")
+        self.assertEqual(len(specs), 33)
+        self.assertEqual(len({s["name"] for s in specs}), len(specs))
+        args = runner.parser().parse_args(["--native-preset", "insights", "--generation-methods", specs[-1]["name"]])
+        self.assertEqual(args.generation_methods, [specs[-1]["name"]])
+
+    def test_unknown_generation_method_stops_before_download(self):
+        from qwen_kv_bench import model_runtime
+        with mock.patch.object(model_runtime, "load_model") as load, contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as result:
+                runner.main(["--preset", "smoke", "--generation-methods", "missing_recipe"])
+        self.assertEqual(result.exception.code, 2)
+        load.assert_not_called()
+
+    def test_explicit_generation_checks_every_requested_method(self):
+        report = {"generation_checks": [], "warnings": []}
+        args = SimpleNamespace(generation_steps=1, dev_tokens=16, tile_tokens=16,
+                               generation_methods=["low", "high"])
+        measured = dict(all_tokens_equal=True, all_logits_bitwise_equal=True,
+                        all_appended_KV_bitwise_equal=True, per_step=[{"logits_finite": True}])
+        rows = [dict(name=name, track="cpu_reference", status="ok",
+                     measurement={"savings_including_state_percent": value})
+                for name, value in (("low", 1), ("high", 20), ("unselected", 30))]
+        with mock.patch.object(runner, "_capacity", return_value={"can_attempt": True}), \
+             mock.patch.object(runner, "_reference_callback", return_value=lambda: []), \
+             mock.patch.object(runner, "_release"), \
+             mock.patch("qwen_kv_bench.model_runtime.generation_check", return_value=measured):
+            runner._generation(None, {"matrices": [], "first_token": 1}, rows,
+                               {r["name"]: object() for r in rows}, [], None, "cpu", args, report, lambda: None)
+        self.assertEqual([r["name"] for r in report["generation_checks"]], ["low", "high"])
+        self.assertTrue(all(r["status"] == "ok" for r in report["generation_checks"]))
+
     def test_missing_torch_stops_before_self_test_discovery(self):
         original = importlib.util.find_spec
         stderr = io.StringIO()

@@ -19,7 +19,8 @@ from typing import Any
 import torch
 
 
-NATIVE_METHODS = ("raw", "exponent", "learned", "e8_symbol", "learned_e8", "binary", "prefill")
+NATIVE_METHODS = ("raw", "exponent", "learned", "e8_symbol", "learned_e8", "binary", "prefill",
+                  "prefill_exponent", "prefill_dictionary")
 CPU_ENTROPY_ONLY = ("huffman", "deflate", "rice", "original_entropy_formats")
 
 
@@ -243,11 +244,15 @@ class Packet:
                 "device_header_d2h_on_each_decode": False,
                 "host_descriptor_guard_cost_in_decode": True},
             allocator_accounting="caller must measure memory_allocated delta/peak separately")
-        if self.metadata["method"] == "prefill":
+        if self.metadata["method"] in ("prefill", "prefill_dictionary"):
             component = result["component_bytes"]
             correction_names = ("prefill_correction", "prefill_correction_widths")
+            description = self.metadata["descriptions"]["prefill_correction"]
+            count = description["count"]
+            groups = (count + description["group_size"] - 1) // description["group_size"]
             result["prefill_recipe"] = dict(
                 predictor=self.metadata["predictor"], correction=self.metadata["correction"],
+                layout=self.metadata.get("layout", "channel"),
                 prediction_scope=self.metadata["prediction_scope"], external_state_bytes=0,
                 predictor_payload_bytes=sum(value for name, value in component.items()
                     if name not in ("header", "original_signs", *correction_names)),
@@ -255,7 +260,25 @@ class Packet:
                 correction_width_bytes=component["prefill_correction_widths"],
                 original_sign_bytes=component["original_signs"],
                 header_bytes=component["header"],
+                correction_symbol_count=count,
+                correction_group_size=description["group_size"],
+                correction_groups=groups,
+                correction_data_bits=description["nbits"],
+                correction_width_bits=groups * 4,
+                correction_data_padding_bits=8 * component["prefill_correction"] - description["nbits"],
+                correction_width_padding_bits=8 * component["prefill_correction_widths"] - groups * 4,
+                correction_bits_per_symbol=(description["nbits"] / count if count else 0.0),
+                diagnostics_source="host packet description and tensor sizes; no device-to-host value reads",
                 symbol_domain="BF16 magnitude bit patterns modulo 32768")
+            if self.metadata["method"] == "prefill_dictionary":
+                ids = component["residual_ids"]
+                result["prefill_recipe"]["predictor_payload_bytes"] -= ids
+                result["prefill_recipe"].update(residual_dictionary_id_bytes=ids,
+                    external_state_bytes="charged once by measurement", n_centroids=self.metadata["n_centroids"],
+                    layout=self.metadata["layout"])
+        elif self.metadata["method"] == "prefill_exponent":
+            from .exponent_recipe import describe
+            result["prefill_recipe"] = describe(self)
         return result
 
 
@@ -336,8 +359,11 @@ def packet_to_cpu(packet, pin_memory=False):
 
 def native_options(preset="main"):
     """Names intentionally distinguish these formats from CPU entropy formats."""
+    if preset == "insights":
+        from .recipe_sweep import insight_options
+        return insight_options()
     if preset not in ("main", "all"):
-        raise ValueError("native preset must be main or all")
+        raise ValueError("native preset must be main, all, or insights")
     methods = [dict(name="native_raw_words", method="raw", options={}),
         dict(name="native_exponent_group_bitpack", method="exponent", options={}),
         dict(name="native_learned_residual_bitpack", method="learned", options={"assignment": "radius"}),
@@ -355,6 +381,21 @@ def native_options(preset="main"):
             methods.append(dict(name=f"native_prefill_{predictor}_{correction}", method="prefill",
                 options=dict(predictor=predictor, correction=correction, group_size=8, step_log2=6)))
     return methods
+
+
+def insight_layout_options():
+    """Matched incremental layout/width experiments; defaults stay unchanged.
+
+    ``channel`` packs neighboring channels within each token (the existing
+    format). ``time`` packs consecutive token rows within each channel.  The
+    latter is only a permutation: predictor bytes and original sign order do
+    not change.  Both variants remain independently decodable tile records.
+    """
+    return [dict(name=f"native_prefill_{predictor}_{layout}_g{size}_residual",
+        method="prefill", options=dict(predictor=predictor, correction="residual",
+            layout=layout, group_size=size, step_log2=6))
+        for predictor in ("midpoint", "affine")
+        for layout, size in (("time", 8), ("channel", 64), ("time", 64))]
 
 
 def _finish(fields, meta, device):
@@ -510,7 +551,7 @@ def _prefill_coset(magnitude, prediction, residual, fields, descriptions, group_
 
 def encode(words, state=None, method="raw", key="global", group_size=64, assignment="radius",
            dimension=64, transform="identity", seed=104729, amplitude_precision="bf16", step_log2=10,
-           predictor="midpoint", correction="coset"):
+           predictor="midpoint", correction="coset", layout="channel", segment_size=256):
     """Encode GPU uint16 words without copying record values to CPU.
 
     Data-dependent bitstream allocation uses tensor indexing and can synchronize
@@ -521,8 +562,16 @@ def encode(words, state=None, method="raw", key="global", group_size=64, assignm
         raise ValueError("expected torch.uint16 [tokens,channels] BF16 words")
     if method not in NATIVE_METHODS:
         raise NotImplementedError("no native decoder for CPU entropy formats")
+    if method == "prefill_exponent":
+        from .exponent_recipe import encode as encode_exponents
+        return encode_exponents(words, predictor=predictor, layout=layout, segment_size=segment_size, key=key)
+    if method == "prefill_dictionary":
+        from .residual_dictionary import encode as encode_dictionary
+        return encode_dictionary(words, state, key=key, layout=layout, group_size=group_size, assignment=assignment)
     if group_size < 1 or assignment not in ("radius", "l1") or amplitude_precision not in ("f32", "bf16"):
         raise ValueError("unsupported native parameters")
+    if layout not in ("channel", "time") or (method != "prefill" and layout != "channel"):
+        raise ValueError("unsupported native correction layout")
     if method == "prefill" and (predictor not in ("zero", "midpoint", "affine", "e8")
             or correction not in ("coset", "residual")):
         raise ValueError("unsupported prefill predictor or correction")
@@ -547,9 +596,16 @@ def encode(words, state=None, method="raw", key="global", group_size=64, assignm
             prediction_scope="same tile across token rows; BF16 magnitude symbols",
             circular_symbol_bits=15, prefill_e8_minimum_group_channels=64,
             prefill_e8_tail_padding="repeat final real midpoint")
+        # Absence means the original row-major channel layout.  Retain the
+        # exact legacy header/fields for default calls and existing wire data.
+        if layout != "channel":
+            meta["layout"] = layout
         magnitude = (flat & 32767).reshape(words.shape)
         fields["original_signs"], _ = _pack_fixed(flat >> 15, 1)
         prediction = _prefill_prediction(magnitude, fields, descriptions, predictor, group_size, step_log2)
+        if layout == "time":
+            magnitude = magnitude.T.contiguous()
+            prediction = prediction.T.contiguous()
         residual = ((magnitude - prediction + 16384) & 32767) - 16384
         if correction == "coset":
             _prefill_coset(magnitude, prediction, residual, fields, descriptions, group_size)
@@ -635,6 +691,12 @@ def decode(packet, state=None):
     state = state or NativeState()
     validate_packet(packet, check_header=not packet._header_verified)
     meta, fields = packet.metadata, packet.fields
+    if meta["method"] == "prefill_exponent":
+        from .exponent_recipe import decode as decode_exponents
+        return decode_exponents(packet)
+    if meta["method"] == "prefill_dictionary":
+        from .residual_dictionary import decode as decode_dictionary
+        return decode_dictionary(packet, state)
     if meta["method"] != "prefill" and state.state_id != meta["state_id"]:
         raise ValueError("native state identity mismatch")
     method = meta["method"]
@@ -642,7 +704,13 @@ def decode(packet, state=None):
     if method == "raw":
         return fields["raw"].view(torch.uint16).reshape(meta["shape"]).clone()
     if method == "prefill":
-        prediction = _restore_prefill_prediction(meta, fields).reshape(-1)
+        layout = meta.get("layout", "channel")
+        if layout not in ("channel", "time"):
+            raise ValueError("unsupported native correction layout")
+        prediction = _restore_prefill_prediction(meta, fields)
+        if layout == "time":
+            prediction = prediction.T.contiguous()
+        prediction = prediction.reshape(-1)
         encoded = _restore(fields, meta["descriptions"], "prefill_correction")
         if meta["correction"] == "coset":
             widths = _restore_widths(fields, meta["descriptions"], "prefill_correction").to(torch.int64).repeat_interleave(meta["group_size"])[:count]
@@ -652,6 +720,9 @@ def decode(packet, state=None):
             magnitude = (prediction + delta) & 32767
         else:
             magnitude = (prediction + encoded) & 32767
+        if layout == "time":
+            tokens, channels = meta["shape"]
+            magnitude = magnitude.reshape(channels, tokens).T.contiguous().reshape(-1)
         signs = _unpack_fixed(fields["original_signs"], count, 1)
         return (magnitude | (signs << 15)).to(torch.uint16).reshape(meta["shape"])
     if method == "exponent":
@@ -709,7 +780,10 @@ def self_test(device="cpu"):
     state = make_state(books, device=device)
     results = {}
     for method in NATIVE_METHODS:
-        packet = encode(words, state, method=method, key="self_test", transform="dense", dimension=32)
+        options = dict(group_size=8, assignment="bitcost") if method == "prefill_dictionary" else {}
+        if method == "prefill_exponent":
+            options = dict(predictor="median")
+        packet = encode(words, state, method=method, key="self_test", transform="dense", dimension=32, **options)
         restored = decode(packet, state)
         exact = bool(torch.all(words.to(torch.int32) == restored.to(torch.int32)).item())
         if not exact:

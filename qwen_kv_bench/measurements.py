@@ -270,11 +270,13 @@ def measure_reference(matrices,adapter,device,outputdir,repeats=3,io_bytes_limit
 
 
 def measure_native(matrices,native_spec,state,device,outputdir,repeats=3,io_bytes_limit=32<<20,
-                   tile_tokens=16,max_records=None,layer_indices=None,measure_io=False):
+                   tile_tokens=16,max_records=None,layer_indices=None,measure_io=False,record_diagnostics=False):
     """Measure separately named gpu_ops tensor packets, one tile at a time.
 
     CPU executes the same tensor functions for functional checking only. State
     physical tensor bytes are charged once after lazy rotations are created.
+    Residual dictionaries conservatively charge the larger of their complete
+    serialized artifact and resident tensor storage.
     """
     from . import gpu_ops
     if repeats<1 or io_bytes_limit<0: raise ValueError('invalid repeats or byte limit')
@@ -287,7 +289,7 @@ def measure_native(matrices,native_spec,state,device,outputdir,repeats=3,io_byte
     components=Counter();payload=raw=0;encode_times=[];decode_times=[];input_times=[];encode_events=[];decode_events=[]
     samples=[];sample_bytes=0;baseline=d.memory_start();all_start=time.perf_counter()
     runtime_diagnostics={};entropy_backend=None;preloaded_rotation_ids=dict(state.rotation_ids)
-    prefill_recipe_totals=Counter();prefill_recipe_description={}
+    prefill_recipe_totals=Counter();prefill_recipe_description={};prefill_recipe_weighted=Counter();record_rows=[]
     for index,layer,kind,start,words,want_sample in records():
         source=torch.from_numpy(words)
         tensor,input_elapsed,_=d.timed(lambda:source.to(device=d.device,copy=True))
@@ -303,7 +305,11 @@ def measure_native(matrices,native_spec,state,device,outputdir,repeats=3,io_byte
         stats=packet.stats
         if 'prefill_recipe' in stats:
             for key,value in stats['prefill_recipe'].items():
-                if isinstance(value,(int,float)):
+                if isinstance(value,(int,float)) and (key.endswith('_fraction') or key.endswith('_per_symbol')):
+                    prefill_recipe_weighted[key]+=value*words.size
+                elif key in ('n_centroids','group_size','correction_group_size','segment_size'):
+                    prefill_recipe_description[key]=value
+                elif isinstance(value,(int,float)):
                     prefill_recipe_totals[key]+=value
                 else:
                     prefill_recipe_description[key]=value
@@ -312,14 +318,19 @@ def measure_native(matrices,native_spec,state,device,outputdir,repeats=3,io_byte
         parts=stats['component_bytes']
         if sum(parts.values())!=stats['serialized_bytes']: raise AssertionError('native packet accounting differs')
         payload+=stats['serialized_bytes'];raw+=words.nbytes;components.update(parts)
+        if record_diagnostics:
+            record_rows.append(dict(ordinal=index,layer=layer,kind=kind,start=start,tokens=words.shape[0],
+                raw_bytes=words.nbytes,serialized_bytes=stats['serialized_bytes'],component_bytes=dict(parts),
+                encode_seconds=encode_times[-1],decode_seconds=decode_times[-1]))
         if want_sample and sample_bytes+stats['serialized_bytes']+words.nbytes<=io_bytes_limit:
             cpu_packet=gpu_ops.packet_to_cpu(packet)
             samples.append((cpu_packet,words.copy()))
             sample_bytes+=stats['serialized_bytes']+words.nbytes
         del packet,restored,tensor
     memory=d.memory_end(baseline)
+    from .recipe_sweep import state_charge,state_info
     result=dict(name=name,execution='tensor_native_accelerator' if d.accelerated else 'tensor_native_cpu_functional',
-        **meta,**_sizes(meta,payload,raw,state.physical_nbytes,components),roundtrip_exact=True,exact_verified=True,
+        **meta,**_sizes(meta,payload,raw,state_charge(state),components),roundtrip_exact=True,exact_verified=True,
         records_checked=meta['records_measured'],original_cpu_format=False,
         input_staging_seconds_total=sum(input_times),encode_seconds_total=sum(encode_times),decode_seconds_total=sum(decode_times),
         one_pass_total_wall_seconds=time.perf_counter()-all_start,memory=memory,
@@ -334,8 +345,13 @@ def measure_native(matrices,native_spec,state,device,outputdir,repeats=3,io_byte
         device_event_elapsed=dict(encode_seconds_total=sum(encode_events) if encode_events else None,
                                   decode_seconds_total=sum(decode_events) if decode_events else None),
         scope='Separately named tensor packet format, not a GPU implementation of the CPU entropy wire formats. Record input CPU→device staging, device encode and device decode are separately synchronized. Full cache is not retained on accelerator. Packet JSON headers and all physical tensor payload bytes are measured; specified 32-byte cache framing and offset costs are added arithmetically, with no complete outer container persisted. Prefetched validated host launch descriptors and CPU descriptor guards are included in native execution; authoritative JSON header parsing/validation occurs during explicit packet transfer/restore. CPU runs establish functionality only. No attention, concurrency, or admission benefit is measured.')
+    if getattr(state,'residual_dictionary_serialized_bytes',0):
+        result['decoder_state_info']=state_info(state)
+    if record_diagnostics:
+        result['record_diagnostics']=record_rows
     if prefill_recipe_description:
         result['prefill_recipe']=dict(prefill_recipe_description,**prefill_recipe_totals)
+        result['prefill_recipe'].update({key:value/(raw//2) if raw else 0. for key,value in prefill_recipe_weighted.items()})
     if samples:
         # Sample packet transfer happens outside isolated decode timing.
         sample_times=[];sample_events=[];restore_times=[]

@@ -1,120 +1,169 @@
 # Prefill-derived KV reconstruction recipes
 
-The experiment asks whether information collected while KV is available during
-prefill can make a smaller exact reconstruction record than our existing
-exponent or learned-dictionary representations. It does not assume a recipe
-can regenerate arbitrary KV without storing the missing information.
+The experiment asks whether metadata collected while KV is available during
+prefill can reduce the **complete exact reconstruction record**. Every bit that
+the predictor cannot recover still has to be represented. Metadata alone is
+not a novelty claim; the contribution must be demonstrated by the mechanism,
+matched byte savings, bounded reconstruction work, and comparison with prior art.
 
-## What is new
+## Reconstruction contract
 
-Each record is a token tile of one layer's K or V, shaped `[tokens, channels]`.
-The encoder builds a predictor from that tile, stores its complete description,
-and adds exact correction information. No hidden states or other records are
-needed by the decoder. There is no fitted dictionary for these methods.
+A record contains one layer's K or V tile, shaped `[tokens, channels]`. Every
+decoder input is either in that record or in explicitly identified, charged
+frozen decoder state. The decoder does not rerun transformer layers or depend
+on other KV records. Original BF16 words are recovered exactly, including signs,
+signed zero, infinities, and NaN payloads; the predictors are not lossy KV caches.
 
-| Predictor | Information collected from this tile | Stored predictor state |
+Most recipes predict **15-bit BF16 magnitude bit patterns as integers**. These
+symbols are not floating-point absolute values. Original signs are stored
+separately. The exponent-only recipes instead preserve the sign and seven
+fraction bits as one unchanged byte and encode the eight exponent bits.
+
+| Recipe | Information collected from this tile | Reconstruction |
 |---|---|---|
-| `zero` | None; matched control | None |
-| `midpoint` | Per-channel minimum and maximum over the tile's token rows | Their integer midpoint, two bytes per channel |
-| `affine` | First and last token's magnitude symbols | Two channel vectors; deterministic integer interpolation recreates the intermediate predictions |
-| `e8` | Per-channel midpoints | Minima per 64 channels and genuine E8 coordinates for midpoint offsets; one reconstructed channel template is reused over token rows |
+| Zero control | None | Exact errors from zero |
+| Midpoint | Minimum and maximum per channel across token rows | Stored integer midpoint plus exact corrections |
+| Affine | First and last token's magnitude symbols per channel | Integer endpoint interpolation plus exact corrections |
+| E8 template | Per-channel magnitude midpoints | Stored E8 description recreates one channel template, then exact corrections recover every token |
+| Exponent median | Median exponent per channel | Stored one-byte anchor plus exact exponent errors |
+| Exponent affine | First and last exponent per channel | Stored endpoint bytes plus exact exponent errors |
+| Affine + residual dictionary | Affine endpoints from this tile; dictionary fitted on TRAIN only | Affine prediction + dictionary residual pattern + final exact correction |
 
-All arithmetic targets **integer BF16 magnitude bit patterns**, not absolute
-floating-point KV magnitudes. Signs are stored exactly. Affine interpolation
-uses floor division in both encoder and decoder. E8 uses a fixed step of 64
-symbols, eight-dimensional vectors, deterministic nearest-point tie handling,
-and repeat-last padding for a channel tail. E8 in this experiment describes a
-channel template; the older `native_e8_symbol_bitpack` describes every token.
+Affine interpolation uses the same floor division at encode and decode. E8
+describes a channel template, rather than every token as in the older
+`native_e8_symbol_bitpack` baseline. The dictionary is an additional source of
+prediction, with its full state cost included, rather than a replacement for
+the tile's prefill-derived metadata.
 
-## Cosets and a matched control
+## Matched incremental experiments
 
-For original magnitude symbol `x` and prediction `p`, define the circular error
+`--native-preset insights` contains **33 native methods**: the 16-method main
+set, six layout/group-size variants, seven exponent-tier variants, and four
+affine-residual dictionaries. Existing `main` and `all` sets stay unchanged.
 
-`d = ((x - p + 16384) mod 32768) - 16384`.
+1. **Layout and group size.** Midpoint and affine corrections are grouped
+   across neighboring channels (`channel`) or across token rows (`time`), with
+   eight or 64 values per width group. The predictor and original sign bits stay
+   the same. Smaller groups can reduce correction widths but cost more width
+   metadata; actual packet accounting measures the net result.
+2. **Exponent prediction and tier coding.** Every exponent error is ZigZag
+   coded into a two-bit primary stream. Escapes use a three-bit secondary
+   stream and, when needed, a nine-bit rare stream. Per-256-value segment
+   offsets locate the compact streams. The sign/fraction byte, anchors, tiers,
+   padding, offsets, and packet header all count. `fixed127` predicts the BF16
+   exponent bias without looking at the tile; it is the useful matched control
+   for prefill-derived median/affine prediction. `zero` is another control.
+   Channel/time permutations preserve the tier counts and stream bit totals;
+   a header spelling difference is not an entropy improvement.
+3. **Residual-trained dictionaries.** Separate 16- and 64-entry dictionaries
+   are fitted on errors **after affine prediction**, using only the three TRAIN
+   captures. Channel/time layouts have separately fitted state. IDs cost
+   **0.5 or 0.75 bits per value**, respectively, before headers and state.
+   Assignment minimizes the final eight-value group's encoded width, with an
+   L1 tie-break; fitting uses heuristic median updates. A dictionary succeeds
+   only when correction savings exceed IDs and full state costs on held-out KV.
 
-For each eight-symbol correction group, let `b` be the bit width of its largest
-ZigZag-encoded error. Store `b` in four bits and `r = x mod 2**b` in `b` bits per
-symbol. The decoder picks the representative near `p`, on the 15-bit circle.
-Width zero means the prediction is exact; width 15 carries the complete
-magnitude symbol. Negative half-modulus ties are defined explicitly. Every
-original BF16 word is recovered, including zeros, infinities and NaN payloads.
+For magnitude symbol `x` and prediction `p`, the circular error is
+`d = ((x - p + 16384) mod 32768) - 16384`. Original coset variants store
+`x mod 2**b`; matched residual variants store ZigZag errors using the same
+per-group width `b`. The correction bit counts are identical. Cosets provide
+an exact reconstruction rule; they do not add savings to the matched residual
+stream. The new layout/dictionary experiments use residuals as the control.
 
-Each predictor is tested twice:
+## Execution and accounting
 
-- `native_prefill_<predictor>_coset` stores these modular residues.
-- `native_prefill_<predictor>_residual` stores circular ZigZag errors with the
-  **same predictor, group size and width selection**.
+`--prefill-recipes` runs a synchronous observer between model prefill chunks.
+It builds selected recipes directly from complete device KV tiles, decodes
+them on that device, and checks every original word before CPU export. A tile
+crossing a chunk boundary is handled when its last row becomes available.
 
-These matched correction streams have identical bit counts. Cosets are a way
-to use a predictor for reconstruction, not an additional source of entropy
-savings. The experiment tests predictor quality and total metadata cost.
-Small total packet-size differences between paired methods can be due to JSON
-header spelling. New methods force their predictor representation, even when
-it expands the record; there is no hidden raw fallback or TEST-based choice.
+The `prefill_observer` report is separate from `native_packet`, which measures
+post-capture encoding, repeated reconstruction, and packet transfer. Observer
+prefill duration includes all enabled recipes, their verification decodes,
+layout copies, synchronization, and model work. It is **not the overhead of
+deploying a single recipe**. The observer discards packets after checking them;
+the transformer still retains its full raw KV cache. No compact attention,
+capacity, concurrency, TTFT, or TPOT benefit is established by this experiment.
 
-## Execution during prefill
+All real packet fields count. The specified 32-byte cache header and
+`8*(record_count+1)` offset table are added arithmetically; a complete outer
+container is not persisted/reopened. Full decoder state is charged once per
+cache. Residual dictionaries conservatively charge the larger of the complete
+serialized artifact and actual distinct device tensor storage, and report both.
+Other native methods report their physical tensor-state contract. Sampling
+produces labelled full-cache estimates, rather than full-cache measurements.
 
-`--prefill-recipes` enables a synchronous observer after each model prefill
-chunk. It reads selected complete KV tiles still on the selected device,
-constructs a recipe there, decodes it there and verifies original word equality.
-A tile spanning two prefill chunks is encoded when its final row is available.
-The source KV does not pass through CPU before this observer encodes it.
+`--recipe-diagnostics` records each selected packet's identity, actual
+component bytes, and encode/decode times. It is automatic for `insights`.
+`recipe_analysis.json` compares only matched standard native records within one
+case; DEV and TEST, observer and post-capture, and CPU and GPU formats are not
+pooled. It reports state-aware increments, K/V breakdowns, and normalized timing.
 
-The report separates two tracks:
-
-- `prefill_observer`: direct device KV encoding between prefill chunks, with
-  one verification decode per selected record. Capture prefill timing includes
-  observer work, layout copies, synchronization and exactness guards.
-- `native_packet`: the usual post-capture encode, repeated decode and packet
-  transfer measurements. This track still exports the full source cache to CPU
-  and stages selected raw tiles back to the device for the experiment.
-
-The observer discards each recipe after verification. **The transformer still
-keeps its complete raw KV cache.** This does not yet reduce the model's memory
-requirement, fuse encoding into attention, implement compact attention, or
-demonstrate concurrency, admission or TTFT/TPOT improvement.
-
-All actual predictor fields, signs, corrections, width nibbles, padding and
-JSON packet headers count toward stored bytes. The existing outer cache header
-and offset table are charged arithmetically. Full-cache sizes remain estimates
-when record sampling is enabled. `prefill_recipe` in the post-capture JSON rows
-breaks down predictor, correction, width, sign and header costs. External
-decoder state is zero for these self-contained recipes.
+Its **stateless size-only oracle** chooses the smallest already encoded packet
+per record, then charges one mode byte per record and the full outer framing.
+It excludes stateful candidates, rejects mismatched records, and shows gains
+against the best fixed stateless method. This measures selection headroom. It
+does not implement an online selector, repackage payloads, measure its encoding
+cost, or establish a latency benefit.
 
 ## Run on the A4500
 
-From the updated repository, with the existing virtual environment active:
+From the checkout with its CUDA virtual environment active:
 
 ```bash
 git pull --ff-only
 python qwen_kv_gpu_bench.py --self-test
-for tile in 16 64; do
-  python qwen_kv_gpu_bench.py --device cuda --preset smoke \
-    --methods raw exponent_huffman_lower_deflate learned_entropy_l1 \
-    --prefill-recipes --tile-tokens "$tile" \
-    --lengths 2048 --cases 1 --max-records 144 \
-    --output "runs/qwen_prefill_t${tile}"
-done
+python qwen_kv_gpu_bench.py --native-preset insights --list-methods
+
+python qwen_kv_gpu_bench.py --device cuda --preset smoke \
+  --methods raw exponent_huffman_lower_deflate \
+  --native-preset insights --prefill-recipes --tile-tokens 64 \
+  --lengths 2048 8192 --cases 3 --max-records 144 \
+  --dev-tokens 512 --generation-steps 2 \
+  --generation-methods \
+    native_prefill_exponent_median_time_tiered \
+    native_prefill_affine_dictionary16_channel_g8_residual \
+    native_prefill_affine_time_g8_residual \
+  --output runs/qwen_insights_t64
 ```
 
-The native smoke set now includes the eight new variants plus the eight older
-native baselines. After checking this run, increase lengths to `2048 8192` and
-cases to `3`, using fresh output directories. Comparing tile sizes tests the
-tradeoff between amortizing template metadata and prediction error over longer
-token spans. `--measure-io` remains optional buffered I/O, not a physical SSD
-bandwidth proof. Nothing in the new methods adds a GPU decoder for the old
-CPU Huffman/Deflate wire formats.
+This uses three held-out synthetic fixtures at each length and explicitly
+requests full 512-token DEV-prefix continuation checks for the three named
+recipes. Those checks compare logits, tokens, and appended KV for two steps;
+they do not validate every unmeasured TEST record or demonstrate task quality.
+A skipped/failed check remains visible. Repeating with `--tile-tokens 16` and a
+fresh output directory tests metadata amortization. `--full-cache` checks all
+records and can take substantially longer. `--measure-io` remains an optional
+buffered I/O diagnostic, not a physical SSD bandwidth measurement.
 
-## Local validation
+After a completed run, push the curated reports for review:
 
-Tests exercise independent NumPy predictor/remainder oracles, all 65,536 BF16
-patterns for all eight variants, wraparound, half-modulus ties, empty/singleton
-tiles, channel tails, actual packet byte accounting, and packet restoration.
-A small randomly initialized BF16 Qwen model checks the observer and two
-continuation steps for every new method. These tests establish functionality,
-not pretrained Qwen-4B GPU performance. CUDA tests skip explicitly without GPU.
+```bash
+bash <<'BASH'
+set -e
+source_dir="runs/qwen_insights_t64"
+dest="benchmark_results/qwen_insights_a4500_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$dest"
+for file in results.json results.csv summary.md frozen_manifest.json source_manifest.json recipe_analysis.json; do
+  cp "$source_dir/$file" "$dest/"
+done
+git add -- "$dest"
+git commit --only -m "Add A4500 prefill recipe insight results" -- "$dest"
+git push origin main
+BASH
+```
 
-`scripts/bench_prefill_sample.py` additionally evaluates an existing uint16 NPZ
-capture without downloading a checkpoint. Its reports label reused-sample
-diagnostics explicitly; they must not be reported as a fresh held-out result
-or an inline/GPU measurement.
+Keep the complete local run directory and its adjacent results ZIP as well:
+they include the actual fitted dictionary artifacts needed to replay decoding.
+The curated Git reports contain measurements and provenance, not model weights
+or raw KV. New Qwen GPU savings and timing require this target run; synthetic
+CPU checks and reused-capture diagnostics are labelled separately.
+
+## Validation
+
+Tests cover independent NumPy predictors/group-width oracles, all 65,536 BF16
+patterns, wraparound and half-modulus ties, tails and singleton tiles, packet
+roundtrips, TRAIN-only state provenance, actual byte accounting, matched record
+identities, selector/framing costs, and full-state-once arithmetic. CUDA tests
+skip explicitly without hardware. These establish implementation correctness;
+they are not pretrained Qwen GPU performance results.

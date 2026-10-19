@@ -14,13 +14,14 @@ import numpy as np
 from . import gpu_ops as g
 from .measurements import _Device, _sizes
 from .model_runtime import _pairs, cache_geometry
+from .recipe_sweep import PREFILL_METHODS, state_charge, state_info
 
 
 class PrefillRecipeObserver:
-    def __init__(self, specs, total_tokens, tile_tokens, device, max_records=72):
+    def __init__(self, specs, total_tokens, tile_tokens, device, max_records=72, states=None):
         if total_tokens < 1 or tile_tokens < 1 or (max_records is not None and max_records < 1):
             raise ValueError("positive token/tile/record limits required")
-        if not specs or any(s["method"] != "prefill" for s in specs):
+        if not specs or any(s["method"] not in PREFILL_METHODS for s in specs):
             raise ValueError("prefill observer requires prefill recipe specifications")
         if len({s["name"] for s in specs}) != len(specs):
             raise ValueError("duplicate prefill recipe names")
@@ -31,6 +32,15 @@ class PrefillRecipeObserver:
         if self.device.accelerated and self.device.device.index is None:
             self.device.device = self.device.torch.device(self.device.kind, self.device.api.current_device())
         self.state = g.make_state({}, device=self.device.device)
+        # Alternatives may share the same frozen model.  Charge that entire
+        # model once per alternative cache, never once per observed packet.
+        supplied_states = dict(states or {})
+        if set(supplied_states) - set(s["name"] for s in specs):
+            raise ValueError("prefill state names must match recipe specifications")
+        if any(s["method"] == "prefill_dictionary" and
+                supplied_states.get(s["name"]) is None for s in specs):
+            raise ValueError("prefill dictionary recipes require per-spec decoder state")
+        self.states = {s["name"]: supplied_states.get(s["name"]) or self.state for s in specs}
         self.meta = None
         self.pending = []
         self.end = 0
@@ -79,10 +89,11 @@ class PrefillRecipeObserver:
                 if row["status"] != "ok":
                     continue
                 try:
+                    state = self.states[spec["name"]]
                     packet, encode_seconds, encode_event = self.device.timed(lambda:
-                        g.encode(words, self.state, method="prefill", key=f"layer_{layer:02d}_{'KV'[kind_index]}",
+                        g.encode(words, state, method=spec["method"], key=f"layer_{layer:02d}_{'KV'[kind_index]}",
                                  **spec.get("options", {})))
-                    restored, decode_seconds, decode_event = self.device.timed(lambda: g.decode(packet, self.state))
+                    restored, decode_seconds, decode_event = self.device.timed(lambda: g.decode(packet, state))
                     if not self.device.torch.equal(restored.to(self.device.torch.int32), words.to(self.device.torch.int32)):
                         raise AssertionError("live prefill KV reconstruction differs from original words")
                     stats = packet.stats
@@ -121,11 +132,13 @@ class PrefillRecipeObserver:
             elif not complete or value["checked"] != self.meta["records_measured"]:
                 row.update(status="error", error="Incomplete prefill recipe observation")
             else:
+                state = self.states[spec["name"]]
                 row["measurement"] = dict(**self.meta,
-                    **_sizes(self.meta, value["payload"], value["raw"], 0, value["components"]),
+                    **_sizes(self.meta, value["payload"], value["raw"], state_charge(state), value["components"]),
                     execution="prefill_observer_accelerator" if self.device.accelerated else "prefill_observer_cpu_functional",
                     device=str(self.device.device), roundtrip_exact=True, exact_verified=True,
-                    records_checked=value["checked"], decoder_state_info={"accounting": "No external dictionary or activations required"},
+                    records_checked=value["checked"], decoder_state_info=state_info(state),
+                    native_state_physical_bytes=state.physical_nbytes,
                     encode_seconds_total=value["encode"], decode_seconds_total=value["decode"],
                     device_event_elapsed=dict(encode_seconds_total=value["encode_event"] if self.device.accelerated else None,
                                               decode_seconds_total=value["decode_event"] if self.device.accelerated else None),

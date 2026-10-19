@@ -22,7 +22,7 @@ class PrefillObserverTests(unittest.TestCase):
 
     def cache(self, end):
         return tuple(tuple(torch.from_numpy(w[:end].copy()).view(torch.bfloat16)
-                           .reshape(1, end, 1, 17).permute(0, 2, 1, 3).contiguous()
+                           .reshape(1, end, 1, w.shape[1]).permute(0, 2, 1, 3).contiguous()
                            for w in pair) for pair in self.matrices)
 
     def test_live_sample_matches_postcapture_exact_records_and_bytes(self):
@@ -76,6 +76,74 @@ class PrefillObserverTests(unittest.TestCase):
         row = observer.report()["results"][0]
         self.assertEqual(row["status"], "failed_correctness")
         self.assertNotIn("measurement", row)
+
+    def test_exponent_and_shared_dictionary_state_are_charged_once(self):
+        from qwen_kv_bench import exponent_recipe, residual_dictionary
+        from qwen_kv_bench.recipe_sweep import state_charge
+        rng = np.random.default_rng(533)
+        self.matrices = [tuple(rng.integers(0, 65536, (19, 24), dtype=np.uint16)
+            for _ in range(2)) for _ in range(2)]
+        exponent_spec = next(s for s in exponent_recipe.options()
+            if s["options"]["predictor"] == "median" and s["options"]["layout"] == "time")
+        dictionary_specs = [dict(name="dictionary_" + assignment, method="prefill_dictionary",
+            options=dict(layout="time", group_size=8, assignment=assignment))
+            for assignment in ("bitcost", "l1")]
+        specs = [exponent_spec, *dictionary_specs]
+        train_caches = [tuple(tuple(((w.astype(np.uint32) + i * 17) & 65535).astype(np.uint16)
+            for w in pair) for pair in self.matrices) for i in range(3)]
+        with tempfile.TemporaryDirectory() as directory:
+            model = residual_dictionary.train(train_caches, directory, tile_tokens=7,
+                layout="time", n_centroids=4, max_samples_per_key=32, iterations=1,
+                model_identity={"name": "observer-functional-test", "config": {"num_hidden_layers": 2}})
+            state = residual_dictionary.make_state(model)
+            states = {s["name"]: state for s in dictionary_specs}
+            observer = PrefillRecipeObserver(specs, 19, 7, "cpu", max_records=8, states=states)
+            self.assertIs(observer.states[dictionary_specs[0]["name"]],
+                observer.states[dictionary_specs[1]["name"]])
+            with mock.patch.object(g, "encode", wraps=g.encode) as calls:
+                observer(self.cache(11), 0, 11, 19)
+                observer(self.cache(19), 11, 19, 19)
+            seen = {call.kwargs["method"] for call in calls.call_args_list}
+            self.assertEqual(seen, {"prefill_exponent", "prefill_dictionary"})
+            for call in calls.call_args_list:
+                if call.kwargs["method"] == "prefill_dictionary":
+                    self.assertIs(call.args[1], state)
+            report = observer.report()
+            self.assertTrue(report["complete"])
+            for spec, row in zip(specs, report["results"]):
+                self.assertEqual(row["status"], "ok", row.get("error"))
+                measurement = row["measurement"]
+                self.assertEqual(measurement["records_checked"], 8)
+                expected_state = states.get(spec["name"], observer.state)
+                charge = state_charge(expected_state)
+                self.assertEqual(measurement["decoder_state_bytes"], charge)
+                self.assertAlmostEqual(measurement["savings_including_state_percent"],
+                    100 * (1 - (measurement["serialized_bytes"] + charge) / measurement["raw_payload_bytes"]))
+                info = measurement["decoder_state_info"]
+                self.assertEqual(info["charged_bytes"], charge)
+                self.assertEqual(info["physical_tensor_bytes"], expected_state.physical_nbytes)
+                self.assertEqual(measurement["native_state_physical_bytes"], expected_state.physical_nbytes)
+                if spec["method"] == "prefill_dictionary":
+                    self.assertEqual(info["serialized_bytes"], model.state_bytes)
+                    self.assertEqual(info["state_id"], model.model_id)
+                    self.assertEqual(info["model_config"], model.config)
+                    self.assertEqual(charge, max(model.state_bytes, state.physical_nbytes))
+                    self.assertGreater(charge, 0)
+                else:
+                    self.assertEqual(charge, 0)
+                expected = measure_native(self.matrices, spec, expected_state, "cpu", directory,
+                    repeats=1, tile_tokens=7, max_records=8, io_bytes_limit=0)
+                for key in ("serialized_bytes", "component_bytes", "decoder_state_bytes",
+                        "estimated_full_savings_including_state_percent"):
+                    self.assertEqual(measurement[key], expected[key], (spec["name"], key))
+            json.dumps(report)
+
+    def test_dictionary_state_required_and_unknown_state_names_rejected(self):
+        spec = dict(name="dictionary", method="prefill_dictionary", options={})
+        with self.assertRaisesRegex(ValueError, "per-spec decoder state"):
+            PrefillRecipeObserver([spec], 19, 7, "cpu")
+        with self.assertRaisesRegex(ValueError, "state names"):
+            PrefillRecipeObserver(self.specs[:1], 19, 7, "cpu", states={"unknown": g.make_state()})
 
     def test_tiny_qwen_live_recipes_and_every_variant_continuation(self):
         from transformers import Qwen3Config, Qwen3ForCausalLM

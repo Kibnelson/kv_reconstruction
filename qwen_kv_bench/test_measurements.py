@@ -36,6 +36,22 @@ class WrappedAdapter(RawAdapter):
         return self.parent.decode(blob[4:],layer,kind)
 
 class MeasurementTests(unittest.TestCase):
+    def test_recipe_configuration_is_constant_and_counts_are_aggregated(self):
+        import torch
+        from qwen_kv_bench import gpu_ops
+        with tempfile.TemporaryDirectory() as directory:
+            words=np.full((17,16),16001,dtype=np.uint16)
+            spec=dict(name='affine',method='prefill',options=dict(predictor='affine',correction='residual',group_size=8))
+            result=measure_native([(words,words.copy())],spec,gpu_ops.make_state(),'cpu',directory,
+                                  tile_tokens=8,io_bytes_limit=0,record_diagnostics=True)
+            recipe=result['prefill_recipe']
+            self.assertEqual(result['records_checked'],6)
+            self.assertEqual(recipe['correction_group_size'],8)
+            self.assertEqual(recipe['correction_symbol_count'],2*words.size)
+            self.assertEqual(recipe['correction_groups'],2*words.size//8)
+            self.assertEqual(recipe['correction_payload_bytes'],result['component_bytes']['prefill_correction'])
+            self.assertEqual(recipe['correction_bits_per_symbol'],0)
+
     def setUp(self):
         rng=np.random.default_rng(92)
         self.matrices=[tuple(rng.integers(0,65536,(25,14),dtype=np.uint16) for _ in range(2)) for _ in range(2)]

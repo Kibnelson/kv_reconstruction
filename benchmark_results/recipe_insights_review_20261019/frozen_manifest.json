@@ -1,0 +1,400 @@
+{
+  "sha256": "bb165f64a742fa1437702b15bef37af83edcce40d6fceb8f958925c642030f92",
+  "manifest": {
+    "configuration": {
+      "tile_tokens": [
+        64
+      ],
+      "max_records": null,
+      "calibration_samples": 256,
+      "calibration_iterations": 4,
+      "seed": 71,
+      "repeats": 1,
+      "io_mib": 0,
+      "threads": 4,
+      "candidate_count": 33,
+      "source_ranges": [
+        {
+          "name": "train_0",
+          "diagnostic_split": "train",
+          "source_token_range": [
+            0,
+            64
+          ],
+          "tokens": 64,
+          "canonical_raw_sha256": "28fb0e71f2a3a0ab62f6ac9555779b1d2d643cf7f70aba7782da08ccfd702ec4",
+          "identity_sha256": "f924a63dc116c492c9c321820cce20299e7aa4266cf37382c6a65be732a88ce9",
+          "raw_payload_bytes": 1474560
+        },
+        {
+          "name": "train_1",
+          "diagnostic_split": "train",
+          "source_token_range": [
+            64,
+            128
+          ],
+          "tokens": 64,
+          "canonical_raw_sha256": "0ece0f98f48e75c63b3ea2a456c3565daa1c61ecb7829c68181d5f1851b7196b",
+          "identity_sha256": "b2c459629306eef3dbdf162decd9cc136a20da7ec187899e880c89ed1ce81047",
+          "raw_payload_bytes": 1474560
+        },
+        {
+          "name": "train_2",
+          "diagnostic_split": "train",
+          "source_token_range": [
+            128,
+            192
+          ],
+          "tokens": 64,
+          "canonical_raw_sha256": "4ff8f1c740d4dce8cd28950a86163606904d92ac66804ea4a14342e848e28d84",
+          "identity_sha256": "6e2abd7617a32c8ac1173df1f8065b4930a9f45d88c3cb7907e0de4578b7f9aa",
+          "raw_payload_bytes": 1474560
+        },
+        {
+          "name": "dev",
+          "diagnostic_split": "dev",
+          "source_token_range": [
+            192,
+            256
+          ],
+          "tokens": 64,
+          "canonical_raw_sha256": "d1fe57e4817ac818b86d9ee65c6a93205aca8dbc4780dd4d8bcc1489926378d3",
+          "identity_sha256": "2c4754a26226af43649ee4d81a073bc0d025918d229e4d08d221fcaf65be18c1",
+          "raw_payload_bytes": 1474560
+        },
+        {
+          "name": "test",
+          "diagnostic_split": "test",
+          "source_token_range": [
+            256,
+            512
+          ],
+          "tokens": 256,
+          "canonical_raw_sha256": "9f617dc46ebe854e043b7686c6801c8dbeca3d7faeefd23cc87e84ef817df6a5",
+          "identity_sha256": "b0f9da30dfe108d39653860ec16ca6abfe271e6611af0b169208462be310411f",
+          "raw_payload_bytes": 5898240
+        }
+      ]
+    },
+    "candidates": [
+      {
+        "name": "native_raw_words",
+        "method": "raw",
+        "options": {}
+      },
+      {
+        "name": "native_exponent_group_bitpack",
+        "method": "exponent",
+        "options": {}
+      },
+      {
+        "name": "native_learned_residual_bitpack",
+        "method": "learned",
+        "options": {
+          "assignment": "radius"
+        }
+      },
+      {
+        "name": "native_e8_symbol_bitpack",
+        "method": "e8_symbol",
+        "options": {
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_learned_e8_residual_bitpack",
+        "method": "learned_e8",
+        "options": {
+          "step_log2": 10
+        }
+      },
+      {
+        "name": "native_binary_identity_d64_bf16_bitpack",
+        "method": "binary",
+        "options": {
+          "dimension": 64,
+          "transform": "identity",
+          "amplitude_precision": "bf16",
+          "assignment": "radius"
+        }
+      },
+      {
+        "name": "native_binary_dense_d64_bf16_bitpack",
+        "method": "binary",
+        "options": {
+          "dimension": 64,
+          "transform": "dense",
+          "amplitude_precision": "bf16",
+          "assignment": "radius"
+        }
+      },
+      {
+        "name": "native_binary_hadamard_d64_bf16_bitpack",
+        "method": "binary",
+        "options": {
+          "dimension": 64,
+          "transform": "hadamard",
+          "amplitude_precision": "bf16",
+          "assignment": "radius"
+        }
+      },
+      {
+        "name": "native_prefill_zero_coset",
+        "method": "prefill",
+        "options": {
+          "predictor": "zero",
+          "correction": "coset",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_zero_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "zero",
+          "correction": "residual",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_midpoint_coset",
+        "method": "prefill",
+        "options": {
+          "predictor": "midpoint",
+          "correction": "coset",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_midpoint_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "midpoint",
+          "correction": "residual",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_affine_coset",
+        "method": "prefill",
+        "options": {
+          "predictor": "affine",
+          "correction": "coset",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_affine_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "affine",
+          "correction": "residual",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_e8_coset",
+        "method": "prefill",
+        "options": {
+          "predictor": "e8",
+          "correction": "coset",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_e8_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "e8",
+          "correction": "residual",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_midpoint_time_g8_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "midpoint",
+          "correction": "residual",
+          "layout": "time",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_midpoint_channel_g64_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "midpoint",
+          "correction": "residual",
+          "layout": "channel",
+          "group_size": 64,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_midpoint_time_g64_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "midpoint",
+          "correction": "residual",
+          "layout": "time",
+          "group_size": 64,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_affine_time_g8_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "affine",
+          "correction": "residual",
+          "layout": "time",
+          "group_size": 8,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_affine_channel_g64_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "affine",
+          "correction": "residual",
+          "layout": "channel",
+          "group_size": 64,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_affine_time_g64_residual",
+        "method": "prefill",
+        "options": {
+          "predictor": "affine",
+          "correction": "residual",
+          "layout": "time",
+          "group_size": 64,
+          "step_log2": 6
+        }
+      },
+      {
+        "name": "native_prefill_exponent_zero_channel_tiered",
+        "method": "prefill_exponent",
+        "options": {
+          "predictor": "zero",
+          "layout": "channel",
+          "segment_size": 256
+        }
+      },
+      {
+        "name": "native_prefill_exponent_fixed127_channel_tiered",
+        "method": "prefill_exponent",
+        "options": {
+          "predictor": "fixed127",
+          "layout": "channel",
+          "segment_size": 256
+        }
+      },
+      {
+        "name": "native_prefill_exponent_fixed127_time_tiered",
+        "method": "prefill_exponent",
+        "options": {
+          "predictor": "fixed127",
+          "layout": "time",
+          "segment_size": 256
+        }
+      },
+      {
+        "name": "native_prefill_exponent_median_channel_tiered",
+        "method": "prefill_exponent",
+        "options": {
+          "predictor": "median",
+          "layout": "channel",
+          "segment_size": 256
+        }
+      },
+      {
+        "name": "native_prefill_exponent_median_time_tiered",
+        "method": "prefill_exponent",
+        "options": {
+          "predictor": "median",
+          "layout": "time",
+          "segment_size": 256
+        }
+      },
+      {
+        "name": "native_prefill_exponent_affine_channel_tiered",
+        "method": "prefill_exponent",
+        "options": {
+          "predictor": "affine",
+          "layout": "channel",
+          "segment_size": 256
+        }
+      },
+      {
+        "name": "native_prefill_exponent_affine_time_tiered",
+        "method": "prefill_exponent",
+        "options": {
+          "predictor": "affine",
+          "layout": "time",
+          "segment_size": 256
+        }
+      },
+      {
+        "name": "native_prefill_affine_dictionary16_channel_g8_residual",
+        "method": "prefill_dictionary",
+        "recipe_model": "recipe_residual16_channel",
+        "dictionary_size": 16,
+        "options": {
+          "layout": "channel",
+          "group_size": 8,
+          "assignment": "bitcost"
+        }
+      },
+      {
+        "name": "native_prefill_affine_dictionary64_channel_g8_residual",
+        "method": "prefill_dictionary",
+        "recipe_model": "recipe_residual64_channel",
+        "dictionary_size": 64,
+        "options": {
+          "layout": "channel",
+          "group_size": 8,
+          "assignment": "bitcost"
+        }
+      },
+      {
+        "name": "native_prefill_affine_dictionary16_time_g8_residual",
+        "method": "prefill_dictionary",
+        "recipe_model": "recipe_residual16_time",
+        "dictionary_size": 16,
+        "options": {
+          "layout": "time",
+          "group_size": 8,
+          "assignment": "bitcost"
+        }
+      },
+      {
+        "name": "native_prefill_affine_dictionary64_time_g8_residual",
+        "method": "prefill_dictionary",
+        "recipe_model": "recipe_residual64_time",
+        "dictionary_size": 64,
+        "options": {
+          "layout": "time",
+          "group_size": 8,
+          "assignment": "bitcost"
+        }
+      }
+    ],
+    "source_capture_sha256": "349b763486ecf5b4942e04d3fea2c6c59e082a04350026c3e6b49962979dda2e",
+    "source_manifest_sha256": "6ad59cbedd73736ce1cd77184b6db94d52ecf00da25b39e2e82917d7a8d5b0d7",
+    "diagnostic_script_sha256": "94ccf2738f4ee0c9d097d9818f7dd85da34db8961cdbe1af2dde3d50cbbba717",
+    "selection": "None; every candidate is predetermined before TRAIN fitting"
+  }
+}
