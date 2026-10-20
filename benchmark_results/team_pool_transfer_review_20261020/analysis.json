@@ -1,0 +1,119 @@
+{
+  "attachment": {
+    "bytes": 18297,
+    "name": "Lossless_KV_Compression_Pool_and_Transfer_Formats.md",
+    "sha256": "e6052a49933e36fb86211aaf0a839ac9239b952d57ddc1a2c4d94de7f9d6732a"
+  },
+  "date_utc": "2026-10-20",
+  "dense_predictor_scenarios": [
+    {
+      "channel_block": 32,
+      "channel_steps_per_predicted_layer": 12,
+      "coefficients": 6236160,
+      "int32_bytes": 24944640,
+      "int64_bytes": 49889280,
+      "joint_KV_width": 384,
+      "layers": 30,
+      "model": "SmolLM2-135M",
+      "predicted_layers": 29,
+      "qualification": "Dense unshared structure projection, not a measured Qwen implementation; excludes means, scales, tables, biases and framing."
+    },
+    {
+      "channel_block": 32,
+      "channel_steps_per_predicted_layer": 64,
+      "coefficients": 219054080,
+      "int32_bytes": 876216320,
+      "int64_bytes": 1752432640,
+      "joint_KV_width": 2048,
+      "layers": 36,
+      "model": "Qwen3-4B-Instruct-2507",
+      "predicted_layers": 35,
+      "qualification": "Dense unshared structure projection, not a measured Qwen implementation; excludes means, scales, tables, biases and framing."
+    }
+  ],
+  "format": "team_pool_transfer_review_arithmetic_v1",
+  "pool_capacity": {
+    "assumption": "Prefix/output split inferred from the proposal arithmetic; not independently supplied allocator data.",
+    "prefix_blocks_per_request": 1600,
+    "raw_output_blocks_per_request": 16,
+    "spare_raw_block_equivalents": [
+      {
+        "bpv": 12.235,
+        "spare": 431.0
+      },
+      {
+        "bpv": 11.37,
+        "spare": 604.0
+      },
+      {
+        "bpv": 11.39,
+        "spare": 600.0
+      },
+      {
+        "bpv": 11.65,
+        "spare": 548.0
+      }
+    ],
+    "third_request_max_pool_bpv": 9.54,
+    "usable_raw_blocks": 2910
+  },
+  "predictor_formula": "(L-1)*(d*d+d*(d-b)/2)",
+  "rank_directory_example": {
+    "additional_bits_per_value": 0.25,
+    "headline_pool_bpv": 11.39,
+    "illustrative_bpv_after_directory": 11.64,
+    "prefix_count_bits": 16,
+    "qualification": "Hypothetical checkpoint layout arithmetic; excludes padding, calibration, allocator and workspace.",
+    "values_per_checkpoint": 64
+  },
+  "recommendation": "Separate KV-only linear probability experiment and GPU resident-pool experiment; matched actual-upstream metadata extension remains untested.",
+  "scope": "Attachment, immutable source comparison, primary-literature review and reproducible arithmetic only. Team reproduction archives not attached; no benchmark rerun or new implementation.",
+  "smol_single_8k_arithmetic": {
+    "assumed_stream_bpv": 8.36,
+    "int32_coefficient_bytes": 24944640,
+    "net_reduction_pct": 34.533854166666664,
+    "qualification": "Applies once-charged dense coefficient state to the reported average chunk bitrate; illustrative budget, not a newly measured full-document packet. Wire savings valid with preinstalled state.",
+    "raw_bytes": 188743680,
+    "stream_bytes": 98618572.8,
+    "values": 94371840
+  },
+  "source_commit": "154093c5116479dedce8a39db3c36b7b92f7f3cd",
+  "sources": [
+    {
+      "name": "SplitZip",
+      "sections": [
+        "4.3.3",
+        "4.3.4"
+      ],
+      "url": "https://arxiv.org/html/2605.01708v2"
+    },
+    {
+      "name": "AQUA-KV",
+      "sections": [
+        "3.2",
+        "Algorithm1",
+        "4.1"
+      ],
+      "url": "https://arxiv.org/html/2501.19392v2"
+    },
+    {
+      "name": "AlignPred",
+      "submission": "2026-10-13",
+      "url": "https://arxiv.org/html/2610.17970v1"
+    },
+    {
+      "name": "Speculative KV coding",
+      "url": "https://fergusfinn.com/blog/kv-entropy-coder/"
+    }
+  ],
+  "training_data": {
+    "Qwen_last_block_context_width": 4064,
+    "our_current_fit_documents": 3,
+    "our_fit_tokens": 1536,
+    "our_tokens_per_document": 512,
+    "qualification": "Match budgets and regularization before attributing differences to the predictor; no convergence claim.",
+    "team_fit_documents": 6,
+    "team_fit_tokens": 49152,
+    "team_tokens_per_document": 8192
+  }
+}
