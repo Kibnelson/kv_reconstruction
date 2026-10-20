@@ -1,0 +1,22 @@
+Focused transfer validation, 20 October 2026
+
+Command (with NumPy 2.3.5, constriction 0.5.0 and the captured CPU environment):
+python3 -m unittest \
+  qwen_kv_bench.test_transfer_reference qwen_kv_bench.test_transfer_coset \
+  tests.test_transfer_extension_runner tests.test_transfer_state_storage \
+  tests.test_review_team_transfer_source tests.test_review_transfer_extensions \
+  tests.test_team_pool_reference tests.test_package_transfer_results \
+  tests.test_standalone_build -q
+
+Captured output:
+----------------------------------------------------------------------
+Ran 73 tests in 26.176s
+
+OK
+
+Additional check:
+python3 scripts/build_standalone.py --check
+Standalone script matches source: qwen_kv_gpu_bench.py
+
+This focused suite is separate from the 40 real-model packet comparisons and
+422 full-artifact checks recorded in the transfer result bundle.

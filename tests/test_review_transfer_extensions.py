@@ -24,6 +24,14 @@ audit=importlib.util.module_from_spec(spec);spec.loader.exec_module(audit)
 def fixture(root):
     states=root/"states";packets=root/"packet_checks"
     states.mkdir();packets.mkdir()
+    captures=root/"captures";captures.mkdir()
+    source=np.full((2,8,2),0x3f80,np.uint16)
+    ids=np.arange(8,dtype=np.int64)
+    np.savez(captures/"test_case.npz",K_bits=source,V_bits=source,ids=ids)
+    full=np.concatenate((source,source),axis=2)
+    capture_identity=dict(name="case",split="test",capture_file=str(captures/"test_case.npz"),
+        kv_sha256=hashlib.sha256(str(full.dtype).encode()+audit.canonical(full.shape)+full.tobytes()).hexdigest(),
+        ids_sha256=hashlib.sha256(str(ids.dtype).encode()+audit.canonical(ids.shape)+ids.tobytes()).hexdigest())
     metadata={"block2":0,"block_hidden_r1":1,"block_kv_r1":1,"block_hidden_shuffled_r1":1,
               "block2_coset_uniform_r2":0,"block2_coset_model_r2":0}
     state_info={}
@@ -115,7 +123,8 @@ def fixture(root):
     result=dict(format="transfer_extension_study_v1",status="completed",exact_original_reproduction=False,
                 arguments=dict(block_size=2,capture_tokens=16,act_dir=None),test_rows=test,dev_rows=dev,aggregate=aggregate,
                 selected_on_dev=selected,development_split=dict(scale_start=0,scale_stop=8,selection_start=8,selection_tokens=4,dev_capture_tokens=16),
-                scope=dict(codec_device="cpu"))
+                scope=dict(codec_device="cpu"),
+                provenance=dict(model_identity=dict(captures=[capture_identity]),sources=[dict(path="scripts/review_transfer_extensions.py",sha256=audit.sha((ROOT/"scripts/review_transfer_extensions.py").read_bytes()))]))
     (root/"results.json").write_text(json.dumps(result))
     return result
 
@@ -185,6 +194,30 @@ class TransferExtensionReviewTests(unittest.TestCase):
     def test_decoder_cannot_receive_hidden_capture(self):
         self.result["test_rows"][0]["decoder_inputs"].append("hidden_capture.npz")
         self.assertTrue(any("only state and packet" in x for x in self.failures()))
+
+    def test_source_capture_is_required_even_when_packets_agree(self):
+        path=self.root/"captures/test_case.npz"
+        with np.load(path,allow_pickle=False) as archive:
+            arrays={name:archive[name].copy() for name in archive.files}
+        arrays["K_bits"][0,0,0]^=1
+        np.savez(path,**arrays)
+        self.assertTrue(any("all variants match actual captured source words" in x for x in self.failures()))
+
+    def test_executed_source_hash_mismatch_is_detected(self):
+        self.result["provenance"]["sources"][0]["sha256"]="0"*64
+        self.assertTrue(any("executed source hash matches" in x for x in self.failures()))
+
+    def test_explicit_source_snapshot_survives_unrelated_repository_updates(self):
+        snapshot=self.root/"executed"
+        target=snapshot/"scripts/review_transfer_extensions.py";target.parent.mkdir(parents=True)
+        data=(ROOT/"scripts/review_transfer_extensions.py").read_bytes()+b"\n# immutable prior source snapshot fixture\n"
+        target.write_bytes(data)
+        self.result["provenance"]["sources"][0]["sha256"]=audit.sha(data)
+        self.save()
+        self.assertFalse(audit.review(self.root)["all_passed"])
+        self.assertTrue(audit.review(self.root,source_root=snapshot)["all_passed"])
+        with mock.patch("sys.stdout",new_callable=io.StringIO):
+            self.assertEqual(audit.main([str(self.root),"--source-root",str(snapshot),"--output",str(self.root/"snapshot_review")]),0)
 
     def test_packet_corruption_is_detected(self):
         packet=Path(self.result["test_rows"][0]["decoder_inputs"][1])

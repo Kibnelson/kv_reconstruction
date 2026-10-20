@@ -102,7 +102,7 @@ def selector_candidates(label, selection, dev, selected, block_name):
     return [r for r in dev if re.match(expression, r["variant"])]
 
 
-def review(input_path):
+def review(input_path, source_root=None):
     input_path = Path(input_path)
     if input_path.is_dir():
         input_path = input_path/"results.json"
@@ -113,6 +113,13 @@ def review(input_path):
     def check(name, passed, **details):
         checks.append(dict(check=name, passed=bool(passed), **details))
     check("completed known study", report.get("format")=="transfer_extension_study_v1" and report.get("status")=="completed")
+    repository = Path(source_root).resolve() if source_root is not None else Path(__file__).resolve().parents[1]
+    source_checks = []
+    for source in report.get("provenance",{}).get("sources",[]):
+        source_path = (repository/source["path"]).resolve()
+        valid = source_path.is_relative_to(repository) and source_path.is_file() and sha(source_path.read_bytes())==source["sha256"]
+        check(f"executed source hash matches source-root file: {source['path']}",valid)
+        source_checks.append(dict(path=source["path"],sha256=source["sha256"],verified_against_current_file=valid))
     test, dev = report["test_rows"], report["dev_rows"]
     check("nonempty DEV and TEST", bool(dev) and bool(test))
     if not dev or not test:
@@ -225,6 +232,50 @@ def review(input_path):
         matched=[e for e in evidence if (e["case"],e["start"],e["tokens"])==address]
         check(f"paired variants recover identical original words: {address}",
               len(matched)==len(variants) and len({e["decoded_sha256"] for e in matched})==1)
+    # Bind every compared page to the actual stored source capture, not just
+    # self-consistent packet checksums or agreement among all variants.
+    capture_records = {r["name"]:r for r in report.get("provenance",{}).get("model_identity",{}).get("captures",[]) if r.get("split")=="test"}
+    capture_cache = {}
+    capture_evidence = []
+    for address, variants in by_address.items():
+        case,start,count = address
+        try:
+            if case not in capture_cache:
+                record = capture_records.get(case)
+                if record:
+                    path = resolve_artifact(root,record["capture_file"],"captures")
+                else:
+                    act_dir = report["arguments"].get("act_dir")
+                    if not act_dir or Path(case).name != case:
+                        raise ValueError("Missing actual TEST capture identity")
+                    path = Path(act_dir).resolve()/(case+".npz")
+                with np.load(path,allow_pickle=False) as archive:
+                    keys,values = archive["K_bits"],archive["V_bits"]
+                    if keys.dtype!=np.uint16 or values.dtype!=np.uint16 or keys.shape!=values.shape or keys.ndim!=3:
+                        raise ValueError("Invalid original KV capture geometry")
+                    original = np.concatenate((keys,values),axis=2)
+                    full_hash = hashlib.sha256(str(original.dtype).encode()+canonical(original.shape)+original.tobytes()).hexdigest()
+                    if record and full_hash != record["kv_sha256"]:
+                        raise ValueError("Actual capture does not match recorded full-KV hash")
+                    if record and "ids_sha256" in record:
+                        ids=np.ascontiguousarray(archive["ids"])
+                        ids_hash=hashlib.sha256(str(ids.dtype).encode()+canonical(ids.shape)+ids.tobytes()).hexdigest()
+                        if ids_hash!=record["ids_sha256"]:
+                            raise ValueError("Actual capture does not match recorded token IDs")
+                capture_cache[case]=(path,original,full_hash)
+            path,original,full_hash=capture_cache[case]
+            if start<0 or start+count>original.shape[1]:
+                raise ValueError("TEST page is outside its actual capture")
+            page=original[:,start:start+count]
+            source_hash=sha(page.astype("<u2",copy=False).tobytes())
+            matched=[e for e in evidence if (e["case"],e["start"],e["tokens"])==address]
+            check(f"all variants match actual captured source words: {address}",
+                  len(matched)==len(variants) and all(e["decoded_sha256"]==source_hash for e in matched) and
+                  all(r["values"]==page.size for r in variants.values()))
+            capture_evidence.append(dict(case=case,start=start,tokens=count,capture_file=path.name,
+                                         full_kv_sha256=full_hash,page_raw_sha256=source_hash,values=int(page.size)))
+        except (OSError,ValueError,KeyError,TypeError) as error:
+            check(f"all variants match actual captured source words: {address}",False,error=str(error))
     paired = []
     layers = defaultdict(lambda:defaultdict(lambda:dict(pages=0,values=0,baseline_ideal_bits=0.,candidate_ideal_bits=0.,metadata_bits=0)))
     for address, variants in sorted(by_address.items()):
@@ -335,10 +386,10 @@ def review(input_path):
                              hidden_rank=selected["hidden"]["rank"],kv_rank=selected["kv_matched_hidden_rank"]["rank"],
                              equal_rank=selected["hidden"]["rank"]==selected["kv_matched_hidden_rank"]["rank"])
     return dict(format=FORMAT,all_passed=all(c["passed"] for c in checks),passed=sum(c["passed"] for c in checks),total=len(checks),
-                source_results_sha256=sha(raw_report),checks=checks,source_scope=report.get("scope"),
+                source_results_sha256=sha(raw_report),checks=checks,source_scope=report.get("scope"),source_provenance_checks=source_checks,source_provenance_root=str(repository),
                 exact_original_reproduction=report.get("exact_original_reproduction",False),
                 frozen_dev_selections=selections,paired_packet_deltas=paired,aggregate=aggregate,
-                packet_only_artifact_evidence=evidence,layer_ideal_screening=layer_screening,
+                packet_only_artifact_evidence=evidence,source_capture_evidence=capture_evidence,layer_ideal_screening=layer_screening,
                 selected_hidden_kv_control=control,matched_hidden_kv_control=matched_control,matched_rank_dev_controls=rank_controls,
                 inference_limits=["Historical team rates use a different checkpoint/corpus; this study cannot establish their exact numerical reproduction.",
                                   "Layer screening uses TEST ideal costs and pays raw metadata bytes; it excludes layer framing/state differences and cannot be presented as a deployed gated codec.",
@@ -371,10 +422,12 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input",type=Path)
     parser.add_argument("--output",type=Path,required=True)
+    parser.add_argument("--source-root",type=Path,default=Path(__file__).resolve().parents[1],
+                        help="Repository or preserved executed-source snapshot for provenance hash checks")
     args=parser.parse_args(argv)
     if args.output.exists() and any(args.output.iterdir()):
         parser.error("--output must be fresh or empty")
-    result=review(args.input)
+    result=review(args.input,source_root=args.source_root)
     args.output.mkdir(parents=True,exist_ok=True)
     (args.output/"insights.json").write_text(json.dumps(result,indent=2,sort_keys=True,allow_nan=False)+"\n")
     (args.output/"summary.md").write_text(markdown(result))

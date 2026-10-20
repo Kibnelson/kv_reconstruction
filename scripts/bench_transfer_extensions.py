@@ -61,6 +61,39 @@ def combined_words(act):
     return np.concatenate([keys, values], axis=2)
 
 
+def limit_act_layers(act, max_layers=None):
+    """Select a KV prefix without relabeling a sparse hidden-hook selection."""
+    keys, values = np.asarray(act["K_bits"]), np.asarray(act["V_bits"])
+    if keys.ndim != 3 or values.shape != keys.shape:
+        raise ValueError("ACT requires paired [layers,tokens,channels] K_bits/V_bits")
+    layers = keys.shape[0]
+    count = layers if max_layers is None else max_layers
+    if not 1 <= count <= layers:
+        raise ValueError("max_layers must select a nonempty contiguous layer prefix")
+    out = dict(act)
+    for key in ("K_bits", "V_bits"):
+        out[key] = np.asarray(act[key])[:count].copy()
+    if "H" not in out:
+        return out
+    hidden = np.asarray(out["H"])
+    selection = np.asarray(out.get("sel", np.arange(layers)))
+    valid = (hidden.ndim == 3 and hidden.shape[1] == keys.shape[1]
+             and selection.ndim == 1 and selection.shape[0] == hidden.shape[0]
+             and selection.dtype.kind in "iu"
+             and len(np.unique(selection)) == len(selection)
+             and np.all((selection >= 0) & (selection < layers)))
+    indices = {int(layer): index for index, layer in enumerate(selection)} if valid else {}
+    if all(layer in indices for layer in range(count)):
+        out["H"] = hidden[[indices[layer] for layer in range(count)]].copy()
+        out["sel"] = np.arange(count, dtype=np.int64)
+    else:
+        # Original ACT files may contain only hooks for e.g. layers 2,12,24.
+        # Keep their KV usable while making missing all-layer metadata explicit.
+        out.pop("H", None)
+        out.pop("sel", None)
+    return out
+
+
 def slice_act(act, start, stop):
     count = np.asarray(act["K_bits"]).shape[1]
     if not 0 <= start < stop <= count:
@@ -103,6 +136,8 @@ def source_features(act, source):
         hidden = np.asarray(act.get("H"))
         if hidden.ndim != 3 or hidden.shape[:2] != np.asarray(act["K_bits"]).shape[:2]:
             raise ValueError("all-layer actual hidden hooks are required for hidden metadata")
+        if "sel" in act and not np.array_equal(np.asarray(act["sel"]), np.arange(hidden.shape[0])):
+            raise ValueError("hidden metadata requires canonical layer indices; normalize ACT selections first")
         return hidden.astype(np.float64)
     if source != "kv":
         raise ValueError("unknown metadata source")
@@ -269,15 +304,9 @@ def prepare_captures(args, output):
         root = Path(args.act_dir)
         fit_paths = sorted(root.glob("train*.npz"))
         test_paths = [root / "test_text.npz", root / "test_code.npz"][:args.test_cases]
-        train = [load_act(path) for path in fit_paths[:args.train_cases]]
-        dev = load_act(root / "tables.npz")
-        tests = [(path.stem, load_act(path)) for path in test_paths]
-        if args.max_layers is not None:
-            for act in train + [dev] + [value for _, value in tests]:
-                for key in ("K_bits", "V_bits"):
-                    act[key] = act[key][:args.max_layers].copy()
-                if "H" in act and np.asarray(act["H"]).shape[0] >= args.max_layers:
-                    act["H"] = act["H"][:args.max_layers].copy()
+        train = [limit_act_layers(load_act(path), args.max_layers) for path in fit_paths[:args.train_cases]]
+        dev = limit_act_layers(load_act(root / "tables.npz"), args.max_layers)
+        tests = [(path.stem, limit_act_layers(load_act(path), args.max_layers)) for path in test_paths]
         used_paths = fit_paths[:args.train_cases] + [root / "tables.npz"] + test_paths
         return train, dev, tests, {"source": "supplied ACT files",
                                    "files": [{"path": str(path), "bytes": path.stat().st_size, "sha256": sha_file(path)} for path in used_paths],

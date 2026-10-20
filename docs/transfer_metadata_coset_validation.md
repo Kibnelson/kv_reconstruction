@@ -32,8 +32,8 @@ The independent run uses three 512-token TRAIN captures, a 512-token DEV
 capture and two 512-token TEST captures, rather than the team's six 8K TRAIN
 documents and 8K test documents. These differences prohibit interpreting a
 similar or different coding rate as reproduction or refutation of 8.360 bpv.
-Full transfer-extension measurements remain pending until the run and artifact
-review complete.
+The completed transfer run and its artifact review are linked below. The compact
+bundle also retains the independently verified `model_download_manifest.json`.
 
 The observed CPU environment is NumPy 2.3.5, PyTorch 2.14.1+cpu,
 Transformers 4.57.6, safetensors 0.8.0, tokenizers 0.22.2 and constriction 0.5.0.
@@ -96,10 +96,94 @@ Report separately:
 - Capture/device/runtime versions, token IDs and content/source hashes.
 
 Capture can use CUDA. **The probability coder and all entropy-codec timings are
-CPU reference measurements.** The current format has one entropy stream per
+CPU reference measurements.** Codec encode times include metadata projection
+and quantization but exclude the original model forward and activation capture.
+CUDA capture copies full hidden/KV arrays to the CPU; measuring and avoiding
+those observation costs is part of a future serving implementation. The current
+format has one entropy stream per
 packet; it does not establish token-parallel GPU decoding, cross-machine parity,
 bounded scratch or compressed-resident attention. State-amortized coding ledgers
 are arithmetic scenarios, not measured GPU admission capacity.
+
+## Measured CPU results
+
+The [compact result bundle](../benchmark_results/team_transfer_extensions_smol_cpu_20261020/summary.md)
+contains the full tables, exact token IDs, model/source provenance and the
+[422/422 passing artifact checks](../benchmark_results/team_transfer_extensions_smol_cpu_20261020/review/summary.md).
+The [73-test focused suite](../benchmark_results/team_transfer_extension_tests_20261020.txt)
+also passes, including the ACT import guard and regenerated standalone checks.
+All 40 TEST packets decoded in separate processes. Each variant recovered the
+same 1,474,560 source BF16 words exactly: four 32-token pages, at positions 0 and
+480 in the two 512-token TEST captures, across all 30 layers. These are short
+context correctness and rate measurements, not a concurrency or long-context
+serving benchmark.
+
+| Representation | Complete packet bits/value | Reduction from BF16 |
+|---|---:|---:|
+| Per-channel mean | 10.227322 | 36.08% |
+| Previous-layer KV | 9.893273 | 38.17% |
+| AQUA-style dependency control | 9.840777 | 38.50% |
+| **Previous layer + 32-channel blocks** | **9.430599** | **41.06%** |
+| Block + paid KV PCA metadata | 9.502062 | 40.61% |
+| Block + paid actual-hidden PCA metadata | 9.507791 | 40.58% |
+| Block + paid shuffled-hidden metadata | 9.514171 | 40.54% |
+| Block + uniform two-bit mantissa coset | 9.430621 | 41.06% |
+| Block + same-joint modelled coset control | 9.430859 | 41.06% |
+| Hidden metadata + uniform coset | 9.507791 | 40.58% |
+
+The block predictor wins on both text pages combined (41.40% reduction) and both
+code pages combined (40.71%). It therefore meets the 40% **warm transfer-packet**
+target in this experiment. The independently packed pool format uses
+11.472233 bits/value, or 28.30% reduction, on the same pages.
+
+DEV selected four int8 metadata coordinates per layer/token and two-bit cosets.
+The hidden hint costs 0.083333 bits/value before framing. It makes the complete
+packets 14,228 bytes larger than the block baseline over the four pages; KV hints
+cost 13,172 extra bytes. Neither metadata variant wins on any of the four pages.
+The uniform coset costs four extra bytes overall, and the same-joint control
+costs 48 extra bytes. Those are effectively the same rate, with finite-coder and
+framing differences. Combining the current hidden hint and coset adds no saving.
+This result concerns raw-hidden PCA hints and scalar mantissa cosets; it does not
+test the earlier Hamming-syndrome or E8 constructions.
+
+The per-layer ideal-bit screen finds a positive net hidden-hint benefit only in
+layer zero, where no previous-layer KV exists. Even there, the KV-derived hint
+helps more. This is a diagnostic from TEST, not a measured gated representation;
+any layer/rank selection must be fitted on TRAIN/DEV before a new TEST run.
+
+Shared state is additional. The measured block decoder's arrays occupy
+51,795,464 bytes (49.40 MiB). If that entire state is charged once over 8,192
+aggregate token positions, and the measured packet rate is assumed constant,
+the arithmetic total is 13.821 bits/value (13.62% reduction). Over 131,072 token
+positions it is 9.705 bits/value (39.34%). These scenarios omit model weights,
+pool layout, raw outputs and scratch; they are not measured GPU capacity gains.
+The separately validated INT32 storage improvement below is not substituted
+into the main results.
+
+CPU timings are retained in the results, including intermittent executor stalls.
+They do not support ranking the variants by speed or predicting GPU latency.
+The executed runner and codec sources are preserved in
+[commit 8b08725](https://github.com/Kibnelson/kv_reconstruction/commit/8b08725eb9333eab10d6ebd83a598df9496b8392).
+A subsequent ACT import guard fixes sparse hidden-layer indexing; it does not
+change these fresh-capture measurements. For a later full-artifact review, use
+`--source-root` pointing to those executed sources. The compact bundle omits
+large states, packets and activations, so it records the executed review rather
+than providing those full artifacts.
+
+## Separate fixed-state storage check
+
+The [state probe](../benchmark_results/team_transfer_state_probe_cpu_20261020/summary.md)
+stores the channel-block predictor's coefficients as INT32 instead of INT64.
+Total frozen arrays fall from 51,795,464 to 26,580,488 bytes. All 184,320 checked
+predictions are identical. More strongly, an unchanged 444,216-byte held-out
+entropy payload decodes to the same 368,640 BF16 words with the compact state.
+Only the packet header's state identity is explicitly rebound for this test.
+This reduces fixed state; it adds no KV packet savings and measures no GPU speed.
+
+A per-block INT16/INT32 range calculation suggests 16,068,104 total array bytes,
+but that mixed-dtype candidate has not passed the packet test. The main transfer
+comparison continues to charge its actual INT64 state, independently of these
+storage experiments.
 
 ## Run on the A4500
 

@@ -68,6 +68,37 @@ class TransferRunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.source_features(act, "hidden")
 
+    def test_partial_hidden_selection_never_aliases_layer_zero(self):
+        act = fixture()
+        act["H"] = act["H"][[1]]
+        act["sel"] = np.array([1])
+        selected = runner.limit_act_layers(act, 1)
+        self.assertEqual(selected["K_bits"].shape[0], 1)
+        self.assertNotIn("H", selected)
+        self.assertNotIn("sel", selected)
+        self.assertNotIn("H", runner.limit_act_layers(act))
+        self.assertIn("H", act)
+
+    def test_layer_prefix_remaps_hidden_selection_and_checks_bounds(self):
+        act = fixture()
+        expected = act["H"].copy()
+        act["H"] = act["H"][[1, 0]]
+        act["sel"] = np.array([1, 0])
+        normalized = runner.limit_act_layers(act)
+        np.testing.assert_array_equal(normalized["H"], expected)
+        np.testing.assert_array_equal(normalized["sel"], [0, 1])
+        prefix = runner.limit_act_layers(act, 1)
+        np.testing.assert_array_equal(prefix["H"], expected[:1])
+        for count in (0, 3):
+            with self.assertRaises(ValueError):
+                runner.limit_act_layers(act, count)
+
+    def test_hidden_source_rejects_noncanonical_layer_indices(self):
+        act = fixture()
+        act["sel"] = np.array([1, 0])
+        with self.assertRaises(ValueError):
+            runner.source_features(act, "hidden")
+
     def test_dev_shuffle_stays_inside_selection_half(self):
         act = fixture(tokens=32)
         projector = runner.fit_projector([fixture(2)], "hidden", 1)

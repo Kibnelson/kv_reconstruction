@@ -17,6 +17,10 @@ The archive does not include the original GGUF weights, activation captures or
 fitted state. The historical rates are therefore recorded evidence, rather
 than a newly reproduced measurement on those exact inputs.
 
+The original capture script imports `gguf` and expects GGUF weights.
+`requirements-transfer.txt` targets the new HuggingFace-based comparison; it
+does not provide the original weights or a locked original GGUF environment.
+
 For the independently tested, packet-only decoder, paid prefill-metadata and
 coset comparisons, see [the validation guide](../../docs/transfer_metadata_coset_validation.md).
 The original scripts are retained unchanged; fixes and experiment extensions
