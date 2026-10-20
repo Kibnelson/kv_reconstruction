@@ -21,19 +21,20 @@ This remains a **specific novelty candidate**, not an established first contribu
 | L3C [24] / DISCUS [15] | Learned auxiliary information for exact image entropy coding / general syndrome-based source coding | Establish important coding ingredients. Neither source is a matching KV-specific prefill-metadata/coset construction. |
 | AlignPred [18] / sequential Wyner–Ziv work [22] | Error-bounded predictive KV lattice coding / idealized query-side-information bounds | Neither inspected mechanism supplies the complete original-BF16, actual-prefill-metadata-assisted coset design above. |
 
-The code audit also separates **three different experiments**:
+The code audit also separates **four different experiments**:
 
 | Our implementation | Information actually retained and used | What it has tested |
 |---|---|---|
 | `producer_pre_rope_coset`, `producer_kproj_norm_rope_coset`, later replay fallbacks | A complete encoded upstream K tensor, plus frozen replay state, position and exact corrections | Actual producer-stage replay with scalar coset corrections. This is not a tiny hidden-metadata codec. |
 | `producer_hidden_exponent`, `producer_hidden_abs_exponent` | Selected int8 features of actual normalized hidden activations; integer predictor coefficients | Hidden metadata conditions exponent predictions. Corrections use signed exponent tiers, not coset disambiguation. |
 | Independent `side_codec.py` hidden mode | Retained learned BF16 code from actual producer activations | The code conditions logistic probabilities for exact arithmetic coding. It does not use cosets. Its first smoke result does not reject the metadata-plus-coset hypothesis. |
+| Direct `syndrome_codec.py` producer-code study | Small actual-hidden code plus exact fields and 31-bit binary coset corrections | Now tested on A4500. All measured planes remain raw, so the fitted code provides no correction-payload gain. This is a direct negative result for that extractor/predictor/code configuration, not all possible metadata-assisted coset designs. |
 
 The conditional latent packets need a further distinction: hidden-derived BF16 features predict pre-RoPE K and V, with **residual** primary corrections. A separate replay stage may contain a coset fallback for pre-RoPE K to final K. That fallback uses the reconstructed full K source, not the tiny features as its disambiguating predictor. Coexistence in one packet is not the proposed coupling.
 
 In the existing scalar implementation, a BF16 **integer word** x is paired with a replay prediction p. The encoder selects group widths b from the circular signed 16-bit error and may send x modulo 2^b. The decoder uses p to choose the matching representative. For the same predictor and group widths, this is an alternative representation of the signed correction, not an additional source of savings: the code explicitly checks identical bit counts. The [producer review](qwen_producer_gpu_review.md) confirms equal numeric payload sizes; the small total-byte difference comes from JSON spelling. Both replay paths needed zero K correction payload on all measured pages in that study.
 
-**The precise open question is whether small upstream metadata can make coset disambiguation sufficiently cheaper to pay for itself.** The new [prefill coset study](prefill_coset_study.md) implements this direct test using omitted-bit prediction and 31-bit binary syndrome groups, with explicit raw escapes and equivalent error-position controls. Local functional checks are separate from target-model savings; pretrained Qwen results are pending. Specify the extracted signal, the coset decoder, its exactness/escape rule, and all retained bytes. Compare it with the same predictor and conventional residual coding, KV-derived metadata at the same budget, and an independent exact codec. A useful contribution could be this particular extraction/coding/restoration algorithm and its measured tradeoff; the current search neither establishes its priority nor dismisses it as already matched.
+**The precise open question is whether small upstream metadata can make coset disambiguation sufficiently cheaper to pay for itself.** The [prefill coset study](prefill_coset_study.md) implements this direct test using omitted-bit prediction and 31-bit binary syndrome groups, with explicit raw escapes and equivalent error-position controls. Its [first A4500 result](qwen_prefill_coset_gpu_review.md) has no retained short groups or correction-payload gain: hidden code estimates 28.91% net reduction versus 30.50% for the field baseline. Sparse optimizer channel coverage and approximately 13 errors per 31-bit group identify concrete fitting/code limitations. Better extractors or decoders remain open questions. A useful contribution could be a particular extraction/coding/restoration algorithm and its measured tradeoff; the current search neither establishes its priority nor dismisses the full combination as already matched.
 
 The latest results separate three decisions:
 
@@ -128,7 +129,7 @@ but it cannot establish novelty. The current selection is:
 | Fixed/learned dictionaries, E8 and scalar cosets | Mathematical building blocks; a particular new KV code would need its own algorithm and measured advantage. |
 | Generic hidden-state retention and KV replay | Overlaps Palu, JIT-KV and KV-Direct. |
 | Generic learned retained code plus exact entropy stream | Overlaps learned lossless auxiliary-representation coding such as L3C. |
-| **Small actual-prefill metadata that disambiguates exact KV coset residues** | **No complete match found in the inspected primary sources. Specific candidate; not directly tested by the current hidden probability track, and priority remains unestablished.** |
+| **Small actual-prefill metadata that disambiguates exact KV coset residues** | **No complete match found in the inspected primary sources. First binary-syndrome variant now tested on Qwen, with no retained syndrome or payload gain. The specific fitting/code design needs improvement; priority and practical advantage remain unestablished.** |
 | **A specific producer-aware extractor or restoration algorithm** | **Research candidate to define precisely. No unique advantage established yet.** |
 
 Among the existing prototypes, the actual-producer track is the appropriate
@@ -181,7 +182,7 @@ Three validation layers would make a resulting claim assessable:
 
 The immediate implementation goal remains higher savings with lower restore cost. Our current evidence does not justify calling any broad approach uniquely ours. It does justify continuing the controlled experiments and narrowing the claimed contribution to whatever mechanism actually wins.
 
-The research priority is therefore to keep exponent/sign coding as a strong practical baseline, keep the shared probability model as the measured learned baseline, and test a precise producer-side code against both. The absence of an established uniqueness claim must not be read as evidence that the specific producer-metadata-assisted coset combination is already published. The comparison above identifies the partial precedents and the remaining untested mechanism separately.
+The research priority is therefore to keep exponent/sign coding as a strong practical baseline, keep the shared probability model as the measured learned baseline, and test precise producer-side designs against both. The absence of an established uniqueness claim must not be read as evidence that the specific producer-metadata-assisted coset combination is already published. The comparison above separates partial precedents, the tested binary-syndrome failure and remaining design questions.
 
 ## Additional boundaries from the focused literature screen
 

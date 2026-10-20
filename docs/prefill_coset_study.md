@@ -6,6 +6,13 @@ short coset indices. The coding machinery is established; the research question
 is whether the particular upstream signal improves the complete size versus
 restoration-work tradeoff over matched KV-only controls.
 
+The [first A4500 review](qwen_prefill_coset_gpu_review.md) is now available:
+all five fitted models retain raw mantissa planes, with no short syndrome
+groups or producer-code payload gain. Hidden code estimates 28.91% net
+reduction versus 30.50% for the field baseline. The logs identify sparse
+optimizer channel coverage and a large mismatch with single-error recovery;
+the next diagnostic is signal quality and training coverage at fixed size.
+
 ## Representation and exactness
 
 The targets are the model's original final K and V words. A page contains one
