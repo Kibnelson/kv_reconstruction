@@ -1,0 +1,44 @@
+{
+  "date_utc": "2026-10-20",
+  "format": "compact_prefill_local_validation_v1",
+  "package": {
+    "bytes": 443058,
+    "file": "compact_prefill_tiny_cpu_20261020.zip",
+    "files": 135,
+    "omits": [
+      "raw KV/hidden captures",
+      "large page packets",
+      "original model weights"
+    ],
+    "sha256": "a7fec4f3b70559a07edd2c98b242bf5828d0637e066b67b95281990f5e0636bc"
+  },
+  "run": {
+    "fitted_variants": 14,
+    "frozen_DEV_winner": "field_baseline",
+    "full_DEV_continuation_checks": 6,
+    "learned_case_rows_verified_exact": 28,
+    "retained_stage_modes": {
+      "packed_raw": 448
+    },
+    "source_manifest": {
+      "embedded_payload_sha256": "853f93f3843ead36f0d802aa2074e17d39a004b20f2d12fefc497a4baeba5ae5",
+      "recorded_files": 190,
+      "sources_sha256": "2d92691e47e7b890a3090c82636143a41daba5ba906b4eb54ae95b7a409371ce"
+    },
+    "status": "completed",
+    "steps": 2,
+    "test_cases": 2,
+    "winner_interpretation": "The field baseline wins this random tiny-model functional run. This does not select the best representation for pretrained Qwen3-4B."
+  },
+  "scope": "Software validation on a random tiny Qwen model with CPU Torch2.11.0 and Transformers4.57.6. No pretrained Qwen3-4B/GPU savings or serving performance result.",
+  "standalone": {
+    "build_check_passed": true,
+    "bytes": 995383,
+    "sha256": "57ffb8695b817012d353cd8de0c710f7108e7abf27e3a6ef24d7924b2343865d"
+  },
+  "unit_checks": {
+    "command": "python -m unittest qwen_kv_bench.test_compact_codec qwen_kv_bench.test_compact_models qwen_kv_bench.test_compact_study tests.test_package_compact_results qwen_kv_bench.test_runner qwen_kv_bench.test_model_runtime tests.test_standalone_build -v",
+    "exhaustive_codec_BF16_patterns": 65536,
+    "passed": 57
+  }
+}
