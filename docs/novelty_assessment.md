@@ -46,7 +46,26 @@ Our floating-point prediction and RoPE corrections are tied to the recorded back
 
 **Prefill access is an opportunity to find a useful signal, rather than a novelty claim.** KVPress already exposes hidden states and KV to prefill hooks [11]. Palu and JIT-KV already retain information upstream of produced KV. We must identify the particular signal that reduces total retained bits or restoration work, including the cost of conveying that signal to the decoder. Keeping a full hidden state can even cost more than the joint KV width in a GQA model.
 
-**Learned side information that changes a probability model is also established.** Ballé et al.'s scale hyperprior transmits a learned side latent, decodes it first and uses it to predict entropy-model parameters while charging both streams [20]. Its image pipeline is lossy, unlike our original-BF16 target. Related transformer representation coding also uses hyperpriors for lossy split inference [21]. These works prevent claiming that a side latent or a rate-trained feature is itself our invention.
+**Learned side information that changes a probability model is also established.** Ballé et al.'s scale hyperprior transmits a learned side latent, decodes it first and uses it to predict entropy-model parameters while charging both streams [20]. Its image pipeline is lossy. More directly, L3C learns auxiliary representations jointly with probability models for **exact lossless** image coding [24]. Thus adding an exact entropy stream to a learned retained code is not a new generic construction. Related transformer representation coding also uses hyperpriors for lossy split inference [21]. The source being original BF16 KV is a relevant application distinction, but does not establish a new coding mechanism.
+
+**Recreating KV from sufficient upstream states also has a closer precedent.**
+KV-Direct proposes residual checkpoints and model-projection-based KV recreation
+[25]. Its same-layer reconstruction discussion overlaps the broad motivation of
+storing how KV is produced instead of all resulting tensors. Our tiny learned
+conditioner plus exact uncertainty stream differs from retaining a sufficient
+residual checkpoint. The paper's broader cross-layer memory and performance
+claims were not independently implementation-audited here; they are not adopted
+as guarantees for our design.
+
+**Our implemented cosets are scalar modulo codes.** The GPU producer codec
+computes a circular signed residual, chooses group widths, then can transmit
+the corresponding `x mod 2**b` residues. It explicitly checks that residual and
+coset widths agree. Lower-field variants likewise use per-coordinate residues,
+prototype IDs and correction widths. There is no parity-check matrix,
+cross-coordinate syndrome decoder or demonstrated Slepian–Wolf coding gain.
+E8 uses an existing lattice projection followed by exact corrections. These
+are legitimate mathematical representations, but their names do not establish
+a new coding primitive.
 
 Producer access may make a useful conditioning signal cheap to obtain during the existing forward pass. That is a practical compute/representation hypothesis, not a guarantee of a lower information-theoretic limit. All retained information must still be counted.
 **Bounded staging and partial transfer also have precedents.** KVPR overlaps partial transfer and recomputation [17]. AlignPred combines alignment, prediction, error-bounded lattice coding and entropy coding, and describes bounded staging, indexing and layerwise restoration [18]. Its reported 128K, eight-request case still admits five requests and queues three with either compressed or native persistence. This illustrates why smaller persisted KV does not automatically increase active GPU capacity. Generic double buffering or layerwise restore is insufficient as a novelty claim.
@@ -61,7 +80,37 @@ Current GPU decode/transfer costs do not demonstrate a migration speedup. The be
 
 The [broader position study](qwen_neural_positions_review.md) now demonstrates the +2.69-point matched 8K improvement. It retains the same declared numerical predictor as the smoke; the controlled full-DEV page-size gain comes almost entirely from smaller headers. CPU arithmetic consumes about 99.67% of restore time. This is evidence for a learned representation, not an implemented high-concurrency materializer.
 
-## The contribution worth testing next
+## Novelty-first research selection
+
+The latest request prioritizes identifying a distinctive mechanism before
+spending more effort on tuning. Longer training remains a useful diagnostic,
+but it cannot establish novelty. The current selection is:
+
+| Current direction | Role after the literature and code check |
+|---|---|
+| Exponent packing, Huffman and sign coding | Practical controls; do not make the broad mechanism the main contribution. |
+| No-code or shared previous-layer neural probabilities | Strong learning/state controls; exact predictive coding and cross-layer conditioning have precedents. |
+| Fixed/learned dictionaries, E8 and scalar cosets | Mathematical building blocks; a particular new KV code would need its own algorithm and measured advantage. |
+| Generic hidden-state retention and KV replay | Overlaps Palu, JIT-KV and KV-Direct. |
+| Generic learned retained code plus exact entropy stream | Overlaps learned lossless auxiliary-representation coding such as L3C. |
+| **A specific producer-aware extractor or restoration algorithm** | **Research candidate to define precisely. No unique advantage established yet.** |
+
+Among the existing prototypes, the actual-producer track is the appropriate
+testbed for that last question. Its current arbitrary learned hidden projection
+is not by itself a sufficiently distinctive contribution. The next design must
+name the particular forward information/computation it reuses, explain why an
+equally useful KV-derived conditioner is more costly, and specify the new code
+or reconstruction algorithm. Independent blocks, prefill hooks, exactness and
+shared weights remain requirements or known ingredients.
+
+Acceptance requires an advantage over no-code, same-page KV-derived metadata,
+stronger KV-only models and practical independent exact codecs after retained
+bits, weights, producer work and decoder work are charged. Better size or lower
+restoration work can be valuable; novelty must attach to the particular
+algorithm that yields the improvement. The present smoke supplies no such
+producer-code advantage.
+
+## Candidate contribution and proof obligations
 
 A more specific research hypothesis is:
 
@@ -71,7 +120,7 @@ The present shared model needs the same token tile's reconstructed previous-laye
 
 Its flow would be: observe the actual normalized hidden state during prefill; produce and retain a compact code `z`; encode original BF16 KV under probabilities determined by `z`; later recover a requested page from its own `z`, symbol stream and shared decoder state. Neither original hidden tensors nor other layers' decoded KV may be required by the page-local variant.
 
-Palu already has independently reconstructable latent tiles and ExANS already has self-contained exact blocks. Consequently, even this combined design is only a research candidate. The contribution must be the particular producer code, fitting objective, packet format or execution mechanism that beats the closest alternatives after all costs are charged.
+Palu already has independently reconstructable latent tiles, ExANS has self-contained exact blocks, and L3C has learned auxiliary representations for exact entropy coding. Consequently, this combined design is only a research candidate. The contribution must be the particular producer code, fitting objective, packet format or execution mechanism that beats the closest alternatives after all costs are charged.
 
 Producer metadata is not free side information at the decoder. Its reduction in correction or symbol bytes must exceed the retained feature bytes and additional state/framing costs. A small function still needs enough input information to recover the original values; calling it reconstruction does not remove that accounting requirement.
 
@@ -129,3 +178,5 @@ GaugeKV is another related exactness claim [23]. Its indexed manuscript discusse
 21. [Understanding Rate-Distortion Performance in Distributed Transformer Inference](https://arxiv.org/html/2601.22002v5), 2026 preprint, §I/II: learned hyperprior coding of intermediate representations for lossy split inference, rather than original-word exact KV caching.
 22. [Polynomial Context-Truncation Sensitivity in Autoregressive Language Models: Sequential Wyner–Ziv Bounds for KV Cache Compression](https://arxiv.org/html/2605.25085v1), 2026 preprint: query-side-information and next-token-distortion formulation with explicit assumptions.
 23. [GaugeKV: Composable Exact KV Cache Compression](https://openreview.net/forum?id=rSxYPLzyBu), public manuscript; indexed [PDF](https://openreview.net/pdf?id=rSxYPLzyBu), Appendix J: FP32 validation and BF16 precision qualification. Full primary-document access was unavailable during this screen.
+24. [Practical Full Resolution Learned Lossless Image Compression (L3C)](https://arxiv.org/abs/1811.12817), CVPR 2019; [author implementation](https://github.com/fab-jul/L3C-PyTorch): learned auxiliary representations, conditional distributions and exact arithmetic coding. This is a cross-domain precedent, rather than a KV serving system.
+25. [The Residual Stream Is All You Need / KV-Direct](https://arxiv.org/html/2603.19664v1), March 2026 preprint, §3.2/§3.4: residual checkpointing and model-based KV recreation. Broader memory/performance claims were not independently reproduced in this review.
