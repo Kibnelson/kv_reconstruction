@@ -1,5 +1,9 @@
 # Actual prefill metadata for exact KV coset reconstruction
 
+The [next controlled training study](prefill_coset_training_study.md) tests
+channel coverage and training duration separately, with fixed DEV probes and
+fresh TEST fixtures, while holding the representation and network size fixed.
+
 This experiment tests the missing coupling: a small retained code derived from
 actual producer activations guides reconstruction of original BF16 KV bits from
 short coset indices. The coding machinery is established; the research question

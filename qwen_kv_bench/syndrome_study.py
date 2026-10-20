@@ -44,6 +44,14 @@ def _parser():
     p.add_argument("--steps", type=int)
     p.add_argument("--batch-tokens", type=int)
     p.add_argument("--channels-per-step", type=int)
+    p.add_argument("--channel-sampling", choices=("random", "balanced"), default="random")
+    p.add_argument("--lr-horizon", type=int, help="Shared cosine horizon for matched short/long training")
+    p.add_argument("--diagnostic-updates", nargs="+", type=int,
+                   help="Fixed DEV probe at initialization and these updates; diagnostic only, no early stopping")
+    p.add_argument("--diagnostic-tokens", type=int, default=64,
+                   help="Fixed DEV tokens per layer, contiguous head/tail segments; no TEST probes")
+    p.add_argument("--fresh-test-fixtures", action="store_true",
+                   help="Use prespecified training-study holdouts instead of previously inspected TEST fixtures")
     p.add_argument("--residue-bits", nargs="+", type=int, default=[0, 2, 4, 6],
                    help="DEV grid; freeze one global retained-mantissa width per model before TEST")
     p.add_argument("--modes", nargs="+", choices=("none", "kv", "kv_canonical", "hidden", "hidden_norm"),
@@ -90,6 +98,13 @@ def _validate(args, parser):
         parser.error("Residue widths and modes must be unique")
     if "none" not in args.modes:
         parser.error("--modes must include none for the matched no-code and field controls")
+    if args.lr_horizon is not None and args.lr_horizon < args.steps:
+        parser.error("--lr-horizon must be at least --steps")
+    if args.diagnostic_tokens < 2:
+        parser.error("--diagnostic-tokens must be at least 2")
+    if args.diagnostic_updates is not None and (not args.diagnostic_updates
+            or any(n < 0 or n > args.steps for n in args.diagnostic_updates)):
+        parser.error("--diagnostic-updates must be in 0..steps")
 
 
 def _feature_summary(codes):
@@ -445,6 +460,11 @@ def main(argv=None):
     from .neural_accounting import account
     from .runner import _source_manifest
     parser = _parser(); args = parser.parse_args(argv); _defaults(args); _validate(args, parser)
+    if args.fresh_test_fixtures:
+        from .coset_training_study import FRESH_TEST
+        test_fixtures = FRESH_TEST
+    else:
+        test_fixtures = TEST
     output = args.output or Path("runs") / ("prefill_coset_" + dt.datetime.now().strftime("%Y%m%d_%H%M%S"))
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         parser.error("--output must be fresh or empty")
@@ -463,11 +483,11 @@ def main(argv=None):
         _note("Loading model for prefill coset study on " + str(device))
         if args.tiny:
             from .producer_study import _tiny
-            report["input_preflight"] = previous._preflight_inputs(None, args)
+            report["input_preflight"] = previous._preflight_inputs(None, args, test_fixtures=test_fixtures)
             model, tokenizer, identity = _tiny(device, args)
         else:
             def validate_inputs(tokenizer):
-                report["input_preflight"] = previous._preflight_inputs(tokenizer, args)
+                report["input_preflight"] = previous._preflight_inputs(tokenizer, args, test_fixtures=test_fixtures)
                 _note("Prompt-budget preflight passed before weights")
             model, tokenizer, identity = runtime.load_model(args.model, args.revision, device,
                 args.local_files_only, tokenizer_validator=validate_inputs)
@@ -489,6 +509,45 @@ def main(argv=None):
                 input_ids_sha256=captured["input_ids_sha256"], kv_words_sha256=captured["kv_words_sha256"],
                 geometry=captured["geometry"], producer_audit=captured["producer_audit"], timings=captured["timings"]))
         report["training_captures"] = metadata
+        diagnostics_out = {}
+        diagnostic_callback = None
+        if args.diagnostic_updates is not None:
+            from . import syndrome_diagnostics as diagnostics
+            _note("Capturing fixed DEV probe before TRAIN fitting; diagnostic-only, no checkpoint selection")
+            probe_capture, probe_records, probe_context = _capture(
+                model, tokenizer, DEV[0], args.dev_tokens, device, args)
+            if (probe_context["rope_inv_freq"].tobytes(), float(probe_context["rope_attention_scaling"])) != signature:
+                raise ValueError("Fixed DEV probe RoPE differs from TRAIN")
+            probe_records, probe_manifest = diagnostics.make_probe(
+                probe_records, tokens_per_layer=args.diagnostic_tokens)
+            probe_capture.pop("matrices")
+            probe_identity = _producer_inputs_hash(probe_records)
+            diagnostic_rows = []
+            def diagnostic_callback(*, mode, update, params, geometry, training_reference):
+                _note(f"Fixed DEV probe: {mode}, update {update}")
+                def memory():
+                    return (dict(allocated_bytes=torch.cuda.memory_allocated(device),
+                        reserved_bytes=torch.cuda.memory_reserved(device),
+                        peak_allocated_since_external_reset_bytes=torch.cuda.max_memory_allocated(device))
+                        if device.type == "cuda" else {})
+                memory_before = memory()
+                probe_started = time.perf_counter()
+                metrics = diagnostics.evaluate(params, geometry, mode, probe_records,
+                    residue_bits=tuple(sorted(args.residue_bits)), seed=args.seed,
+                    rope_scaling=scaling,
+                    prior_logits=training_reference["prior_logits"],
+                    ablations=update in (0, args.steps))
+                metrics["execution"] = dict(device=str(device), evaluation_wall_seconds=time.perf_counter()-probe_started,
+                    parameter_resident_bytes=sum(t.numel()*t.element_size() for t in params.values()),
+                    memory_before=memory_before, memory_after=memory(),
+                    scope="Diagnostic evaluation including CPU statistics/staging. Allocator peaks are cumulative without resetting counters; no isolated inference, kernel or serving measurement.")
+                if _producer_inputs_hash(probe_records) != probe_identity:
+                    raise AssertionError("Fixed DEV probe inputs changed")
+                diagnostic_rows.append(dict(mode=mode, update=update, metrics=metrics))
+                write_json(output / "training_probe_progress.json", dict(
+                    format="prefill_coset_probe_progress_v1", probe_manifest=probe_manifest,
+                    checkpoints=diagnostic_rows, scope="Diagnostic progress only; no early stopping or TEST input"))
+                return metrics
         hashes = [_producer_inputs_hash(rows) for rows in train_records]
         anchor = previous.fit_anchor(train_matrices, metadata, identity, device)
         (output / "calibration").mkdir(exist_ok=True); anchor.dump(output / "calibration" / "frozen_exponent_state.bin")
@@ -503,8 +562,26 @@ def main(argv=None):
         models = learned.fit(train_records, output / "calibration", training_metadata=metadata, model_identity=identity,
             inverse=inverse, rope_scaling=scaling, head_dim=head_dim, rank=args.rank, width=args.width,
             steps=args.steps, batch_tokens=args.batch_tokens, channels_per_step=args.channels_per_step,
-            device=device, seed=args.seed, modes=tuple(args.modes))
+            device=device, seed=args.seed, modes=tuple(args.modes), sampling=args.channel_sampling,
+            lr_horizon=args.lr_horizon, diagnostic_callback=diagnostic_callback,
+            diagnostic_updates=args.diagnostic_updates, diagnostics_out=diagnostics_out)
         report["training_wall_seconds"] = time.perf_counter() - started
+        report["training_budget"].update(channel_sampling=args.channel_sampling,
+            learning_rate_horizon=args.lr_horizon or args.steps,
+            timing_scope="Fit wall time includes fixed DEV diagnostic work when enabled; per-checkpoint diagnostic time is logged separately")
+        if diagnostic_callback is not None:
+            diagnostic_file = output / "training_diagnostics.json"
+            write_json(diagnostic_file, dict(format="qwen_prefill_coset_training_diagnostics_v1",
+                probe_manifest=probe_manifest, capture=probe_capture,
+                evaluation=dict(residue_bits=sorted(args.residue_bits),
+                    updates=sorted(set([0, *args.diagnostic_updates, args.steps])),
+                    token_budget=args.diagnostic_tokens, ablations_at_updates=sorted(set([0, args.steps])),
+                    protocol="Fixed DEV diagnostics never optimize or select checkpoints. Final requested TRAIN update is always frozen; TEST never tunes.") ,
+                modes=diagnostics_out))
+            raw = diagnostic_file.read_bytes()
+            report["training_diagnostics"] = dict(file=diagnostic_file.name, bytes=len(raw),
+                sha256=hashlib.sha256(raw).hexdigest())
+            del probe_capture, probe_records, probe_context, diagnostic_callback, diagnostic_rows, diagnostics_out
         for name, fitted in models.items():
             reloaded = learned.load(fitted.path, expected_model_identity=identity,
                 expected_training_hashes=fitted.metadata["training_hashes"],
@@ -588,7 +665,7 @@ def main(argv=None):
 
         for length in args.lengths:
             starts = previous._starts(length, args.tile_tokens, layers, args.max_pairs)
-            for fixture in TEST[:args.cases]:
+            for fixture in test_fixtures[:args.cases]:
                 _note(f"TEST producer capture: {fixture['name']}, {length} tokens, starts {starts}")
                 inline = InlineCodes(models, device)
                 captured, records, context = _capture(model, tokenizer, fixture, length, device, args, starts, inline=inline)

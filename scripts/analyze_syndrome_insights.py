@@ -36,7 +36,49 @@ def read_report(source):
     return report, hashlib.sha256(data).hexdigest()
 
 
-def sampling_coverage(report):
+def load_training_diagnostics(source, report):
+    """Optionally load and rehash the external observer/coverage companion.
+
+    A standalone results JSON can still reconstruct the compact coverage hash
+    when its companion was not supplied; that absence is reported explicitly.
+    A present but corrupted companion is always rejected.
+    """
+    descriptor = report.get("training_diagnostics")
+    if descriptor is None:
+        return None
+    if not isinstance(descriptor, dict):
+        raise ValueError("Invalid training diagnostic companion descriptor")
+    name = descriptor.get("file")
+    if not isinstance(name, str) or Path(name).name != name or name in (".", ".."):
+        raise ValueError("Invalid training diagnostic companion filename")
+    source = Path(source)
+    path = (source if source.is_dir() else source.parent) / name
+    if not path.exists():
+        return None
+    data = path.read_bytes()
+    if len(data) != descriptor.get("bytes") or hashlib.sha256(data).hexdigest() != descriptor.get("sha256"):
+        raise ValueError("Training diagnostic companion byte/hash mismatch")
+    value = json.loads(data, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
+    if (not isinstance(value, dict) or value.get("format") != "qwen_prefill_coset_training_diagnostics_v1"
+            or not isinstance(value.get("modes"), dict)):
+        raise ValueError("Invalid training diagnostic companion format")
+    return value
+
+
+def _coverage_summary(counts, words, omitted):
+    """NumPy-only copy of syndrome_models._coverage_summary; parity tested."""
+    def summary(a):
+        return dict(slots=int(a.size), zero_slots=int(np.sum(a == 0)), minimum=int(a.min()), maximum=int(a.max()),
+            mean=float(a.mean()), percentiles=dict(zip(("p25", "p50", "p75", "p95"), np.percentile(a, [25, 50, 75, 95]).tolist())))
+    histogram = np.unique(counts, return_counts=True)
+    return dict(optimizer_layer_channel=summary(counts), word_layer_channel=summary(words),
+        optimizer_update_histogram={str(int(n)): int(c) for n, c in zip(*histogram)},
+        by_layer={str(layer): dict(optimizer=summary(counts[layer]), words=summary(words[layer])) for layer in range(len(counts))},
+        omitted_word_examples_by_bitplane={str(bit): summary(omitted[..., bit]) for bit in range(7)},
+        interpretation="Optimizer exposure only. Initial TRAIN priors and source normalizers use all selected TRAIN captures; shared parameters may generalize to channels absent from optimizer minibatches.")
+
+
+def sampling_coverage(report, training_diagnostics=None):
     models = report["models"]
     first = models[next(iter(models))]["metadata"]
     geometry, train = first["geometry"], first["training"]
@@ -67,19 +109,54 @@ def sampling_coverage(report):
     batch = int(train["batch_tokens"])
     channel_budget = min(int(train["channels_per_step"]), columns)
     budgets = list(map(int, first["config"]["training_residue_bits"]))
-    rng = np.random.default_rng(int(train["seed"]))
-    seen = np.zeros((layers, columns), dtype=np.int32)
+    seed = int(train["seed"])
+    strategy = train.get("channel_sampling", "random")
+    if strategy not in ("random", "balanced"):
+        raise ValueError("Unrecognized channel sampling strategy")
+    if min(count, batch, channel_budget, layers, columns) < 1 or not budgets or any(not 0 <= b <= 6 for b in budgets):
+        raise ValueError("Invalid recorded TRAIN sampling budget")
+    rng = np.random.default_rng(seed)
+    # Deliberately independent copy of the producer's channel-only scheduler:
+    # keep the legacy main RNG channel draw even when balanced indices replace
+    # it, preserving paired source/window/residue draws and duration prefixes.
+    channel_rng = {layer: np.random.default_rng(np.random.SeedSequence([seed, 0x434f5345, layer]))
+                   for layer in range(layers)}
+    queues = {layer: np.empty(0, dtype=np.int64) for layer in range(layers)}
+    seen = np.zeros((layers, columns), dtype=np.int64)
+    channel_words = np.zeros_like(seen)
+    omitted_words = np.zeros((layers, columns, 7), dtype=np.int64)
     digest = hashlib.sha256()
     reconstructed = {}
     words = token_examples = 0
-    checkpoints = {int(row["update"]): row for row in train["checkpoints"]}
+    checkpoints = {int(row["update"]) for model in models.values()
+                   for row in model["metadata"]["training"]["checkpoints"]}
+    external_modes = {} if training_diagnostics is None else training_diagnostics["modes"]
+    if training_diagnostics is not None and set(external_modes) != set(models):
+        raise ValueError("Training diagnostic companion modes mismatch")
+    checkpoints.update(int(row["update"]) for item in external_modes.values() for row in item.get("checkpoints", []))
+    prefixes = {0: digest.hexdigest()}
     for update in range(1, count + 1):
         layer = (update - 1) % layers
         ri = int(rng.integers(len(grouped[layer])))
         capture, begin, tokens = grouped[layer][ri]
         sampled_tokens = min(batch, tokens)
         offset = int(rng.integers(tokens - sampled_tokens + 1))
-        indices = np.sort(rng.choice(columns, size=channel_budget, replace=False))
+        legacy = np.sort(rng.choice(columns, size=channel_budget, replace=False))
+        if strategy == "random":
+            indices = legacy
+        else:
+            selected = []
+            while len(selected) < channel_budget:
+                if not len(queues[layer]):
+                    permutation = channel_rng[layer].permutation(columns)
+                    if selected:
+                        used = np.isin(permutation, selected)
+                        permutation = np.concatenate((permutation[~used], permutation[used]))
+                    queues[layer] = permutation
+                take = min(channel_budget-len(selected), len(queues[layer]))
+                selected.extend(queues[layer][:take].tolist())
+                queues[layer] = queues[layer][take:]
+            indices = np.sort(np.asarray(selected, dtype=np.int64))
         b = budgets[int(rng.integers(len(budgets)))]
         row = dict(update=update, layer=layer, capture=capture, record=ri,
                    offset=offset, start=begin+offset, tokens=sampled_tokens,
@@ -87,12 +164,26 @@ def sampling_coverage(report):
         digest.update(canonical(row))
         if update in checkpoints:
             reconstructed[update] = row
+            prefixes[update] = digest.hexdigest()
         seen[layer, indices] += 1
+        channel_words[layer, indices] += sampled_tokens
+        omitted_words[layer, indices, b:] += sampled_tokens
         words += sampled_tokens * len(indices)
         token_examples += sampled_tokens
     observed = digest.hexdigest()
+    coverage = dict(optimizer_updates_by_layer_channel=seen.tolist(),
+        word_examples_by_layer_channel=channel_words.tolist(), summary=_coverage_summary(seen, channel_words, omitted_words))
+    coverage_hash = hashlib.sha256(canonical(coverage)).hexdigest()
+    compact = {k: v for k, v in coverage["summary"].items() if k != "by_layer"}
+    compact_verified, external_verified = [], []
     for mode, model in models.items():
         recorded = model["metadata"]["training"]
+        if (recorded.get("channel_sampling", "random") != strategy
+                or any(recorded[k] != train[k] for k in ("seed", "total_optimizer_updates", "batch_tokens", "channels_per_step"))
+                or model["metadata"]["geometry"]["layers"] != layers
+                or 2*model["metadata"]["geometry"]["channels"] != columns
+                or model["metadata"]["config"]["training_residue_bits"] != budgets):
+            raise ValueError("Models declare different TRAIN sampling configurations: " + mode)
         if observed != recorded["sampling_sha256"]:
             raise ValueError("Reconstructed full sampling digest mismatch: " + mode)
         if words != recorded["total_word_examples"] or token_examples != recorded["total_token_examples"]:
@@ -101,7 +192,26 @@ def sampling_coverage(report):
             actual = reconstructed.get(int(checkpoint["update"]))
             if actual is None or any(actual[k] != checkpoint[k] for k in actual):
                 raise ValueError("Reconstructed checkpoint fields mismatch: " + mode)
+            if "sampling_prefix_sha256" in checkpoint and prefixes[int(checkpoint["update"])] != checkpoint["sampling_prefix_sha256"]:
+                raise ValueError("Reconstructed checkpoint prefix digest mismatch: " + mode)
+        if "coverage_sha256" in recorded or "coverage_summary" in recorded:
+            if recorded.get("coverage_sha256") != coverage_hash or canonical(recorded.get("coverage_summary")) != canonical(compact):
+                raise ValueError("Reconstructed compact coverage/hash mismatch: " + mode)
+            compact_verified.append(mode)
+        if mode in external_modes:
+            item = external_modes[mode]
+            if canonical(item.get("coverage")) != canonical(coverage):
+                raise ValueError("External full optimizer coverage mismatch: " + mode)
+            for checkpoint in item.get("checkpoints", []):
+                update = int(checkpoint["update"])
+                if prefixes.get(update) != checkpoint.get("sampling_prefix_sha256"):
+                    raise ValueError("External observer sampling prefix mismatch: " + mode)
+            external_verified.append(mode)
     return dict(schedule_digest_verified=observed, all_model_schedules_verified=True,
+        channel_sampling=strategy, reconstructed_coverage_sha256=coverage_hash,
+        compact_coverage_verified_models=compact_verified, external_coverage_verified_models=external_verified,
+        external_coverage_companion_recorded=report.get("training_diagnostics") is not None,
+        external_coverage_companion_loaded=training_diagnostics is not None,
         layer_channel_slots=int(seen.size), never_selected_by_optimizer=int(np.sum(seen == 0)),
         never_selected_fraction=float(np.mean(seen == 0)), one_minibatch_slots=int(np.sum(seen == 1)),
         max_minibatches_per_slot=int(seen.max()),
@@ -134,12 +244,12 @@ def row_summary(row):
     return out
 
 
-def analyze(report, source_hash):
+def analyze(report, source_hash, training_diagnostics=None):
     result = dict(format="prefill_coset_metadata_insights_v1",
         scope="Read-only recorded-diagnostic arithmetic, not a GPU rerun, fixed-validation convergence test, new coding bound, or new encoded representation.",
         source_results_sha256=source_hash, selected_residue_bits=report["selection"],
         training_wall_seconds=report["training_wall_seconds"], elapsed_wall_seconds=report["elapsed_wall_seconds"],
-        models={}, sampling_coverage=sampling_coverage(report), cases=[])
+        models={}, sampling_coverage=sampling_coverage(report, training_diagnostics), cases=[])
     for mode, model in report["models"].items():
         t = model["metadata"]["training"]
         grid = report["development_grid"][mode]
@@ -216,7 +326,7 @@ def main(argv=None):
         parser.error("--output must be a fresh file")
     try:
         report, source_hash = read_report(args.input)
-        result = analyze(report, source_hash)
+        result = analyze(report, source_hash, load_training_diagnostics(args.input, report))
         data = json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n"
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("x", encoding="utf-8") as stream:

@@ -360,12 +360,94 @@ class Prepared:
         return (self.predict_logits(layer,feature_words,start,known_words,residue_bits)>=0).astype(np.uint8)
 
 
+def training_schedule(grouped, layers, columns, steps, batch_tokens, channels_per_step, seed, sampling="random"):
+    """Yield reproducible TRAIN addresses; random exactly preserves the v1 RNG.
+
+    Balanced traverses one independent shuffled channel permutation per layer.
+    A wrapped permutation puts channels already in the current minibatch last,
+    so each epoch visits every channel and each minibatch contains no repeats.
+    We still consume the legacy random-channel draw: source/window/residue
+    draws are therefore identical between samplers and across duration prefixes.
+    """
+    if sampling not in ("random", "balanced"):
+        raise ValueError("sampling must be random or balanced")
+    columns, layers = _int(columns,"columns"), _int(layers,"layers")
+    size=min(_int(channels_per_step,"channels_per_step"),columns)
+    rng=np.random.default_rng(_int(seed,"seed",0))
+    channel_rng={layer:np.random.default_rng(np.random.SeedSequence([seed,0x434f5345,layer]))
+                 for layer in range(layers)}
+    queues={layer:np.empty(0,dtype=np.int64) for layer in range(layers)}
+    for update in range(1,_int(steps,"steps")+1):
+        layer=(update-1)%layers
+        ri=int(rng.integers(len(grouped[layer])));capture_index,record=grouped[layer][ri]
+        count=min(_int(batch_tokens,"batch_tokens"),int(record["tokens"]))
+        offset=int(rng.integers(record["tokens"]-count+1))
+        legacy=np.sort(rng.choice(columns,size=size,replace=False))
+        if sampling=="random":indices=legacy
+        else:
+            chosen=[]
+            while len(chosen)<size:
+                if not len(queues[layer]):
+                    permutation=channel_rng[layer].permutation(columns)
+                    if chosen:
+                        used=np.isin(permutation,chosen)
+                        permutation=np.concatenate((permutation[~used],permutation[used]))
+                    queues[layer]=permutation
+                take=min(size-len(chosen),len(queues[layer]))
+                chosen.extend(queues[layer][:take].tolist())
+                queues[layer]=queues[layer][take:]
+            indices=np.sort(np.asarray(chosen,dtype=np.int64))
+        b=int(BUDGETS[int(rng.integers(len(BUDGETS)))])
+        yield dict(update=update,layer=layer,capture=int(capture_index),record=ri,offset=offset,
+            start=int(record["start"])+offset,tokens=count,residue_bits=b,channel_indices=indices.tolist())
+
+
+def parameter_sha256(params):
+    """Canonical numerical-state hash, independent of manifest/training logs."""
+    digest=hashlib.sha256()
+    for name,value in sorted(params.items()):
+        array=value.detach().cpu().contiguous().numpy() if isinstance(value,torch.Tensor) else np.asarray(value)
+        array=np.ascontiguousarray(array)
+        digest.update(_canonical(dict(name=name,shape=list(array.shape),dtype=array.dtype.str)))
+        digest.update(array.tobytes())
+    return digest.hexdigest()
+
+
+def _coverage_summary(counts,words,omitted):
+    def summary(a):
+        return dict(slots=int(a.size),zero_slots=int(np.sum(a==0)),minimum=int(a.min()),maximum=int(a.max()),
+            mean=float(a.mean()),percentiles=dict(zip(("p25","p50","p75","p95"),np.percentile(a,[25,50,75,95]).tolist())))
+    histogram=np.unique(counts,return_counts=True)
+    return dict(optimizer_layer_channel=summary(counts),word_layer_channel=summary(words),
+        optimizer_update_histogram={str(int(n)):int(c) for n,c in zip(*histogram)},
+        by_layer={str(layer):dict(optimizer=summary(counts[layer]),words=summary(words[layer])) for layer in range(len(counts))},
+        omitted_word_examples_by_bitplane={str(bit):summary(omitted[...,bit]) for bit in range(7)},
+        interpretation="Optimizer exposure only. Initial TRAIN priors and source normalizers use all selected TRAIN captures; shared parameters may generalize to channels absent from optimizer minibatches.")
+
+
 def fit(training_record_sets,output_dir,*,training_metadata,model_identity,inverse,rope_scaling,head_dim,
-        rank=8,width=32,steps=1000,batch_tokens=32,channels_per_step=64,device="cpu",seed=71,modes=MODES):
-    """Fit TRAIN-only omitted-bit BCE with balanced identical mode schedules."""
+        rank=8,width=32,steps=1000,batch_tokens=32,channels_per_step=64,device="cpu",seed=71,modes=MODES,
+        sampling="random",lr_horizon=None,diagnostic_callback=None,diagnostic_updates=None,diagnostics_out=None):
+    """Fit TRAIN-only omitted-bit BCE with identical mode schedules.
+
+    Optional fixed-DEV diagnostics are read-only observers, never optimizer
+    inputs or checkpoint selectors. Their detailed output stays outside the
+    deployed model manifest via ``diagnostics_out``.
+    """
     rank,width,steps,batch_tokens,channels_per_step=(_int(v,n) for v,n in
         ((rank,"rank"),(width,"width"),(steps,"steps"),(batch_tokens,"batch_tokens"),(channels_per_step,"channels_per_step")))
     head_dim,seed=_int(head_dim,"head_dim"),_int(seed,"seed",0)
+    horizon=steps if lr_horizon is None else _int(lr_horizon,"lr_horizon")
+    if horizon<steps or sampling not in ("random","balanced"):
+        raise ValueError("invalid syndrome sampling or LR horizon")
+    if diagnostic_callback is not None and not callable(diagnostic_callback):
+        raise ValueError("diagnostic_callback must be callable")
+    diagnostic_points={0,steps} if diagnostic_updates is None else {0,steps,*(_int(v,"diagnostic update",0) for v in diagnostic_updates)}
+    if any(v>steps for v in diagnostic_points):raise ValueError("diagnostic update exceeds TRAIN steps")
+    if diagnostics_out is not None and not isinstance(diagnostics_out,dict):
+        raise ValueError("diagnostics_out must be a dictionary")
+    if diagnostic_callback is not None and diagnostics_out is None:
+        raise ValueError("diagnostic callback requires external diagnostics_out")
     modes=tuple(modes)
     if head_dim%2 or not modes or len(set(modes))!=len(modes) or any(m not in MODES for m in modes):
         raise ValueError("invalid syndrome geometry/modes")
@@ -445,18 +527,44 @@ def fit(training_record_sets,output_dir,*,training_metadata,model_identity,inver
             network[name]=torch.nn.Parameter(value)
         params=dict(constants,**network)
         optimizer=torch.optim.Adam(list(network.values()),lr=1e-3)
-        rng=np.random.default_rng(seed);checkpoints=[];recent=[]
+        checkpoints=[];recent=[]
         updates={str(l):0 for l in range(layers)};token_examples=dict.fromkeys(updates,0);word_examples=dict.fromkeys(updates,0)
         mask_counts=np.zeros(7,np.int64);bit_errors=np.zeros(7,np.int64);b_counts={str(b):0 for b in BUDGETS}
         schedule_hash=hashlib.sha256();first_loss=None
-        for update in range(1,steps+1):
-            layer=(update-1)%layers
-            ri=int(rng.integers(len(grouped[layer])));capture_index,record=grouped[layer][ri]
-            count=min(batch_tokens,record["tokens"]);offset=int(rng.integers(record["tokens"]-count+1))
-            indices=np.sort(rng.choice(2*channels,size=min(channels_per_step,2*channels),replace=False))
-            b=int(BUDGETS[int(rng.integers(len(BUDGETS)))]);start=int(record["start"])+offset
-            schedule=dict(update=update,layer=layer,capture=capture_index,record=ri,offset=offset,
-                start=start,tokens=count,residue_bits=b,channel_indices=indices.tolist())
+        channel_updates=np.zeros((layers,2*channels),dtype=np.int64)
+        channel_words=np.zeros_like(channel_updates)
+        omitted_words=np.zeros((layers,2*channels,7),dtype=np.int64)
+        initial_parameter_hash=parameter_sha256(params)
+        reference_prior=initial_prior.copy();reference_prior.flags.writeable=False
+        training_reference=dict(prior_logits=reference_prior)
+        reference_hash=parameter_sha256(training_reference)
+        diagnostic_seconds=0.
+        external=dict(checkpoints=[])
+        if diagnostics_out is not None:
+            if mode in diagnostics_out:raise ValueError("diagnostics_out already contains mode "+mode)
+            diagnostics_out[mode]=external
+        def observe(update):
+            nonlocal diagnostic_seconds
+            if diagnostic_callback is None or update not in diagnostic_points:return
+            began_diagnostic=time.perf_counter()
+            before_hash=parameter_sha256(params);before_geometry=_canonical(geometry)
+            with torch.inference_mode():
+                metrics=diagnostic_callback(mode=mode,update=update,params=params,geometry=geometry,
+                    training_reference=training_reference)
+            if (before_hash!=parameter_sha256(params) or before_geometry!=_canonical(geometry)
+                    or reference_hash!=parameter_sha256(training_reference)):
+                raise ValueError("read-only diagnostic callback changed TRAIN parameters, geometry or reference")
+            metrics=producer._json(metrics);_canonical(metrics)
+            elapsed=time.perf_counter()-began_diagnostic;diagnostic_seconds+=elapsed
+            external["checkpoints"].append(dict(update=update,metrics=metrics,parameter_sha256=before_hash,
+                sampling_prefix_sha256=schedule_hash.hexdigest(),
+                coverage_summary=_coverage_summary(channel_updates,channel_words,omitted_words),diagnostic_seconds=elapsed))
+        observe(0)
+        for schedule in training_schedule(grouped,layers,2*channels,steps,batch_tokens,channels_per_step,seed,sampling):
+            update,layer,ri,offset,count,b,start=(schedule[k] for k in
+                ("update","layer","record","offset","tokens","residue_bits","start"))
+            capture_index,record=grouped[layer][ri]
+            indices=np.asarray(schedule["channel_indices"],dtype=np.int64)
             schedule_hash.update(_canonical(schedule))
             words=joint(record)[offset:offset+count][:,indices].copy()
             known=torch.tensor(words.copy(),device=target_device);ci=torch.tensor(indices,device=target_device,dtype=torch.long)
@@ -476,21 +584,29 @@ def fit(training_record_sets,output_dir,*,training_metadata,model_identity,inver
             loss.backward()
             if any(p.grad is not None and not bool(torch.isfinite(p.grad).all()) for p in network.values()):
                 raise ValueError("nonfinite syndrome TRAIN gradient")
-            rate=float(1e-3*.5*(1+np.cos(np.pi*update/(steps+1))))
+            rate=float(1e-3*.5*(1+np.cos(np.pi*update/(horizon+1))))
             for group in optimizer.param_groups:group["lr"]=rate
             optimizer.step()
             if any(not bool(torch.isfinite(p).all()) for p in network.values()):
                 raise ValueError("nonfinite syndrome TRAIN parameter")
             updates[str(layer)]+=1;token_examples[str(layer)]+=count;word_examples[str(layer)]+=words.size;b_counts[str(b)]+=1
+            channel_updates[layer,indices]+=1;channel_words[layer,indices]+=count;omitted_words[layer,indices,b:]+=count
             with torch.no_grad():
                 errors=((logits>=0)!=(bits>=.5)).sum(dim=(0,1)).cpu().numpy()
                 bit_errors[b:]+=errors[b:];mask_counts[b:]+=words.size
-            if update==1 or update==steps or update%max(1,steps//8)==0:
+            if update==1 or update==steps or update%max(1,steps//8)==0 or update in diagnostic_points:
                 losses=perbit.mean(dim=(0,1)).detach().cpu().tolist()
                 checkpoints.append(dict(**schedule,channels=len(indices),
                     channel_indices_sha256=hashlib.sha256(indices.astype("<i4").tobytes()).hexdigest(),
                     omitted_bit_BCE_bits=value,BCE_by_bitplane=losses,bit_errors_by_bitplane=errors.tolist(),
-                    omitted_bitplanes=list(range(b,7)),learning_rate=rate))
+                    omitted_bitplanes=list(range(b,7)),learning_rate=rate,
+                    parameter_sha256=parameter_sha256(params),sampling_prefix_sha256=schedule_hash.hexdigest()))
+            observe(update)
+        coverage=dict(optimizer_updates_by_layer_channel=channel_updates.tolist(),
+            word_examples_by_layer_channel=channel_words.tolist(),
+            summary=_coverage_summary(channel_updates,channel_words,omitted_words))
+        external["coverage"]=coverage
+        final_parameter_hash=parameter_sha256(params)
         arrays.update({n:p.detach().cpu().numpy().astype(np.float32,copy=True) for n,p in network.items()})
         metadata=dict(format=FORMAT,mode=mode,training_only=True,model_identity=identity,geometry=geometry,
             training_hashes=before,training_captures=[dict(split="train",sha256=digest,metadata=row)
@@ -514,9 +630,17 @@ def fit(training_record_sets,output_dir,*,training_metadata,model_identity,inver
                 total_word_examples=sum(word_examples.values()),word_examples_by_layer=word_examples,
                 omitted_bit_examples_by_plane=mask_counts.tolist(),bit_errors_by_plane=bit_errors.tolist(),residue_bits_update_counts=b_counts,
                 sampling="round-robin layers; identical seeded capture/window/channel/residue schedule across modes",
+                channel_sampling=sampling,
+                channel_sampling_rule=("legacy independent choice without replacement within each minibatch" if sampling=="random" else
+                    "independent seeded per-layer channel permutations; full cycles without replacement; wrap reorders next cycle to avoid within-minibatch duplicates; legacy channel RNG draws consumed so source/window/residue addresses match random"),
+                learning_rate_horizon=horizon,initial_parameter_sha256=initial_parameter_hash,final_parameter_sha256=final_parameter_hash,
+                coverage_sha256=hashlib.sha256(_canonical(coverage)).hexdigest(),
+                coverage_summary={k:v for k,v in coverage["summary"].items() if k!="by_layer"},
                 sampling_sha256=schedule_hash.hexdigest(),initial_batch_loss=first_loss,final_batch_loss=recent[-1],
                 final_mean_last_100_batch_losses=float(np.mean(recent)),checkpoints=checkpoints,
-                optimizer="Adam defaults; cosine LR 1e-3*0.5*(1+cos(pi*update/(steps+1)))",
+                optimizer="Adam defaults; cosine LR 1e-3*0.5*(1+cos(pi*update/(learning_rate_horizon+1)))",
+                diagnostic_contract="Read-only observer at explicit updates; no DEV gradients, early stopping, checkpoint selection or optimizer mutation. Diagnostic metrics/full coverage are external to deployment state.",
+                diagnostic_wall_seconds=diagnostic_seconds,
                 runtime=_runtime(target_device),fit_seconds=time.perf_counter()-began),
             scope="Functional learned bit predictor; all encoder/decoder/normalizer/center/state bytes charged. Same recorded backend contract only; no cross-device portable replay or GPU syndrome throughput claim.")
         model=Model(mode,arrays,metadata)

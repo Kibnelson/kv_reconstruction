@@ -1,0 +1,34 @@
+{
+  "all_generation_checks_pass": true,
+  "archive": {
+    "all_members_rehashed": true,
+    "bytes": 1949372,
+    "file": "benchmark_results/prefill_coset_training_tiny_20261020.zip",
+    "sha256": "716b9c0d9aed5af76ea2aabac9dac5fc84327530686aed42a7d4a42d69e93df8"
+  },
+  "auxiliary_suite": {
+    "command": "python -m unittest tests.test_standalone_build tests.test_analyze_syndrome_insights tests.test_review_coset_training_results tests.test_review_syndrome_results tests.test_package_coset_training_results tests.test_package_results",
+    "run": 36,
+    "status": "passed"
+  },
+  "benchmark_command": "python qwen_kv_gpu_bench.py --prefill-coset-training-study --tiny --dev-tokens 64 --short-steps 2 --long-steps 4 --residue-bits 2 6 --generation-steps 1 --repeats 1 --cases 2 --max-pairs 4 --threads 2",
+  "child_cases": 8,
+  "format": "prefill_coset_training_validation_summary_v1",
+  "generation_checks": 12,
+  "matched_arms": 4,
+  "packaged_audit": true,
+  "packaged_audit_checks": 5295,
+  "qwen_suite": {
+    "command": "python -m unittest discover -s qwen_kv_bench -p 'test_*.py'",
+    "run": 331,
+    "skipped_cuda": 11,
+    "status": "passed"
+  },
+  "scope": "CPU random tiny-model software validation only; no pretrained Qwen savings, GPU performance, convergence or serving claim.",
+  "source_hash": "01032d488984c0a9e164014f252265f902acead5875bfe0d921d4fc691caac72",
+  "standalone": {
+    "bytes": 938870,
+    "sha256": "4c764dc3ef03e0248fb92f306aa96a09de788442a7999a644f07c5e40a151062"
+  },
+  "syndrome_recovery_exercised_checks": 0
+}

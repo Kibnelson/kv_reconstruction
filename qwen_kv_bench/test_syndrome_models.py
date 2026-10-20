@@ -178,6 +178,82 @@ class SyndromeModelTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"contract"):p.encode_features(self.data[0][0])
         finally:torch.set_num_threads(2)
 
+    def test_schedule_preserves_legacy_random_and_balances_epoch_wraps(self):
+        grouped={layer:[(capture,rows[layer]) for capture,rows in enumerate(self.data)] for layer in range(2)}
+        actual=list(models.training_schedule(grouped,2,16,24,16,6,71,"random"))
+        rng=np.random.default_rng(71);legacy=[]
+        for update in range(1,25):
+            layer=(update-1)%2;ri=int(rng.integers(len(grouped[layer])));capture,r=grouped[layer][ri]
+            count=min(16,r["tokens"]);offset=int(rng.integers(r["tokens"]-count+1))
+            indices=np.sort(rng.choice(16,size=6,replace=False));b=int(models.BUDGETS[int(rng.integers(4))])
+            legacy.append(dict(update=update,layer=layer,capture=capture,record=ri,offset=offset,
+                start=r["start"]+offset,tokens=count,residue_bits=b,channel_indices=indices.tolist()))
+        self.assertEqual(actual,legacy)
+        balanced=list(models.training_schedule(grouped,2,16,24,16,6,71,"balanced"))
+        again=list(models.training_schedule(grouped,2,16,24,16,6,71,"balanced"))
+        self.assertEqual(balanced,again)
+        counts=np.zeros((2,16),np.int64)
+        for a,b in zip(actual,balanced):
+            self.assertEqual({k:v for k,v in a.items() if k!="channel_indices"},
+                             {k:v for k,v in b.items() if k!="channel_indices"})
+            self.assertEqual(len(set(b["channel_indices"])),6)
+            counts[b["layer"],b["channel_indices"]]+=1
+            perlayer=counts[b["layer"]]
+            self.assertLessEqual(int(perlayer.max()-perlayer.min()),1)
+        self.assertGreater(int(counts.min()),0)
+        # Recorded first A4500 run: preserve its exact full legacy schedule.
+        historical={layer:[(capture,dict(tokens=64,start=start)) for capture in range(3)
+                           for start in range(0,512,64)] for layer in range(36)}
+        digest=hashlib.sha256()
+        for row in models.training_schedule(historical,36,2048,1000,32,64,71):
+            digest.update(models._canonical(row))
+        self.assertEqual(digest.hexdigest(),"7ef6e5a320c6af5ade5b8207918b4dfc93f80c2cf6f0799d8bbe42f0403ba534")
+
+    def test_shared_lr_horizon_and_diagnostics_preserve_training_prefix(self):
+        diagnostic=[]
+        def callback(*,mode,update,params,geometry,training_reference):
+            self.assertFalse(torch.is_grad_enabled())
+            self.assertFalse(training_reference["prior_logits"].flags.writeable)
+            self.assertEqual(geometry["layers"],2)
+            diagnostic.append((mode,update))
+            return dict(finite=bool(torch.isfinite(params["prior"]).all()),
+                        reference_sha=models.parameter_sha256(training_reference))
+        with tempfile.TemporaryDirectory() as temporary:
+            short_out={};long_out={}
+            short=fit(Path(temporary)/"short",steps=3,modes=("none",),sampling="balanced",lr_horizon=6,
+                diagnostic_callback=callback,diagnostic_updates=[0,3],diagnostics_out=short_out)["none"]
+            long=fit(Path(temporary)/"long",steps=6,modes=("none",),sampling="balanced",lr_horizon=6,
+                diagnostic_callback=callback,diagnostic_updates=[0,3,6],diagnostics_out=long_out)["none"]
+            a,b=short.metadata["training"],long.metadata["training"]
+            self.assertEqual(a["initial_parameter_sha256"],b["initial_parameter_sha256"])
+            checkpoint=next(row for row in b["checkpoints"] if row["update"]==3)
+            self.assertEqual(a["final_parameter_sha256"],checkpoint["parameter_sha256"])
+            self.assertEqual(a["sampling_sha256"],checkpoint["sampling_prefix_sha256"])
+            self.assertEqual([row["update"] for row in short_out["none"]["checkpoints"]],[0,3])
+            self.assertEqual([row["update"] for row in long_out["none"]["checkpoints"]],[0,3,6])
+            coverage=long_out["none"]["coverage"]
+            self.assertEqual(b["coverage_sha256"],hashlib.sha256(models._canonical(coverage)).hexdigest())
+            counts=np.array(coverage["optimizer_updates_by_layer_channel"])
+            self.assertEqual(int(counts.sum()),6*8)
+            self.assertEqual(b["coverage_summary"]["optimizer_layer_channel"]["zero_slots"],int(np.sum(counts==0)))
+            def keys(value):
+                if isinstance(value,dict):
+                    return set(value).union(*(keys(v) for v in value.values()))
+                if isinstance(value,list):return set().union(*(keys(v) for v in value))
+                return set()
+            self.assertNotIn("metrics",keys(long.metadata))
+            with self.assertRaisesRegex(ValueError,"horizon"):
+                fit(Path(temporary)/"invalid",steps=3,modes=("none",),lr_horizon=2)
+
+    def test_diagnostic_callback_cannot_mutate_training_parameters(self):
+        def callback(**kwargs):
+            kwargs["params"]["prior"].add_(1.)
+            return {}
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(ValueError,"read-only diagnostic"):
+                fit(Path(temporary)/"mutating",steps=1,modes=("none",),
+                    diagnostic_callback=callback,diagnostics_out={})
+
 
 if __name__=="__main__":
     unittest.main()

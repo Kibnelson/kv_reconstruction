@@ -20,7 +20,8 @@ import tempfile
 
 
 REPORTS = ("results.csv", "summary.md", "producer_summary.json",
-           "decision_summary.json", "source_manifest.json", "frozen_manifest.json")
+           "decision_summary.json", "source_manifest.json", "frozen_manifest.json",
+           "training_diagnostics.json", "training_probe_progress.json")
 REQUIRED_REPORTS = ("results.csv", "summary.md", "source_manifest.json", "frozen_manifest.json")
 MAX_FILE_BYTES = 99 << 20
 CHUNK_BYTES = 1 << 20

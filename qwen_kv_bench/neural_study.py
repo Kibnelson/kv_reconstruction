@@ -86,7 +86,7 @@ def _defaults(args):
         args.revision = runtime.DEFAULT_REVISION
 
 
-def _preflight_inputs(tokenizer, args):
+def _preflight_inputs(tokenizer, args, *, test_fixtures=None):
     """Validate every requested prompt budget without any forward pass or fit.
 
     The same offset-aware builder used by capture preserves fixed content.
@@ -98,7 +98,7 @@ def _preflight_inputs(tokenizer, args):
     jobs = [(fixture, args.train_tokens, "--train-tokens") for fixture in TRAIN]
     jobs.append((DEV[0], args.dev_tokens, "--dev-tokens"))
     jobs.extend((fixture, length, "--lengths")
-                for length in args.lengths for fixture in TEST[:args.cases])
+                for length in args.lengths for fixture in (TEST if test_fixtures is None else test_fixtures)[:args.cases])
     prompts = []
     for fixture, tokens, argument in jobs:
         try:
