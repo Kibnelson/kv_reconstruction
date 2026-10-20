@@ -1,14 +1,45 @@
 # Novelty assessment of the KV representation experiments
 
-Literature checked on **2026-10-19**. This is a mechanism comparison, not a claim of research priority. Published papers, preprints, author reports and implementation sources are identified separately below. Not finding our exact packet layout does not establish that it is new.
+Literature checked through **2026-10-20**. This is a mechanism comparison, not a claim of research priority. Published papers, preprints, author reports and implementation sources are identified separately below. Not finding our exact packet layout does not establish that it is new.
 
 **Most broad ingredients already exist.** Our current work tests particular exact representations and their costs. A contribution would need a specific new predictor, code format or execution mechanism, with a measured advantage over the closest controls. Neither encoding during prefill nor reaching 40% reduction would establish novelty by itself.
+
+## Specific question: actual prefill metadata plus exact coset reconstruction
+
+**Known ingredients do not establish that their particular combination is already published.** The earlier classification was too broad for this question. In the inspected primary sources, we have not found a complete match for:
+
+> Retain a small code extracted from actual upstream prefill activations; use that code to disambiguate transmitted coset residues; recover the target model's original BF16 KV words exactly from the page and frozen state.
+
+This remains a **specific novelty candidate**, not an established first contribution. Here, upstream metadata means a retained signal derived from the actual hidden state, normalization or projection computation. It does not mean a histogram calculated from final KV, or merely running a KV-only codec while prefill happens.
+
+| Inspected work | Relevant mechanism | Boundary relative to this candidate |
+|---|---|---|
+| ExANS [2] | KV-derived exponent centers and exact rANS streams | Has metadata, but its described metadata comes from produced KV. Its modulo-256 recentering is reversible with the stored center; it does not omit a quotient that upstream information must disambiguate. |
+| NestQuant [26], §4.1 | Explicit nested-lattice coordinates modulo q, including KV quantization | A close KV/coset precedent. It rounds to lattice points and selects minimum-energy representatives for lossy quantization, rather than using retained actual-prefill metadata to restore original BF16 words. |
+| AQUA-KV [7] | Previous-layer KV prediction plus quantized residuals | Establishes predictive KV coding, but not the specified upstream-metadata-assisted exact coset decoder. |
+| Palu [9] / KV-Direct [25] | Hidden-derived latent retention / sufficient residual-state replay | Establish upstream-state reconstruction, not this compact metadata plus exact coset construction. |
+| L3C [24] / DISCUS [15] | Learned auxiliary information for exact image entropy coding / general syndrome-based source coding | Establish important coding ingredients. Neither source is a matching KV-specific prefill-metadata/coset construction. |
+| AlignPred [18] / sequential Wyner–Ziv work [22] | Error-bounded predictive KV lattice coding / idealized query-side-information bounds | Neither inspected mechanism supplies the complete original-BF16, actual-prefill-metadata-assisted coset design above. |
+
+The code audit also separates **three different experiments**:
+
+| Our implementation | Information actually retained and used | What it has tested |
+|---|---|---|
+| `producer_pre_rope_coset`, `producer_kproj_norm_rope_coset`, later replay fallbacks | A complete encoded upstream K tensor, plus frozen replay state, position and exact corrections | Actual producer-stage replay with scalar coset corrections. This is not a tiny hidden-metadata codec. |
+| `producer_hidden_exponent`, `producer_hidden_abs_exponent` | Selected int8 features of actual normalized hidden activations; integer predictor coefficients | Hidden metadata conditions exponent predictions. Corrections use signed exponent tiers, not coset disambiguation. |
+| Independent `side_codec.py` hidden mode | Retained learned BF16 code from actual producer activations | The code conditions logistic probabilities for exact arithmetic coding. It does not use cosets. Its first smoke result does not reject the metadata-plus-coset hypothesis. |
+
+The conditional latent packets need a further distinction: hidden-derived BF16 features predict pre-RoPE K and V, with **residual** primary corrections. A separate replay stage may contain a coset fallback for pre-RoPE K to final K. That fallback uses the reconstructed full K source, not the tiny features as its disambiguating predictor. Coexistence in one packet is not the proposed coupling.
+
+In the existing scalar implementation, a BF16 **integer word** x is paired with a replay prediction p. The encoder selects group widths b from the circular signed 16-bit error and may send x modulo 2^b. The decoder uses p to choose the matching representative. For the same predictor and group widths, this is an alternative representation of the signed correction, not an additional source of savings: the code explicitly checks identical bit counts. The [producer review](qwen_producer_gpu_review.md) confirms equal numeric payload sizes; the small total-byte difference comes from JSON spelling. Both replay paths needed zero K correction payload on all measured pages in that study.
+
+**The precise untested question is whether small upstream metadata can make coset disambiguation sufficiently cheaper to pay for itself.** Specify the extracted signal, the coset decoder, its exactness/escape rule, and all retained bytes. Compare it with the same predictor and conventional residual coding, KV-derived metadata at the same budget, and an independent exact codec. A useful contribution could be this particular extraction/coding/restoration algorithm and its measured tradeoff; the current search neither establishes its priority nor dismisses it as already matched.
 
 The latest results separate three decisions:
 
 - **Strongest reported simple codec:** exponent Huffman plus temporal sign coding, 33.39% mean estimated reduction including state in its earlier six-case study. This is a combination of established techniques.
 - **Strongest demonstrated learned improvement:** shared previous-layer probability coding, 32.20% estimated net reduction at 8K versus 29.51% for its matched control. This is a measured +2.69 percentage-point improvement, with substantial prior conceptual overlap.
-- **Research hypothesis under test:** a particular code derived from actual producer hidden states that conditions exact probabilities and removes previous-layer reconstruction prerequisites. The [first A4500 side-code smoke](qwen_prefill_side_gpu_review.md) validates exact independent restoration, but hidden code estimates 31.43% net savings versus 32.20% for no-code. It loses probability rate before side/state overhead. Only 200 updates were used; target-model advantage and research novelty remain unproven.
+- **Most recent probability-track experiment:** a particular code derived from actual producer hidden states that conditions exact probabilities and removes previous-layer reconstruction prerequisites. The [first A4500 side-code smoke](qwen_prefill_side_gpu_review.md) validates exact independent restoration, but hidden code estimates 31.43% net savings versus 32.20% for no-code. It loses probability rate before side/state overhead. Only 200 updates were used; target-model advantage and research novelty remain unproven. This is not a test of the small producer-metadata-assisted coset candidate above.
 
 The two headline codec percentages use different sampled pages and framing. They are evidence summaries, not a paired leaderboard. The [conditional review](qwen_conditional_gpu_review.md) and [neural position review](qwen_neural_positions_review.md) retain their separate protocols.
 
@@ -93,6 +124,7 @@ but it cannot establish novelty. The current selection is:
 | Fixed/learned dictionaries, E8 and scalar cosets | Mathematical building blocks; a particular new KV code would need its own algorithm and measured advantage. |
 | Generic hidden-state retention and KV replay | Overlaps Palu, JIT-KV and KV-Direct. |
 | Generic learned retained code plus exact entropy stream | Overlaps learned lossless auxiliary-representation coding such as L3C. |
+| **Small actual-prefill metadata that disambiguates exact KV coset residues** | **No complete match found in the inspected primary sources. Specific candidate; not directly tested by the current hidden probability track, and priority remains unestablished.** |
 | **A specific producer-aware extractor or restoration algorithm** | **Research candidate to define precisely. No unique advantage established yet.** |
 
 Among the existing prototypes, the actual-producer track is the appropriate
@@ -145,7 +177,7 @@ Three validation layers would make a resulting claim assessable:
 
 The immediate implementation goal remains higher savings with lower restore cost. Our current evidence does not justify calling any broad approach uniquely ours. It does justify continuing the controlled experiments and narrowing the claimed contribution to whatever mechanism actually wins.
 
-The research priority is therefore to keep exponent/sign coding as a strong practical baseline, keep the shared probability model as the measured learned baseline, and test a precise producer-side code against both. No current broad approach or untested combination has established uniqueness in this review.
+The research priority is therefore to keep exponent/sign coding as a strong practical baseline, keep the shared probability model as the measured learned baseline, and test a precise producer-side code against both. The absence of an established uniqueness claim must not be read as evidence that the specific producer-metadata-assisted coset combination is already published. The comparison above identifies the partial precedents and the remaining untested mechanism separately.
 
 ## Additional boundaries from the focused literature screen
 
@@ -180,3 +212,4 @@ GaugeKV is another related exactness claim [23]. Its indexed manuscript discusse
 23. [GaugeKV: Composable Exact KV Cache Compression](https://openreview.net/forum?id=rSxYPLzyBu), public manuscript; indexed [PDF](https://openreview.net/pdf?id=rSxYPLzyBu), Appendix J: FP32 validation and BF16 precision qualification. Full primary-document access was unavailable during this screen.
 24. [Practical Full Resolution Learned Lossless Image Compression (L3C)](https://arxiv.org/abs/1811.12817), CVPR 2019; [author implementation](https://github.com/fab-jul/L3C-PyTorch): learned auxiliary representations, conditional distributions and exact arithmetic coding. This is a cross-domain precedent, rather than a KV serving system.
 25. [The Residual Stream Is All You Need / KV-Direct](https://arxiv.org/html/2603.19664v1), March 2026 preprint, §3.2/§3.4: residual checkpointing and model-based KV recreation. Broader memory/performance claims were not independently reproduced in this review.
+26. [NestQuant: Nested Lattice Quantization for Matrix Products and LLMs](https://arxiv.org/html/2502.09720v3), 2025 preprint, §4.1/Algorithms 1–2: nested-lattice coordinate residues modulo q and minimum-energy coset representatives, applied to lossy weight, activation and KV-cache quantization. This is a direct KV/coset ingredient precedent, not the original-BF16 actual-prefill-metadata-assisted decoder specified above.
