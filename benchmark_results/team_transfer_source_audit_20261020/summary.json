@@ -1,0 +1,448 @@
+{
+  "all_passed": true,
+  "amortization": {
+    "actual_padded_int64_coefficients": {
+      "assumptions": "Constant observed stream rate; coefficients installed once and shared. Excludes other constants, framing and scratch.",
+      "minimum_aggregate_tokens_for_target": 38979,
+      "state_bytes": 69599232,
+      "state_inclusive_bpv": 14.26,
+      "state_inclusive_reduction_percent": 10.875000000000002,
+      "stream_bpv": 8.36,
+      "target_reduction_percent": 40.0,
+      "tokens": 8192
+    },
+    "hypothetical_compact_int32_coefficients": {
+      "assumptions": "Constant observed stream rate; coefficients installed once and shared. Excludes other constants, framing and scratch.",
+      "minimum_aggregate_tokens_for_target": 14122,
+      "state_bytes": 25214976,
+      "state_inclusive_bpv": 10.497499999999999,
+      "state_inclusive_reduction_percent": 34.39062500000001,
+      "stream_bpv": 8.36,
+      "target_reduction_percent": 40.0,
+      "tokens": 8192
+    }
+  },
+  "checks": [
+    {
+      "check": "source identity: combined.py",
+      "passed": true
+    },
+    {
+      "check": "source identity: combined_results.txt",
+      "passed": true
+    },
+    {
+      "check": "source identity: deploy_checks.py",
+      "passed": true
+    },
+    {
+      "check": "source identity: exact_ideas.py",
+      "passed": true
+    },
+    {
+      "check": "source identity: pool_variants.py",
+      "passed": true
+    },
+    {
+      "check": "source identity: smol_dump_act.py",
+      "passed": true
+    },
+    {
+      "check": "audited original combined.py version",
+      "passed": true
+    },
+    {
+      "check": "logged value geometry: test_text:0",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_text:0:transfer",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_text:0:pool",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_text:0:baseline_analytical",
+      "passed": true
+    },
+    {
+      "check": "logged value geometry: test_text:4096",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_text:4096:transfer",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_text:4096:pool",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_text:4096:baseline_analytical",
+      "passed": true
+    },
+    {
+      "check": "logged value geometry: test_code:0",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_code:0:transfer",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_code:0:pool",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_code:0:baseline_analytical",
+      "passed": true
+    },
+    {
+      "check": "logged value geometry: test_code:4096",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_code:4096:transfer",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_code:4096:pool",
+      "passed": true
+    },
+    {
+      "check": "rounded historical percentage: test_code:4096:baseline_analytical",
+      "passed": true
+    },
+    {
+      "check": "all historical records share predictor geometry",
+      "passed": true
+    },
+    {
+      "check": "historical logs report all roundtrips true",
+      "passed": true
+    },
+    {
+      "check": "new test: all BF16 symbol mappings invert exactly",
+      "passed": true,
+      "tested_words": 65536
+    },
+    {
+      "check": "new test: probability group counts are positive and normalize",
+      "inverse_scales": [
+        0.125,
+        0.5,
+        1.0,
+        2.0,
+        8.0
+      ],
+      "means": [
+        -100.0,
+        -1.0,
+        0.0,
+        1.0,
+        100.0
+      ],
+      "passed": true
+    },
+    {
+      "check": "new test: every mantissa group matches its group count",
+      "minimum_word_count": 65536,
+      "passed": true,
+      "tested_word_probabilities": 327680
+    },
+    {
+      "check": "new test: ordered BF16 interval edges are monotone",
+      "passed": true
+    }
+  ],
+  "coefficient_accounting": {
+    "active_coefficients": 6303744,
+    "actual_float64_inverse_scale_bytes": 92160,
+    "actual_int64_bias_bytes": 92160,
+    "actual_padded_coefficients": 8699904,
+    "actual_padded_int64_coefficient_bytes": 69599232,
+    "block_channels": 32,
+    "combined_kv_channels": 384,
+    "hypothetical_compact_int32_coefficient_bytes": 25214976,
+    "later_layer_active_coefficients": 6236160,
+    "layer_zero_active_coefficients": 67584,
+    "layers": 30,
+    "useful_macs_per_value_all_layers": 547.2,
+    "useful_macs_per_value_predicted_layers": 560.0
+  },
+  "format": "team_transfer_source_audit_v1",
+  "historical_evidence": {
+    "chunk_count": 4,
+    "model_compression_independently_reproduced": false,
+    "rates_are_rounded_log_values": true,
+    "records": [
+      {
+        "block_channels": 32,
+        "document": "test_text",
+        "historical_cpu_raw_restore_bytes_per_second": 56713.846153846156,
+        "historical_cpu_seconds": {
+          "decode_and_pack": 104.0,
+          "encode": 101.0,
+          "fit": 245.0,
+          "unpack": 0.5
+        },
+        "historical_roundtrip_assertions": {
+          "decoded": true,
+          "encoder": true,
+          "pool": true
+        },
+        "layers": 30,
+        "metrics": {
+          "baseline_analytical": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 12.243,
+            "logged_reduction_percent": 23.5
+          },
+          "pool": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 11.442,
+            "logged_reduction_percent": 28.5
+          },
+          "transfer": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 8.655,
+            "logged_reduction_percent": 45.9
+          }
+        },
+        "start": 0,
+        "steps_per_layer": 12,
+        "stop": 255,
+        "tokens": 256,
+        "values": 2949120
+      },
+      {
+        "block_channels": 32,
+        "document": "test_text",
+        "historical_cpu_raw_restore_bytes_per_second": 56713.846153846156,
+        "historical_cpu_seconds": {
+          "decode_and_pack": 104.0,
+          "encode": 100.0,
+          "fit": 242.0,
+          "unpack": 0.4
+        },
+        "historical_roundtrip_assertions": {
+          "decoded": true,
+          "encoder": true,
+          "pool": true
+        },
+        "layers": 30,
+        "metrics": {
+          "baseline_analytical": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 12.238,
+            "logged_reduction_percent": 23.5
+          },
+          "pool": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 11.35,
+            "logged_reduction_percent": 29.1
+          },
+          "transfer": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 8.239,
+            "logged_reduction_percent": 48.5
+          }
+        },
+        "start": 4096,
+        "steps_per_layer": 12,
+        "stop": 4351,
+        "tokens": 256,
+        "values": 2949120
+      },
+      {
+        "block_channels": 32,
+        "document": "test_code",
+        "historical_cpu_raw_restore_bytes_per_second": 56713.846153846156,
+        "historical_cpu_seconds": {
+          "decode_and_pack": 104.0,
+          "encode": 100.0,
+          "fit": 248.0,
+          "unpack": 0.4
+        },
+        "historical_roundtrip_assertions": {
+          "decoded": true,
+          "encoder": true,
+          "pool": true
+        },
+        "layers": 30,
+        "metrics": {
+          "baseline_analytical": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 12.236,
+            "logged_reduction_percent": 23.5
+          },
+          "pool": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 11.414,
+            "logged_reduction_percent": 28.7
+          },
+          "transfer": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 8.514,
+            "logged_reduction_percent": 46.8
+          }
+        },
+        "start": 0,
+        "steps_per_layer": 12,
+        "stop": 255,
+        "tokens": 256,
+        "values": 2949120
+      },
+      {
+        "block_channels": 32,
+        "document": "test_code",
+        "historical_cpu_raw_restore_bytes_per_second": 57264.46601941747,
+        "historical_cpu_seconds": {
+          "decode_and_pack": 103.0,
+          "encode": 100.0,
+          "fit": 242.0,
+          "unpack": 0.5
+        },
+        "historical_roundtrip_assertions": {
+          "decoded": true,
+          "encoder": true,
+          "pool": true
+        },
+        "layers": 30,
+        "metrics": {
+          "baseline_analytical": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 12.237,
+            "logged_reduction_percent": 23.5
+          },
+          "pool": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 11.346,
+            "logged_reduction_percent": 29.1
+          },
+          "transfer": {
+            "evidence": "historical supplied log; not independently rerun",
+            "logged_bpv": 8.032,
+            "logged_reduction_percent": 49.8
+          }
+        },
+        "start": 4096,
+        "steps_per_layer": 12,
+        "stop": 4351,
+        "tokens": 256,
+        "values": 2949120
+      }
+    ],
+    "total_values": 11796480,
+    "weighted_average_logged_bpv": {
+      "baseline_analytical": 12.238500000000002,
+      "pool": 11.388000000000002,
+      "transfer": 8.36
+    },
+    "weighted_average_reduction_percent": {
+      "baseline_analytical": 23.509374999999988,
+      "pool": 28.82499999999999,
+      "transfer": 47.75
+    }
+  },
+  "passed": 29,
+  "production_limitations": [
+    {
+      "detail": "Original GGUF and ACT captures were not supplied; historical compression and word comparisons have not been independently reproduced.",
+      "id": "original_model_data_missing",
+      "status": "unverified"
+    },
+    {
+      "detail": "One RangeEncoder is used across tokens, layers and channel groups. Independent predictor tokens do not make the original entropy stream independently decodable.",
+      "id": "monolithic_entropy_stream",
+      "status": "observed"
+    },
+    {
+      "detail": "Shape, token positions, fitted constants and tables come from CLI/globals. Their delivery, identities, chunk offsets and checksums are not included in stream bytes.",
+      "id": "external_framing",
+      "status": "observed"
+    },
+    {
+      "detail": "transfer allocates a full decoded output with zeros_like(ORIG); the script retains originals and additional encoder/decoded/unpacked copies. Bounded-scratch compressed residency is not demonstrated.",
+      "id": "full_dense_output",
+      "status": "observed"
+    },
+    {
+      "detail": "The predictor uses integers, but standardization and constriction inputs use floating point. Constants/tables are regenerated; cross-machine parity is not tested.",
+      "id": "integer_portability",
+      "status": "unverified"
+    },
+    {
+      "detail": "fxv casts very large finite values, infinities and NaNs to int64 without specified fallback/clamping. Positive symbol counts alone do not validate this feature path.",
+      "id": "extreme_feature_conversion",
+      "status": "unverified"
+    },
+    {
+      "detail": "Supplied execution is CPU only. MAC counts and payload ratios do not establish GPU throughput or serving benefit.",
+      "id": "gpu_performance",
+      "status": "unmeasured"
+    },
+    {
+      "detail": "The original baseline GPU-format size is calculated by a formula; transfer/pool payloads are actually packed.",
+      "id": "baseline_size_analytical",
+      "status": "observed"
+    },
+    {
+      "detail": "The original combined codec conditions on produced KV; it contains no actual upstream hidden metadata or transmitted coset residues.",
+      "id": "hook_coset_extensions",
+      "status": "absent"
+    }
+  ],
+  "provenance": {
+    "archive_hash_recomputed": false,
+    "archive_hash_scope": "Copied from preserved manifest; checks above hash the extracted source files.",
+    "files": [
+      {
+        "bytes": 14281,
+        "file": "combined.py",
+        "sha256": "b44a63d32c1d3144436a01205701a26478fed7a63c8bf27777932a3436354cf3"
+      },
+      {
+        "bytes": 6073,
+        "file": "combined_results.txt",
+        "sha256": "f388d1eb138775b7f19ea8707c02048825e39ebefc97a2308d9c57756c445425"
+      },
+      {
+        "bytes": 6289,
+        "file": "deploy_checks.py",
+        "sha256": "17ac2e11b004c8e56e5e0a264dbe3eeeb90c19867713a566f70b4ddcc5efdbaa"
+      },
+      {
+        "bytes": 9606,
+        "file": "exact_ideas.py",
+        "sha256": "ebb956f11c107c2ec6f4388ee8352cc5e7a81dd40572f17925472ddc14acf769"
+      },
+      {
+        "bytes": 4779,
+        "file": "pool_variants.py",
+        "sha256": "f8a1811593624d649558942dfcaae8b072f34187b19e4d7efc08c86fccc4db00"
+      },
+      {
+        "bytes": 5418,
+        "file": "smol_dump_act.py",
+        "sha256": "4cdf7724bc657b2f4494aeac1583762de3470d484c8accc1043901981b981535"
+      }
+    ],
+    "original_archive_sha256": "846834ef24431310001928f56d7780575c3566b2857c4472600e699197bd8d9d",
+    "source": "user supplied kv_combined_test.zip",
+    "source_manifest_sha256": "4827f96c5910bfcba15a1adfa39bd796f080f556103d517d85b776478ede4078"
+  },
+  "scope": "Source/log audit and independent helper tests; not original-data compression reproduction",
+  "source_observations": {
+    "actual_A_dtype": "int64",
+    "actual_A_storage": "zero-padded dense matrices",
+    "decoder_has_shape_only_ORIG_reference": true,
+    "layer_zero_earlier_channel_predictor": true,
+    "original_target_numeric_input_to_encoder_only": true,
+    "scope": "Manual source observations, not a general static proof or an independent decoder execution",
+    "source_uses_single_entropy_stream": true
+  },
+  "total": 29
+}

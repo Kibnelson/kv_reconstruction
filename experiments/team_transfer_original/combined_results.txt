@@ -1,0 +1,77 @@
+Combined approach: linear-predictor transfer format (#4) + per-channel fixed-width GPU-pool format (#1). SmolLM2 KV, CPU.
+Fit: train0..train5 (6 x 8,192 tokens); scales: tables (dataclasses.py); tests: test_text (PEP 8), test_code (argparse.py).
+
+## combined.py ACT_DIR DOC T0 256 32   (end to end: encode -> decode -> pack into pool -> unpack -> compare)
+test_text, tokens 0-255, all 30 layers, 2,949,120 values, decoder block 32 channels (12 steps/layer)
+  transfer stream (real bytes)        8.655 bits/value   45.9% smaller   ideal 8.655
+  GPU pool, packed (real bytes)      11.442 bits/value   28.5% smaller
+  current GPU format on same tokens  12.243 bits/value   23.5% smaller
+  decoded words == original: True; encoder pass == original: True; pool unpacked == original: True
+  CPU seconds (numpy, indicative only): fit 245, encode 101, decode+pack 104, unpack 0.5
+test_text, tokens 4096-4351, all 30 layers, 2,949,120 values, decoder block 32 channels (12 steps/layer)
+  transfer stream (real bytes)        8.239 bits/value   48.5% smaller   ideal 8.238
+  GPU pool, packed (real bytes)      11.350 bits/value   29.1% smaller
+  current GPU format on same tokens  12.238 bits/value   23.5% smaller
+  decoded words == original: True; encoder pass == original: True; pool unpacked == original: True
+  CPU seconds (numpy, indicative only): fit 242, encode 100, decode+pack 104, unpack 0.4
+test_code, tokens 0-255, all 30 layers, 2,949,120 values, decoder block 32 channels (12 steps/layer)
+  transfer stream (real bytes)        8.514 bits/value   46.8% smaller   ideal 8.514
+  GPU pool, packed (real bytes)      11.414 bits/value   28.7% smaller
+  current GPU format on same tokens  12.236 bits/value   23.5% smaller
+  decoded words == original: True; encoder pass == original: True; pool unpacked == original: True
+  CPU seconds (numpy, indicative only): fit 248, encode 100, decode+pack 104, unpack 0.4
+test_code, tokens 4096-4351, all 30 layers, 2,949,120 values, decoder block 32 channels (12 steps/layer)
+  transfer stream (real bytes)        8.032 bits/value   49.8% smaller   ideal 8.032
+  GPU pool, packed (real bytes)      11.346 bits/value   29.1% smaller
+  current GPU format on same tokens  12.237 bits/value   23.5% smaller
+  decoded words == original: True; encoder pass == original: True; pool unpacked == original: True
+  CPU seconds (numpy, indicative only): fit 242, encode 100, decode+pack 103, unpack 0.5
+
+Average of the 4 chunks: transfer 8.360 bits/value (47.8%), pool 11.388 (28.8%), current GPU format 12.239 (23.5%); all words bit-exact.
+
+## pool_variants.py ACT_DIR   (pool format variants on whole test documents, all 30 layers)
+
+=== text: bits per value, all 30 layers (BF16 = 16); escape room per layer set from FIT data ===
+A0 current GPU format (variable size): 12.237 (23.5%)
+variant                                     variable     fixed, p99.9 room     fixed, max room  raw blocks
+P1 escape penalty 8                   11.369 (28.9%)      11.651 (27.2%)    11.695 (26.9%)      0.21%
+P1 escape penalty 12                  11.374 (28.9%)      11.631 (27.3%)    11.672 (27.1%)      0.19%
+P1 escape penalty 16                  11.391 (28.8%)      11.633 (27.3%)    11.672 (27.1%)      0.21%
+P1 escape penalty 24                  11.704 (26.8%)      11.825 (26.1%)    11.842 (26.0%)      0.19%
+P2 escape penalty 8                   11.416 (28.7%)      11.536 (27.9%)    11.550 (27.8%)      0.17%
+P2 escape penalty 12                  11.420 (28.6%)      11.516 (28.0%)    11.525 (28.0%)      0.17%
+P2 escape penalty 16                  11.428 (28.6%)      11.519 (28.0%)    11.526 (28.0%)      0.23%
+P2 escape penalty 24                  11.772 (26.4%)      11.835 (26.0%)    11.839 (26.0%)      0.25%
+
+=== code: bits per value, all 30 layers (BF16 = 16); escape room per layer set from FIT data ===
+A0 current GPU format (variable size): 12.235 (23.5%)
+variant                                     variable     fixed, p99.9 room     fixed, max room  raw blocks
+P1 escape penalty 8                   11.347 (29.1%)      11.644 (27.2%)    11.693 (26.9%)      0.05%
+P1 escape penalty 12                  11.355 (29.0%)      11.623 (27.4%)    11.669 (27.1%)      0.02%
+P1 escape penalty 16                  11.374 (28.9%)      11.625 (27.3%)    11.669 (27.1%)      0.03%
+P1 escape penalty 24                  11.696 (26.9%)      11.821 (26.1%)    11.841 (26.0%)      0.08%
+P2 escape penalty 8                   11.406 (28.7%)      11.532 (27.9%)    11.550 (27.8%)      0.08%
+P2 escape penalty 12                  11.412 (28.7%)      11.511 (28.1%)    11.524 (28.0%)      0.07%
+P2 escape penalty 16                  11.421 (28.6%)      11.513 (28.0%)    11.525 (28.0%)      0.10%
+P2 escape penalty 24                  11.767 (26.5%)      11.828 (26.1%)    11.836 (26.0%)      0.08%
+
+## deploy_checks.py ACT_DIR all   (decoder block size and fixed point, cost only, layers 1-29)
+layers 1..29 (29 layers), bits per value (BF16 = 16); steps = sequential blocks per layer
+
+=== text ===
+B3 bsz=2 (pairs, as measured)               8.249   48.4%   steps/layer 192
+B3 bsz=8                                    8.280   48.3%   steps/layer 48
+B3 bsz=32                                   8.355   47.8%   steps/layer 12
+B3 bsz=192 (K block, then V block)          8.668   45.8%   steps/layer 2
+B1-like bsz=384 (previous layer only)       8.967   44.0%   steps/layer 1
+B3 bsz=2, fixed point                       8.250   48.4%   steps/layer 192
+B3 bsz=32, fixed point                      8.356   47.8%   steps/layer 12
+
+=== code ===
+B3 bsz=2 (pairs, as measured)               7.938   50.4%   steps/layer 192
+B3 bsz=8                                    7.969   50.2%   steps/layer 48
+B3 bsz=32                                   8.047   49.7%   steps/layer 12
+B3 bsz=192 (K block, then V block)          8.383   47.6%   steps/layer 2
+B1-like bsz=384 (previous layer only)       8.710   45.6%   steps/layer 1
+B3 bsz=2, fixed point                       7.938   50.4%   steps/layer 192
+B3 bsz=32, fixed point                      8.048   49.7%   steps/layer 12

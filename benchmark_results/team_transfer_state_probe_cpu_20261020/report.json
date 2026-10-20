@@ -1,0 +1,113 @@
+{
+  "after": {
+    "INT16_or_INT32_candidate_all_frozen_array_bytes": 16068104,
+    "INT16_or_INT32_candidate_coefficient_bytes": 14702592,
+    "all_frozen_array_bytes": 26580488,
+    "coefficient_bytes": 25214976,
+    "coefficient_dtypes": [
+      "int32"
+    ],
+    "coefficient_elements": 6303744,
+    "minimum_exact_signed_dtype_block_counts": {
+      "empty": 1,
+      "int16": 287,
+      "int32": 72
+    },
+    "state_sha256": "19f1420112429dec6328e63f818f2c1ae1f45cc4084c9f5a48fd5e050eff5f3a"
+  },
+  "arithmetic_INT16_INT32_candidate": {
+    "all_frozen_array_bytes": 16068104,
+    "block_range_counts": {
+      "empty": 1,
+      "int16": 287,
+      "int32": 72
+    },
+    "coefficient_bytes": 14702592,
+    "packet_validated": false,
+    "scope": "Storage arithmetic only: each frozen block uses INT16 when its entire coefficient range fits, otherwise INT32; no mixed-dtype packet validation"
+  },
+  "before": {
+    "INT16_or_INT32_candidate_all_frozen_array_bytes": 16068104,
+    "INT16_or_INT32_candidate_coefficient_bytes": 14702592,
+    "all_frozen_array_bytes": 51795464,
+    "coefficient_bytes": 50429952,
+    "coefficient_dtypes": [
+      "int64"
+    ],
+    "coefficient_elements": 6303744,
+    "minimum_exact_signed_dtype_block_counts": {
+      "empty": 1,
+      "int16": 287,
+      "int32": 72
+    },
+    "state_sha256": "ee4a83c56954004630be87ca05720f20aa660c3cebc44686b24dd2ba5333fcca"
+  },
+  "candidate_state": {
+    "bytes": 16250497,
+    "path": "runs/transfer_state_compaction_probe/block32_int32.npz",
+    "sha256": "481ba4c94a1d1e3cb60bb5700fdf9cde09a17e52c789f0dc65877f13ff1f7633"
+  },
+  "capture": {
+    "path": "runs/transfer_smoke_cpu/captures/train_train_railway_512.npz",
+    "role": "TRAIN; frozen predictors were not refitted",
+    "sha256": "db86b3795232b296dc1a2ca8e5d7fa0abdf83c32e5710923092f11f0b64dc34e"
+  },
+  "checks": {
+    "accumulation_dtypes": [
+      "int64"
+    ],
+    "checked_blocks": 360,
+    "checked_values": 184320,
+    "first_absolute_position": 0,
+    "last_absolute_position": 15,
+    "layers": 30,
+    "prediction_sha256": "75137d2591bfbb4a484130c725d7fe83ccc716a2ccc700acb0177d5d5795c8e8",
+    "predictions_bit_identical": true,
+    "tokens": 16
+  },
+  "coefficient_bytes_saved": 25214976,
+  "frozen_array_bytes_saved": 25214976,
+  "frozen_array_reduction_fraction": 0.486818227943667,
+  "limitations": [
+    "Tested 16 token positions from one real TRAIN capture by default, across every layer/channel block.",
+    "No coefficient quantization, truncation, retraining, or change to CDF tables.",
+    "INT32 storage is exact only after checking all frozen coefficients fit the signed range.",
+    "Numpy INT64 features times INT32 coefficients produced INT64 accumulation in this CPU runtime.",
+    "Packet checks, when present, explicitly replace only state identity and preserve the original entropy payload; separate GPU validation remains necessary."
+  ],
+  "packet_check": {
+    "changed_header_fields": [
+      "state_sha256"
+    ],
+    "compact_decode_seconds": 15.794931558999451,
+    "compact_state_sha256": "19f1420112429dec6328e63f818f2c1ae1f45cc4084c9f5a48fd5e050eff5f3a",
+    "decoded_sha256": "c610d18c65e2d7bd849cad05b29ce600454d45bacad7f53d3b5e11d288c1e638",
+    "entropy_stream_bytes": 444216,
+    "equals_original_decoded_array": true,
+    "exact_decoder_checksum_verified": true,
+    "expected_decoded_file_sha256": "ec83475cb9f6ac04bc35891d7c78e713d27d320f02309a2adc67cfe826547b06",
+    "expected_decoded_path": "runs/transfer_smoke_cpu/packet_checks/TEST_test_antarctic_story_block32_0.npy",
+    "metadata_bytes": 0,
+    "original_packet_sha256": "3cbb70475f023b38cfcaf7cea15fcb4ec01e9278ab1ff26f144f7d606c40b6ac",
+    "original_state_sha256": "ee4a83c56954004630be87ca05720f20aa660c3cebc44686b24dd2ba5333fcca",
+    "payload_bytes_unchanged": true,
+    "payload_sha256": "1acb8a4d2057d062423c63e8a271822b6e7da698b812d40e75fd814b1a043f29",
+    "reframed_packet_path": "runs/transfer_state_compaction_probe/TEST_test_antarctic_story_block32_int32.bin",
+    "reframed_packet_sha256": "a962cefc585e3459026683cba55b9bc07eef8413a1526c0025294ffbaa898c5e",
+    "scope": "Original entropy payload decoded with INT32 coefficients after explicit state-identity header replacement",
+    "shape": [
+      30,
+      32,
+      384
+    ],
+    "source_packet_path": "runs/transfer_smoke_cpu/packet_checks/TEST_test_antarctic_story_block32_0.bin",
+    "values": 368640
+  },
+  "scope": "CPU frozen-state storage probe; no new KV entropy stream or GPU performance result",
+  "source_state": {
+    "bytes": 17187807,
+    "path": "runs/transfer_smoke_cpu/states/block32.npz",
+    "sha256": "039e82e0dbe60a02a1c6f99536483b6976fcc23cc2b820ba60206d78f417bf5e"
+  },
+  "source_state_unchanged": true
+}
