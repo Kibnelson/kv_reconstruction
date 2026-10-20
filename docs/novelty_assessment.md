@@ -8,7 +8,7 @@ The latest results separate three decisions:
 
 - **Strongest reported simple codec:** exponent Huffman plus temporal sign coding, 33.39% mean estimated reduction including state in its earlier six-case study. This is a combination of established techniques.
 - **Strongest demonstrated learned improvement:** shared previous-layer probability coding, 32.20% estimated net reduction at 8K versus 29.51% for its matched control. This is a measured +2.69 percentage-point improvement, with substantial prior conceptual overlap.
-- **Most promising research hypothesis:** a particular code derived from actual producer hidden states that conditions exact probabilities and removes previous-layer reconstruction prerequisites. It is unimplemented and has no established novelty or measured advantage yet.
+- **Most promising research hypothesis:** a particular code derived from actual producer hidden states that conditions exact probabilities and removes previous-layer reconstruction prerequisites. The [prefill side-code study](prefill_side_probability_study.md) now implements the first controlled experiment; target-model advantage and research novelty remain unproven.
 
 The two headline codec percentages use different sampled pages and framing. They are evidence summaries, not a paired leaderboard. The [conditional review](qwen_conditional_gpu_review.md) and [neural position review](qwen_neural_positions_review.md) retain their separate protocols.
 
@@ -57,7 +57,7 @@ A more specific research hypothesis is:
 
 > A compact code derived from actual producer activations can replace previous-layer prerequisites for exact KV probability decoding, improving the complete-size versus random-page-restoration tradeoff for a fixed model.
 
-The present shared model needs the same token tile's reconstructed previous-layer KV. Restoring a late-layer page can therefore require a depth-35 chain. Adding hidden features to that model might improve size while leaving the chain intact. A distinct, unimplemented variant would instead retain a small page-local hidden-derived code and condition the exact symbol probabilities on that code and frozen shared state alone.
+The present shared model needs the same token tile's reconstructed previous-layer KV. Restoring a late-layer page can therefore require a depth-35 chain. Adding hidden features to that model might improve size while leaving the chain intact. The new page-local variant instead retains a small hidden-derived code and conditions the exact symbol probabilities on that code and frozen shared state alone. Its initial implementation compares no code, final-KV-derived code, inverse-RoPE-aligned final-KV-derived code, and actual-hidden-derived code. The canonicalized KV control avoids attributing an encoder's easier positional alignment to uniquely upstream information. These controls share code rank where applicable, decoder width, TRAIN data and update schedule; differing encoder dimensions and complete state still count.
 
 Its flow would be: observe the actual normalized hidden state during prefill; produce and retain a compact code `z`; encode original BF16 KV under probabilities determined by `z`; later recover a requested page from its own `z`, symbol stream and shared decoder state. Neither original hidden tensors nor other layers' decoded KV may be required by the page-local variant.
 

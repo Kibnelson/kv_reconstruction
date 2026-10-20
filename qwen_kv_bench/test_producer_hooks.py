@@ -134,6 +134,32 @@ class ProducerHookTests(unittest.TestCase):
         self.assertEqual(set(context["norm_weights"]), {0, 1})
         self.assertTrue(all(not record["_buffers"] for record in hooks._records))
 
+    def test_explicit_starts_match_all_layers_and_preserve_tail(self):
+        model = _model()
+        ids = [i % 47 + 1 for i in range(19)]
+        with ProducerCapture(model, 19, tile_tokens=7, max_tiles=4,
+                             selected_starts=[14, 0]) as hooks:
+            captured = capture(model, ids, "cpu", chunk_tokens=8)
+        records, audit, _ = hooks.finalize(captured["matrices"])
+        self.assertEqual([(r["layer"], r["start"], r["tokens"]) for r in records],
+                         [(0, 0, 7), (0, 14, 5), (1, 0, 7), (1, 14, 5)])
+        self.assertEqual(audit["selection_rule"], "explicit_token_starts_across_all_layers")
+        self.assertEqual(audit["selected_tile_pairs"], 4)
+        self.assertTrue(audit["all_stage_targets_exact"])
+        for record in records:
+            for index, field in enumerate(("k", "v")):
+                expected = captured["matrices"][record["layer"]][index]
+                start = record["start"]
+                np.testing.assert_array_equal(record[field], expected[start:start + record["tokens"]])
+
+    def test_explicit_starts_reject_invalid_or_over_budget_plans(self):
+        model = _model()
+        for starts in ([], [0, 0], [-7], [1], [21], [True], [0.0]):
+            with self.subTest(starts=starts), self.assertRaisesRegex(ValueError, "selected_starts"):
+                ProducerCapture(model, 19, tile_tokens=7, max_tiles=4, selected_starts=starts)
+        with self.assertRaisesRegex(ValueError, "exceed max_tiles"):
+            ProducerCapture(model, 19, tile_tokens=7, max_tiles=2, selected_starts=[0, 14])
+
     def test_callback_builds_exact_recipes_inside_attention_before_model_return(self):
         from qwen_kv_bench import gpu_ops as g
         model = _model()

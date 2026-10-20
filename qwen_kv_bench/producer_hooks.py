@@ -37,6 +37,9 @@ class ProducerCapture:
     ``max_tiles`` counts layer/token pairs, each holding both K and V. Selection
     is fixed before prefill. Pass ``None`` to capture all tiles (small-model/full
     DEV diagnostics only); no hidden feature is serialized by this class.
+    ``selected_starts`` optionally fixes the same tile-aligned token starts at
+    every layer, for matched independent-page and cross-layer comparisons.
+    The selected pair count must fit ``max_tiles`` when a cap is provided.
     An optional ``on_tile(record, context)`` runs synchronously inside attention
     forward, immediately after the actual cache layer is updated and the tile
     is complete. Its CPU diagnostic work is included in model prefill time.
@@ -45,7 +48,8 @@ class ProducerCapture:
     _STAGES = ("input_layernorm", "attention_pre", "k_proj", "k_norm", "v_proj", "attention_post")
     _FIELDS = ("hidden", "k_proj", "k_pre_rope", "cos", "sin", "k", "v", "_v_hook", "_k_replay")
 
-    def __init__(self, model, total_tokens, tile_tokens=64, max_tiles=72, on_tile=None):
+    def __init__(self, model, total_tokens, tile_tokens=64, max_tiles=72, on_tile=None,
+                 selected_starts=None):
         self.model = model
         if on_tile is not None and not callable(on_tile):
             raise TypeError("on_tile must be callable or None")
@@ -113,8 +117,23 @@ class ProducerCapture:
         self._rope_stable = True
         tiles = math.ceil(self.total_tokens / self.tile_tokens)
         total_pairs = self.layer_count * tiles
-        count = total_pairs if max_tiles is None else min(max_tiles, total_pairs)
-        ordinals = np.linspace(0, total_pairs - 1, count, dtype=np.int64)
+        if selected_starts is None:
+            count = total_pairs if max_tiles is None else min(max_tiles, total_pairs)
+            ordinals = np.linspace(0, total_pairs - 1, count, dtype=np.int64)
+            self.selection_rule = "evenly_spaced_layer_major_pairs"
+        else:
+            starts = list(selected_starts)
+            if (not starts or any(isinstance(start, (bool, np.bool_)) or
+                    not isinstance(start, (int, np.integer)) or
+                    start < 0 or start >= self.total_tokens or start % self.tile_tokens
+                    for start in starts) or len(set(starts)) != len(starts)):
+                raise ValueError("selected_starts must be unique in-range tile-aligned token starts")
+            if max_tiles is not None and self.layer_count * len(starts) > max_tiles:
+                raise ValueError("selected_starts across all layers exceed max_tiles")
+            starts = sorted(int(start) for start in starts)
+            ordinals = [layer * tiles + start // self.tile_tokens
+                        for layer in range(self.layer_count) for start in starts]
+            self.selection_rule = "explicit_token_starts_across_all_layers"
         self._records = []
         self._by_layer = {i: [] for i in range(self.layer_count)}
         for ordinal in ordinals:
@@ -421,6 +440,7 @@ class ProducerCapture:
             selected_tile_pairs=len(records), logical_KV_records=2 * len(records),
             total_tile_pairs=self._total_pairs, coverage="full" if len(records) == self._total_pairs else "sampled",
             total_tokens=self.total_tokens, tile_tokens=self.tile_tokens,
+            selection_rule=self.selection_rule,
             layers=self.layer_count, head_dim=self.head_dim, kv_heads=self.heads,
             channels=self.channels, hidden_size=self.hidden_size, chunks_observed=self._chunks,
             hook_counts=dict(self._counts),

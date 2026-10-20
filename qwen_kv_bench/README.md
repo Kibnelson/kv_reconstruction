@@ -150,6 +150,30 @@ The BF16 weights alone occupy about **7.49 GiB**, before KV, attention workspace
 
 ## Inspect, share and extend
 
+The separate `--prefill-side-study` tests independent exact pages conditioned on
+learned codes emitted during actual attention forward. It compares no code,
+final-KV code, inverse-RoPE-aligned final-KV code, and actual normalized-hidden
+code, with frozen-exponent and previous-layer neural controls. Neural probability
+prediction uses the selected device; arithmetic entropy coding remains a CPU
+reference. All side bits, indexed framing and complete model state count.
+
+```bash
+python qwen_kv_gpu_bench.py --prefill-side-study \
+  --device cuda --rank 8 --width 128 --steps 200 --batch-tokens 64 \
+  --shared-width 128 --shared-steps 200 \
+  --train-tokens 512 --dev-tokens 128 --lengths 2048 --cases 1 \
+  --chunk-tokens 512 --tile-tokens 64 --max-pairs 72 \
+  --generation-steps 2 --output runs/qwen_prefill_side_smoke
+```
+
+The smoke budget checks the pipeline and preliminary rates. Use 7,000 total
+updates, width 512 for both local and chain models, 2K/8K contexts, three cases
+and 144 sampled pairs for a broader study. A larger code rank is a separate
+fresh run. See `docs/prefill_side_probability_study.md` in the repository for
+the full protocol, accounting boundaries, run and push commands. CPU entropy
+work can dominate runtime. This implements neither compact-resident attention
+nor a concurrency scheduler; target-model savings remain to be measured.
+
 The separate forward-hook preset `--producer-study --producer-preset conditional`
 compares four conditional ideas in 13 fixed candidates: true device Huffman
 exponent streams, separate sign streams, KV anchor prediction, and actual-prefill

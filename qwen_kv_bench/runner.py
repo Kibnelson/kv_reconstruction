@@ -23,6 +23,8 @@ def parser():
     p.add_argument("--self-test", action="store_true", help="Run synthetic CPU correctness tests without downloading weights")
     p.add_argument("--list-methods", action="store_true")
     p.add_argument("--producer-study", action="store_true", help="Run the separate forward-hook experiment; combine with --help for its options")
+    p.add_argument("--neural-probability-study", action="store_true", help="Run the previous-layer learned probability study; combine with --help for its options")
+    p.add_argument("--prefill-side-study", action="store_true", help="Run independent exact pages conditioned on learned prefill side codes; combine with --help for its options")
     p.add_argument("--device", default="auto", help="auto chooses CUDA then Intel XPU; CPU must be explicit; cuda:1 etc supported")
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--revision", default=None, help="Default model uses pinned commit; custom model defaults to its resolved main commit")
@@ -291,6 +293,10 @@ def _require_runtime_packages(p):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if "--prefill-side-study" in argv:
+        from .side_study import main as side_main
+        argv.remove("--prefill-side-study")
+        return side_main(argv)
     if "--neural-probability-study" in argv:
         from .neural_study import main as neural_main
         argv.remove("--neural-probability-study")
