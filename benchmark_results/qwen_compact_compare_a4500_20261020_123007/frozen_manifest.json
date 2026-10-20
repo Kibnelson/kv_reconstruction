@@ -1,0 +1,2523 @@
+{
+  "format": "compact_prefill_freeze_v1",
+  "model_identity": {
+    "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+    "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+    "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95",
+    "local_model": false,
+    "local_weights_content_hashed": false,
+    "device": "cuda:0",
+    "dtype": "bfloat16",
+    "attention_backend": "sdpa",
+    "model_storage_bytes": 8044936448,
+    "parameter_count": 4022468096,
+    "load_seconds": 1.9470952115952969,
+    "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+    "bf16_probe": {
+      "success": true,
+      "error": null,
+      "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support"
+    }
+  },
+  "source_sha256": "2d92691e47e7b890a3090c82636143a41daba5ba906b4eb54ae95b7a409371ce",
+  "training_input_hashes": [
+    "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+    "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+    "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0"
+  ],
+  "models": {
+    "lsb_local_none": {
+      "model_id": "e7bb7eecc45a586dea2a7589f110183217851ac3777c3d9c24c440a928eeef1f",
+      "serialized_state_bytes": 82512,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_local_none.json",
+          "bytes": 5014,
+          "sha256": "e7bb7eecc45a586dea2a7589f110183217851ac3777c3d9c24c440a928eeef1f"
+        },
+        {
+          "file": "calibration/compact_lsb_local_none.bin",
+          "bytes": 77498,
+          "sha256": "f6d22bcac2460f5f3b6881f57a70f0e69026c6553dc2198fc5bf9a94689a6e45"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 0,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "lsb",
+          "name": "lsb_local_none",
+          "page_shared": false,
+          "pooled": false,
+          "side_bits": 0,
+          "source": "none"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88456,
+            "file": "compact_lsb_local_none_training.json",
+            "required_for_decode": false,
+            "sha256": "0032d417c0ba221b855deb39107cd53130ea8678163e09e2063c4ceb5aa4bdbc"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.9448766708374023,
+          "initial_loss_bits": 2.0159497261047363,
+          "mean_last_20_loss_bits": 2.9508471369743345,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "lsb",
+        "name": "lsb_local_none",
+        "page_shared": false,
+        "pooled": false,
+        "side_bits": 0,
+        "source": "none"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_pool_none": {
+      "model_id": "7a0443ca09c3f6f57741c8701dda371d438292f8d3bf6729a9a00d9633112ade",
+      "serialized_state_bytes": 82507,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_pool_none.json",
+          "bytes": 5009,
+          "sha256": "7a0443ca09c3f6f57741c8701dda371d438292f8d3bf6729a9a00d9633112ade"
+        },
+        {
+          "file": "calibration/compact_lsb_pool_none.bin",
+          "bytes": 77498,
+          "sha256": "8b121b08abafc1e989be15cf3221e12d92189404bdf004568fe546c80e778b40"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 0,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "lsb",
+          "name": "lsb_pool_none",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 0,
+          "source": "none"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88508,
+            "file": "compact_lsb_pool_none_training.json",
+            "required_for_decode": false,
+            "sha256": "8b700b5969cba7be2088e05f747cc5f1e1ed73d475e61016b291832cae092115"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.944112539291382,
+          "initial_loss_bits": 2.0182080268859863,
+          "mean_last_20_loss_bits": 2.9424917697906494,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "lsb",
+        "name": "lsb_pool_none",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 0,
+        "source": "none"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_pool_kv2": {
+      "model_id": "9e9c7cc9b8a32ea90cd7f8d592c51eee6a7fea7d259af811be8d55b21d2ed76e",
+      "serialized_state_bytes": 91408,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_pool_kv2.json",
+          "bytes": 5005,
+          "sha256": "9e9c7cc9b8a32ea90cd7f8d592c51eee6a7fea7d259af811be8d55b21d2ed76e"
+        },
+        {
+          "file": "calibration/compact_lsb_pool_kv2.bin",
+          "bytes": 86403,
+          "sha256": "21dd775341f428fdf1d7c1332e7e24c56970dcd57d70c1a57bef2d5d022060a0"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2048,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "lsb",
+          "name": "lsb_pool_kv2",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 2,
+          "source": "kv"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88510,
+            "file": "compact_lsb_pool_kv2_training.json",
+            "required_for_decode": false,
+            "sha256": "0757a7a5c72e71404cf3f712e7b81a4658cad5d6b01268ea9370dee0d1a53e68"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.945692777633667,
+          "initial_loss_bits": 2.018650531768799,
+          "mean_last_20_loss_bits": 2.943485152721405,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "lsb",
+        "name": "lsb_pool_kv2",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 2,
+        "source": "kv"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_pool_hidden1": {
+      "model_id": "9de24c92afe2e81a0aa795da81fd55156ff95489c4fea10dec2ae3ff4d516409",
+      "serialized_state_bytes": 93474,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_pool_hidden1.json",
+          "bytes": 5022,
+          "sha256": "9de24c92afe2e81a0aa795da81fd55156ff95489c4fea10dec2ae3ff4d516409"
+        },
+        {
+          "file": "calibration/compact_lsb_pool_hidden1.bin",
+          "bytes": 88452,
+          "sha256": "b9de59b66319ca7e1094b48d25305944b5c122f0a6f4e38bea54ee75ee73d668"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2560,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "lsb",
+          "name": "lsb_pool_hidden1",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 1,
+          "source": "hidden"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88524,
+            "file": "compact_lsb_pool_hidden1_training.json",
+            "required_for_decode": false,
+            "sha256": "b67dc95a7977c7dc1e7cba60312e40708bc15729555a227fec1228e8387273e8"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.945157051086426,
+          "initial_loss_bits": 2.020744562149048,
+          "mean_last_20_loss_bits": 2.9409459590911866,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "lsb",
+        "name": "lsb_pool_hidden1",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 1,
+        "source": "hidden"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_pool_hidden2": {
+      "model_id": "941314ffe277a0baa31fb883b30adbbc9cb07755889e82cd213e0ac507268e31",
+      "serialized_state_bytes": 93476,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_pool_hidden2.json",
+          "bytes": 5024,
+          "sha256": "941314ffe277a0baa31fb883b30adbbc9cb07755889e82cd213e0ac507268e31"
+        },
+        {
+          "file": "calibration/compact_lsb_pool_hidden2.bin",
+          "bytes": 88452,
+          "sha256": "6f5f78b715ca80ea34b1449dfd5eec6ba3619e285d844dc0c1fe38ae3beac511"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2560,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "lsb",
+          "name": "lsb_pool_hidden2",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 2,
+          "source": "hidden"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88485,
+            "file": "compact_lsb_pool_hidden2_training.json",
+            "required_for_decode": false,
+            "sha256": "dbedb99eeb75d41d3334eb9e190a667060d0dadba4728fad8822fefd97c7151d"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.9534130096435547,
+          "initial_loss_bits": 2.0186283588409424,
+          "mean_last_20_loss_bits": 2.9440853595733643,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "lsb",
+        "name": "lsb_pool_hidden2",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 2,
+        "source": "hidden"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_pool_hidden4": {
+      "model_id": "59b3bffe7a1b9a1a09eea2f8a0ec232338a04606bf217da49390672293351b03",
+      "serialized_state_bytes": 93474,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_pool_hidden4.json",
+          "bytes": 5022,
+          "sha256": "59b3bffe7a1b9a1a09eea2f8a0ec232338a04606bf217da49390672293351b03"
+        },
+        {
+          "file": "calibration/compact_lsb_pool_hidden4.bin",
+          "bytes": 88452,
+          "sha256": "38397ca10ce02ff8af936fa2ea945a970d73d58a90f634fb68f362ccc6eb1bf7"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2560,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "lsb",
+          "name": "lsb_pool_hidden4",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 4,
+          "source": "hidden"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88509,
+            "file": "compact_lsb_pool_hidden4_training.json",
+            "required_for_decode": false,
+            "sha256": "4b9404234ab68ea8004e5c0218622acd018dad04a3b1773da7dedb5c4dd398b2"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.945568799972534,
+          "initial_loss_bits": 2.0180842876434326,
+          "mean_last_20_loss_bits": 2.941490387916565,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "lsb",
+        "name": "lsb_pool_hidden4",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 4,
+        "source": "hidden"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_page_hidden2": {
+      "model_id": "c9697242afaa2edcff20d1c703080507d9087d587252d3ee773d657312cbc121",
+      "serialized_state_bytes": 93472,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_page_hidden2.json",
+          "bytes": 5020,
+          "sha256": "c9697242afaa2edcff20d1c703080507d9087d587252d3ee773d657312cbc121"
+        },
+        {
+          "file": "calibration/compact_lsb_page_hidden2.bin",
+          "bytes": 88452,
+          "sha256": "af4d0ca90ab6bd1de282a8886f6074703ee0ad43ce519e59e99c0ae0e34cb95b"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2560,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "lsb",
+          "name": "lsb_page_hidden2",
+          "page_shared": true,
+          "pooled": true,
+          "side_bits": 2,
+          "source": "hidden"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88479,
+            "file": "compact_lsb_page_hidden2_training.json",
+            "required_for_decode": false,
+            "sha256": "a18d5040feb030ab967a4cc159a631627a2dc3ff99fab2579c88ace235bdfc75"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.94465708732605,
+          "initial_loss_bits": 2.016543388366699,
+          "mean_last_20_loss_bits": 2.9408262968063354,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "lsb",
+        "name": "lsb_page_hidden2",
+        "page_shared": true,
+        "pooled": true,
+        "side_bits": 2,
+        "source": "hidden"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_page_kv2": {
+      "model_id": "d3f00f81f7a8b5d603f56d9a5157d6ecd1c79229b5670952c5b80baa55827003",
+      "serialized_state_bytes": 91406,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_page_kv2.json",
+          "bytes": 5003,
+          "sha256": "d3f00f81f7a8b5d603f56d9a5157d6ecd1c79229b5670952c5b80baa55827003"
+        },
+        {
+          "file": "calibration/compact_lsb_page_kv2.bin",
+          "bytes": 86403,
+          "sha256": "4aa2d530c15e4de1163a0d9f4df04595ba2c96e0c9be5fe5fb7f51031c9885db"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2048,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "lsb",
+          "name": "lsb_page_kv2",
+          "page_shared": true,
+          "pooled": true,
+          "side_bits": 2,
+          "source": "kv"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88499,
+            "file": "compact_lsb_page_kv2_training.json",
+            "required_for_decode": false,
+            "sha256": "e70d930a51dd34c6431cd75e8ac4abe53b6055a8b292ea27542d47dbd9f59df5"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.948885440826416,
+          "initial_loss_bits": 2.016543388366699,
+          "mean_last_20_loss_bits": 2.94256796836853,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "lsb",
+        "name": "lsb_page_kv2",
+        "page_shared": true,
+        "pooled": true,
+        "side_bits": 2,
+        "source": "kv"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_kfirst_none": {
+      "model_id": "c75a1b9e249bce0b11825c54c365336a6e13ba8ec65c601f5687f2d0ae89de29",
+      "serialized_state_bytes": 82515,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_kfirst_none.json",
+          "bytes": 5017,
+          "sha256": "c75a1b9e249bce0b11825c54c365336a6e13ba8ec65c601f5687f2d0ae89de29"
+        },
+        {
+          "file": "calibration/compact_lsb_kfirst_none.bin",
+          "bytes": 77498,
+          "sha256": "765980e2cfd2bba81f795762f585a85d9430151a5d5ed4d73d4dddc19f8a471a"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 0,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": true,
+          "layout": "lsb",
+          "name": "lsb_kfirst_none",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 0,
+          "source": "none"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88618,
+            "file": "compact_lsb_kfirst_none_training.json",
+            "required_for_decode": false,
+            "sha256": "04ef69fe46dd6fc5b46abb52a04a147d004843e6257488be21cc566d3895434a"
+          },
+          "eligible_channel_range": [
+            1024,
+            2048
+          ],
+          "final_loss_bits": 2.9277687072753906,
+          "initial_loss_bits": 2.0134551525115967,
+          "mean_last_20_loss_bits": 2.932509481906891,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 1152,
+          "sampling_sha256": "cab898fbf17b9d5b48ba25a88f7235a8c58fe6d68e6a637f1e2c93f0a4b54c15",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": true,
+        "layout": "lsb",
+        "name": "lsb_kfirst_none",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 0,
+        "source": "none"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_kfirst_kv2": {
+      "model_id": "36454e57963393869ee28fb7b416a0e9cb7d3d78003f9fd8cd3e16c78855c4da",
+      "serialized_state_bytes": 91419,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_kfirst_kv2.json",
+          "bytes": 5016,
+          "sha256": "36454e57963393869ee28fb7b416a0e9cb7d3d78003f9fd8cd3e16c78855c4da"
+        },
+        {
+          "file": "calibration/compact_lsb_kfirst_kv2.bin",
+          "bytes": 86403,
+          "sha256": "9fe2ed3697996dce97dbc3a141ba4bf94203ed0b906e60f5586bed221e8d0a4c"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2048,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": true,
+          "layout": "lsb",
+          "name": "lsb_kfirst_kv2",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 2,
+          "source": "kv"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88580,
+            "file": "compact_lsb_kfirst_kv2_training.json",
+            "required_for_decode": false,
+            "sha256": "6a738bba46a0fd26e569ca7c6f5f9fd438a7848eb6053f840407173d08e981f0"
+          },
+          "eligible_channel_range": [
+            1024,
+            2048
+          ],
+          "final_loss_bits": 2.9309825897216797,
+          "initial_loss_bits": 2.0143368244171143,
+          "mean_last_20_loss_bits": 2.9343195080757143,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 1152,
+          "sampling_sha256": "cab898fbf17b9d5b48ba25a88f7235a8c58fe6d68e6a637f1e2c93f0a4b54c15",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": true,
+        "layout": "lsb",
+        "name": "lsb_kfirst_kv2",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 2,
+        "source": "kv"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "lsb_kfirst_hidden2": {
+      "model_id": "dca31be5c0d32c468bfbebbf44af01958a7d16d144e9ae2e241dd7fcb9d55002",
+      "serialized_state_bytes": 93483,
+      "files": [
+        {
+          "file": "calibration/compact_lsb_kfirst_hidden2.json",
+          "bytes": 5031,
+          "sha256": "dca31be5c0d32c468bfbebbf44af01958a7d16d144e9ae2e241dd7fcb9d55002"
+        },
+        {
+          "file": "calibration/compact_lsb_kfirst_hidden2.bin",
+          "bytes": 88452,
+          "sha256": "46c1ceac28d7d6c534295c2197b7d903c2ba2566b463346658d781eefa83a9c4"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              2,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2560,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": true,
+          "layout": "lsb",
+          "name": "lsb_kfirst_hidden2",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 2,
+          "source": "hidden"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88583,
+            "file": "compact_lsb_kfirst_hidden2_training.json",
+            "required_for_decode": false,
+            "sha256": "b637bb6a3afd0e55f2dfea6582d21e679fbe060448247cd87fd35f6eb481ec34"
+          },
+          "eligible_channel_range": [
+            1024,
+            2048
+          ],
+          "final_loss_bits": 2.9275574684143066,
+          "initial_loss_bits": 2.013988494873047,
+          "mean_last_20_loss_bits": 2.9363351345062254,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 1152,
+          "sampling_sha256": "cab898fbf17b9d5b48ba25a88f7235a8c58fe6d68e6a637f1e2c93f0a4b54c15",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": true,
+        "layout": "lsb",
+        "name": "lsb_kfirst_hidden2",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 2,
+        "source": "hidden"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "msb_pool_none": {
+      "model_id": "7152b82cd14a4fb036131e942095d14e949205aac20751a475b29e144361a25e",
+      "serialized_state_bytes": 82504,
+      "files": [
+        {
+          "file": "calibration/compact_msb_pool_none.json",
+          "bytes": 5006,
+          "sha256": "7152b82cd14a4fb036131e942095d14e949205aac20751a475b29e144361a25e"
+        },
+        {
+          "file": "calibration/compact_msb_pool_none.bin",
+          "bytes": 77498,
+          "sha256": "fe5f9bcf24309c2cece5aded310ad6555725987850ccdf54c12e1ebccf5b6f6b"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              3,
+              2
+            ],
+            [
+              0,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 0,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "msb",
+          "name": "msb_pool_none",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 0,
+          "source": "none"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88465,
+            "file": "compact_msb_pool_none_training.json",
+            "required_for_decode": false,
+            "sha256": "185f694e95fd15bd5153b2914ef66536116b2c4fcbdb3afa9e883c5aeed0c003"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.95619535446167,
+          "initial_loss_bits": 2.019401788711548,
+          "mean_last_20_loss_bits": 2.938979411125183,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "msb",
+        "name": "msb_pool_none",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 0,
+        "source": "none"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "msb_pool_kv2": {
+      "model_id": "eed0543636886c0f33d8136c2360ffb6162306828d59126e98fd5206b124984a",
+      "serialized_state_bytes": 91410,
+      "files": [
+        {
+          "file": "calibration/compact_msb_pool_kv2.json",
+          "bytes": 5007,
+          "sha256": "eed0543636886c0f33d8136c2360ffb6162306828d59126e98fd5206b124984a"
+        },
+        {
+          "file": "calibration/compact_msb_pool_kv2.bin",
+          "bytes": 86403,
+          "sha256": "e71faff9d544cb49bcbd978860eaf98d94f3e550c582f9eb88a55a21cee94744"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              3,
+              2
+            ],
+            [
+              0,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2048,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "msb",
+          "name": "msb_pool_kv2",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 2,
+          "source": "kv"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88396,
+            "file": "compact_msb_pool_kv2_training.json",
+            "required_for_decode": false,
+            "sha256": "e48cfab2a01ba4e17e730279815b0a96ad29bb88a6fef30b459aa522751ff143"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.9595537185668945,
+          "initial_loss_bits": 2.019866466522217,
+          "mean_last_20_loss_bits": 2.9401217341423034,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "msb",
+        "name": "msb_pool_kv2",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 2,
+        "source": "kv"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    },
+    "msb_pool_hidden2": {
+      "model_id": "8b9003197ac5a2ddee04bec77b7f6f0a6fee486fad53750e08284369608d85ac",
+      "serialized_state_bytes": 93475,
+      "files": [
+        {
+          "file": "calibration/compact_msb_pool_hidden2.json",
+          "bytes": 5023,
+          "sha256": "8b9003197ac5a2ddee04bec77b7f6f0a6fee486fad53750e08284369608d85ac"
+        },
+        {
+          "file": "calibration/compact_msb_pool_hidden2.bin",
+          "bytes": 88452,
+          "sha256": "a8bea4b403b305b1d5f3f77f00ebcf582500d0a95908a1832d6d0b7816e80893"
+        }
+      ],
+      "metadata": {
+        "config": {
+          "activation": "GELU approximate=tanh",
+          "counts": "CPU float64 softmax; positive floor and fixed last-symbol remainder; total65536",
+          "hint": "scalar postprojection TRAIN calibration, known-field innovation, uniform STE grid[-3,3]",
+          "known_context": "Exact field statistics only, remasked at every call",
+          "objective": "Joint-symbol cross entropy surrogate; fixed hint bits charged by packet codec, no variable-rate entropy bonus",
+          "projection_calibration": "Frozen TRAIN-only scalar mean/std at initialization, not per-input-channel normalizers",
+          "runtime_scope": "same selected-device FP32 predictor and CPU integerization; cross-device CDF portability not promised",
+          "stage_plan": [
+            [
+              3,
+              2
+            ],
+            [
+              0,
+              3
+            ]
+          ]
+        },
+        "format": "compact_prefill_joint_models_v1",
+        "geometry": {
+          "channels": 1024,
+          "head_dim": 128,
+          "hidden_size": 2560,
+          "layers": 36,
+          "source_width": 2560,
+          "width": 32
+        },
+        "model_identity": {
+          "attention_backend": "sdpa",
+          "bf16_probe": {
+            "error": null,
+            "scope": "BF16 allocation and matmul functionality, not proof of native hardware execution or SDPA support",
+            "success": true
+          },
+          "config_sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "device": "cuda:0",
+          "dtype": "bfloat16",
+          "load_seconds": 1.9470952115952969,
+          "local_model": false,
+          "local_weights_content_hashed": false,
+          "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+          "model_storage_bytes": 8044936448,
+          "parameter_count": 4022468096,
+          "placement": "Explicit single device; no device_map, automatic offload, or remote code",
+          "requested_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "resolved_commit": "cdbee75f17c01a7cc42f958dc650907174af0554",
+          "runtime_config_sha256": "043866f2ecd8b60f9acb0fd75e8e6d78126dff588368e659d6e03574c4e27f95"
+        },
+        "spec": {
+          "base_bits": 2,
+          "key_first": false,
+          "layout": "msb",
+          "name": "msb_pool_hidden2",
+          "page_shared": false,
+          "pooled": true,
+          "side_bits": 2,
+          "source": "hidden"
+        },
+        "training": {
+          "batch_tokens": 32,
+          "channel_stage_slots_without_examples": 0,
+          "channels_per_update": 64,
+          "data_sampling_sha256": "5dc9413ad272c412a0749d87245e91806faec3781c9fc69232fc8198aa0db304",
+          "diagnostics": {
+            "bytes": 88459,
+            "file": "compact_msb_pool_hidden2_training.json",
+            "required_for_decode": false,
+            "sha256": "140a4f80cf3b9716a07dfd6841f789baf9382983cb98f14b07e0a3ddd5f22eee"
+          },
+          "eligible_channel_range": [
+            0,
+            2048
+          ],
+          "final_loss_bits": 2.9551925659179688,
+          "initial_loss_bits": 2.0199992656707764,
+          "mean_last_20_loss_bits": 2.938728618621826,
+          "minimum_updates_for_one_complete_channel_stage_cycle": 2304,
+          "sampling_sha256": "0e4bc2a8cbf9c98ae81254e27e23e3de38c42b74260cb621f9e276209540d37f",
+          "seed": 71,
+          "updates": 4096
+        },
+        "training_captures": [
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "195b58f4f1e092f169af62107df7011ff50549e4854c232c0b1cb344bbfb42c9",
+            "kv_words_sha256": "4e0bd833fcdb7d822f372a38b381b37b90b2c5a1814fd2c40e9ea888d1fc5730",
+            "name": "train_ferry_maintenance",
+            "producer_inputs_sha256": "8fd3cff1f8273b55d3f2efc09482570874ee701be915cf46b5b977280a5fad91",
+            "producer_records_sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "sha256": "aa3a0bce31b71ec1bf0833dc083b66a4f03df4da0d948e0e96c68fd4f7669808",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "63761fab487683feaa7c72f0ee5c922c4d527cfeade5ebf236aa63fc9c5749fa",
+            "kv_words_sha256": "f745735369d967002fb026804903f6430b49363f9a7badb90acac2ce7d9da20f",
+            "name": "train_python_bounded_ring",
+            "producer_inputs_sha256": "a817a8780e7acc30a15eb37f4d8a807cbeada6ce562f1342bae13b50cfa84c9f",
+            "producer_records_sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "sha256": "d1682f525ca32defdf17344653c270b9b632c2a9e27f61279d849ecd23b54e4c",
+            "split": "train",
+            "tokens": 512
+          },
+          {
+            "geometry": {
+              "channels": 1024,
+              "columns": 1024,
+              "head_dim": 128,
+              "kv_heads": 8,
+              "layers": 36,
+              "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+              "tokens": 512
+            },
+            "input_ids_sha256": "a9a2dd2745e0d22df2783aaa3837806535d0b3c5e66a02c9f05f5020f99e2aaa",
+            "kv_words_sha256": "2bca92d48e7701a81564fd5da439ab3b900be8f180674629c20be853833b71c9",
+            "name": "train_seed_vault_records",
+            "producer_inputs_sha256": "82e382785e43c3ddb59a49c7818263fc2da41922a09b4cb0e7dc04c78ba330f0",
+            "producer_records_sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "sha256": "5ae623c14d6c7717bb9bb991b25e1800f237aa0d20fad70d0424e9976cbd4cb9",
+            "split": "train",
+            "tokens": 512
+          }
+        ],
+        "training_hashes": [
+          "1209d357220e328904556a43a80f8b4847ed5e6d10315dfcf651c09532f3224c",
+          "ee648614c893adcea9cc71aca0e45f403d87315d25e7c8da9c2548621d41c1f7",
+          "b2dbd883c397a23217141dc4dcdaf6b12e04ffb2cd10e45eaba63517913953d2"
+        ],
+        "training_only": true
+      },
+      "spec": {
+        "base_bits": 2,
+        "key_first": false,
+        "layout": "msb",
+        "name": "msb_pool_hidden2",
+        "page_shared": false,
+        "pooled": true,
+        "side_bits": 2,
+        "source": "hidden"
+      },
+      "scope": "Full encoder/decoder/calibration artifact charged, even if some state is producer-only"
+    }
+  },
+  "field_state": {
+    "model_id": "5b22863aa126807bbf0e972237b3cfd382ee2ade3028c2650ed3dd2ccdcecca4",
+    "serialized_bytes": 73889,
+    "resident_bytes": 73728,
+    "charged_bytes": 73889,
+    "file": "calibration/coset_field_centers.bin",
+    "sha256": "5b22863aa126807bbf0e972237b3cfd382ee2ade3028c2650ed3dd2ccdcecca4",
+    "decoder_inputs": "Frozen exponent centers only; no learned weights or retained code"
+  },
+  "anchor_state": {
+    "serialized_bytes": 443390,
+    "resident_bytes": 73728,
+    "file": "calibration/frozen_exponent_state.bin",
+    "sha256": "c37d659d078b980d0f3226e18935c97bb9b8a6a7919ccfda0526458db4e8a222"
+  },
+  "protocol": "TRAIN fitting only. DEV freezes one storage-first winner. TEST reports all candidates without tuning.",
+  "selection": {
+    "winner": "field_baseline",
+    "best_learned_candidate": "lsb_kfirst_hidden2",
+    "split": "dev",
+    "name": "dev_orchard_sensor_log",
+    "tokens": 128,
+    "selection_reference_cache_tokens": 8192,
+    "rule": "Minimum complete DEV packet/raw ratio scaled to prespecified max requested TEST length, plus max(serialized,resident) full state; lexicographic tie break. TEST never replaces this selection.",
+    "input_ids_sha256": "9ab2a8be229a7b223f368c94a6d6bc7c2779cb46a2cde03c04e1d56e35163344",
+    "producer_inputs_sha256": "1488b20df56bc93c38dc8771d3eead40c9310af82714f5d11a49982bf352f53a"
+  }
+}
