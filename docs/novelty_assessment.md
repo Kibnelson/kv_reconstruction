@@ -8,7 +8,7 @@ The latest results separate three decisions:
 
 - **Strongest reported simple codec:** exponent Huffman plus temporal sign coding, 33.39% mean estimated reduction including state in its earlier six-case study. This is a combination of established techniques.
 - **Strongest demonstrated learned improvement:** shared previous-layer probability coding, 32.20% estimated net reduction at 8K versus 29.51% for its matched control. This is a measured +2.69 percentage-point improvement, with substantial prior conceptual overlap.
-- **Most promising research hypothesis:** a particular code derived from actual producer hidden states that conditions exact probabilities and removes previous-layer reconstruction prerequisites. The [prefill side-code study](prefill_side_probability_study.md) now implements the first controlled experiment; target-model advantage and research novelty remain unproven.
+- **Research hypothesis under test:** a particular code derived from actual producer hidden states that conditions exact probabilities and removes previous-layer reconstruction prerequisites. The [first A4500 side-code smoke](qwen_prefill_side_gpu_review.md) validates exact independent restoration, but hidden code estimates 31.43% net savings versus 32.20% for no-code. It loses probability rate before side/state overhead. Only 200 updates were used; target-model advantage and research novelty remain unproven.
 
 The two headline codec percentages use different sampled pages and framing. They are evidence summaries, not a paired leaderboard. The [conditional review](qwen_conditional_gpu_review.md) and [neural position review](qwen_neural_positions_review.md) retain their separate protocols.
 
@@ -27,6 +27,16 @@ The two headline codec percentages use different sampled pages and framing. They
 | **Earlier learned/fixed dictionaries, binary transforms, E8 and cosets** | Earlier prototypes use other configurations; no directly comparable winning current Qwen result is established here. Their percentages cannot be stacked with the later studies. | Codebooks [13], E8 quantization [14], reversible transforms and coset source coding [15] are established ingredients. Our exact symbol/correction formats do not establish a new coding theorem. |
 
 The mean-predictor control also falls back everywhere and supplies no new retained representation. Raw transfer and zero-prediction controls test accounting/correctness, rather than research novelty.
+
+The new [independent probability-page experiment](qwen_prefill_side_gpu_review.md)
+adds a different learned representation: actual retained codes condition exact
+entropy probabilities rather than full-word point-prediction corrections. Every
+new side page is retained and exact, so this validates that mechanism without
+fallback. However, the no-code probability model wins the first 2K smoke, and
+all three code-bearing variants lose complete packet bytes on every layer.
+The no-code variant is independent too. Independence therefore cannot yet be
+credited as a unique benefit of the producer code. Longer training at fixed
+width/rank is the next controlled test; no 8K side-code result exists yet.
 
 ## Important boundaries
 

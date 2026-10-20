@@ -2,8 +2,10 @@
 
 This experiment tests whether a small code created from actual prefill hidden
 states can improve exact KV coding while removing the previous-layer decoding
-dependency. It is an implemented representation experiment; a savings or
-serving advantage still requires target-model measurements.
+dependency. The [first A4500 smoke review](qwen_prefill_side_gpu_review.md)
+validates independent exact restoration, but finds no savings advantage for
+the hidden code over no-code. Longer training and broader validation remain
+necessary; a serving advantage is unmeasured.
 
 ## Flow
 
@@ -105,24 +107,27 @@ python qwen_kv_gpu_bench.py --prefill-side-study \
 ```
 
 This first run checks the pipeline and produces preliminary held-out rates;
-200 updates across 36 layers is a small training budget. For the broader
-comparison, use the previous shared model's 7,000-update aggregate budget and
-512-wide networks:
+200 updates across 36 layers is a small training budget. The smoke now shows
+only 2–10 updates per layer and a no-code lead. First isolate training duration:
+keep rank 8, width 128, batch 64 and the original data/geometry, while raising
+the aggregate update count to 7,000:
 
 ```bash
 python qwen_kv_gpu_bench.py --prefill-side-study \
-  --device cuda --rank 8 --width 512 --steps 7000 --batch-tokens 64 \
-  --shared-width 512 --shared-steps 7000 \
+  --device cuda --rank 8 --width 128 --steps 7000 --batch-tokens 64 \
+  --shared-width 128 --shared-steps 7000 \
   --train-tokens 512 --dev-tokens 128 \
-  --lengths 2048 8192 --cases 3 --chunk-tokens 512 \
-  --tile-tokens 64 --max-pairs 144 --generation-steps 2 \
-  --output runs/qwen_prefill_side_r8
+  --lengths 2048 --cases 1 --chunk-tokens 512 \
+  --tile-tokens 64 --max-pairs 72 --generation-steps 2 \
+  --output runs/qwen_prefill_side_train7000
 ```
 
-Repeat with `--rank 32 --output runs/qwen_prefill_side_r32` to measure whether
-the larger code pays for its extra bits. Choose changes using DEV, and use new
-held-out data before presenting a selected configuration's final result.
-The Python CPU arithmetic reference can make these runs take substantial time.
+Then broaden to `--lengths 2048 8192 --cases 3 --max-pairs 144` with a fresh
+output directory. Width 512 and rank 32 are separate later ablations, after
+testing whether training duration helps at the current capacity and side cost.
+Reusing the smoke fixture is diagnostic; choose changes using DEV and use new
+held-out data before presenting a selected configuration's final result. The
+Python CPU arithmetic reference can make these runs take substantial time.
 
 Create a size-safe results package and push it:
 

@@ -1,0 +1,1688 @@
+{
+  "format": "prefill_side_review_v1",
+  "results_json_sha256": "891444774873f805c672fe2750bf11f3b131cb95a30ade88d834793397b5588f",
+  "source_sha256": "82b89584d81f640b75d8984fe82ec379673e57e65f3b497126be0a5bc1b6df10",
+  "config": {
+    "device": "cuda",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "local_files_only": false,
+    "tiny": false,
+    "rank": 8,
+    "width": 128,
+    "steps": 200,
+    "batch_tokens": 64,
+    "train_tokens": 512,
+    "dev_tokens": 128,
+    "lengths": [
+      2048
+    ],
+    "cases": 1,
+    "chunk_tokens": 512,
+    "tile_tokens": 64,
+    "max_pairs": 72,
+    "generation_steps": 2,
+    "shared_width": 128,
+    "shared_steps": 200,
+    "skip_chain_control": false,
+    "threads": 4,
+    "seed": 71,
+    "output": "runs/qwen_prefill_side_smoke"
+  },
+  "elapsed_seconds": 1799.2695974297822,
+  "training_seconds": 10.604586550965905,
+  "updates_per_layer_min": 2,
+  "updates_per_layer_max": 10,
+  "available_layer_token_rows": 55296,
+  "actual_training_token_examples": 12800,
+  "cases": [
+    {
+      "name": "test_pottery_kiln_diary",
+      "tokens": 2048,
+      "selected_starts": [
+        0,
+        1984
+      ],
+      "methods": [
+        {
+          "method": "frozen_exponent_control",
+          "packet_bytes": 13332471,
+          "raw_sample_bytes": 18874368,
+          "packet_reduction_pct": 29.362026850382488,
+          "net_estimated_reduction_pct": 29.2152957783805,
+          "charged_state_bytes": 443113,
+          "state_MiB": 0.42258548736572266,
+          "dependency_depth": 0,
+          "decode_seconds": 0.16629287973046303,
+          "component_bytes": null,
+          "sample_fraction_of_full_cache": 0.0625,
+          "net_delta_vs_none_pp": -2.98069847954644
+        },
+        {
+          "method": "side_none",
+          "packet_bytes": 12609560,
+          "raw_sample_bytes": 18874368,
+          "packet_reduction_pct": 33.192147148980034,
+          "net_estimated_reduction_pct": 32.19599425792694,
+          "charged_state_bytes": 3008281,
+          "state_MiB": 2.86892032623291,
+          "dependency_depth": 0,
+          "decode_seconds": 59.10593534260988,
+          "component_bytes": {
+            "feature_bytes": 0,
+            "entropy_payload_bytes": 12505173,
+            "framing_bytes": 103694,
+            "container_framing_bytes": 693
+          },
+          "sample_fraction_of_full_cache": 0.0625,
+          "ideal_bits_per_value": 10.600241656270546,
+          "integer_CDF_bits_per_value": 10.60024308708977,
+          "retained_code_bits_per_value": 0.0,
+          "complete_packet_bits_per_value": 10.689256456163195,
+          "CPU_entropy_decode_seconds": 58.99501513876021,
+          "CPU_entropy_decode_pct": 99.8123366067947,
+          "prediction_seconds": 0.08156407810747623,
+          "per_layer": {
+            "0": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354859,
+              "feature_bytes": 0,
+              "ideal_bits": 2815710.9259448303,
+              "integer_cdf_bits": 2815710.914784791,
+              "packet_reduction_pct": 32.316017150878906,
+              "ideal_bits_per_value": 10.741084769992181
+            },
+            "1": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349739,
+              "feature_bytes": 0,
+              "ideal_bits": 2774746.5659091454,
+              "integer_cdf_bits": 2774746.5190904313,
+              "packet_reduction_pct": 33.292579650878906,
+              "ideal_bits_per_value": 10.584818137775976
+            },
+            "2": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350936,
+              "feature_bytes": 0,
+              "ideal_bits": 2784336.87459216,
+              "integer_cdf_bits": 2784336.825886757,
+              "packet_reduction_pct": 33.06427001953125,
+              "ideal_bits_per_value": 10.62140226208557
+            },
+            "3": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350169,
+              "feature_bytes": 0,
+              "ideal_bits": 2778190.4646790484,
+              "integer_cdf_bits": 2778190.4559794758,
+              "packet_reduction_pct": 33.21056365966797,
+              "ideal_bits_per_value": 10.597955568996614
+            },
+            "4": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352366,
+              "feature_bytes": 0,
+              "ideal_bits": 2795760.3727123453,
+              "integer_cdf_bits": 2795760.330148124,
+              "packet_reduction_pct": 32.79151916503906,
+              "ideal_bits_per_value": 10.664979449128515
+            },
+            "5": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349904,
+              "feature_bytes": 0,
+              "ideal_bits": 2776045.2665377287,
+              "integer_cdf_bits": 2776045.4297244768,
+              "packet_reduction_pct": 33.2611083984375,
+              "ideal_bits_per_value": 10.589772287512698
+            },
+            "6": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352529,
+              "feature_bytes": 0,
+              "ideal_bits": 2797060.4729650654,
+              "integer_cdf_bits": 2797060.4775619092,
+              "packet_reduction_pct": 32.76042938232422,
+              "ideal_bits_per_value": 10.669938938007604
+            },
+            "7": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349032,
+              "feature_bytes": 0,
+              "ideal_bits": 2769072.884944559,
+              "integer_cdf_bits": 2769072.9201185023,
+              "packet_reduction_pct": 33.42742919921875,
+              "ideal_bits_per_value": 10.56317476251434
+            },
+            "8": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352526,
+              "feature_bytes": 0,
+              "ideal_bits": 2797045.6794971833,
+              "integer_cdf_bits": 2797045.869786762,
+              "packet_reduction_pct": 32.76100158691406,
+              "ideal_bits_per_value": 10.669882505406125
+            },
+            "9": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350342,
+              "feature_bytes": 0,
+              "ideal_bits": 2779569.7147487057,
+              "integer_cdf_bits": 2779569.571747332,
+              "packet_reduction_pct": 33.17756652832031,
+              "ideal_bits_per_value": 10.603216990465949
+            },
+            "10": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351356,
+              "feature_bytes": 0,
+              "ideal_bits": 2787642.987003207,
+              "integer_cdf_bits": 2787643.182231113,
+              "packet_reduction_pct": 32.984161376953125,
+              "ideal_bits_per_value": 10.634014080059842
+            },
+            "11": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350564,
+              "feature_bytes": 0,
+              "ideal_bits": 2781317.1740368255,
+              "integer_cdf_bits": 2781317.204792088,
+              "packet_reduction_pct": 33.135223388671875,
+              "ideal_bits_per_value": 10.60988301863413
+            },
+            "12": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349268,
+              "feature_bytes": 0,
+              "ideal_bits": 2770983.4731361666,
+              "integer_cdf_bits": 2770983.460374222,
+              "packet_reduction_pct": 33.382415771484375,
+              "ideal_bits_per_value": 10.5704630780646
+            },
+            "13": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349912,
+              "feature_bytes": 0,
+              "ideal_bits": 2776110.3127173316,
+              "integer_cdf_bits": 2776111.638006225,
+              "packet_reduction_pct": 33.25958251953125,
+              "ideal_bits_per_value": 10.590020418996168
+            },
+            "14": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349919,
+              "feature_bytes": 0,
+              "ideal_bits": 2776154.2589077963,
+              "integer_cdf_bits": 2776155.141350179,
+              "packet_reduction_pct": 33.25824737548828,
+              "ideal_bits_per_value": 10.590188060408769
+            },
+            "15": {
+              "raw_bytes": 524288,
+              "packet_bytes": 348649,
+              "feature_bytes": 0,
+              "ideal_bits": 2766026.923443891,
+              "integer_cdf_bits": 2766025.8672230626,
+              "packet_reduction_pct": 33.50048065185547,
+              "ideal_bits_per_value": 10.551555341506543
+            },
+            "16": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351220,
+              "feature_bytes": 0,
+              "ideal_bits": 2786581.751673977,
+              "integer_cdf_bits": 2786582.1205047406,
+              "packet_reduction_pct": 33.010101318359375,
+              "ideal_bits_per_value": 10.629965788551242
+            },
+            "17": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350465,
+              "feature_bytes": 0,
+              "ideal_bits": 2780518.671099104,
+              "integer_cdf_bits": 2780518.3494038037,
+              "packet_reduction_pct": 33.15410614013672,
+              "ideal_bits_per_value": 10.60683697166101
+            },
+            "18": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350905,
+              "feature_bytes": 0,
+              "ideal_bits": 2784054.1710630544,
+              "integer_cdf_bits": 2784062.370286848,
+              "packet_reduction_pct": 33.07018280029297,
+              "ideal_bits_per_value": 10.62032383370611
+            },
+            "19": {
+              "raw_bytes": 524288,
+              "packet_bytes": 348219,
+              "feature_bytes": 0,
+              "ideal_bits": 2762559.9434315832,
+              "integer_cdf_bits": 2762560.1139326273,
+              "packet_reduction_pct": 33.582496643066406,
+              "ideal_bits_per_value": 10.538329862333615
+            },
+            "20": {
+              "raw_bytes": 524288,
+              "packet_bytes": 348231,
+              "feature_bytes": 0,
+              "ideal_bits": 2762653.0959854964,
+              "integer_cdf_bits": 2762653.052330157,
+              "packet_reduction_pct": 33.58020782470703,
+              "ideal_bits_per_value": 10.538685211126314
+            },
+            "21": {
+              "raw_bytes": 524288,
+              "packet_bytes": 347666,
+              "feature_bytes": 0,
+              "ideal_bits": 2758148.1065376075,
+              "integer_cdf_bits": 2758148.1096255826,
+              "packet_reduction_pct": 33.68797302246094,
+              "ideal_bits_per_value": 10.521500040197783
+            },
+            "22": {
+              "raw_bytes": 524288,
+              "packet_bytes": 348261,
+              "feature_bytes": 0,
+              "ideal_bits": 2762889.9404995134,
+              "integer_cdf_bits": 2762889.9162968453,
+              "packet_reduction_pct": 33.574485778808594,
+              "ideal_bits_per_value": 10.539588701246313
+            },
+            "23": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349125,
+              "feature_bytes": 0,
+              "ideal_bits": 2769803.676684509,
+              "integer_cdf_bits": 2769803.6743422057,
+              "packet_reduction_pct": 33.409690856933594,
+              "ideal_bits_per_value": 10.565962511766468
+            },
+            "24": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350285,
+              "feature_bytes": 0,
+              "ideal_bits": 2779114.427762042,
+              "integer_cdf_bits": 2779114.1446751943,
+              "packet_reduction_pct": 33.188438415527344,
+              "ideal_bits_per_value": 10.601480208442847
+            },
+            "25": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349883,
+              "feature_bytes": 0,
+              "ideal_bits": 2775898.8929818785,
+              "integer_cdf_bits": 2775898.894625803,
+              "packet_reduction_pct": 33.265113830566406,
+              "ideal_bits_per_value": 10.589213916709436
+            },
+            "26": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350531,
+              "feature_bytes": 0,
+              "ideal_bits": 2781067.8742641215,
+              "integer_cdf_bits": 2781067.874421457,
+              "packet_reduction_pct": 33.141517639160156,
+              "ideal_bits_per_value": 10.608932015472876
+            },
+            "27": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349236,
+              "feature_bytes": 0,
+              "ideal_bits": 2770685.1045764037,
+              "integer_cdf_bits": 2770685.2450715853,
+              "packet_reduction_pct": 33.388519287109375,
+              "ideal_bits_per_value": 10.569324892335525
+            },
+            "28": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349765,
+              "feature_bytes": 0,
+              "ideal_bits": 2774938.1612473554,
+              "integer_cdf_bits": 2774938.1872131363,
+              "packet_reduction_pct": 33.287620544433594,
+              "ideal_bits_per_value": 10.585549015988752
+            },
+            "29": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350915,
+              "feature_bytes": 0,
+              "ideal_bits": 2784136.7186430534,
+              "integer_cdf_bits": 2784137.106606437,
+              "packet_reduction_pct": 33.068275451660156,
+              "ideal_bits_per_value": 10.620638727733816
+            },
+            "30": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349077,
+              "feature_bytes": 0,
+              "ideal_bits": 2769418.9558084966,
+              "integer_cdf_bits": 2769419.1347096683,
+              "packet_reduction_pct": 33.418846130371094,
+              "ideal_bits_per_value": 10.564494918092715
+            },
+            "31": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350043,
+              "feature_bytes": 0,
+              "ideal_bits": 2777162.3490832467,
+              "integer_cdf_bits": 2777162.3510182486,
+              "packet_reduction_pct": 33.234596252441406,
+              "ideal_bits_per_value": 10.594033619244563
+            },
+            "32": {
+              "raw_bytes": 524288,
+              "packet_bytes": 349897,
+              "feature_bytes": 0,
+              "ideal_bits": 2775974.093722458,
+              "integer_cdf_bits": 2775975.903732715,
+              "packet_reduction_pct": 33.26244354248047,
+              "ideal_bits_per_value": 10.589500784768898
+            },
+            "33": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352671,
+              "feature_bytes": 0,
+              "ideal_bits": 2798201.318831768,
+              "integer_cdf_bits": 2798201.827021443,
+              "packet_reduction_pct": 32.73334503173828,
+              "ideal_bits_per_value": 10.674290919615814
+            },
+            "34": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350152,
+              "feature_bytes": 0,
+              "ideal_bits": 2778025.6256480636,
+              "integer_cdf_bits": 2778025.7503107754,
+              "packet_reduction_pct": 33.21380615234375,
+              "ideal_bits_per_value": 10.597326757995848
+            },
+            "35": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350250,
+              "feature_bytes": 0,
+              "ideal_bits": 2778823.7233701693,
+              "integer_cdf_bits": 2778824.522659461,
+              "packet_reduction_pct": 33.19511413574219,
+              "ideal_bits_per_value": 10.600371259194066
+            }
+          },
+          "per_position": {
+            "0": {
+              "raw_bytes": 9437184,
+              "packet_bytes": 6353248,
+              "feature_bytes": 0,
+              "ideal_bits": 50409196.03887073,
+              "integer_cdf_bits": 50409208.976734705,
+              "packet_reduction_pct": 32.678561740451386,
+              "ideal_bits_per_value": 10.683101238435263
+            },
+            "1984": {
+              "raw_bytes": 9437184,
+              "packet_bytes": 6255619,
+              "feature_bytes": 0,
+              "ideal_bits": 49627234.91581916,
+              "integer_cdf_bits": 49627235.48085946,
+              "packet_reduction_pct": 33.71307584974501,
+              "ideal_bits_per_value": 10.517382074105827
+            }
+          },
+          "inline_code_seconds": 0.008310850709676743,
+          "net_delta_vs_none_pp": 0.0,
+          "packet_layers_beating_none": [],
+          "ideal_rate_layers_beating_none": [],
+          "loss_components_vs_none_pp": {
+            "feature_bytes": 0.0,
+            "entropy_payload_bytes": 0.0,
+            "framing_bytes": 0.0,
+            "container_framing_bytes": 0.0,
+            "state": 0.0
+          }
+        },
+        {
+          "method": "side_kv",
+          "packet_bytes": 12712954,
+          "raw_sample_bytes": 18874368,
+          "packet_reduction_pct": 32.64434602525499,
+          "net_estimated_reduction_pct": 31.429693433973526,
+          "charged_state_bytes": 3668128,
+          "state_MiB": 3.498199462890625,
+          "dependency_depth": 0,
+          "decode_seconds": 58.11323560774326,
+          "component_bytes": {
+            "feature_bytes": 73728,
+            "entropy_payload_bytes": 12534775,
+            "framing_bytes": 103758,
+            "container_framing_bytes": 693
+          },
+          "sample_fraction_of_full_cache": 0.0625,
+          "ideal_bits_per_value": 10.625336386969895,
+          "integer_CDF_bits_per_value": 10.62533645794148,
+          "retained_code_bits_per_value": 0.0625,
+          "complete_packet_bits_per_value": 10.776904635959202,
+          "CPU_entropy_decode_seconds": 57.99739163182676,
+          "CPU_entropy_decode_pct": 99.80065818964472,
+          "prediction_seconds": 0.0850358996540308,
+          "per_layer": {
+            "0": {
+              "raw_bytes": 524288,
+              "packet_bytes": 357126,
+              "feature_bytes": 2048,
+              "ideal_bits": 2817452.2329074293,
+              "integer_cdf_bits": 2817452.2286832086,
+              "packet_reduction_pct": 31.883621215820312,
+              "ideal_bits_per_value": 10.747727328901021
+            },
+            "1": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353083,
+              "feature_bytes": 2048,
+              "ideal_bits": 2785093.4884952744,
+              "integer_cdf_bits": 2785093.817089665,
+              "packet_reduction_pct": 32.654762268066406,
+              "ideal_bits_per_value": 10.624288515072916
+            },
+            "2": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353510,
+              "feature_bytes": 2048,
+              "ideal_bits": 2788539.5781140355,
+              "integer_cdf_bits": 2788539.5148376888,
+              "packet_reduction_pct": 32.57331848144531,
+              "ideal_bits_per_value": 10.637434303718702
+            },
+            "3": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352520,
+              "feature_bytes": 2048,
+              "ideal_bits": 2780596.6570092347,
+              "integer_cdf_bits": 2780596.692085752,
+              "packet_reduction_pct": 32.76214599609375,
+              "ideal_bits_per_value": 10.607134464299143
+            },
+            "4": {
+              "raw_bytes": 524288,
+              "packet_bytes": 355130,
+              "feature_bytes": 2048,
+              "ideal_bits": 2801460.1062371996,
+              "integer_cdf_bits": 2801460.103920786,
+              "packet_reduction_pct": 32.26432800292969,
+              "ideal_bits_per_value": 10.686722207020567
+            },
+            "5": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354102,
+              "feature_bytes": 2048,
+              "ideal_bits": 2793230.27647857,
+              "integer_cdf_bits": 2793229.724478284,
+              "packet_reduction_pct": 32.46040344238281,
+              "ideal_bits_per_value": 10.655327897943764
+            },
+            "6": {
+              "raw_bytes": 524288,
+              "packet_bytes": 355067,
+              "feature_bytes": 2048,
+              "ideal_bits": 2800969.230033289,
+              "integer_cdf_bits": 2800969.5990686305,
+              "packet_reduction_pct": 32.276344299316406,
+              "ideal_bits_per_value": 10.68484966290775
+            },
+            "7": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350972,
+              "feature_bytes": 2048,
+              "ideal_bits": 2768199.933334464,
+              "integer_cdf_bits": 2768199.7020842973,
+              "packet_reduction_pct": 33.057403564453125,
+              "ideal_bits_per_value": 10.559844716394288
+            },
+            "8": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354973,
+              "feature_bytes": 2048,
+              "ideal_bits": 2800206.3549043834,
+              "integer_cdf_bits": 2800206.3159684893,
+              "packet_reduction_pct": 32.294273376464844,
+              "ideal_bits_per_value": 10.6819395252395
+            },
+            "9": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352734,
+              "feature_bytes": 2048,
+              "ideal_bits": 2782287.8801303096,
+              "integer_cdf_bits": 2782287.8587847995,
+              "packet_reduction_pct": 32.72132873535156,
+              "ideal_bits_per_value": 10.61358596851467
+            },
+            "10": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354774,
+              "feature_bytes": 2048,
+              "ideal_bits": 2798598.2619655845,
+              "integer_cdf_bits": 2798598.6201427514,
+              "packet_reduction_pct": 32.33222961425781,
+              "ideal_bits_per_value": 10.675805137502993
+            },
+            "11": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353745,
+              "feature_bytes": 2048,
+              "ideal_bits": 2790399.7398652527,
+              "integer_cdf_bits": 2790399.7809386356,
+              "packet_reduction_pct": 32.52849578857422,
+              "ideal_bits_per_value": 10.644530257664691
+            },
+            "12": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352092,
+              "feature_bytes": 2048,
+              "ideal_bits": 2777177.7685962995,
+              "integer_cdf_bits": 2777177.757094036,
+              "packet_reduction_pct": 32.843780517578125,
+              "ideal_bits_per_value": 10.594092440018843
+            },
+            "13": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352545,
+              "feature_bytes": 2048,
+              "ideal_bits": 2780778.4117340688,
+              "integer_cdf_bits": 2780778.418369682,
+              "packet_reduction_pct": 32.75737762451172,
+              "ideal_bits_per_value": 10.607827803550983
+            },
+            "14": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352892,
+              "feature_bytes": 2048,
+              "ideal_bits": 2783554.3933108374,
+              "integer_cdf_bits": 2783553.6963427393,
+              "packet_reduction_pct": 32.691192626953125,
+              "ideal_bits_per_value": 10.618417332881307
+            },
+            "15": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352024,
+              "feature_bytes": 2048,
+              "ideal_bits": 2776605.445351592,
+              "integer_cdf_bits": 2776606.3929549027,
+              "packet_reduction_pct": 32.85675048828125,
+              "ideal_bits_per_value": 10.591909200102203
+            },
+            "16": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353949,
+              "feature_bytes": 2048,
+              "ideal_bits": 2792015.2796918005,
+              "integer_cdf_bits": 2792016.3946794537,
+              "packet_reduction_pct": 32.489585876464844,
+              "ideal_bits_per_value": 10.65069305302353
+            },
+            "17": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353340,
+              "feature_bytes": 2048,
+              "ideal_bits": 2787119.7280873554,
+              "integer_cdf_bits": 2787118.7404450327,
+              "packet_reduction_pct": 32.605743408203125,
+              "ideal_bits_per_value": 10.632018005704328
+            },
+            "18": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353696,
+              "feature_bytes": 2048,
+              "ideal_bits": 2789985.255362129,
+              "integer_cdf_bits": 2789983.7520297947,
+              "packet_reduction_pct": 32.537841796875,
+              "ideal_bits_per_value": 10.64294912476398
+            },
+            "19": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350682,
+              "feature_bytes": 2048,
+              "ideal_bits": 2765873.8175892895,
+              "integer_cdf_bits": 2765873.808817531,
+              "packet_reduction_pct": 33.11271667480469,
+              "ideal_bits_per_value": 10.550971289021643
+            },
+            "20": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351384,
+              "feature_bytes": 2048,
+              "ideal_bits": 2771486.8283184012,
+              "integer_cdf_bits": 2771486.816118197,
+              "packet_reduction_pct": 32.97882080078125,
+              "ideal_bits_per_value": 10.572383225701909
+            },
+            "21": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350874,
+              "feature_bytes": 2048,
+              "ideal_bits": 2767415.112507499,
+              "integer_cdf_bits": 2767415.1127170343,
+              "packet_reduction_pct": 33.07609558105469,
+              "ideal_bits_per_value": 10.556850862531657
+            },
+            "22": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351336,
+              "feature_bytes": 2048,
+              "ideal_bits": 2771122.2447062396,
+              "integer_cdf_bits": 2771122.211923903,
+              "packet_reduction_pct": 32.98797607421875,
+              "ideal_bits_per_value": 10.570992449593504
+            },
+            "23": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351320,
+              "feature_bytes": 2048,
+              "ideal_bits": 2770980.050869153,
+              "integer_cdf_bits": 2770980.043123902,
+              "packet_reduction_pct": 32.99102783203125,
+              "ideal_bits_per_value": 10.570450023151981
+            },
+            "24": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352258,
+              "feature_bytes": 2048,
+              "ideal_bits": 2778478.1708578756,
+              "integer_cdf_bits": 2778478.1384981973,
+              "packet_reduction_pct": 32.81211853027344,
+              "ideal_bits_per_value": 10.59905308097029
+            },
+            "25": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352963,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784115.1045285286,
+              "integer_cdf_bits": 2784115.1128338315,
+              "packet_reduction_pct": 32.677650451660156,
+              "ideal_bits_per_value": 10.62055627643024
+            },
+            "26": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353329,
+              "feature_bytes": 2048,
+              "ideal_bits": 2787036.681900376,
+              "integer_cdf_bits": 2787036.822622684,
+              "packet_reduction_pct": 32.60784149169922,
+              "ideal_bits_per_value": 10.631701209641937
+            },
+            "27": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352455,
+              "feature_bytes": 2048,
+              "ideal_bits": 2780039.0216288706,
+              "integer_cdf_bits": 2780038.616521761,
+              "packet_reduction_pct": 32.77454376220703,
+              "ideal_bits_per_value": 10.605007254138453
+            },
+            "28": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352870,
+              "feature_bytes": 2048,
+              "ideal_bits": 2783387.0664442573,
+              "integer_cdf_bits": 2783387.061910514,
+              "packet_reduction_pct": 32.69538879394531,
+              "ideal_bits_per_value": 10.617779031540898
+            },
+            "29": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353435,
+              "feature_bytes": 2048,
+              "ideal_bits": 2787901.4044478894,
+              "integer_cdf_bits": 2787902.001489769,
+              "packet_reduction_pct": 32.587623596191406,
+              "ideal_bits_per_value": 10.634999864379461
+            },
+            "30": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353250,
+              "feature_bytes": 2048,
+              "ideal_bits": 2786408.532768987,
+              "integer_cdf_bits": 2786409.03841337,
+              "packet_reduction_pct": 32.62290954589844,
+              "ideal_bits_per_value": 10.629305010868023
+            },
+            "31": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353063,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784935.2106036465,
+              "integer_cdf_bits": 2784935.3811722677,
+              "packet_reduction_pct": 32.65857696533203,
+              "ideal_bits_per_value": 10.623684732832514
+            },
+            "32": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352623,
+              "feature_bytes": 2048,
+              "ideal_bits": 2781395.3279138147,
+              "integer_cdf_bits": 2781395.2121001356,
+              "packet_reduction_pct": 32.74250030517578,
+              "ideal_bits_per_value": 10.61018115201498
+            },
+            "33": {
+              "raw_bytes": 524288,
+              "packet_bytes": 355216,
+              "feature_bytes": 2048,
+              "ideal_bits": 2802144.906900623,
+              "integer_cdf_bits": 2802144.8147990126,
+              "packet_reduction_pct": 32.2479248046875,
+              "ideal_bits_per_value": 10.689334514238826
+            },
+            "34": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352755,
+              "feature_bytes": 2048,
+              "ideal_bits": 2782439.594701565,
+              "integer_cdf_bits": 2782440.144936859,
+              "packet_reduction_pct": 32.717323303222656,
+              "ideal_bits_per_value": 10.614164713674793
+            },
+            "35": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354174,
+              "feature_bytes": 2048,
+              "ideal_bits": 2793825.447433981,
+              "integer_cdf_bits": 2793825.7675044015,
+              "packet_reduction_pct": 32.44667053222656,
+              "ideal_bits_per_value": 10.65759829495995
+            }
+          },
+          "per_position": {
+            "0": {
+              "raw_bytes": 9437184,
+              "packet_bytes": 6397910,
+              "feature_bytes": 36864,
+              "ideal_bits": 50471327.243792236,
+              "integer_cdf_bits": 50471328.03328727,
+              "packet_reduction_pct": 32.205306159125435,
+              "ideal_bits_per_value": 10.6962685571866
+            },
+            "1984": {
+              "raw_bytes": 9437184,
+              "packet_bytes": 6314351,
+              "feature_bytes": 36864,
+              "ideal_bits": 49801927.30193787,
+              "integer_cdf_bits": 49801927.18221472,
+              "packet_reduction_pct": 33.09072918362088,
+              "ideal_bits_per_value": 10.554404216753191
+            }
+          },
+          "inline_code_seconds": 0.03325674310326576,
+          "net_delta_vs_none_pp": -0.766300823953415,
+          "packet_layers_beating_none": [],
+          "ideal_rate_layers_beating_none": [
+            7,
+            24
+          ],
+          "loss_components_vs_none_pp": {
+            "feature_bytes": 0.390625,
+            "entropy_payload_bytes": 0.15683703952365452,
+            "framing_bytes": 0.0003390842013888889,
+            "container_framing_bytes": 0.0,
+            "state": 0.2184997002283732
+          }
+        },
+        {
+          "method": "side_kv_canonical",
+          "packet_bytes": 12700586,
+          "raw_sample_bytes": 18874368,
+          "packet_reduction_pct": 32.70987404717339,
+          "net_estimated_reduction_pct": 31.495186686515808,
+          "charged_state_bytes": 3668233,
+          "state_MiB": 3.4982995986938477,
+          "dependency_depth": 0,
+          "decode_seconds": 58.15623601153493,
+          "component_bytes": {
+            "feature_bytes": 73728,
+            "entropy_payload_bytes": 12521680,
+            "framing_bytes": 104485,
+            "container_framing_bytes": 693
+          },
+          "sample_fraction_of_full_cache": 0.0625,
+          "ideal_bits_per_value": 10.614237344587819,
+          "integer_CDF_bits_per_value": 10.61423790254731,
+          "retained_code_bits_per_value": 0.0625,
+          "complete_packet_bits_per_value": 10.766420152452257,
+          "CPU_entropy_decode_seconds": 58.04092985764146,
+          "CPU_entropy_decode_pct": 99.80173037011784,
+          "prediction_seconds": 0.08453432843089104,
+          "per_layer": {
+            "0": {
+              "raw_bytes": 524288,
+              "packet_bytes": 356506,
+              "feature_bytes": 2048,
+              "ideal_bits": 2812314.109228676,
+              "integer_cdf_bits": 2812314.0123955384,
+              "packet_reduction_pct": 32.00187683105469,
+              "ideal_bits_per_value": 10.728126942553239
+            },
+            "1": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352225,
+              "feature_bytes": 2048,
+              "ideal_bits": 2778073.9955162443,
+              "integer_cdf_bits": 2778074.144382443,
+              "packet_reduction_pct": 32.81841278076172,
+              "ideal_bits_per_value": 10.597511274399736
+            },
+            "2": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353039,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784590.434584523,
+              "integer_cdf_bits": 2784590.3963065753,
+              "packet_reduction_pct": 32.66315460205078,
+              "ideal_bits_per_value": 10.62236951669511
+            },
+            "3": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352651,
+              "feature_bytes": 2048,
+              "ideal_bits": 2781468.5594980596,
+              "integer_cdf_bits": 2781468.5284521515,
+              "packet_reduction_pct": 32.737159729003906,
+              "ideal_bits_per_value": 10.610460508339155
+            },
+            "4": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354185,
+              "feature_bytes": 2048,
+              "ideal_bits": 2793738.716192307,
+              "integer_cdf_bits": 2793738.694818004,
+              "packet_reduction_pct": 32.44457244873047,
+              "ideal_bits_per_value": 10.657267441529491
+            },
+            "5": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352973,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784053.345468836,
+              "integer_cdf_bits": 2784054.1318306895,
+              "packet_reduction_pct": 32.675743103027344,
+              "ideal_bits_per_value": 10.620320684314102
+            },
+            "6": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354539,
+              "feature_bytes": 2048,
+              "ideal_bits": 2796617.3764986703,
+              "integer_cdf_bits": 2796617.408843876,
+              "packet_reduction_pct": 32.377052307128906,
+              "ideal_bits_per_value": 10.668248659128839
+            },
+            "7": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350895,
+              "feature_bytes": 2048,
+              "ideal_bits": 2767424.384382606,
+              "integer_cdf_bits": 2767424.269919615,
+              "packet_reduction_pct": 33.07209014892578,
+              "ideal_bits_per_value": 10.556886231928276
+            },
+            "8": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354050,
+              "feature_bytes": 2048,
+              "ideal_bits": 2792666.643388884,
+              "integer_cdf_bits": 2792666.675462883,
+              "packet_reduction_pct": 32.47032165527344,
+              "ideal_bits_per_value": 10.653177808337723
+            },
+            "9": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352832,
+              "feature_bytes": 2048,
+              "ideal_bits": 2782919.0126746558,
+              "integer_cdf_bits": 2782918.972618882,
+              "packet_reduction_pct": 32.70263671875,
+              "ideal_bits_per_value": 10.615993548105834
+            },
+            "10": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354280,
+              "feature_bytes": 2048,
+              "ideal_bits": 2794493.855817062,
+              "integer_cdf_bits": 2794493.9782596035,
+              "packet_reduction_pct": 32.42645263671875,
+              "ideal_bits_per_value": 10.660148070591209
+            },
+            "11": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353011,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784346.009342219,
+              "integer_cdf_bits": 2784346.030946335,
+              "packet_reduction_pct": 32.668495178222656,
+              "ideal_bits_per_value": 10.621437108391644
+            },
+            "12": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351917,
+              "feature_bytes": 2048,
+              "ideal_bits": 2775610.750715886,
+              "integer_cdf_bits": 2775610.7343349624,
+              "packet_reduction_pct": 32.877159118652344,
+              "ideal_bits_per_value": 10.588114741195243
+            },
+            "13": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352206,
+              "feature_bytes": 2048,
+              "ideal_bits": 2777904.168917897,
+              "integer_cdf_bits": 2777904.4818428205,
+              "packet_reduction_pct": 32.82203674316406,
+              "ideal_bits_per_value": 10.59686343733939
+            },
+            "14": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352511,
+              "feature_bytes": 2048,
+              "ideal_bits": 2780348.1890511587,
+              "integer_cdf_bits": 2780347.763506265,
+              "packet_reduction_pct": 32.76386260986328,
+              "ideal_bits_per_value": 10.606186634258876
+            },
+            "15": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352106,
+              "feature_bytes": 2048,
+              "ideal_bits": 2777119.483369123,
+              "integer_cdf_bits": 2777120.5025702044,
+              "packet_reduction_pct": 32.84111022949219,
+              "ideal_bits_per_value": 10.593870099522107
+            },
+            "16": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353741,
+              "feature_bytes": 2048,
+              "ideal_bits": 2790194.6394761624,
+              "integer_cdf_bits": 2790195.694064725,
+              "packet_reduction_pct": 32.529258728027344,
+              "ideal_bits_per_value": 10.64374786177125
+            },
+            "17": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353300,
+              "feature_bytes": 2048,
+              "ideal_bits": 2786649.155492818,
+              "integer_cdf_bits": 2786651.350902208,
+              "packet_reduction_pct": 32.613372802734375,
+              "ideal_bits_per_value": 10.630222913714668
+            },
+            "18": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353327,
+              "feature_bytes": 2048,
+              "ideal_bits": 2786862.116171962,
+              "integer_cdf_bits": 2786862.447854184,
+              "packet_reduction_pct": 32.60822296142578,
+              "ideal_bits_per_value": 10.631035294235085
+            },
+            "19": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350743,
+              "feature_bytes": 2048,
+              "ideal_bits": 2766194.2593220696,
+              "integer_cdf_bits": 2766194.238924165,
+              "packet_reduction_pct": 33.10108184814453,
+              "ideal_bits_per_value": 10.552193677223471
+            },
+            "20": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351112,
+              "feature_bytes": 2048,
+              "ideal_bits": 2769142.314943089,
+              "integer_cdf_bits": 2769142.2166644223,
+              "packet_reduction_pct": 33.03070068359375,
+              "ideal_bits_per_value": 10.563439616939885
+            },
+            "21": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350815,
+              "feature_bytes": 2048,
+              "ideal_bits": 2766779.4126384463,
+              "integer_cdf_bits": 2766779.4243940534,
+              "packet_reduction_pct": 33.08734893798828,
+              "ideal_bits_per_value": 10.554425859979425
+            },
+            "22": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350874,
+              "feature_bytes": 2048,
+              "ideal_bits": 2767247.9633467617,
+              "integer_cdf_bits": 2767248.0133461566,
+              "packet_reduction_pct": 33.07609558105469,
+              "ideal_bits_per_value": 10.556213239085242
+            },
+            "23": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351305,
+              "feature_bytes": 2048,
+              "ideal_bits": 2770683.077075856,
+              "integer_cdf_bits": 2770683.0791412964,
+              "packet_reduction_pct": 32.99388885498047,
+              "ideal_bits_per_value": 10.569317158034728
+            },
+            "24": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352240,
+              "feature_bytes": 2048,
+              "ideal_bits": 2778180.775922993,
+              "integer_cdf_bits": 2778180.975226992,
+              "packet_reduction_pct": 32.8155517578125,
+              "ideal_bits_per_value": 10.597918609325383
+            },
+            "25": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352974,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784052.283633285,
+              "integer_cdf_bits": 2784052.2470967765,
+              "packet_reduction_pct": 32.67555236816406,
+              "ideal_bits_per_value": 10.62031663373293
+            },
+            "26": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353155,
+              "feature_bytes": 2048,
+              "ideal_bits": 2785483.0866052816,
+              "integer_cdf_bits": 2785483.518447659,
+              "packet_reduction_pct": 32.641029357910156,
+              "ideal_bits_per_value": 10.625774713917853
+            },
+            "27": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352189,
+              "feature_bytes": 2048,
+              "ideal_bits": 2777781.5148489242,
+              "integer_cdf_bits": 2777781.32529632,
+              "packet_reduction_pct": 32.825279235839844,
+              "ideal_bits_per_value": 10.596395549197862
+            },
+            "28": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352418,
+              "feature_bytes": 2048,
+              "ideal_bits": 2779609.998857664,
+              "integer_cdf_bits": 2779609.980426551,
+              "packet_reduction_pct": 32.78160095214844,
+              "ideal_bits_per_value": 10.60337066214624
+            },
+            "29": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353656,
+              "feature_bytes": 2048,
+              "ideal_bits": 2789500.697052004,
+              "integer_cdf_bits": 2789500.449940229,
+              "packet_reduction_pct": 32.54547119140625,
+              "ideal_bits_per_value": 10.64110068150331
+            },
+            "30": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352941,
+              "feature_bytes": 2048,
+              "ideal_bits": 2783780.06742821,
+              "integer_cdf_bits": 2783780.339602951,
+              "packet_reduction_pct": 32.681846618652344,
+              "ideal_bits_per_value": 10.61927821131977
+            },
+            "31": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352794,
+              "feature_bytes": 2048,
+              "ideal_bits": 2782608.3421847466,
+              "integer_cdf_bits": 2782608.2225289117,
+              "packet_reduction_pct": 32.70988464355469,
+              "ideal_bits_per_value": 10.614808434237467
+            },
+            "32": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352127,
+              "feature_bytes": 2048,
+              "ideal_bits": 2777268.937537687,
+              "integer_cdf_bits": 2777268.692198322,
+              "packet_reduction_pct": 32.83710479736328,
+              "ideal_bits_per_value": 10.594440221930263
+            },
+            "33": {
+              "raw_bytes": 524288,
+              "packet_bytes": 355042,
+              "feature_bytes": 2048,
+              "ideal_bits": 2800593.6769944704,
+              "integer_cdf_bits": 2800593.7932139584,
+              "packet_reduction_pct": 32.28111267089844,
+              "ideal_bits_per_value": 10.68341704175747
+            },
+            "34": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352475,
+              "feature_bytes": 2048,
+              "ideal_bits": 2780051.72801747,
+              "integer_cdf_bits": 2780051.7912983843,
+              "packet_reduction_pct": 32.770729064941406,
+              "ideal_bits_per_value": 10.605055725164299
+            },
+            "35": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352739,
+              "feature_bytes": 2048,
+              "ideal_bits": 2782157.758349937,
+              "integer_cdf_bits": 2782157.5790539347,
+              "packet_reduction_pct": 32.720375061035156,
+              "ideal_bits_per_value": 10.613089593314884
+            }
+          },
+          "per_position": {
+            "0": {
+              "raw_bytes": 9437184,
+              "packet_bytes": 6398006,
+              "feature_bytes": 36864,
+              "ideal_bits": 50469275.26547352,
+              "integer_cdf_bits": 50469281.16679619,
+              "packet_reduction_pct": 32.20428890652127,
+              "ideal_bits_per_value": 10.695833686293183
+            },
+            "1984": {
+              "raw_bytes": 9437184,
+              "packet_bytes": 6301887,
+              "feature_bytes": 36864,
+              "ideal_bits": 49699235.575073145,
+              "integer_cdf_bits": 49699234.93931684,
+              "packet_reduction_pct": 33.22280248006185,
+              "ideal_bits_per_value": 10.532641002882459
+            }
+          },
+          "inline_code_seconds": 0.0550319105386734,
+          "net_delta_vs_none_pp": -0.7008075714111328,
+          "packet_layers_beating_none": [],
+          "ideal_rate_layers_beating_none": [
+            0,
+            4,
+            6,
+            7,
+            8,
+            24
+          ],
+          "loss_components_vs_none_pp": {
+            "feature_bytes": 0.390625,
+            "entropy_payload_bytes": 0.08745723300509983,
+            "framing_bytes": 0.0041908688015407985,
+            "container_framing_bytes": 0.0,
+            "state": 0.2185344696044922
+          }
+        },
+        {
+          "method": "side_hidden",
+          "packet_bytes": 12702737,
+          "raw_sample_bytes": 18874368,
+          "packet_reduction_pct": 32.69847763909234,
+          "net_estimated_reduction_pct": 31.42956660853492,
+          "charged_state_bytes": 3831983,
+          "state_MiB": 3.654463768005371,
+          "dependency_depth": 0,
+          "decode_seconds": 57.887710927054286,
+          "component_bytes": {
+            "feature_bytes": 73728,
+            "entropy_payload_bytes": 12524275,
+            "framing_bytes": 104041,
+            "container_framing_bytes": 693
+          },
+          "sample_fraction_of_full_cache": 0.0625,
+          "ideal_bits_per_value": 10.616437532616526,
+          "integer_CDF_bits_per_value": 10.61643851567588,
+          "retained_code_bits_per_value": 0.0625,
+          "complete_packet_bits_per_value": 10.768243577745226,
+          "CPU_entropy_decode_seconds": 57.77245677448809,
+          "CPU_entropy_decode_pct": 99.8009004835043,
+          "prediction_seconds": 0.08472293615341187,
+          "per_layer": {
+            "0": {
+              "raw_bytes": 524288,
+              "packet_bytes": 357033,
+              "feature_bytes": 2048,
+              "ideal_bits": 2816647.400838569,
+              "integer_cdf_bits": 2816646.695146313,
+              "packet_reduction_pct": 31.90135955810547,
+              "ideal_bits_per_value": 10.744657138208652
+            },
+            "1": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352297,
+              "feature_bytes": 2048,
+              "ideal_bits": 2778743.2949342737,
+              "integer_cdf_bits": 2778743.2649325393,
+              "packet_reduction_pct": 32.80467987060547,
+              "ideal_bits_per_value": 10.600064449059577
+            },
+            "2": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353087,
+              "feature_bytes": 2048,
+              "ideal_bits": 2785062.033978616,
+              "integer_cdf_bits": 2785062.1185862347,
+              "packet_reduction_pct": 32.65399932861328,
+              "ideal_bits_per_value": 10.624168525614227
+            },
+            "3": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352390,
+              "feature_bytes": 2048,
+              "ideal_bits": 2779484.330407139,
+              "integer_cdf_bits": 2779484.3205991713,
+              "packet_reduction_pct": 32.78694152832031,
+              "ideal_bits_per_value": 10.602891275051647
+            },
+            "4": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354318,
+              "feature_bytes": 2048,
+              "ideal_bits": 2794924.112112426,
+              "integer_cdf_bits": 2794924.0568039063,
+              "packet_reduction_pct": 32.41920471191406,
+              "ideal_bits_per_value": 10.661789368104653
+            },
+            "5": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353162,
+              "feature_bytes": 2048,
+              "ideal_bits": 2785655.810443189,
+              "integer_cdf_bits": 2785655.677431482,
+              "packet_reduction_pct": 32.63969421386719,
+              "ideal_bits_per_value": 10.626433603070026
+            },
+            "6": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354606,
+              "feature_bytes": 2048,
+              "ideal_bits": 2797217.4173649377,
+              "integer_cdf_bits": 2797217.302662288,
+              "packet_reduction_pct": 32.36427307128906,
+              "ideal_bits_per_value": 10.670537633380652
+            },
+            "7": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351268,
+              "feature_bytes": 2048,
+              "ideal_bits": 2770501.427657928,
+              "integer_cdf_bits": 2770501.564152181,
+              "packet_reduction_pct": 33.000946044921875,
+              "ideal_bits_per_value": 10.568624220496856
+            },
+            "8": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354432,
+              "feature_bytes": 2048,
+              "ideal_bits": 2795847.1245026197,
+              "integer_cdf_bits": 2795847.939325412,
+              "packet_reduction_pct": 32.3974609375,
+              "ideal_bits_per_value": 10.665310380945662
+            },
+            "9": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353614,
+              "feature_bytes": 2048,
+              "ideal_bits": 2789280.8228868693,
+              "integer_cdf_bits": 2789282.1446377644,
+              "packet_reduction_pct": 32.55348205566406,
+              "ideal_bits_per_value": 10.64026192812679
+            },
+            "10": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354727,
+              "feature_bytes": 2048,
+              "ideal_bits": 2798171.067315837,
+              "integer_cdf_bits": 2798172.1054207683,
+              "packet_reduction_pct": 32.34119415283203,
+              "ideal_bits_per_value": 10.67417551924071
+            },
+            "11": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353286,
+              "feature_bytes": 2048,
+              "ideal_bits": 2786634.917304961,
+              "integer_cdf_bits": 2786634.972041472,
+              "packet_reduction_pct": 32.61604309082031,
+              "ideal_bits_per_value": 10.630168599338383
+            },
+            "12": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352093,
+              "feature_bytes": 2048,
+              "ideal_bits": 2777100.211072764,
+              "integer_cdf_bits": 2777100.221233596,
+              "packet_reduction_pct": 32.843589782714844,
+              "ideal_bits_per_value": 10.593796581545883
+            },
+            "13": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352107,
+              "feature_bytes": 2048,
+              "ideal_bits": 2777213.411828483,
+              "integer_cdf_bits": 2777214.286984341,
+              "packet_reduction_pct": 32.840919494628906,
+              "ideal_bits_per_value": 10.594228408159191
+            },
+            "14": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352448,
+              "feature_bytes": 2048,
+              "ideal_bits": 2779946.221490967,
+              "integer_cdf_bits": 2779946.4686584184,
+              "packet_reduction_pct": 32.77587890625,
+              "ideal_bits_per_value": 10.604653249706143
+            },
+            "15": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351911,
+              "feature_bytes": 2048,
+              "ideal_bits": 2775635.256159151,
+              "integer_cdf_bits": 2775636.2558077592,
+              "packet_reduction_pct": 32.87830352783203,
+              "ideal_bits_per_value": 10.58820822204266
+            },
+            "16": {
+              "raw_bytes": 524288,
+              "packet_bytes": 354220,
+              "feature_bytes": 2048,
+              "ideal_bits": 2794123.9782233858,
+              "integer_cdf_bits": 2794126.235135764,
+              "packet_reduction_pct": 32.437896728515625,
+              "ideal_bits_per_value": 10.658737099545997
+            },
+            "17": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353065,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784872.7956636418,
+              "integer_cdf_bits": 2784874.6076932447,
+              "packet_reduction_pct": 32.65819549560547,
+              "ideal_bits_per_value": 10.623446638731544
+            },
+            "18": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353127,
+              "feature_bytes": 2048,
+              "ideal_bits": 2785369.3289743746,
+              "integer_cdf_bits": 2785369.8376885103,
+              "packet_reduction_pct": 32.64636993408203,
+              "ideal_bits_per_value": 10.625340762994288
+            },
+            "19": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350560,
+              "feature_bytes": 2048,
+              "ideal_bits": 2764833.419226214,
+              "integer_cdf_bits": 2764832.962247243,
+              "packet_reduction_pct": 33.135986328125,
+              "ideal_bits_per_value": 10.547002484230857
+            },
+            "20": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350916,
+              "feature_bytes": 2048,
+              "ideal_bits": 2767679.172053975,
+              "integer_cdf_bits": 2767679.281140585,
+              "packet_reduction_pct": 33.068084716796875,
+              "ideal_bits_per_value": 10.557858169761563
+            },
+            "21": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350533,
+              "feature_bytes": 2048,
+              "ideal_bits": 2764643.7024682676,
+              "integer_cdf_bits": 2764643.6952569024,
+              "packet_reduction_pct": 33.141136169433594,
+              "ideal_bits_per_value": 10.546278772233077
+            },
+            "22": {
+              "raw_bytes": 524288,
+              "packet_bytes": 350957,
+              "feature_bytes": 2048,
+              "ideal_bits": 2767990.4717052663,
+              "integer_cdf_bits": 2767990.470773843,
+              "packet_reduction_pct": 33.060264587402344,
+              "ideal_bits_per_value": 10.559045683690133
+            },
+            "23": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351271,
+              "feature_bytes": 2048,
+              "ideal_bits": 2770520.2115226113,
+              "integer_cdf_bits": 2770520.224054051,
+              "packet_reduction_pct": 33.00037384033203,
+              "ideal_bits_per_value": 10.568695875254102
+            },
+            "24": {
+              "raw_bytes": 524288,
+              "packet_bytes": 351798,
+              "feature_bytes": 2048,
+              "ideal_bits": 2774743.315233521,
+              "integer_cdf_bits": 2774743.1074288227,
+              "packet_reduction_pct": 32.89985656738281,
+              "ideal_bits_per_value": 10.58480573743256
+            },
+            "25": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352738,
+              "feature_bytes": 2048,
+              "ideal_bits": 2782245.062377429,
+              "integer_cdf_bits": 2782245.055757782,
+              "packet_reduction_pct": 32.72056579589844,
+              "ideal_bits_per_value": 10.613422631749836
+            },
+            "26": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353022,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784524.774688937,
+              "integer_cdf_bits": 2784525.0709849233,
+              "packet_reduction_pct": 32.66639709472656,
+              "ideal_bits_per_value": 10.622119044070956
+            },
+            "27": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352477,
+              "feature_bytes": 2048,
+              "ideal_bits": 2780175.2042414197,
+              "integer_cdf_bits": 2780175.2343546934,
+              "packet_reduction_pct": 32.770347595214844,
+              "ideal_bits_per_value": 10.60552674957817
+            },
+            "28": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352336,
+              "feature_bytes": 2048,
+              "ideal_bits": 2779040.681282878,
+              "integer_cdf_bits": 2779040.683818888,
+              "packet_reduction_pct": 32.7972412109375,
+              "ideal_bits_per_value": 10.601198887950432
+            },
+            "29": {
+              "raw_bytes": 524288,
+              "packet_bytes": 353624,
+              "feature_bytes": 2048,
+              "ideal_bits": 2789342.6958469125,
+              "integer_cdf_bits": 2789342.968619627,
+              "packet_reduction_pct": 32.55157470703125,
+              "ideal_bits_per_value": 10.640497954738283
+            },
+            "30": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352775,
+              "feature_bytes": 2048,
+              "ideal_bits": 2782542.720182078,
+              "integer_cdf_bits": 2782542.64526201,
+              "packet_reduction_pct": 32.71350860595703,
+              "ideal_bits_per_value": 10.614558106163322
+            },
+            "31": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352924,
+              "feature_bytes": 2048,
+              "ideal_bits": 2783778.083437021,
+              "integer_cdf_bits": 2783778.0571195404,
+              "packet_reduction_pct": 32.685089111328125,
+              "ideal_bits_per_value": 10.619270642994007
+            },
+            "32": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352099,
+              "feature_bytes": 2048,
+              "ideal_bits": 2777154.8407656746,
+              "integer_cdf_bits": 2777153.952726868,
+              "packet_reduction_pct": 32.842445373535156,
+              "ideal_bits_per_value": 10.594004977286051
+            },
+            "33": {
+              "raw_bytes": 524288,
+              "packet_bytes": 355254,
+              "feature_bytes": 2048,
+              "ideal_bits": 2802383.592992722,
+              "integer_cdf_bits": 2802383.353952955,
+              "packet_reduction_pct": 32.24067687988281,
+              "ideal_bits_per_value": 10.6902450294217
+            },
+            "34": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352600,
+              "feature_bytes": 2048,
+              "ideal_bits": 2781132.6816841997,
+              "integer_cdf_bits": 2781132.9727607365,
+              "packet_reduction_pct": 32.74688720703125,
+              "ideal_bits_per_value": 10.60917923616104
+            },
+            "35": {
+              "raw_bytes": 524288,
+              "packet_bytes": 352969,
+              "feature_bytes": 2048,
+              "ideal_bits": 2784112.826938906,
+              "integer_cdf_bits": 2784113.8859195206,
+              "packet_reduction_pct": 32.67650604248047,
+              "ideal_bits_per_value": 10.620547588115334
+            }
+          },
+          "per_position": {
+            "0": {
+              "raw_bytes": 9437184,
+              "packet_bytes": 6400226,
+              "feature_bytes": 36864,
+              "ideal_bits": 50488686.05945897,
+              "integer_cdf_bits": 50488695.22535192,
+              "packet_reduction_pct": 32.18076494004991,
+              "ideal_bits_per_value": 10.699947369778734
+            },
+            "1984": {
+              "raw_bytes": 9437184,
+              "packet_bytes": 6301818,
+              "feature_bytes": 36864,
+              "ideal_bits": 49700588.36034919,
+              "integer_cdf_bits": 49700588.47176825,
+              "packet_reduction_pct": 33.223533630371094,
+              "ideal_bits_per_value": 10.53292769545432
+            }
+          },
+          "inline_code_seconds": 0.031808385625481606,
+          "net_delta_vs_none_pp": -0.7664276493920212,
+          "packet_layers_beating_none": [],
+          "ideal_rate_layers_beating_none": [
+            4,
+            8,
+            24
+          ],
+          "loss_components_vs_none_pp": {
+            "feature_bytes": 0.390625,
+            "entropy_payload_bytes": 0.10120603773328993,
+            "framing_bytes": 0.001838472154405382,
+            "container_framing_bytes": 0.0,
+            "state": 0.2727581395043267
+          }
+        },
+        {
+          "method": "previous_layer_shared",
+          "packet_bytes": 13226686,
+          "raw_sample_bytes": 18874368,
+          "packet_reduction_pct": 29.922495947943794,
+          "net_estimated_reduction_pct": 28.23970682091183,
+          "charged_state_bytes": 5081853,
+          "state_MiB": 4.846432685852051,
+          "dependency_depth": 35,
+          "decode_seconds": 63.3765955530107,
+          "component_bytes": {
+            "page_framing": 1728,
+            "page_descriptor": 99663,
+            "anchor_header_framing": 8,
+            "anchor_native_header": 1611,
+            "anchor_native_fields": 372393,
+            "cpu_entropy_payload": 12750667,
+            "cache_header": 32,
+            "page_offset_table": 584
+          },
+          "sample_fraction_of_full_cache": 0.0625,
+          "net_delta_vs_none_pp": -3.95628743701511
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Logged GPU exactness is not replayed by this stdlib audit.",
+    "Learned model shards, compressed pages and original KV are omitted from the shared package; their hashes/byte counts are declarations.",
+    "Full-cache/concurrency ratios are sampled estimates; no serving capacity or speedup is measured."
+  ],
+  "historical_comparison": [
+    {
+      "case": "test_pottery_kiln_diary",
+      "tokens": 2048,
+      "raw_sample_bytes": 18874368,
+      "pages": 72,
+      "input_ids_sha256": "ddc105f4f548dad0b8245e7db0f766f208404491a8d817c55291285a842bfeb6",
+      "kv_words_sha256": "ddc4ed86b371977d37f6609741a167ff0e5361a88536adb555e77e0da0889f27",
+      "outer_container_and_index_excluded": true,
+      "scope": "Existing logged per-page bytes on identical KV addresses; no new serialization or model execution. Width and training budgets differ.",
+      "methods": [
+        {
+          "method": "historical_neural_shared",
+          "page_bytes": 12520271,
+          "charged_state_bytes": 14843670,
+          "width": 512,
+          "total_updates": 7000,
+          "page_reduction_pct": 33.665217293633354
+        },
+        {
+          "method": "side_none",
+          "page_bytes": 12608867,
+          "charged_state_bytes": 3008281,
+          "width": 128,
+          "total_updates": 200,
+          "page_reduction_pct": 33.1958187950982
+        },
+        {
+          "method": "side_kv",
+          "page_bytes": 12712261,
+          "charged_state_bytes": 3668128,
+          "width": 128,
+          "total_updates": 200,
+          "page_reduction_pct": 32.648017671373154
+        },
+        {
+          "method": "side_kv_canonical",
+          "page_bytes": 12699893,
+          "charged_state_bytes": 3668233,
+          "width": 128,
+          "total_updates": 200,
+          "page_reduction_pct": 32.71354569329156
+        },
+        {
+          "method": "side_hidden",
+          "page_bytes": 12702044,
+          "charged_state_bytes": 3831983,
+          "width": 128,
+          "total_updates": 200,
+          "page_reduction_pct": 32.7021492852105
+        }
+      ]
+    }
+  ]
+}
