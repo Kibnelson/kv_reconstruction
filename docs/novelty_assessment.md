@@ -33,7 +33,7 @@ The conditional latent packets need a further distinction: hidden-derived BF16 f
 
 In the existing scalar implementation, a BF16 **integer word** x is paired with a replay prediction p. The encoder selects group widths b from the circular signed 16-bit error and may send x modulo 2^b. The decoder uses p to choose the matching representative. For the same predictor and group widths, this is an alternative representation of the signed correction, not an additional source of savings: the code explicitly checks identical bit counts. The [producer review](qwen_producer_gpu_review.md) confirms equal numeric payload sizes; the small total-byte difference comes from JSON spelling. Both replay paths needed zero K correction payload on all measured pages in that study.
 
-**The precise untested question is whether small upstream metadata can make coset disambiguation sufficiently cheaper to pay for itself.** Specify the extracted signal, the coset decoder, its exactness/escape rule, and all retained bytes. Compare it with the same predictor and conventional residual coding, KV-derived metadata at the same budget, and an independent exact codec. A useful contribution could be this particular extraction/coding/restoration algorithm and its measured tradeoff; the current search neither establishes its priority nor dismisses it as already matched.
+**The precise open question is whether small upstream metadata can make coset disambiguation sufficiently cheaper to pay for itself.** The new [prefill coset study](prefill_coset_study.md) implements this direct test using omitted-bit prediction and 31-bit binary syndrome groups, with explicit raw escapes and equivalent error-position controls. Local functional checks are separate from target-model savings; pretrained Qwen results are pending. Specify the extracted signal, the coset decoder, its exactness/escape rule, and all retained bytes. Compare it with the same predictor and conventional residual coding, KV-derived metadata at the same budget, and an independent exact codec. A useful contribution could be this particular extraction/coding/restoration algorithm and its measured tradeoff; the current search neither establishes its priority nor dismisses it as already matched.
 
 The latest results separate three decisions:
 
@@ -88,15 +88,19 @@ residual checkpoint. The paper's broader cross-layer memory and performance
 claims were not independently implementation-audited here; they are not adopted
 as guarantees for our design.
 
-**Our implemented cosets are scalar modulo codes.** The GPU producer codec
+**Our earlier implemented cosets are scalar modulo codes.** The GPU producer codec
 computes a circular signed residual, chooses group widths, then can transmit
 the corresponding `x mod 2**b` residues. It explicitly checks that residual and
 coset widths agree. Lower-field variants likewise use per-coordinate residues,
-prototype IDs and correction widths. There is no parity-check matrix,
+prototype IDs and correction widths. In these earlier formats there is no parity-check matrix,
 cross-coordinate syndrome decoder or demonstrated Slepian–Wolf coding gain.
 E8 uses an existing lattice projection followed by exact corrections. These
 are legitimate mathematical representations, but their names do not establish
-a new coding primitive.
+a new coding primitive. The subsequent [binary syndrome experiment](prefill_coset_study.md)
+does add a parity-check matrix across 31 selected bits, with encoder-verified
+single-error reconstruction and raw escapes. This is established syndrome
+machinery used to test the producer-specific signal; no Slepian–Wolf gain or
+target-model advantage is inferred from its implementation alone.
 
 Producer access may make a useful conditioning signal cheap to obtain during the existing forward pass. That is a practical compute/representation hypothesis, not a guarantee of a lower information-theoretic limit. All retained information must still be counted.
 **Bounded staging and partial transfer also have precedents.** KVPR overlaps partial transfer and recomputation [17]. AlignPred combines alignment, prediction, error-bounded lattice coding and entropy coding, and describes bounded staging, indexing and layerwise restoration [18]. Its reported 128K, eight-request case still admits five requests and queues three with either compressed or native persistence. This illustrates why smaller persisted KV does not automatically increase active GPU capacity. Generic double buffering or layerwise restore is insufficient as a novelty claim.

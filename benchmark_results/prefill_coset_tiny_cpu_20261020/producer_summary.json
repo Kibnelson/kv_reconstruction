@@ -1,0 +1,2208 @@
+{
+  "status": "completed",
+  "training_captures": [
+    {
+      "split": "train",
+      "name": "train_ferry_maintenance",
+      "tokens": 64,
+      "sha256": "279686d40d8430b9f6c8715a221e462b8e74261cad2a1c484eb4ce47b9b020a1",
+      "producer_records_sha256": "279686d40d8430b9f6c8715a221e462b8e74261cad2a1c484eb4ce47b9b020a1",
+      "producer_inputs_sha256": "29c288e93e02584a0b00d80bf9e51932001e64d827ef60701c30b2f24f99490d",
+      "input_ids_sha256": "dc87e5109e1fd6c11d8fddf045e803b8d1f9560677966d3324a573637f8262a4",
+      "kv_words_sha256": "3e8ea5c8e9c25f726706a1061158fb9f37c7fb2bb3adfdb5a718defba73d2129",
+      "geometry": {
+        "layers": 2,
+        "kv_heads": 2,
+        "tokens": 64,
+        "head_dim": 16,
+        "columns": 32,
+        "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+        "channels": 32
+      },
+      "producer_audit": {
+        "format": "qwen3_inside_forward_producer_capture_v1",
+        "selected_tile_pairs": 4,
+        "logical_KV_records": 8,
+        "total_tile_pairs": 4,
+        "coverage": "full",
+        "total_tokens": 64,
+        "tile_tokens": 32,
+        "selection_rule": "evenly_spaced_layer_major_pairs",
+        "layers": 2,
+        "head_dim": 16,
+        "kv_heads": 2,
+        "channels": 32,
+        "hidden_size": 64,
+        "chunks_observed": 2,
+        "hook_counts": {
+          "root_pre": 2,
+          "rotary": 2,
+          "root_post": 2
+        },
+        "inner_stage_counts": {
+          "0": {
+            "input_layernorm": 2,
+            "attention_pre": 2,
+            "k_proj": 2,
+            "k_norm": 2,
+            "v_proj": 2,
+            "attention_post": 2
+          },
+          "1": {
+            "input_layernorm": 2,
+            "attention_pre": 2,
+            "k_proj": 2,
+            "k_norm": 2,
+            "v_proj": 2,
+            "attention_post": 2
+          }
+        },
+        "all_stage_targets_exact": true,
+        "v_hook_equals_cache": true,
+        "k_rope_replay_equals_cache": true,
+        "exported_cache_equals_hook_cache": true,
+        "rope_stable": true,
+        "rope_position_rule": "contiguous absolute positions starting at zero",
+        "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+        "copied_selected_and_context_bytes": 73856,
+        "retained_public_selected_bytes": 57344,
+        "decoder_context_array_bytes": 96,
+        "selected_tiles_ready_inside_attention": 4,
+        "on_tile_enabled": false,
+        "on_tile_callback_count": 0,
+        "on_tile_callback_wall_seconds": 0.0,
+        "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+        "raw_hidden_features_persisted": false,
+        "hooks_removed": true,
+        "selected_records": [
+          {
+            "layer": 0,
+            "start": 0,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 0,
+            "start": 32,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 1,
+            "start": 0,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 1,
+            "start": 32,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          }
+        ],
+        "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied."
+      },
+      "timings": {
+        "prefill": {
+          "wall_seconds": 0.016690477001247928,
+          "device_event_seconds": null,
+          "device": "cpu",
+          "synchronized": true,
+          "observer_included": false,
+          "producer_hooks_included": true,
+          "scope": "Instrumented forward includes actual producer hooks, diagnostic CPU copies and selected-device code emission when supplied. CPU syndrome/position packets are constructed afterward. Full raw KV remains resident."
+        },
+        "device_to_cpu_words": {
+          "wall_seconds": 0.002368592999118846,
+          "device_event_seconds": null,
+          "device": "cpu",
+          "synchronized": true
+        }
+      }
+    },
+    {
+      "split": "train",
+      "name": "train_python_bounded_ring",
+      "tokens": 64,
+      "sha256": "f7f47070a3722670fb73adbd65de1d3b6585d41fb7918295ae5ee8983a3dd80d",
+      "producer_records_sha256": "f7f47070a3722670fb73adbd65de1d3b6585d41fb7918295ae5ee8983a3dd80d",
+      "producer_inputs_sha256": "cf7db2ba487725735fe14000a23d66d95e5d7342e42686271b754b953eae0e9d",
+      "input_ids_sha256": "5fb03ac89d2bbe598c87693b9929a04675260430fb0220eebd6efcf5e26bf73a",
+      "kv_words_sha256": "924ea2d9151550f8121353d538f99d51570054b5aa2a8042237e0eb267bc61b1",
+      "geometry": {
+        "layers": 2,
+        "kv_heads": 2,
+        "tokens": 64,
+        "head_dim": 16,
+        "columns": 32,
+        "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+        "channels": 32
+      },
+      "producer_audit": {
+        "format": "qwen3_inside_forward_producer_capture_v1",
+        "selected_tile_pairs": 4,
+        "logical_KV_records": 8,
+        "total_tile_pairs": 4,
+        "coverage": "full",
+        "total_tokens": 64,
+        "tile_tokens": 32,
+        "selection_rule": "evenly_spaced_layer_major_pairs",
+        "layers": 2,
+        "head_dim": 16,
+        "kv_heads": 2,
+        "channels": 32,
+        "hidden_size": 64,
+        "chunks_observed": 2,
+        "hook_counts": {
+          "root_pre": 2,
+          "rotary": 2,
+          "root_post": 2
+        },
+        "inner_stage_counts": {
+          "0": {
+            "input_layernorm": 2,
+            "attention_pre": 2,
+            "k_proj": 2,
+            "k_norm": 2,
+            "v_proj": 2,
+            "attention_post": 2
+          },
+          "1": {
+            "input_layernorm": 2,
+            "attention_pre": 2,
+            "k_proj": 2,
+            "k_norm": 2,
+            "v_proj": 2,
+            "attention_post": 2
+          }
+        },
+        "all_stage_targets_exact": true,
+        "v_hook_equals_cache": true,
+        "k_rope_replay_equals_cache": true,
+        "exported_cache_equals_hook_cache": true,
+        "rope_stable": true,
+        "rope_position_rule": "contiguous absolute positions starting at zero",
+        "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+        "copied_selected_and_context_bytes": 73856,
+        "retained_public_selected_bytes": 57344,
+        "decoder_context_array_bytes": 96,
+        "selected_tiles_ready_inside_attention": 4,
+        "on_tile_enabled": false,
+        "on_tile_callback_count": 0,
+        "on_tile_callback_wall_seconds": 0.0,
+        "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+        "raw_hidden_features_persisted": false,
+        "hooks_removed": true,
+        "selected_records": [
+          {
+            "layer": 0,
+            "start": 0,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 0,
+            "start": 32,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 1,
+            "start": 0,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 1,
+            "start": 32,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          }
+        ],
+        "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied."
+      },
+      "timings": {
+        "prefill": {
+          "wall_seconds": 0.012072721998265479,
+          "device_event_seconds": null,
+          "device": "cpu",
+          "synchronized": true,
+          "observer_included": false,
+          "producer_hooks_included": true,
+          "scope": "Instrumented forward includes actual producer hooks, diagnostic CPU copies and selected-device code emission when supplied. CPU syndrome/position packets are constructed afterward. Full raw KV remains resident."
+        },
+        "device_to_cpu_words": {
+          "wall_seconds": 0.0025221150062861852,
+          "device_event_seconds": null,
+          "device": "cpu",
+          "synchronized": true
+        }
+      }
+    },
+    {
+      "split": "train",
+      "name": "train_seed_vault_records",
+      "tokens": 64,
+      "sha256": "5c339416bb8f535e88db504146b8e4872bf924700abe70fa375593f9efd1b570",
+      "producer_records_sha256": "5c339416bb8f535e88db504146b8e4872bf924700abe70fa375593f9efd1b570",
+      "producer_inputs_sha256": "0bff389bc27de1f4bfde53ecb29d856b99296af505e0c964467890236c13f690",
+      "input_ids_sha256": "26d34284b68e211fa04f9cc1cae746b184c720f97518c0b482722b3fbbe04b24",
+      "kv_words_sha256": "8aa7ee670aded77b34bf048958763e774a6fb3a1ff9d0d295fb11a18a06f109d",
+      "geometry": {
+        "layers": 2,
+        "kv_heads": 2,
+        "tokens": 64,
+        "head_dim": 16,
+        "columns": 32,
+        "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+        "channels": 32
+      },
+      "producer_audit": {
+        "format": "qwen3_inside_forward_producer_capture_v1",
+        "selected_tile_pairs": 4,
+        "logical_KV_records": 8,
+        "total_tile_pairs": 4,
+        "coverage": "full",
+        "total_tokens": 64,
+        "tile_tokens": 32,
+        "selection_rule": "evenly_spaced_layer_major_pairs",
+        "layers": 2,
+        "head_dim": 16,
+        "kv_heads": 2,
+        "channels": 32,
+        "hidden_size": 64,
+        "chunks_observed": 2,
+        "hook_counts": {
+          "root_pre": 2,
+          "rotary": 2,
+          "root_post": 2
+        },
+        "inner_stage_counts": {
+          "0": {
+            "input_layernorm": 2,
+            "attention_pre": 2,
+            "k_proj": 2,
+            "k_norm": 2,
+            "v_proj": 2,
+            "attention_post": 2
+          },
+          "1": {
+            "input_layernorm": 2,
+            "attention_pre": 2,
+            "k_proj": 2,
+            "k_norm": 2,
+            "v_proj": 2,
+            "attention_post": 2
+          }
+        },
+        "all_stage_targets_exact": true,
+        "v_hook_equals_cache": true,
+        "k_rope_replay_equals_cache": true,
+        "exported_cache_equals_hook_cache": true,
+        "rope_stable": true,
+        "rope_position_rule": "contiguous absolute positions starting at zero",
+        "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+        "copied_selected_and_context_bytes": 73856,
+        "retained_public_selected_bytes": 57344,
+        "decoder_context_array_bytes": 96,
+        "selected_tiles_ready_inside_attention": 4,
+        "on_tile_enabled": false,
+        "on_tile_callback_count": 0,
+        "on_tile_callback_wall_seconds": 0.0,
+        "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+        "raw_hidden_features_persisted": false,
+        "hooks_removed": true,
+        "selected_records": [
+          {
+            "layer": 0,
+            "start": 0,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 0,
+            "start": 32,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 1,
+            "start": 0,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          },
+          {
+            "layer": 1,
+            "start": 32,
+            "tokens": 32,
+            "v_hook_cache_mismatched_words": 0,
+            "k_rope_replay_cache_mismatched_words": 0,
+            "k_cache_export_mismatched_words": 0,
+            "v_cache_export_mismatched_words": 0,
+            "all_stage_targets_exact": true,
+            "selected_shapes": {
+              "hidden": [
+                32,
+                64
+              ],
+              "cos": [
+                32,
+                16
+              ],
+              "sin": [
+                32,
+                16
+              ],
+              "k_proj": [
+                32,
+                32
+              ],
+              "k_pre_rope": [
+                32,
+                32
+              ],
+              "_k_replay": [
+                32,
+                32
+              ],
+              "_v_hook": [
+                32,
+                32
+              ],
+              "k": [
+                32,
+                32
+              ],
+              "v": [
+                32,
+                32
+              ]
+            }
+          }
+        ],
+        "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied."
+      },
+      "timings": {
+        "prefill": {
+          "wall_seconds": 0.012681373002124019,
+          "device_event_seconds": null,
+          "device": "cpu",
+          "synchronized": true,
+          "observer_included": false,
+          "producer_hooks_included": true,
+          "scope": "Instrumented forward includes actual producer hooks, diagnostic CPU copies and selected-device code emission when supplied. CPU syndrome/position packets are constructed afterward. Full raw KV remains resident."
+        },
+        "device_to_cpu_words": {
+          "wall_seconds": 0.0023839459972805344,
+          "device_event_seconds": null,
+          "device": "cpu",
+          "synchronized": true
+        }
+      }
+    }
+  ],
+  "development": {
+    "first_token": 82,
+    "geometry": {
+      "layers": 2,
+      "kv_heads": 2,
+      "tokens": 32,
+      "head_dim": 16,
+      "columns": 32,
+      "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+      "channels": 32
+    },
+    "cache_class": "transformers.cache_utils.DynamicCache",
+    "raw_payload_bytes": 8192,
+    "timings": {
+      "prefill": {
+        "wall_seconds": 0.011429338999732863,
+        "device_event_seconds": null,
+        "device": "cpu",
+        "synchronized": true,
+        "observer_included": false,
+        "producer_hooks_included": true,
+        "scope": "Instrumented forward includes actual producer hooks, diagnostic CPU copies and selected-device code emission when supplied. CPU syndrome/position packets are constructed afterward. Full raw KV remains resident."
+      },
+      "device_to_cpu_words": {
+        "wall_seconds": 0.002283144000102766,
+        "device_event_seconds": null,
+        "device": "cpu",
+        "synchronized": true
+      }
+    },
+    "memory": {
+      "initial": {
+        "device": "cpu",
+        "allocated_bytes": null,
+        "reserved_bytes": null,
+        "peak_allocated_bytes": null,
+        "peak_reserved_bytes": null,
+        "free_device_bytes": null,
+        "total_device_bytes": null,
+        "note": "CPU allocator peaks are not measured by this helper"
+      },
+      "prefill": {
+        "device": "cpu",
+        "allocated_bytes": null,
+        "reserved_bytes": null,
+        "peak_allocated_bytes": null,
+        "peak_reserved_bytes": null,
+        "free_device_bytes": null,
+        "total_device_bytes": null,
+        "note": "CPU allocator peaks are not measured by this helper"
+      },
+      "device_to_cpu_words": {
+        "device": "cpu",
+        "allocated_bytes": null,
+        "reserved_bytes": null,
+        "peak_allocated_bytes": null,
+        "peak_reserved_bytes": null,
+        "free_device_bytes": null,
+        "total_device_bytes": null,
+        "note": "CPU allocator peaks are not measured by this helper"
+      },
+      "after_cache_release": {
+        "device": "cpu",
+        "allocated_bytes": null,
+        "reserved_bytes": null,
+        "peak_allocated_bytes": null,
+        "peak_reserved_bytes": null,
+        "free_device_bytes": null,
+        "total_device_bytes": null,
+        "note": "CPU allocator peaks are not measured by this helper"
+      }
+    },
+    "chunk_tokens": 32,
+    "scope": "Full device KV capture with CPU export; no encoded-cache attention or offload",
+    "input_ids_sha256": "868916793b8b7045dd4010907238c171c7e5f3a408dcb23a13cebfdabed2457a",
+    "kv_words_sha256": "a036860c5e05ac0ba83ad1935edd47d196b75076e454aed3527bd41037c15948",
+    "producer_records_sha256": "60d663545277cd0eb9975bc16addb9dbedc2944cb20ac1094b0d7bdb4e3aa83d",
+    "producer_audit": {
+      "format": "qwen3_inside_forward_producer_capture_v1",
+      "selected_tile_pairs": 2,
+      "logical_KV_records": 4,
+      "total_tile_pairs": 2,
+      "coverage": "full",
+      "total_tokens": 32,
+      "tile_tokens": 32,
+      "selection_rule": "evenly_spaced_layer_major_pairs",
+      "layers": 2,
+      "head_dim": 16,
+      "kv_heads": 2,
+      "channels": 32,
+      "hidden_size": 64,
+      "chunks_observed": 1,
+      "hook_counts": {
+        "root_pre": 1,
+        "rotary": 1,
+        "root_post": 1
+      },
+      "inner_stage_counts": {
+        "0": {
+          "input_layernorm": 1,
+          "attention_pre": 1,
+          "k_proj": 1,
+          "k_norm": 1,
+          "v_proj": 1,
+          "attention_post": 1
+        },
+        "1": {
+          "input_layernorm": 1,
+          "attention_pre": 1,
+          "k_proj": 1,
+          "k_norm": 1,
+          "v_proj": 1,
+          "attention_post": 1
+        }
+      },
+      "all_stage_targets_exact": true,
+      "v_hook_equals_cache": true,
+      "k_rope_replay_equals_cache": true,
+      "exported_cache_equals_hook_cache": true,
+      "rope_stable": true,
+      "rope_position_rule": "contiguous absolute positions starting at zero",
+      "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+      "copied_selected_and_context_bytes": 36960,
+      "retained_public_selected_bytes": 28672,
+      "decoder_context_array_bytes": 96,
+      "selected_tiles_ready_inside_attention": 2,
+      "on_tile_enabled": true,
+      "on_tile_callback_count": 2,
+      "on_tile_callback_wall_seconds": 0.0066032879913109355,
+      "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+      "raw_hidden_features_persisted": false,
+      "hooks_removed": true,
+      "selected_records": [
+        {
+          "layer": 0,
+          "start": 0,
+          "tokens": 32,
+          "v_hook_cache_mismatched_words": 0,
+          "k_rope_replay_cache_mismatched_words": 0,
+          "k_cache_export_mismatched_words": 0,
+          "v_cache_export_mismatched_words": 0,
+          "all_stage_targets_exact": true,
+          "selected_shapes": {
+            "hidden": [
+              32,
+              64
+            ],
+            "cos": [
+              32,
+              16
+            ],
+            "sin": [
+              32,
+              16
+            ],
+            "k_proj": [
+              32,
+              32
+            ],
+            "k_pre_rope": [
+              32,
+              32
+            ],
+            "_k_replay": [
+              32,
+              32
+            ],
+            "_v_hook": [
+              32,
+              32
+            ],
+            "k": [
+              32,
+              32
+            ],
+            "v": [
+              32,
+              32
+            ]
+          }
+        },
+        {
+          "layer": 1,
+          "start": 0,
+          "tokens": 32,
+          "v_hook_cache_mismatched_words": 0,
+          "k_rope_replay_cache_mismatched_words": 0,
+          "k_cache_export_mismatched_words": 0,
+          "v_cache_export_mismatched_words": 0,
+          "all_stage_targets_exact": true,
+          "selected_shapes": {
+            "hidden": [
+              32,
+              64
+            ],
+            "cos": [
+              32,
+              16
+            ],
+            "sin": [
+              32,
+              16
+            ],
+            "k_proj": [
+              32,
+              32
+            ],
+            "k_pre_rope": [
+              32,
+              32
+            ],
+            "_k_replay": [
+              32,
+              32
+            ],
+            "_v_hook": [
+              32,
+              32
+            ],
+            "k": [
+              32,
+              32
+            ],
+            "v": [
+              32,
+              32
+            ]
+          }
+        }
+      ],
+      "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied."
+    },
+    "inline_side_codes": {
+      "methods": {
+        "none": {
+          "calls": 2,
+          "feature_bytes": 0,
+          "wall_seconds": 0.003933759995561559,
+          "preparation": {
+            "wall_seconds": 0.0015435649984283373,
+            "device_event_seconds": null,
+            "device": "cpu",
+            "synchronized": true
+          },
+          "records": [
+            {
+              "layer": 0,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 0,
+                "feature_bytes": 0,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 0,
+                "maximum_absolute_value": 0.0,
+                "nonfinite_words": 0
+              }
+            },
+            {
+              "layer": 1,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 0,
+                "feature_bytes": 0,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 0,
+                "maximum_absolute_value": 0.0,
+                "nonfinite_words": 0
+              }
+            }
+          ]
+        },
+        "kv": {
+          "calls": 2,
+          "feature_bytes": 256,
+          "wall_seconds": 0.0007099940048647113,
+          "preparation": {
+            "wall_seconds": 0.00107076000131201,
+            "device_event_seconds": null,
+            "device": "cpu",
+            "synchronized": true
+          },
+          "records": [
+            {
+              "layer": 0,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 128,
+              "sha256": "2733a978350c2e72908d8e9295b13b67ae7037dc8ac0ef45491b1fb00eef895d",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 2,
+                "feature_bytes": 128,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 62,
+                "maximum_absolute_value": 2.609375,
+                "nonfinite_words": 0,
+                "latent_clamped_values": 0,
+                "source_width": 64,
+                "source_min": -3.09375,
+                "source_max": 2.953125,
+                "normalization_scale_recomputation": false
+              }
+            },
+            {
+              "layer": 1,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 128,
+              "sha256": "8b5aa9bc445275cb7415f656250909c324e3edcbc6bd4358905a0103e48adb0c",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 2,
+                "feature_bytes": 128,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 64,
+                "maximum_absolute_value": 2.578125,
+                "nonfinite_words": 0,
+                "latent_clamped_values": 0,
+                "source_width": 64,
+                "source_min": -2.5,
+                "source_max": 2.71875,
+                "normalization_scale_recomputation": false
+              }
+            }
+          ]
+        },
+        "kv_canonical": {
+          "calls": 2,
+          "feature_bytes": 256,
+          "wall_seconds": 0.0007843459970899858,
+          "preparation": {
+            "wall_seconds": 0.0010675750017981045,
+            "device_event_seconds": null,
+            "device": "cpu",
+            "synchronized": true
+          },
+          "records": [
+            {
+              "layer": 0,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 128,
+              "sha256": "a29cff044dfcba9ef798db5eabe6a2fdf81d8f8a1564ab7088998efdf5c912b9",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 2,
+                "feature_bytes": 128,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 61,
+                "maximum_absolute_value": 2.6875,
+                "nonfinite_words": 0,
+                "latent_clamped_values": 0,
+                "source_width": 64,
+                "source_min": -3.0625,
+                "source_max": 2.953125,
+                "normalization_scale_recomputation": false
+              }
+            },
+            {
+              "layer": 1,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 128,
+              "sha256": "da5bc10f1534dfded7639ceef738504ce6eb4729cb87694ade4f1402263bfdcc",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 2,
+                "feature_bytes": 128,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 62,
+                "maximum_absolute_value": 2.6875,
+                "nonfinite_words": 0,
+                "latent_clamped_values": 0,
+                "source_width": 64,
+                "source_min": -2.90625,
+                "source_max": 2.734375,
+                "normalization_scale_recomputation": false
+              }
+            }
+          ]
+        },
+        "hidden": {
+          "calls": 2,
+          "feature_bytes": 256,
+          "wall_seconds": 0.0004301310036680661,
+          "preparation": {
+            "wall_seconds": 0.0010331829980714247,
+            "device_event_seconds": null,
+            "device": "cpu",
+            "synchronized": true
+          },
+          "records": [
+            {
+              "layer": 0,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 128,
+              "sha256": "45c184ba7d76827d102cd8badb7871f97b950d88f4b46ba9d59a6770a0a8dc0d",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 2,
+                "feature_bytes": 128,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 61,
+                "maximum_absolute_value": 2.4375,
+                "nonfinite_words": 0,
+                "latent_clamped_values": 0,
+                "source_width": 64,
+                "source_min": -3.0,
+                "source_max": 3.078125,
+                "normalization_scale_recomputation": false
+              }
+            },
+            {
+              "layer": 1,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 128,
+              "sha256": "da03decbdcd82a78507768325979457ef250af5157279f188e39e7bf6685ec8e",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 2,
+                "feature_bytes": 128,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 62,
+                "maximum_absolute_value": 2.484375,
+                "nonfinite_words": 0,
+                "latent_clamped_values": 0,
+                "source_width": 64,
+                "source_min": -3.265625,
+                "source_max": 3.15625,
+                "normalization_scale_recomputation": false
+              }
+            }
+          ]
+        },
+        "hidden_norm": {
+          "calls": 2,
+          "feature_bytes": 256,
+          "wall_seconds": 0.0005525060041691177,
+          "preparation": {
+            "wall_seconds": 0.0009926120037562214,
+            "device_event_seconds": null,
+            "device": "cpu",
+            "synchronized": true
+          },
+          "records": [
+            {
+              "layer": 0,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 128,
+              "sha256": "79378faa8155a424d7edf9c6afa7e6e155e96ef2abfe67f0f916eee0a1025af6",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 2,
+                "feature_bytes": 128,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 62,
+                "maximum_absolute_value": 2.6875,
+                "nonfinite_words": 0,
+                "latent_clamped_values": 0,
+                "source_width": 66,
+                "source_min": -3.0,
+                "source_max": 10.077118873596191,
+                "normalization_scale_recomputation": true
+              }
+            },
+            {
+              "layer": 1,
+              "start": 0,
+              "tokens": 32,
+              "feature_bytes": 128,
+              "sha256": "ad1b47ec62ba2a369e9dbff57307a2c0b04b775cb2df4b6b54403b5d5db3ab1d",
+              "encoder_diagnostics": {
+                "tokens": 32,
+                "rank": 2,
+                "feature_bytes": 128,
+                "finite": true,
+                "zero_words": 0,
+                "unique_word_count": 61,
+                "maximum_absolute_value": 2.6875,
+                "nonfinite_words": 0,
+                "latent_clamped_values": 0,
+                "source_width": 66,
+                "source_min": -3.265625,
+                "source_max": 10.251897811889648,
+                "normalization_scale_recomputation": true
+              }
+            }
+          ]
+        }
+      },
+      "observed_inside_attention_forward": true,
+      "scope": "Synchronous producer on_tile callback, before attention returns; CPU diagnostic feature copies and selected-device code emission included in instrumented prefill time. No baseline overhead or fused-kernel claim."
+    },
+    "producer_inputs_sha256": "1b15f01e416b9abde7e803e9e21afd4d5818a29d29e90522fd2517e42aa77fd0"
+  },
+  "test_captures": [
+    {
+      "name": "test_pottery_kiln_diary",
+      "tokens": 64,
+      "capture": {
+        "first_token": 6,
+        "geometry": {
+          "layers": 2,
+          "kv_heads": 2,
+          "tokens": 64,
+          "head_dim": 16,
+          "columns": 32,
+          "source": "Actual returned cache tensor dimensions, not hidden_size/query_heads",
+          "channels": 32
+        },
+        "cache_class": "transformers.cache_utils.DynamicCache",
+        "raw_payload_bytes": 16384,
+        "timings": {
+          "prefill": {
+            "wall_seconds": 0.018532955000409856,
+            "device_event_seconds": null,
+            "device": "cpu",
+            "synchronized": true,
+            "observer_included": false,
+            "producer_hooks_included": true,
+            "scope": "Instrumented forward includes actual producer hooks, diagnostic CPU copies and selected-device code emission when supplied. CPU syndrome/position packets are constructed afterward. Full raw KV remains resident."
+          },
+          "device_to_cpu_words": {
+            "wall_seconds": 0.0036343180036055855,
+            "device_event_seconds": null,
+            "device": "cpu",
+            "synchronized": true
+          }
+        },
+        "memory": {
+          "initial": {
+            "device": "cpu",
+            "allocated_bytes": null,
+            "reserved_bytes": null,
+            "peak_allocated_bytes": null,
+            "peak_reserved_bytes": null,
+            "free_device_bytes": null,
+            "total_device_bytes": null,
+            "note": "CPU allocator peaks are not measured by this helper"
+          },
+          "prefill": {
+            "device": "cpu",
+            "allocated_bytes": null,
+            "reserved_bytes": null,
+            "peak_allocated_bytes": null,
+            "peak_reserved_bytes": null,
+            "free_device_bytes": null,
+            "total_device_bytes": null,
+            "note": "CPU allocator peaks are not measured by this helper"
+          },
+          "device_to_cpu_words": {
+            "device": "cpu",
+            "allocated_bytes": null,
+            "reserved_bytes": null,
+            "peak_allocated_bytes": null,
+            "peak_reserved_bytes": null,
+            "free_device_bytes": null,
+            "total_device_bytes": null,
+            "note": "CPU allocator peaks are not measured by this helper"
+          },
+          "after_cache_release": {
+            "device": "cpu",
+            "allocated_bytes": null,
+            "reserved_bytes": null,
+            "peak_allocated_bytes": null,
+            "peak_reserved_bytes": null,
+            "free_device_bytes": null,
+            "total_device_bytes": null,
+            "note": "CPU allocator peaks are not measured by this helper"
+          }
+        },
+        "chunk_tokens": 32,
+        "scope": "Full device KV capture with CPU export; no encoded-cache attention or offload",
+        "input_ids_sha256": "0a5d7c137ed1f3b1d670d5fb744effc15128eb97bfdc3f3128d9b98e7deda182",
+        "kv_words_sha256": "6b671110998b8b6a8bcc33fa4b1186d8b12e7c7bff1a74e935c3587250e0d573",
+        "producer_records_sha256": "9abffaa18fff7951cd860af38c74a23aad9a995f864e25b62ada774daa249fd4",
+        "producer_audit": {
+          "format": "qwen3_inside_forward_producer_capture_v1",
+          "selected_tile_pairs": 4,
+          "logical_KV_records": 8,
+          "total_tile_pairs": 4,
+          "coverage": "full",
+          "total_tokens": 64,
+          "tile_tokens": 32,
+          "selection_rule": "explicit_token_starts_across_all_layers",
+          "layers": 2,
+          "head_dim": 16,
+          "kv_heads": 2,
+          "channels": 32,
+          "hidden_size": 64,
+          "chunks_observed": 2,
+          "hook_counts": {
+            "root_pre": 2,
+            "rotary": 2,
+            "root_post": 2
+          },
+          "inner_stage_counts": {
+            "0": {
+              "input_layernorm": 2,
+              "attention_pre": 2,
+              "k_proj": 2,
+              "k_norm": 2,
+              "v_proj": 2,
+              "attention_post": 2
+            },
+            "1": {
+              "input_layernorm": 2,
+              "attention_pre": 2,
+              "k_proj": 2,
+              "k_norm": 2,
+              "v_proj": 2,
+              "attention_post": 2
+            }
+          },
+          "all_stage_targets_exact": true,
+          "v_hook_equals_cache": true,
+          "k_rope_replay_equals_cache": true,
+          "exported_cache_equals_hook_cache": true,
+          "rope_stable": true,
+          "rope_position_rule": "contiguous absolute positions starting at zero",
+          "replay_device": "original producer device; actual loaded Qwen3 apply_rotary_pos_emb",
+          "copied_selected_and_context_bytes": 73856,
+          "retained_public_selected_bytes": 57344,
+          "decoder_context_array_bytes": 96,
+          "selected_tiles_ready_inside_attention": 4,
+          "on_tile_enabled": true,
+          "on_tile_callback_count": 4,
+          "on_tile_callback_wall_seconds": 0.00507124300202122,
+          "on_tile_stage": "attention_forward_post_hook; before decoder layer resumes and root model returns",
+          "raw_hidden_features_persisted": false,
+          "hooks_removed": true,
+          "selected_records": [
+            {
+              "layer": 0,
+              "start": 0,
+              "tokens": 32,
+              "v_hook_cache_mismatched_words": 0,
+              "k_rope_replay_cache_mismatched_words": 0,
+              "k_cache_export_mismatched_words": 0,
+              "v_cache_export_mismatched_words": 0,
+              "all_stage_targets_exact": true,
+              "selected_shapes": {
+                "hidden": [
+                  32,
+                  64
+                ],
+                "cos": [
+                  32,
+                  16
+                ],
+                "sin": [
+                  32,
+                  16
+                ],
+                "k_proj": [
+                  32,
+                  32
+                ],
+                "k_pre_rope": [
+                  32,
+                  32
+                ],
+                "_k_replay": [
+                  32,
+                  32
+                ],
+                "_v_hook": [
+                  32,
+                  32
+                ],
+                "k": [
+                  32,
+                  32
+                ],
+                "v": [
+                  32,
+                  32
+                ]
+              }
+            },
+            {
+              "layer": 0,
+              "start": 32,
+              "tokens": 32,
+              "v_hook_cache_mismatched_words": 0,
+              "k_rope_replay_cache_mismatched_words": 0,
+              "k_cache_export_mismatched_words": 0,
+              "v_cache_export_mismatched_words": 0,
+              "all_stage_targets_exact": true,
+              "selected_shapes": {
+                "hidden": [
+                  32,
+                  64
+                ],
+                "cos": [
+                  32,
+                  16
+                ],
+                "sin": [
+                  32,
+                  16
+                ],
+                "k_proj": [
+                  32,
+                  32
+                ],
+                "k_pre_rope": [
+                  32,
+                  32
+                ],
+                "_k_replay": [
+                  32,
+                  32
+                ],
+                "_v_hook": [
+                  32,
+                  32
+                ],
+                "k": [
+                  32,
+                  32
+                ],
+                "v": [
+                  32,
+                  32
+                ]
+              }
+            },
+            {
+              "layer": 1,
+              "start": 0,
+              "tokens": 32,
+              "v_hook_cache_mismatched_words": 0,
+              "k_rope_replay_cache_mismatched_words": 0,
+              "k_cache_export_mismatched_words": 0,
+              "v_cache_export_mismatched_words": 0,
+              "all_stage_targets_exact": true,
+              "selected_shapes": {
+                "hidden": [
+                  32,
+                  64
+                ],
+                "cos": [
+                  32,
+                  16
+                ],
+                "sin": [
+                  32,
+                  16
+                ],
+                "k_proj": [
+                  32,
+                  32
+                ],
+                "k_pre_rope": [
+                  32,
+                  32
+                ],
+                "_k_replay": [
+                  32,
+                  32
+                ],
+                "_v_hook": [
+                  32,
+                  32
+                ],
+                "k": [
+                  32,
+                  32
+                ],
+                "v": [
+                  32,
+                  32
+                ]
+              }
+            },
+            {
+              "layer": 1,
+              "start": 32,
+              "tokens": 32,
+              "v_hook_cache_mismatched_words": 0,
+              "k_rope_replay_cache_mismatched_words": 0,
+              "k_cache_export_mismatched_words": 0,
+              "v_cache_export_mismatched_words": 0,
+              "all_stage_targets_exact": true,
+              "selected_shapes": {
+                "hidden": [
+                  32,
+                  64
+                ],
+                "cos": [
+                  32,
+                  16
+                ],
+                "sin": [
+                  32,
+                  16
+                ],
+                "k_proj": [
+                  32,
+                  32
+                ],
+                "k_pre_rope": [
+                  32,
+                  32
+                ],
+                "_k_replay": [
+                  32,
+                  32
+                ],
+                "_v_hook": [
+                  32,
+                  32
+                ],
+                "k": [
+                  32,
+                  32
+                ],
+                "v": [
+                  32,
+                  32
+                ]
+              }
+            }
+          ],
+          "scope": "Read-only inside-forward hooks; only fixed selected tile intersections exported. Hidden and projection tensors are temporary diagnostics, not free reconstruction state. Model retains full raw cache. No speed, capacity, compressed attention or serving result is implied."
+        },
+        "inline_side_codes": {
+          "methods": {
+            "none": {
+              "calls": 4,
+              "feature_bytes": 0,
+              "wall_seconds": 0.00042453199421288446,
+              "preparation": {
+                "wall_seconds": 0.0013159110021661036,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true
+              },
+              "records": [
+                {
+                  "layer": 0,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 0,
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 0,
+                    "feature_bytes": 0,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 0,
+                    "maximum_absolute_value": 0.0,
+                    "nonfinite_words": 0
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 0,
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 0,
+                    "feature_bytes": 0,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 0,
+                    "maximum_absolute_value": 0.0,
+                    "nonfinite_words": 0
+                  }
+                },
+                {
+                  "layer": 0,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 0,
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 0,
+                    "feature_bytes": 0,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 0,
+                    "maximum_absolute_value": 0.0,
+                    "nonfinite_words": 0
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 0,
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 0,
+                    "feature_bytes": 0,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 0,
+                    "maximum_absolute_value": 0.0,
+                    "nonfinite_words": 0
+                  }
+                }
+              ]
+            },
+            "kv": {
+              "calls": 4,
+              "feature_bytes": 512,
+              "wall_seconds": 0.0010706289976951666,
+              "preparation": {
+                "wall_seconds": 0.0011028180015273392,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true
+              },
+              "records": [
+                {
+                  "layer": 0,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "29764dc60bf78262382279035beca6db8e334964f7baeb356cdab1f9eb2ac9c3",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 63,
+                    "maximum_absolute_value": 3.3125,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -3.0625,
+                    "source_max": 2.671875,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "f5714dd4912967aaf848d59fb398515cd65869ee5dcd0ee021f111c3618861d5",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 64,
+                    "maximum_absolute_value": 2.515625,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -2.8125,
+                    "source_max": 2.65625,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 0,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "65586e6dfea4f0a100092a39a3c2483c83e3670314eebafc4207a234092bc485",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 64,
+                    "maximum_absolute_value": 2.375,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -2.734375,
+                    "source_max": 2.96875,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "1ebcc38ac0fee4b6348c874badca7f9bc4fa0196cfb8a3763b1fcb76f846e724",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 60,
+                    "maximum_absolute_value": 3.265625,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -2.765625,
+                    "source_max": 2.90625,
+                    "normalization_scale_recomputation": false
+                  }
+                }
+              ]
+            },
+            "kv_canonical": {
+              "calls": 4,
+              "feature_bytes": 512,
+              "wall_seconds": 0.0013327950000530109,
+              "preparation": {
+                "wall_seconds": 0.0010927830007858574,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true
+              },
+              "records": [
+                {
+                  "layer": 0,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "fdce00348e12db1e754a458b85b3d060ef35804655bfecae634513c6d6fed39c",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 62,
+                    "maximum_absolute_value": 2.6875,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -3.0625,
+                    "source_max": 2.953125,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "1e13899dcea6fe6cb2ff91606471a0ee72b9c6abce297424dec170e54cba0147",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 63,
+                    "maximum_absolute_value": 2.578125,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -2.484375,
+                    "source_max": 2.5,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 0,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "86d8837540dc5f36fb77939388da3b47afc64af17e95ecb9097f44b1f636ce96",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 62,
+                    "maximum_absolute_value": 2.40625,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -2.75,
+                    "source_max": 3.03125,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "c3a902cf3a1087721f9d3ae6c9576e94bdd763826d81750bdec50d5e616e9539",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 63,
+                    "maximum_absolute_value": 2.515625,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -2.6875,
+                    "source_max": 2.9375,
+                    "normalization_scale_recomputation": false
+                  }
+                }
+              ]
+            },
+            "hidden": {
+              "calls": 4,
+              "feature_bytes": 512,
+              "wall_seconds": 0.0008505060031893663,
+              "preparation": {
+                "wall_seconds": 0.0010531230000196956,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true
+              },
+              "records": [
+                {
+                  "layer": 0,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "d1dc2e01225c3246ca031bed2ede37ee020edcba1afe2efef5a72275fc147a87",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 63,
+                    "maximum_absolute_value": 2.203125,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -4.625,
+                    "source_max": 3.21875,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "d86a7fbb00499c67449a8be51b4c94780f4cf97659f6980dfcdfc0d0e646db7c",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 64,
+                    "maximum_absolute_value": 2.578125,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -4.5625,
+                    "source_max": 3.03125,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 0,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "544356a8ab382b0359c992ece2e11ad4bc2bb3660b4affa9c1b6eedd3fca844e",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 61,
+                    "maximum_absolute_value": 3.03125,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -3.75,
+                    "source_max": 3.078125,
+                    "normalization_scale_recomputation": false
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "e1970ea67e4634f140451b89756269629e737b6696c0d6e82c99bb834c263774",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 61,
+                    "maximum_absolute_value": 2.9375,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 64,
+                    "source_min": -3.484375,
+                    "source_max": 3.453125,
+                    "normalization_scale_recomputation": false
+                  }
+                }
+              ]
+            },
+            "hidden_norm": {
+              "calls": 4,
+              "feature_bytes": 512,
+              "wall_seconds": 0.0010544350006966852,
+              "preparation": {
+                "wall_seconds": 0.001000714000838343,
+                "device_event_seconds": null,
+                "device": "cpu",
+                "synchronized": true
+              },
+              "records": [
+                {
+                  "layer": 0,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "e44173c17b42d76b96fe099c50002a394646382c258d6ad73540a5d0acb1ebb6",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 59,
+                    "maximum_absolute_value": 2.6875,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 66,
+                    "source_min": -4.625,
+                    "source_max": 10.077118873596191,
+                    "normalization_scale_recomputation": true
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 0,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "9537e231c1f78bd7a1f049710e02f1fbafcb34facac7fbd0254cfc8239187785",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 62,
+                    "maximum_absolute_value": 3.9375,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 66,
+                    "source_min": -4.5625,
+                    "source_max": 9.930108070373535,
+                    "normalization_scale_recomputation": true
+                  }
+                },
+                {
+                  "layer": 0,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "5599e84468b36c00df0ac161ed3d01136d1e9b2e94a4babd2b568f2cbc7043ce",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 62,
+                    "maximum_absolute_value": 3.015625,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 66,
+                    "source_min": -3.75,
+                    "source_max": 10.80210018157959,
+                    "normalization_scale_recomputation": true
+                  }
+                },
+                {
+                  "layer": 1,
+                  "start": 32,
+                  "tokens": 32,
+                  "feature_bytes": 128,
+                  "sha256": "d3c3b0ce7686bd6c90ad1b63510568f1da6f0ea5e1112cfd519468a57ab3379c",
+                  "encoder_diagnostics": {
+                    "tokens": 32,
+                    "rank": 2,
+                    "feature_bytes": 128,
+                    "finite": true,
+                    "zero_words": 0,
+                    "unique_word_count": 63,
+                    "maximum_absolute_value": 2.953125,
+                    "nonfinite_words": 0,
+                    "latent_clamped_values": 0,
+                    "source_width": 66,
+                    "source_min": -3.484375,
+                    "source_max": 9.629878044128418,
+                    "normalization_scale_recomputation": true
+                  }
+                }
+              ]
+            }
+          },
+          "observed_inside_attention_forward": true,
+          "scope": "Synchronous producer on_tile callback, before attention returns; CPU diagnostic feature copies and selected-device code emission included in instrumented prefill time. No baseline overhead or fused-kernel claim."
+        },
+        "producer_inputs_sha256": "3c91316c2793d964d1ba16dfc180aae8501e02115c96d628ea38f0eca19abcd9"
+      }
+    }
+  ]
+}

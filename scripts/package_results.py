@@ -119,7 +119,7 @@ def package(run, destination):
             files=sorted(files, key=lambda entry: entry["file"]),
             raw_results_json_included=False, raw_KV_arrays_included=False,
             manifest_scope="All delivered files except package_manifest.json itself",
-            scope="Byte-preserving gzip plus allowlisted reports and calibration state only. No raw results.json, KV arrays, hidden captures, model weights or arbitrary run files are exported. No JSON parse or benchmark correctness claim.")
+            scope="Byte-preserving gzip plus allowlisted reports and calibration state only. Calibration may contain fitted codec parameters. No raw results.json, KV arrays, hidden captures, pretrained LLM weights or arbitrary run files are exported. No JSON parse or benchmark correctness claim.")
         manifest_path = staging / "package_manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         _regular(manifest_path)

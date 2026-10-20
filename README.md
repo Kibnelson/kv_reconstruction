@@ -2,6 +2,8 @@
 
 Benchmarks for storing a decoder recipe plus exact corrections instead of raw BF16 KV tensors. The default model is **Qwen/Qwen3-4B-Instruct-2507**, pinned to commit `cdbee75f17c01a7cc42f958dc650907174af0554`.
 
+The [prefill metadata and exact coset study](docs/prefill_coset_study.md) adds `--prefill-coset-study`: small actual-hidden codes condition omitted mantissa bit predictions, with verified 31-bit syndrome groups, matched error-position controls and raw escapes. It records real packet/state bytes, DEV width selection, group error histograms and independent restoration. The shareable calibration includes fitted codec parameters. Neural work uses the selected device; initial syndrome/field coding runs on CPU. Local tiny-model validation does not establish pretrained Qwen savings or GPU codec performance.
+
 The repository contains the readable implementations, tests, and a generated single-file runner. It compares exponent packing, field/entropy coding, learned dictionaries, fixed controls, temporal predictors, E8/coset residuals, hybrids, binary residual predictors, and prefill-derived recipes. `--preset all --grid` exposes **104 CPU reference variants and 31 native tensor variants**. The native packets use their own grouped bitpacking format; original Huffman/Deflate codecs still execute on CPU.
 
 The new [prefill recipe experiment](docs/prefill_recipes.md) derives per-channel centers, affine trends or an E8 template from each KV tile, with exact coset and matched residual controls. `--prefill-recipes` also constructs and verifies recipes directly from device KV between prefill chunks. Full raw model KV remains resident.

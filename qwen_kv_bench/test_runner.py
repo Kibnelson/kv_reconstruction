@@ -13,6 +13,11 @@ from qwen_kv_bench import runner
 
 
 class RunnerTests(unittest.TestCase):
+    def test_prefill_coset_dispatch_preserves_separate_options(self):
+        with mock.patch("qwen_kv_bench.syndrome_study.main", return_value=0) as study:
+            self.assertEqual(runner.main(["--prefill-coset-study", "--steps", "123", "--help"]), 0)
+        study.assert_called_once_with(["--steps", "123", "--help"])
+
     def test_insights_and_explicit_generation_selection(self):
         from qwen_kv_bench.gpu_ops import native_options
         specs = native_options("insights")
