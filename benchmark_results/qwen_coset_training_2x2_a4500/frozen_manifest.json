@@ -1,0 +1,99 @@
+{
+  "format": "prefill_coset_training_plan_v1",
+  "config": {
+    "device": "cuda",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "local_files_only": false,
+    "tiny": false,
+    "rank": 8,
+    "width": 32,
+    "steps": null,
+    "batch_tokens": 32,
+    "channels_per_step": 64,
+    "channel_sampling": [
+      "random",
+      "balanced"
+    ],
+    "lr_horizon": 8000,
+    "diagnostic_updates": null,
+    "diagnostic_tokens": 64,
+    "fresh_test_fixtures": true,
+    "residue_bits": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "modes": [
+      "none",
+      "kv",
+      "hidden"
+    ],
+    "train_tokens": 512,
+    "dev_tokens": 128,
+    "lengths": [
+      2048,
+      8192
+    ],
+    "cases": 2,
+    "chunk_tokens": 512,
+    "tile_tokens": 64,
+    "max_pairs": 72,
+    "generation_steps": 2,
+    "repeats": 3,
+    "threads": 4,
+    "seed": 71,
+    "output": "runs/qwen_coset_training_2x2",
+    "short_steps": 1000,
+    "long_steps": 8000,
+    "probe_updates": [
+      250,
+      1000,
+      4000,
+      8000
+    ]
+  },
+  "arms": [
+    {
+      "name": "random_short",
+      "sampling": "random",
+      "steps": 1000
+    },
+    {
+      "name": "random_long",
+      "sampling": "random",
+      "steps": 8000
+    },
+    {
+      "name": "balanced_short",
+      "sampling": "balanced",
+      "steps": 1000
+    },
+    {
+      "name": "balanced_long",
+      "sampling": "balanced",
+      "steps": 8000
+    }
+  ],
+  "lr_horizon": 8000,
+  "fresh_test_fixtures": [
+    {
+      "name": "test_training_holdout_canal_gates",
+      "kind": "text",
+      "prefix": "Read the operating journal for a canal lock.",
+      "body": "Shift <cycle>: Amara checks the upper gate's bearing temperature before opening the sluice. The crew records water levels on both sides, waits for the signal lamp, and compares vibration readings with the previous shift. A repaired pressure gauge stays in the instrument cabinet until its calibration is confirmed.\n",
+      "suffix": "Why should the crew compare water levels before opening the gate?",
+      "split": "test"
+    },
+    {
+      "name": "test_training_holdout_interval_merge",
+      "kind": "code",
+      "prefix": "Review this interval merger and its invariant.",
+      "body": "def merge_<cycle>(intervals):\n    merged = []\n    for lo, hi in sorted(intervals):\n        if lo > hi:\n            raise ValueError('reversed interval')\n        if merged and lo <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], hi)\n        else:\n            merged.append([lo, hi])\n    return merged\n# Each retained interval starts after the previous one ends.\n\n",
+      "suffix": "Why must intervals be sorted before the loop?",
+      "split": "test"
+    }
+  ],
+  "protocol": "Prespecified full 2x2 plan; final TRAIN update only. Fixed DEV diagnostics observe without optimization or checkpoint selection. All arms reported; TEST never selects a winner or tuning parameter."
+}
