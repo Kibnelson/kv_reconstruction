@@ -1,5 +1,11 @@
 # Fixed-capacity training study for producer-informed exact cosets
 
+The [A4500 result review](qwen_coset_training_gpu_review.md) is now available.
+Its corrected package audit passes 12,803 checks. Full channel coverage and
+longer fitting do not reduce packet bytes; a weak hidden-code probability
+benefit remains below metadata cost. The review explains the original three
+false audit mismatches and how to rerun only the audit on existing data.
+
 The first A4500 coset run restored original BF16 words exactly but retained no
 short syndrome groups. Its hidden-code error rate did not beat constant zero,
 and 41.59% of layer/channel pairs received no optimizer minibatch. Full TRAIN

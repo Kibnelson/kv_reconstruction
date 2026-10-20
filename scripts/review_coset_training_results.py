@@ -190,6 +190,7 @@ def review(directory, source_root=None):
     directory = Path(directory).resolve()
     report, raw = _report(directory)
     checks, child_reviews, signatures, mode_records = [], {}, {}, {}
+    excluded_load_seconds = {}
     def check(name, passed):
         checks.append(dict(check=name, passed=bool(passed)))
     root_package = _package_checks(directory, raw, check)
@@ -227,7 +228,18 @@ def review(directory, source_root=None):
         check(name + " diagnostics format", diag["format"] == "qwen_prefill_coset_training_diagnostics_v1")
         check(name + " child source identity", child["source_manifest"] == source)
         check(name + " matching prescribed optimizer budget", child["config"]["steps"] == arm["steps"])
-        identities = dict(model_identity=child["model_identity"], training_hashes=[row["producer_inputs_sha256"] for row in child["training_captures"]],
+        cross_arm_identity = child["model_identity"]
+        if isinstance(cross_arm_identity, dict) and "load_seconds" in cross_arm_identity:
+            # This wall-time observation is retained and validated, but is not
+            # model provenance. Preserve every other field and all within-arm
+            # artifact/frozen-model identity checks in packet_audit.review.
+            cross_arm_identity = dict(cross_arm_identity)
+            load_seconds = cross_arm_identity.pop("load_seconds")
+            excluded_load_seconds[name] = load_seconds
+            check(name + " model load timing finite and nonnegative",
+                  not isinstance(load_seconds, bool) and isinstance(load_seconds, (int, float))
+                  and math.isfinite(load_seconds) and load_seconds >= 0)
+        identities = dict(model_identity=cross_arm_identity, training_hashes=[row["producer_inputs_sha256"] for row in child["training_captures"]],
             development_inputs=child["development"]["producer_inputs_sha256"], probe_manifest=diag["probe_manifest"],
             diagnostic_capture={k:diag["capture"][k] for k in ("producer_inputs_sha256", "input_ids_sha256", "kv_words_sha256")},
             test=[{k: case[k] for k in ("name", "tokens", "selected_starts", "matched_record_addresses")} | dict(
@@ -310,7 +322,10 @@ def review(directory, source_root=None):
                 check(mode + "/" + sampling + " identical short sampling prefix", point is not None and point["sampling_prefix_sha256"] == a["sampling_sha256"])
     validation = dict(format="prefill_coset_training_validation_v1", checks=checks, all_passed=all(row["passed"] for row in checks), passed=sum(row["passed"] for row in checks), total=len(checks))
     analysis = dict(format="prefill_coset_training_review_v1", results_json_sha256=sha(raw), child_reviews=child_reviews,
-        matched_arms=report["arms"], limitations=["Recorded evidence audit; no GPU rerun or omitted-packet replay.", "Fixed DEV diagnostic curves are not packet-rate measurements. Final packets and complete state remain separately charged.", "The audit does not require or establish savings, speed, novelty, convergence or serving-capacity gains."])
+        matched_arms=report["arms"],
+        cross_arm_model_identity_rule="Only top-level model_identity.load_seconds is excluded from cross-arm identity matching. Its finite nonnegative value is retained below. All other identity fields and full within-arm frozen-model/artifact bindings remain checked.",
+        excluded_cross_arm_model_load_seconds=excluded_load_seconds,
+        limitations=["Recorded evidence audit; no GPU rerun or omitted-packet replay.", "Fixed DEV diagnostic curves are not packet-rate measurements. Final packets and complete state remain separately charged.", "The audit does not require or establish savings, speed, novelty, convergence or serving-capacity gains."])
     return analysis, validation
 
 
@@ -329,7 +344,8 @@ def main(argv=None):
     args.output.mkdir(parents=True, exist_ok=True)
     for name, value in (("analysis.json", analysis), ("validation.json", validation)):
         (args.output / name).write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n")
-    print(json.dumps(dict(all_passed=validation["all_passed"], passed=validation["passed"], total=validation["total"], output=str(args.output))))
+    print(json.dumps(dict(all_passed=validation["all_passed"], passed=validation["passed"], total=validation["total"],
+        failed_checks=[row["check"] for row in validation["checks"] if not row["passed"]], output=str(args.output))))
     return 0 if validation["all_passed"] else 1
 
 

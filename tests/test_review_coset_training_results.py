@@ -2,6 +2,8 @@
 import copy
 import gzip
 import importlib.util
+import io
+import json
 import struct
 import zlib
 from pathlib import Path
@@ -157,6 +159,37 @@ class CosetTrainingAuditTests(unittest.TestCase):
     def test_valid_factorial_does_not_require_savings(self):
         self.assertEqual(self.failures(), [])
 
+    def pretrained_identities(self):
+        for index, arm in enumerate(self.report["arms"]):
+            identity=dict(model_id="Qwen/Qwen3-4B-Instruct-2507", resolved_commit="fixed-revision",
+                          config_sha256="fixed-config", runtime_config_sha256="fixed-runtime", load_seconds=1.+index/10.)
+            self.mutate(arm["name"], lambda d, identity=identity:d.update(model_identity=identity))
+
+    def test_pretrained_load_timings_are_observations_not_model_identity(self):
+        self.pretrained_identities()
+        analysis,validation=audit.review(self.root)
+        self.assertTrue(validation["all_passed"])
+        self.assertEqual(analysis["excluded_cross_arm_model_load_seconds"],
+                         {arm["name"]:1.+index/10. for index,arm in enumerate(self.report["arms"])})
+        # Original evidence is not normalized on disk or altered in memory by
+        # the comparison; full per-arm identity retains the timing.
+        child,_=audit.read_json(self.root/"random_long"/"results.json")
+        self.assertEqual(child["model_identity"]["load_seconds"],1.1)
+
+    def test_revision_and_config_still_define_identity(self):
+        self.pretrained_identities()
+        for field in ("resolved_commit","config_sha256","runtime_config_sha256"):
+            self.mutate("random_long", lambda d,field=field:d["model_identity"].update({field:"changed"}))
+            self.assertTrue(any("matched sources, probes, TEST addresses" in x for x in self.failures()))
+            original={"resolved_commit":"fixed-revision","config_sha256":"fixed-config","runtime_config_sha256":"fixed-runtime"}[field]
+            self.mutate("random_long", lambda d,field=field,original=original:d["model_identity"].update({field:original}))
+
+    def test_negative_or_boolean_load_timing_is_rejected(self):
+        self.pretrained_identities()
+        for timing in (-1.,True):
+            self.mutate("random_long",lambda d,timing=timing:d["model_identity"].update(load_seconds=timing))
+            self.assertTrue(any("model load timing finite and nonnegative" in x for x in self.failures()))
+
     def test_changed_training_prefix_is_rejected(self):
         self.mutate("random_long", lambda d:d["modes"]["none"]["checkpoints"][1].update(parameter_sha256="wrong"), diagnostic=True)
         self.assertTrue(any("identical short numerical prefix" in x for x in self.failures()))
@@ -211,6 +244,20 @@ class CosetTrainingAuditTests(unittest.TestCase):
         package_fixture(self.root,self.report)
         (self.root/"training_package_manifest.json").unlink()
         self.assertTrue(any("complete training package manifest present" in x for x in self.failures()))
+
+    def test_cli_reports_exact_failed_labels_and_empty_success_list(self):
+        for failed in (True,False):
+            with self.subTest(failed=failed):
+                output=self.root/("failed_review" if failed else "passed_review")
+                checks=[dict(check="unchanged source identity",passed=True),
+                        dict(check="random_long exact short numerical prefix",passed=not failed)]
+                validation=dict(all_passed=not failed,passed=1 if failed else 2,total=2,checks=checks)
+                with mock.patch.object(audit,"review",return_value=({},validation)), mock.patch("sys.stdout",new_callable=io.StringIO) as captured:
+                    code=audit.main([str(self.root),"--output",str(output)])
+                summary=json.loads(captured.getvalue())
+                self.assertEqual(code,1 if failed else 0)
+                self.assertEqual(summary["failed_checks"],["random_long exact short numerical prefix"] if failed else [])
+                self.assertEqual(json.loads((output/"validation.json").read_bytes()),validation)
 
     def test_cli_refuses_existing_output(self):
         output=self.root/"review"; output.mkdir(); (output/"keep").write_text("preserve")
