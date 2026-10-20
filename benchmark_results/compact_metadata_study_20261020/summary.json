@@ -1,0 +1,102 @@
+{
+  "created_utc": "2026-10-20",
+  "diagnostic_projection": {
+    "arm": "random_long",
+    "best_raw_or_probability_gain_bits_per_KV_value": 0.003010802604179297,
+    "gross_side_budget_bits_per_token_layer": 6.1661237333592,
+    "qualification": "Gross aggregate DEV loss advantage with free per-plane raw/probability choice. Excludes current128bits/token/layer metadata (0.0625bits/value); charging that makes the difference negative. State and headers add cost. No new encoded packet or TEST saving.",
+    "residue_bits": 0
+  },
+  "exactness": "Any changed features or FP32 path require newly computed corrections and independent original-BF16 packet equality.",
+  "format": "compact_prefill_metadata_review_v1",
+  "geometry": {
+    "channels": 1024,
+    "decoder_rank": 8,
+    "head_dim": 128,
+    "hidden_size": 2560,
+    "layers": 36,
+    "rank": 8,
+    "source_width": 2560,
+    "width": 32
+  },
+  "goal_arithmetic": {
+    "additional_bits_per_value_needed": 1.5208246144000004,
+    "field_baseline_8K_bits_per_value": 11.1208246144,
+    "field_baseline_8K_mean_net_savings_pct": 30.49484616,
+    "raw_bits_per_KV_value": 16,
+    "target_40pct_bits_per_value": 9.6
+  },
+  "larger_rate_candidate": "High-mantissa-first page-local grouped refinement; compare no hint, produced-KV hint and actual-prefill hint using the same conditional decoder. All stages and exact correction bits count. Not implemented or measured.",
+  "measured_balanced_long_bit6": {
+    "K_V": {
+      "K": {
+        "gain_bits_per_kind_value": 0.0001944862523480806,
+        "gain_weighted_per_original_BF16_value": 9.72431261740403e-05,
+        "hidden_BCE": 0.9516618740811243,
+        "none_BCE": 0.9518563603334724
+      },
+      "V": {
+        "gain_bits_per_kind_value": 0.002801797023264996,
+        "gain_weighted_per_original_BF16_value": 0.001400898511632498,
+        "hidden_BCE": 0.9537627548672079,
+        "none_BCE": 0.9565645518904728
+      }
+    },
+    "V_fraction_of_hidden_vs_no_code_BCE_gain": 0.9350908327223212,
+    "top4_layers": {
+      "fraction_of_positive_surrogate_gain": 0.3169744050632887,
+      "layer_fraction": 0.1111111111111111,
+      "layer_ids": [
+        18,
+        17,
+        0,
+        16
+      ],
+      "top_layers": 4,
+      "unpaid_surrogate_gain_bpv": 0.00047640032968887216
+    }
+  },
+  "measured_encoder": {
+    "charged_codec_state_bytes": 3633949,
+    "encoder_only_float32_payload_bytes": 819232,
+    "source_normalizer_float32_payload_bytes": 737280,
+    "source_normalizer_fraction_of_encoder": 0.8999648451232374
+  },
+  "new_encoded_savings_measured": false,
+  "next_test": "Matched decoder-known pooled-context control, then a TRAIN-fitted two-bit actual-prefill innovation; separately test exact same-page K-to-V conditioning and page sharing.",
+  "payload_arithmetic_only": [
+    {
+      "bits_per_KV_value": 0.0625,
+      "bits_per_token_layer": 128,
+      "bytes_per_token_layer": 16.0
+    },
+    {
+      "bits_per_KV_value": 0.03125,
+      "bits_per_token_layer": 64,
+      "bytes_per_token_layer": 8.0
+    },
+    {
+      "bits_per_KV_value": 0.015625,
+      "bits_per_token_layer": 32,
+      "bytes_per_token_layer": 4.0
+    },
+    {
+      "bits_per_KV_value": 0.001953125,
+      "bits_per_token_layer": 4,
+      "bytes_per_token_layer": 0.5
+    },
+    {
+      "bits_per_KV_value": 0.0009765625,
+      "bits_per_token_layer": 2,
+      "bytes_per_token_layer": 0.25
+    },
+    {
+      "bits_per_KV_value": 0.00048828125,
+      "bits_per_token_layer": 1,
+      "bytes_per_token_layer": 0.125
+    }
+  ],
+  "reviewed_main_commit": "1d8f29cb9983bad6cb5ee049ac809d480b5bc90f",
+  "scope": "Frozen arrays, retained aggregate DEV diagnostics, source audit, theoretical payload arithmetic and primary-literature review only. No new model forward, training or encoded TEST result.",
+  "source_results_commit": "58c4fe2ac4b6ae4f3d84f1ce2ae58fe5995a912f"
+}
