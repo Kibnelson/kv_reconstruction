@@ -191,9 +191,18 @@ class Engine:
     def _encode(self,words,start=0,*,raw_fallback=True):
         t=self.t
         if words.device!=self.device or words.dtype!=t.uint16 or not words.is_contiguous():raise ValueError('resident contiguous original UINT16 words required')
-        layers,tokens,width=self._shape(tuple(words.shape),start)
-        from . import transfer_t1_kernels as k
+        self._shape(tuple(words.shape),start)
         parameters=self._walk(words,start)
+        return self._encode_prepared(words,start,parameters,raw_fallback=raw_fallback)
+
+    def _encode_prepared(self,words,start,parameters,*,raw_fallback=True):
+        """Private timing control: entropy encode with source-derived parameters.
+
+        This is never a decoder input or a standalone codec latency result.
+        The normal encode path includes the preceding causal parameter walk.
+        """
+        t=self.t;layers,tokens,width=self._shape(tuple(words.shape),start)
+        from . import transfer_t1_kernels as k
         xs=t.full((tokens,),1<<23,dtype=t.int64,device=self.device);count=t.zeros_like(xs)
         error=t.zeros(tokens,dtype=t.int32,device=self.device)
         # Each binary symbol emits at most two bytes; 16 symbols per word.
@@ -243,27 +252,56 @@ class Engine:
             feature_limit=self.feature_limit,scope='state only; encoder parameter replay, rANS lane scratch and chunk output are additional measured peaks')
 
 
-def export_packet(packet,model_identity):
-    """D2H compressed-byte export and CPU envelope/checksum; no KV decode."""
+def model_identity_digest(model_identity):
+    """Bind the complete canonical identity without repeating its manifest."""
     if not model_identity:raise ValueError('model identity required for external storage')
+    return hashlib.sha256(prob.canonical(model_identity)).hexdigest()
+
+
+def export_packet(packet,model_identity,*,identity_mode='sha256'):
+    """D2H compressed-byte export and CPU envelope/checksum; no KV decode."""
+    digest=model_identity_digest(model_identity)
+    if identity_mode not in ('sha256','full'):raise ValueError('invalid model identity mode')
     if packet.encoder_error is not None and bool(packet.encoder_error.any().item()):raise ValueError('T1 encoder overflow/error')
     payload=packet.payload.cpu().numpy().tobytes()
     directory=packet.directory.cpu().numpy().astype('<i8',copy=False).tobytes()
+    identity={'model_identity_sha256':digest} if identity_mode=='sha256' else {'model_identity':model_identity}
     meta=prob.canonical(dict(format=FORMAT,shape=list(packet.shape),start=packet.start,
-        state_sha256=packet.state_sha256,raw=packet.raw,model_identity=model_identity))
+        state_sha256=packet.state_sha256,raw=packet.raw,**identity))
     body=meta+directory+payload
     return HEADER.pack(MAGIC,len(meta),len(directory),len(payload),hashlib.sha256(body).digest())+body
 
 
-def import_packet(data,engine,model_identity):
-    """Validate CPU envelope and upload only compressed payload/directory."""
+def _read_envelope(data):
     data=bytes(data)
     if len(data)<HEADER.size:raise ValueError('truncated T1 envelope')
     magic,mn,dn,pn,digest=HEADER.unpack(data[:HEADER.size])
     body=data[HEADER.size:]
     if magic!=MAGIC or mn>65536 or mn+dn+pn!=len(body) or hashlib.sha256(body).digest()!=digest:raise ValueError('T1 envelope length/checksum mismatch')
-    meta=json.loads(body[:mn]);shape=tuple(meta['shape'])
-    if meta['format']!=FORMAT or meta['state_sha256']!=engine.state_sha256 or meta['model_identity']!=model_identity:raise ValueError('T1 model/state identity mismatch')
+    meta=json.loads(body[:mn])
+    return meta,body,mn,dn,pn
+
+
+def packet_accounting(data):
+    """Verified byte counts; neither CPU KV reconstruction nor GPU work."""
+    meta,body,mn,dn,pn=_read_envelope(data)
+    return dict(complete_bytes=HEADER.size+len(body),payload_bytes=pn,directory_bytes=dn,
+        envelope_bytes=HEADER.size+mn,identity_mode='sha256' if 'model_identity_sha256' in meta else 'full')
+
+
+def import_packet(data,engine,model_identity):
+    """Validate CPU envelope and upload only compressed payload/directory.
+
+    Old full-identity envelopes remain readable. New envelopes carry the
+    SHA256 of that same complete canonical identity; both forms require the
+    receiver's independently supplied expected identity and saved state.
+    """
+    meta,body,mn,dn,pn=_read_envelope(data);shape=tuple(meta['shape'])
+    full='model_identity' in meta;hashed='model_identity_sha256' in meta
+    if full==hashed:raise ValueError('exactly one T1 model identity binding required')
+    expected=model_identity_digest(model_identity)
+    matches=meta['model_identity_sha256']==expected if hashed else meta['model_identity']==model_identity
+    if meta['format']!=FORMAT or meta['state_sha256']!=engine.state_sha256 or not matches:raise ValueError('T1 model/state identity mismatch')
     engine._shape(shape,meta['start'])
     if type(meta['raw']) is not bool:raise ValueError('invalid raw mode')
     expected=0 if meta['raw'] else shape[1]*16

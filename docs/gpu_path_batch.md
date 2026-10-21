@@ -1,5 +1,10 @@
 # GPU KV path: attention, T1 and external restore batch
 
+The first full A4500 batch passed. See the
+[results review](gpu_path_a4500_20261021_review.md) for measured rates,
+latency limits, shared-state accounting and the compact-identity/profiling
+follow-up. Use `--diagnostics` with the command below for that next batch.
+
 The user has approved batching related implementation and testing without a
 separate approval after each step. This batch connects the component paths
 below. It does not implement a native model cache backend or serving engine.
@@ -84,8 +89,11 @@ On model pages the runner requires exact mean/scale/offset parity with the
 original CPU reference, so clipping cannot silently change the claimed frozen
 A/B comparison. State validation rejects noncausal columns and unsafe tables.
 
-Lane restart states, the lane directory, envelope, model/state identities,
+Lane restart states, the lane directory, envelope, model/state identity digests,
 checksum, padding and raw fallback all count in complete external packet bytes.
+The full expected model identity is canonicalized and hashed at both ends;
+the packet carries its SHA256. Updated decoders also accept the earlier full
+identity envelope. Full identities remain available in source/report manifests.
 The uniform prior and positive conditional counts support every BF16 pattern.
 An actual CUDA test exercises all 65,536 original words through entropy coding.
 
@@ -164,6 +172,14 @@ For a smaller diagnostic run, omit `--publish-results` and pass
 `--attention-limit 1 --transfer-limit 1 --repeats 1`. A value of zero means all
 source pages. The normal batch uses all available pages, three transfer samples
 and twenty attention samples after warmup.
+
+Add `--diagnostics` to measure source-derived encoder parameter replay and
+entropy encoding from prepared parameters separately, and collect profiler
+summaries for actual encode and causal decode. By default this samples the
+first and last selected pages per dataset/arm. `--diagnostic-limit 0` profiles
+all selected pages. Profiler times are separate from normal medians; missing
+CUDA profiler activity is explicitly recorded. Reports contain operation names
+and times, not tensor contents or raw trace files.
 
 ## Local checks and remaining integration
 

@@ -1,7 +1,9 @@
 # GPU KV lifecycle: transfer, resident pool and attention
 
-Date: 2026-10-21. Status: proposed implementation plan, grounded in current
-component measurements. This document adds no new GPU result. The user has
+Date: 2026-10-21. Status: lifecycle plan with measured GPU components. The
+[A4500 review](gpu_path_a4500_20261021_review.md) records the completed
+P1 attention, T1 entropy and external restore batch. Native cache integration
+and serving performance remain future work. The user has
 now approved batching related work without a separate approval between steps.
 See [the GPU path batch](gpu_path_batch.md) for current implementation coverage
 and the A4500 experiment command.
@@ -44,7 +46,7 @@ indexes and restart layout must have its rate measured again.
 ### Why keep a pool if T has the smaller measured representation?
 
 T's current decoder advances through earlier layers, earlier channel groups
-and one sequential entropy stream. For example, recovering layer three's
+and sequential entropy lanes. For example, recovering layer three's
 last group in a chunk requires recovering its prerequisites. A byte offset
 to that group does not remove those prediction dependencies. This work is
 reasonable once at cache admission, but repeating it for attention's selected
@@ -70,15 +72,17 @@ an efficient attention cache.
 | Representation | Current evidence | Remaining implementation |
 |---|---|---|
 | Original BF16 KV | Native HF capture from GPU model execution | Replace the persistent dense cache allocation when integrating the pool |
-| Existing transfer stream, called T0 here | CPU probabilities/entropy; exact causal decode using GPU predictor/width parameters | GPU probability and entropy kernels, practical stream parallelism and bounded installation |
+| Existing transfer stream, called T0 here | CPU entropy reference, 8.828674 complete bpv for Qwen B | Retained as a matched reference; T1 is a separate GPU ABI |
 | Existing pool records, called P0 here | Exact GPU tensor pack/unpack; byte parity with the original records | Attention tile access, production allocation, raw tail, overflow and serving integration |
-| Proposed resident ABI P1 | Design below | Implement and measure; it is not byte-compatible with P0 unless explicitly demonstrated |
-| Proposed GPU wire ABI T1 | Design below | Implement and measure; its rates cannot inherit T0's reported numbers |
+| Resident ABI P1 | Actual A4500 pack, selected reads, raw tail and fused attention; 13.05 allocated packet bpv on the SmolLM fixture | Reusable serving allocation, native cache writer, model continuation and concurrency |
+| GPU wire ABI T1 | Actual GPU probabilities/entropy, exact isolated decode, file restore to P1; 9.023300 complete bpv for Qwen B | Reduce codec latency; measure compact identity framing; fused bounded-scratch conversion and transport integration |
 
-The Qwen four-layer study records T0 arm B at 8.828674 complete packet
-bits/value. Its entropy coder is CPU-only. The earlier GPU pool replay uses
-frozen SmolLM words and a different format/workload. Those rates do not form
-a paired end-to-end Qwen comparison. Keep both as historical component results.
+The Qwen four-layer T0 study records arm B at 8.828674 complete packet
+bits/value with CPU entropy coding. The new A4500 batch reuses the same
+exploratory Qwen words and frozen states, measures T1 separately and compares
+both coders on those pages. The older SmolLM pool replay remains a different
+workload. No report establishes full-model serving performance. Designs and
+integration milestones below include work beyond these measured components.
 
 ## 2. Target lifecycle
 

@@ -85,6 +85,11 @@ class OrchestrationTests(unittest.TestCase):
             self.assertTrue(result['serial_cycle_memory']['source_pool_released_after_file_and_directory_fsync'])
             self.assertTrue(result['parameter_oracle']['mean_scale_offset_exact'])
             self.assertTrue(result['P']['requested_capacity_rejected'])
+            accounting=result['T_packet_accounting']
+            self.assertEqual(accounting['identity_mode'],'sha256')
+            self.assertEqual(accounting['complete_bytes'],result['complete_external_T_bytes'])
+            self.assertEqual(accounting['complete_bytes'],accounting['payload_bytes']+accounting['directory_bytes']+accounting['envelope_bytes'])
+            self.assertEqual(result['identity_compaction_saved_bytes'],result['legacy_full_identity_accounting']['complete_bytes']-accounting['complete_bytes'])
 
 
 if __name__=='__main__':unittest.main()

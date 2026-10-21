@@ -24,6 +24,14 @@ def model_and_words():
 
 
 class ReferenceTests(unittest.TestCase):
+    def test_identity_digest_binds_complete_canonical_manifest(self):
+        identity={'model':'example','config':{'heads':8,'dimension':128}}
+        reordered={'config':{'dimension':128,'heads':8},'model':'example'}
+        self.assertEqual(t1.model_identity_digest(identity),t1.model_identity_digest(reordered))
+        changed={'model':'example','config':{'heads':4,'dimension':128}}
+        self.assertNotEqual(t1.model_identity_digest(identity),t1.model_identity_digest(changed))
+        with self.assertRaises(ValueError):t1.model_identity_digest({})
+
     def test_special_words_and_adversarial_probabilities_roundtrip(self):
         words=np.array([0,32768,1,32769,0x7f80,0xff80,0x7fc1,0xffff,0x3f80,0xbf80],np.uint16)
         mu=np.linspace(-100,100,len(words));inv=2.**np.linspace(-8,16,len(words))
@@ -74,6 +82,9 @@ class InterpreterTests(unittest.TestCase):
             np.testing.assert_array_equal(off.numpy(),expected_off)
             np.testing.assert_array_equal(inv.numpy(),r['inverse']*e.adapter.scale_table[expected_off+prob.MAX_OFFSET,None])
         packet=e.encode(source,raw_fallback=False)
+        prepared=e._encode_prepared(source,0,records,raw_fallback=False)
+        np.testing.assert_array_equal(prepared.payload.numpy(),packet.payload.numpy())
+        np.testing.assert_array_equal(prepared.directory.numpy(),packet.directory.numpy())
         np.testing.assert_array_equal(packet.encoder_error.numpy(),0)
         means=np.concatenate([r[2].numpy()[0] for r in records]);inverses=np.concatenate([r[3].numpy()[0] for r in records])
         expected=oracle.encode_lane(w[:,0].ravel(),means,inverses)
@@ -88,6 +99,30 @@ class InterpreterTests(unittest.TestCase):
         out,err,_=e.decode(imported);np.testing.assert_array_equal(err.numpy(),0);np.testing.assert_array_equal(out.numpy(),w)
         with self.assertRaises(ValueError):t1.import_packet(wire[:-1]+bytes([wire[-1]^1]),e,{'model':'synthetic software check'})
         with self.assertRaises(ValueError):t1.import_packet(wire,e,{'model':'different model'})
+        self.check_identity_envelopes(e,packet,w)
+
+    def check_identity_envelopes(self,e,packet,w):
+        identity={'model':'synthetic','complete_config':'x'*6000}
+        compact=t1.export_packet(packet,identity)
+        legacy=t1.export_packet(packet,identity,identity_mode='full')
+        counts=t1.packet_accounting(compact);old_counts=t1.packet_accounting(legacy)
+        self.assertEqual(counts['identity_mode'],'sha256');self.assertEqual(old_counts['identity_mode'],'full')
+        self.assertLess(len(compact),len(legacy)-5800)
+        self.assertEqual(counts['complete_bytes'],counts['payload_bytes']+counts['directory_bytes']+counts['envelope_bytes'])
+        for data in [compact,legacy]:
+            imported=t1.import_packet(data,e,identity)
+            np.testing.assert_array_equal(imported.payload.cpu().numpy(),packet.payload.cpu().numpy())
+            np.testing.assert_array_equal(imported.directory.cpu().numpy(),packet.directory.cpu().numpy())
+            out,error,_=e.decode(imported)
+            np.testing.assert_array_equal(error.cpu().numpy(),0);np.testing.assert_array_equal(out.cpu().numpy(),w)
+            with self.assertRaises(ValueError):t1.import_packet(data,e,{'model':'synthetic','complete_config':'y'*6000})
+        # Even with a valid outer checksum, an ambiguous identity is rejected.
+        import hashlib,json
+        magic,mn,dn,pn,digest=t1.HEADER.unpack(compact[:t1.HEADER.size]);body=compact[t1.HEADER.size:]
+        meta=json.loads(body[:mn]);meta['model_identity']=identity;encoded=prob.canonical(meta)
+        changed=encoded+body[mn:]
+        ambiguous=t1.HEADER.pack(magic,len(encoded),dn,pn,hashlib.sha256(changed).digest())+changed
+        with self.assertRaises(ValueError):t1.import_packet(ambiguous,e,identity)
 
     def test_raw_fallback_and_invalid_lane_bounds_are_explicit(self):
         e,w,capture=self.engine();source=torch.from_numpy(w)
@@ -150,6 +185,7 @@ class CudaTests(unittest.TestCase):
         means=np.concatenate([r[2].cpu().numpy()[0] for r in records]);inverses=np.concatenate([r[3].cpu().numpy()[0] for r in records])
         self.assertEqual(packet.payload.cpu().numpy().tobytes(),oracle.encode_lane(w[:,0].ravel(),means,inverses))
         out,error,_=e.decode(packet);np.testing.assert_array_equal(error.cpu().numpy(),0);np.testing.assert_array_equal(out.cpu().numpy(),w)
+        InterpreterTests.check_identity_envelopes(self,e,packet,w)
 
     def test_parallel_gpu_lanes_preserve_special_words(self):
         base,state,w,capture=model_and_words();e=t1.Engine(base,state)

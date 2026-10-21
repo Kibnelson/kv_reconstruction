@@ -203,7 +203,7 @@ def isolated_decode(packet_path,identity,source_spec,output,tag,args,expected_wo
         scope='Fresh process receives only saved state, expected model identity and T packet; emits a decoded-word hash, not raw KV.')
 
 
-def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source_spec=None):
+def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source_spec=None,*,diagnose=False):
     g=case.layout;start=int(case.provenance['token_start'])
     ds,source,source_pool,stats=pool(case,torch,device,args.arena_ratio)
     oracle_report=parameter_oracle(engine,source,case,start)
@@ -215,6 +215,15 @@ def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source
     decoded,decode_timing=measure(lambda:engine.decode(packet),args,torch,device,g.raw_bytes)
     words,error,_=decoded;checked_status(error,'T1 decode');np.testing.assert_array_equal(words.cpu().numpy(),case.words);del decoded,words,error
     begin=time.perf_counter();wire=t1.export_packet(packet,model_identity);export_seconds=time.perf_counter()-begin
+    accounting=t1.packet_accounting(wire)
+    # A matched framing control: identical entropy payload, lane directory and
+    # identity binding; only the representation of that identity changes.
+    legacy_wire=t1.export_packet(packet,model_identity,identity_mode='full')
+    legacy_accounting=t1.packet_accounting(legacy_wire)
+    legacy_import=t1.import_packet(legacy_wire,engine,model_identity)
+    if not torch.equal(legacy_import.payload,packet.payload) or not torch.equal(legacy_import.directory,packet.directory):
+        raise AssertionError('legacy identity envelope changed the encoded stream')
+    del legacy_wire,legacy_import
     pt,pto_timing=measure(lambda:bridge.encode_pool(engine,source_pool,ds,start),args,torch,device,g.raw_bytes)
     checked_status(pt.encoder_error,'P1 to T1')
     # Same original words, state and lane order must give identical packets.
@@ -263,6 +272,8 @@ def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source
     result=dict(name=case.name,start=start,provenance=case.provenance,restored_attention_query_seed=903,parameter_oracle=oracle_report,original_words=int(case.words.size),original_bytes=g.raw_bytes,
         raw_fallback=coding['raw'],T_payload_bytes=coding['payload'],T_directory_bytes=coding['directory'],
         complete_external_T_bytes=len(wire),complete_T_bpv=len(wire)*8/case.words.size,
+        T_packet_accounting=accounting,legacy_full_identity_accounting=legacy_accounting,
+        identity_compaction_saved_bytes=legacy_accounting['complete_bytes']-len(wire),
         external_saving_fraction=1-len(wire)/g.raw_bytes,P=stats,restored_P=final_stats,
         encoder_lane_workspace_capacity_bytes=coding['workspace'],
         cold_first_encode_seconds_including_JIT=cold_seconds,kv_to_T_gpu_body=encode_timing,
@@ -286,6 +297,11 @@ def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source
         np.testing.assert_array_equal(restored,case.words)
         result['paired_CPU_T0']=dict(bytes=len(old),bpv=len(old)*8/case.words.size,encode_and_decode_wall_seconds=time.perf_counter()-begin,
             scope='CPU reference; same original words and frozen A/B state, different framing/finite-precision coder. Not GPU timing.')
+    if diagnose:
+        from scripts import gpu_path_diagnostics
+        diagnostic_words,diagnostic_error=bridge.unpack_words(final,ds)
+        checked_status(diagnostic_error,'diagnostic source pool')
+        result['bottleneck_diagnostics']=gpu_path_diagnostics.run(engine,diagnostic_words,start,model_identity,args,torch,device,measure)
     return result
 
 
@@ -340,6 +356,8 @@ def highlights(r):
         for key in ['kv_to_T_gpu_body','T_to_KV_gpu','P_to_T_gpu_body','T_to_P_gpu_composed','raw_control_P_to_words','raw_control_words_to_P']:row[key]=timing(x[key])
         row['serial_link_diagnostic']=x.get('serial_link_diagnostic')
         row['serial_cycle_memory']=x['serial_cycle_memory']
+        for key in ['T_packet_accounting','legacy_full_identity_accounting','identity_compaction_saved_bytes','bottleneck_diagnostics']:
+            if key in x:row[key]=x[key]
         h['transfer'].append(row)
         if x['arm']=='B':
             paired=next((a for a in r['transfer'] if a['arm']=='A' and a['dataset']==x['dataset'] and a['name']==x['name']),None)
@@ -369,7 +387,25 @@ def summary(r):
         '|---|---|---:|---|---:|---:|---:|---:|---|']
     for x in r['transfer']:
         lines.append(f"| {x['dataset']}/{x['name']} | {x['arm']} | {x['complete_T_bpv']:.5f} | {x['raw_fallback']} | {x['kv_to_T_gpu_body']['wall_median_ms']:.3f} | {x['T_to_KV_gpu']['wall_median_ms']:.3f} | {x['P_to_T_gpu_body']['wall_median_ms']:.3f} | {x['T_to_P_gpu_composed']['wall_median_ms']:.3f} | {x['exact']} |")
-    lines+=['','T1 is a new 12-bit binary-rANS stream with per-token restarts. Complete external bytes include the envelope, model/state identities, directory, checksum and payload. Shared state and measured scratch/peaks are separate. Raw fallback is explicitly identified.',
+    accounting_rows=[x for x in r['transfer'] if 'T_packet_accounting' in x]
+    if accounting_rows:
+        lines+=['','| Group | Complete bpv | Payload bpv | Directory + envelope bpv | Legacy full-identity bpv |',
+            '|---|---:|---:|---:|---:|']
+        for dataset,arm in sorted({(x['dataset'],x['arm']) for x in accounting_rows}):
+            rows=[x for x in accounting_rows if (x['dataset'],x['arm'])==(dataset,arm)]
+            words=sum(x['original_words'] for x in rows)
+            def rate(field):return sum(x['T_packet_accounting'][field] for x in rows)*8/words
+            old=sum(x['legacy_full_identity_accounting']['complete_bytes'] for x in rows)*8/words
+            lines.append(f"| {dataset}/{arm} | {rate('complete_bytes'):.6f} | {rate('payload_bytes'):.6f} | {rate('directory_bytes')+rate('envelope_bytes'):.6f} | {old:.6f} |")
+    diagnostic_rows=[x for x in r['transfer'] if 'bottleneck_diagnostics' in x]
+    if diagnostic_rows:
+        lines+=['','| Diagnostic encoder control | Parameters ms | Prepared entropy ms | Encode device events | Decode device events |',
+            '|---|---:|---:|---:|---:|']
+        for x in diagnostic_rows:
+            d=x['bottleneck_diagnostics'];ep=d['encode_profile'];dp=d['decode_profile']
+            lines.append(f"| {x['dataset']}/{x['arm']}/{x['name']} | {d['parameter_replay_gpu']['wall_median_ms']:.3f} | {d['entropy_encode_with_prepared_parameters_gpu']['wall_median_ms']:.3f} | {ep.get('CUDA_device_event_count','unavailable')} | {dp.get('CUDA_device_event_count','unavailable')} |")
+        lines+=['','Prepared entropy uses parameters computed from known source KV; it is an encoder timing control. Actual causal decode remains packet-only. Profiled event totals are separate from the uninstrumented medians; missing CUDA profiler activity is explicit.']
+    lines+=['','T1 is a new 12-bit binary-rANS stream with per-token restarts. Complete external bytes include the envelope, model/state identity digests, directory, checksum and payload. The independently expected full model identity is hashed and verified, and legacy full-identity envelopes remain readable. Shared state and measured scratch/peaks are separate. Raw fallback is explicitly identified.',
         '', 'T rates do not inherit the earlier CPU ~44% result. P rates and T rates are separate representations. GPU-body codec times exclude separately reported compressed-byte export/import and CPU envelope/checksum. The actual filesystem cycle is measured directly.',
         '', 'Attention uses seeded component queries, not model logits. The bridge temporarily materializes one bounded chunk; it is not a fused two-layer-scratch converter. Filesystem reads may hit the page cache. Native cache-writer/generation integration, concurrency, cold SSD and real network throughput remain unimplemented.']
     if r['failures']:
@@ -390,6 +426,8 @@ def parser():
     a.add_argument('--cpu-t0-control',action='store_true');a.add_argument('--skip-tests',action='store_true')
     a.add_argument('--validate-inputs-only',action='store_true',help='explicit CPU input/state validation; no codec/GPU measurement')
     a.add_argument('--skip-isolated',action='store_true',help='skip the fresh-process packet-only GPU decoder control')
+    a.add_argument('--diagnostics',action='store_true',help='measure encoder substeps and collect CUDA operation summaries on selected pages')
+    a.add_argument('--diagnostic-limit',type=int,default=2,help='diagnostic pages per dataset/arm, evenly sampled; 0 means all')
     a.add_argument('--decode-child',type=Path);a.add_argument('--identity-file',type=Path)
     a.add_argument('--base-state-file',type=Path);a.add_argument('--adapter-state-file',type=Path)
     return a
@@ -399,10 +437,10 @@ def main(argv=None):
     args=parser().parse_args(argv)
     if args.decode_child:return child(args)
     if args.output.exists():raise ValueError('fresh output directory required')
-    if args.repeats<1 or args.attention_repeats<1 or args.warmup<0 or args.attention_limit<0 or args.transfer_limit<0 or args.gqa_multiple<1 or not np.isfinite(args.arena_ratio) or args.arena_ratio<=0:raise ValueError('invalid measurement bounds')
+    if args.repeats<1 or args.attention_repeats<1 or args.warmup<0 or args.attention_limit<0 or args.transfer_limit<0 or args.diagnostic_limit<0 or args.gqa_multiple<1 or not np.isfinite(args.arena_ratio) or args.arena_ratio<=0:raise ValueError('invalid measurement bounds')
     if not args.arms or any(x not in ('A','B') for x in args.arms.split(',')):raise ValueError('this baseline batch supports A,B only')
     args.output.mkdir(parents=True)
-    sources=['scripts/bench_gpu_path.py','scripts/bench_pool_p1.py','qwen_kv_bench/pool_p1.py','qwen_kv_bench/pool_p1_kernels.py','qwen_kv_bench/pool_attention.py','qwen_kv_bench/pool_attention_kernels.py','qwen_kv_bench/transfer_t1.py','qwen_kv_bench/transfer_t1_kernels.py','qwen_kv_bench/gpu_kv_bridge.py','qwen_kv_bench/transfer_reference.py','qwen_kv_bench/transfer_probability.py','qwen_kv_bench/transfer_gpu_predictor.py']
+    sources=['scripts/bench_gpu_path.py','scripts/gpu_path_diagnostics.py','scripts/bench_pool_p1.py','qwen_kv_bench/pool_p1.py','qwen_kv_bench/pool_p1_kernels.py','qwen_kv_bench/pool_attention.py','qwen_kv_bench/pool_attention_kernels.py','qwen_kv_bench/transfer_t1.py','qwen_kv_bench/transfer_t1_kernels.py','qwen_kv_bench/gpu_kv_bridge.py','qwen_kv_bench/transfer_reference.py','qwen_kv_bench/transfer_probability.py','qwen_kv_bench/transfer_gpu_predictor.py']
     r=dict(format='gpu_kv_path_batch_v1',status='running',runtime=dict(python=sys.version,numpy=np.__version__,platform=platform.platform()),arguments={k:str(v) if isinstance(v,Path) else v for k,v in vars(args).items()},
         sources=[dict(path=f,sha256=sha(ROOT/f)) for f in sources],datasets=[],attention=[],transfer=[],failures=[],
         coverage=dict(gpu_measured=False,attention_component=False,gpu_entropy=False,external_T_P_bridge=False,
@@ -445,12 +483,14 @@ def main(argv=None):
                 log(f"loading {d['name']} T1 arm {arm} state")
                 begin=time.perf_counter();engine=t1.Engine(d['base'],state,device);torch.cuda.synchronize(device)
                 r.setdefault('transfer_states',[]).append(dict(dataset=d['name'],arm=arm,cold_initialize_seconds=time.perf_counter()-begin,**engine.statistics()))
-                for case in limited(d['cases'],args.transfer_limit):
+                transfer_cases=limited(d['cases'],args.transfer_limit)
+                diagnostic_ids={id(c) for c in limited(transfer_cases,args.diagnostic_limit)} if args.diagnostics else set()
+                for case in transfer_cases:
                     tag=re.sub(r'[^A-Za-z0-9_.-]+','_',d['name']+'_'+arm+'_'+case.name);stage='transfer/'+tag;log(stage)
                     try:
                         identity=case.provenance.get('model_identity',d['identity'])
                         spec=dict(kind='fixture',path=args.fixture) if d['name']=='frozen_smol' else dict(kind='saved',base=args.captures_from/'calibration/base.npz',adapter=args.captures_from/'calibration'/(arm+'_decoder.npz'))
-                        r['transfer'].append(dict(dataset=d['name'],arm=arm,**transfer_case(case,engine,args,torch,device,args.output,tag,identity,spec)))
+                        r['transfer'].append(dict(dataset=d['name'],arm=arm,**transfer_case(case,engine,args,torch,device,args.output,tag,identity,spec,diagnose=id(case) in diagnostic_ids)))
                     except Exception as e:failure(stage,e)
                     checkpoint()
                 del engine
