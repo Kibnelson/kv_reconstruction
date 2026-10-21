@@ -107,20 +107,18 @@ def write_sectors(W, R, B, DESC, A8, A16, A32,
 
 
 @triton.jit
-def unpack_sectors(A8, A16, A32, DESC, R, B, IDS, OUT, STATUS,
-                   CAPACITY: tl.constexpr, SECTORS: tl.constexpr,
-                   T: tl.constexpr, C: tl.constexpr, HEADS2: tl.constexpr,
-                   D: tl.constexpr, TILE: tl.constexpr, PAGES: tl.constexpr,
-                   N: tl.constexpr):
-    out_id = tl.program_id(0)
-    sid = tl.load(IDS + out_id)
+def load_sector(A8, A16, A32, DESC, R, B, sid,
+                CAPACITY: tl.constexpr, SECTORS: tl.constexpr,
+                T: tl.constexpr, C: tl.constexpr, HEADS2: tl.constexpr,
+                D: tl.constexpr, TILE: tl.constexpr, PAGES: tl.constexpr,
+                N: tl.constexpr):
     id_ok = (sid >= 0) & (sid < SECTORS)
     base = tl.load(DESC + sid * 4, id_ok, other=-1)
     size = tl.load(DESC + sid * 4 + 1, id_ok, other=0)
     mode = tl.load(DESC + sid * 4 + 2, id_ok, other=-1)
     escapes = tl.load(DESC + sid * 4 + 3, id_ok, other=-1)
     basic = id_ok & (base >= 0) & (base % 16 == 0) & (size > 0) & (size % 16 == 0)
-    basic = basic & (base + size <= CAPACITY) & ((mode == 0) | (mode == 1))
+    basic = basic & (base <= CAPACITY) & (size <= CAPACITY-base) & ((mode == 0) | (mode == 1))
     i = tl.arange(0, N)
     result = tl.full((N,), 0, tl.int32)
     good = tl.full((), False, tl.int1)
@@ -162,5 +160,18 @@ def unpack_sectors(A8, A16, A32, DESC, R, B, IDS, OUT, STATUS,
                 good = (tl.sum(escaped.to(tl.int32), 0) == escapes)
                 good = good & (tl.sum((valid & ((exp < 0) | (exp > 255))).to(tl.int32), 0) == 0)
                 result = tl.where(valid & good, result, 0)
-    tl.store(OUT + out_id * N + i, tl.where(good, result, 0).to(tl.uint16))
+    return tl.where(good, result, 0).to(tl.uint16), good
+
+
+@triton.jit
+def unpack_sectors(A8, A16, A32, DESC, R, B, IDS, OUT, STATUS,
+                   CAPACITY: tl.constexpr, SECTORS: tl.constexpr,
+                   T: tl.constexpr, C: tl.constexpr, HEADS2: tl.constexpr,
+                   D: tl.constexpr, TILE: tl.constexpr, PAGES: tl.constexpr,
+                   N: tl.constexpr):
+    out_id = tl.program_id(0)
+    sid = tl.load(IDS + out_id)
+    result, good = load_sector(A8, A16, A32, DESC, R, B, sid,
+        CAPACITY, SECTORS, T, C, HEADS2, D, TILE, PAGES, N)
+    tl.store(OUT + out_id * N + tl.arange(0, N), result)
     tl.store(STATUS + out_id, tl.where(good, 0, 1).to(tl.int32))

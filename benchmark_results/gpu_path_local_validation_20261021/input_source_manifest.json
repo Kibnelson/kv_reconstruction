@@ -1,0 +1,79 @@
+{
+  "datasets": [
+    {
+      "adapter_sha256": {
+        "A": "8d6a457926b6e00e278c5f9a011d126a939d069396c081c0a726936c47ccff01"
+      },
+      "arms": [
+        "A"
+      ],
+      "base_sha256": "ee4a83c56954004630be87ca05720f20aa660c3cebc44686b24dd2ba5333fcca",
+      "identity": {
+        "kind": "frozen_fixture",
+        "manifest_sha256": "6b4c2d95d823265388d4cda484023f94847ba25cd023de5814e80f7797bc0254",
+        "path": "/workspace/scratch/cf461553fac4/kv_gpu_path/benchmark_fixtures/team_transfer_smol_replay_v1",
+        "required_files_verified": [
+          "page_000_words.npy",
+          "page_001_words.npy",
+          "page_002_words.npy",
+          "page_003_words.npy",
+          "pool_state.npz"
+        ],
+        "scope": "Same source words as historical P0 replay; verifies required words and pool calibration only, not unused T packets/predictor state; not fresh Qwen or serving execution"
+      },
+      "name": "frozen_smol",
+      "pages": 4,
+      "scope": "Frozen model words; fixed-width A. The fixture contains no fitted B adapter."
+    }
+  ],
+  "sources": [
+    {
+      "path": "scripts/bench_gpu_path.py",
+      "sha256": "6c2e9ddba7b51ef7fc96b970caaf3f1396d7bca3a858002b21a2b8bde22a039f"
+    },
+    {
+      "path": "scripts/bench_pool_p1.py",
+      "sha256": "80b560fb73a1f5b26adbde5cd75721aaaa27beded569c99f10963931fb49770c"
+    },
+    {
+      "path": "qwen_kv_bench/pool_p1.py",
+      "sha256": "34e7750689f80e0b9528360d8743f7afc215f1df81dbb6a04238094510cec6a1"
+    },
+    {
+      "path": "qwen_kv_bench/pool_p1_kernels.py",
+      "sha256": "40b429bdd98332e75c183b63e1c41f4c9829c43a0c4df68f8d6a274f5772b2d7"
+    },
+    {
+      "path": "qwen_kv_bench/pool_attention.py",
+      "sha256": "0a370d63c9c67af87a4b5b41249c112d368397b8bb314788d03ceff97875eb43"
+    },
+    {
+      "path": "qwen_kv_bench/pool_attention_kernels.py",
+      "sha256": "55ae69408455268902e0c776fdebe6f4a9625914646cd89f067a1266653c008b"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_t1.py",
+      "sha256": "a7f08b8d59ccc4dd4432a7156213186bcc7f31f32198e01b2ecd37cd495d29f3"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_t1_kernels.py",
+      "sha256": "eec4dfa9c39f5b6c85b2974f56f8f222f9e9520e518b6f01210329f18ec96d11"
+    },
+    {
+      "path": "qwen_kv_bench/gpu_kv_bridge.py",
+      "sha256": "f9746df91806d633f70baecdeeeb9ef23ae705ad895de8658203e82544c808ff"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_reference.py",
+      "sha256": "c2e67b275af2df776fa020402063b874164ae6d3edc8a1dcd5efd65af37070c3"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_probability.py",
+      "sha256": "1db09c9b20dfda294236654798a57364a71fc59b35de4ed893d6e047428f9ede"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_gpu_predictor.py",
+      "sha256": "76e663ec7cf64679f2e45e50ad460f14379356cc523a28ddb6883074b2d2beaa"
+    }
+  ]
+}

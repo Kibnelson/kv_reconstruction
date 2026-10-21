@@ -1,8 +1,10 @@
 # GPU KV lifecycle: transfer, resident pool and attention
 
 Date: 2026-10-21. Status: proposed implementation plan, grounded in current
-component measurements. This document adds no new GPU result. Work proceeds
-one task at a time, with a report and user approval before the next task.
+component measurements. This document adds no new GPU result. The user has
+now approved batching related work without a separate approval between steps.
+See [the GPU path batch](gpu_path_batch.md) for current implementation coverage
+and the A4500 experiment command.
 
 The target is an exact GPU data path: produce KV, keep active pages in a
 resident pool, store inactive KV as compact transfer chunks in DRAM/SSD, move
@@ -296,7 +298,8 @@ prefill hidden metadata is not required by this lifecycle.
 
 ## 6. Implementation tasks and approval gates
 
-Each row is one task to complete, report and review before starting the next.
+The rows identify separate deliverables and evidence requirements. Related
+implementation/testing can now be batched under the user’s latest authorization.
 The numbering is the execution order, not a claim that these components exist.
 
 | Task | Concrete deliverable | Required evidence before moving on |

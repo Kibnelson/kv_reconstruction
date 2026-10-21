@@ -1,0 +1,161 @@
+{
+  "checks": [
+    "Actual Triton source interpreted on CPU; no CUDA claims",
+    "Independent attention oracle and matched dense path, GQA, raw tail and selected layer despite invalid other layer",
+    "Independent T1 CPU byte oracle, causal mean/width/offset parity, packet-only recovery and multi-lane special words",
+    "Positive binary probabilities for every BF16 rank; exhaustive entropy-core CUDA test exists but is not executed here",
+    "P-to-T-to-file-to-T-to-P, restored attention, invalid stream publication rejection",
+    "Controller orchestration with explicit raw-capacity retry and both attention cache forms",
+    "Packaging allowlist excludes encoded KV and raw captures; failed status is preserved",
+    "Strict requested-CUDA failure remains failed with GPU coverage false",
+    "Frozen source/state hashes verified, verified saved tiny A/B state import; no model forward or fitting on TEST",
+    "Standalone regenerated and --check matched; A4500 script rebuilds/publishes it directly via Git"
+  ],
+  "date": "2026-10-21",
+  "format": "gpu_path_local_validation_v1",
+  "gpu_executed": false,
+  "gpu_timing_measured": false,
+  "offline_compilation": {
+    "P1_regression_variants": 12,
+    "cuda_executed": false,
+    "new_kernel_variants": 20,
+    "target": "SM86",
+    "triton": "3.6.0"
+  },
+  "pending": [
+    "Eight real CUDA tests including all 65536 words through the entropy core",
+    "Attention latency, T1 rate/latency/memory and CPU/GPU count parity on A4500",
+    "Fresh-process real GPU T1 decode",
+    "Native model generation/cache integration and reusable serving allocator",
+    "Concurrency, 2K/8K serving capacity, cold SSD and real network validation",
+    "New prefill-H hint/coset research experiments"
+  ],
+  "publication": {
+    "generated_local_sha256": "12ff165e1b25390bd24759566f9509c2df0eca47d31a92d2cefc93f56488dd99",
+    "generated_standalone_pending": true,
+    "note": "A4500 helper rebuilds/checks/publishes the generated file directly with Git before hardware tests.",
+    "source_only_checkpoint": true
+  },
+  "sources": [
+    {
+      "bytes": 22413,
+      "path": "README.md",
+      "sha256": "aee5f59f4323169d4b1d562bc0d8ff82f3716160abd993ba324d62b2de6432fe"
+    },
+    {
+      "bytes": 24825,
+      "path": "docs/gpu_kv_transfer_pool_roadmap.md",
+      "sha256": "0e3f7e9be1cb7de12da2076bcb2f001638c15def86fa7338c8427b046f9b64e8"
+    },
+    {
+      "bytes": 10675,
+      "path": "docs/gpu_path_batch.md",
+      "sha256": "87fbda2424f598d79a261355acb4fede752a0a7d80b9b2596dc309143a21156f"
+    },
+    {
+      "bytes": 8413,
+      "path": "qwen_kv_bench/pool_p1_kernels.py",
+      "sha256": "40b429bdd98332e75c183b63e1c41f4c9829c43a0c4df68f8d6a274f5772b2d7"
+    },
+    {
+      "bytes": 5235,
+      "path": "qwen_kv_bench/pool_attention.py",
+      "sha256": "0a370d63c9c67af87a4b5b41249c112d368397b8bb314788d03ceff97875eb43"
+    },
+    {
+      "bytes": 3001,
+      "path": "qwen_kv_bench/pool_attention_kernels.py",
+      "sha256": "55ae69408455268902e0c776fdebe6f4a9625914646cd89f067a1266653c008b"
+    },
+    {
+      "bytes": 18377,
+      "path": "qwen_kv_bench/transfer_t1.py",
+      "sha256": "a7f08b8d59ccc4dd4432a7156213186bcc7f31f32198e01b2ecd37cd495d29f3"
+    },
+    {
+      "bytes": 6385,
+      "path": "qwen_kv_bench/transfer_t1_kernels.py",
+      "sha256": "eec4dfa9c39f5b6c85b2974f56f8f222f9e9520e518b6f01210329f18ec96d11"
+    },
+    {
+      "bytes": 2571,
+      "path": "qwen_kv_bench/transfer_t1_reference.py",
+      "sha256": "f38cc1690a40580ab2c4bdab13bf42ea99e27f6c7528d127c289c4ca1b732f52"
+    },
+    {
+      "bytes": 3535,
+      "path": "qwen_kv_bench/gpu_kv_bridge.py",
+      "sha256": "f9746df91806d633f70baecdeeeb9ef23ae705ad895de8658203e82544c808ff"
+    },
+    {
+      "bytes": 2895,
+      "path": "scripts/check_gpu_path_kernels.py",
+      "sha256": "a51333588a5c7ae509acaf94b567e6141acef3f490223997f1d2eab232a78179"
+    },
+    {
+      "bytes": 36169,
+      "path": "scripts/bench_gpu_path.py",
+      "sha256": "6c2e9ddba7b51ef7fc96b970caaf3f1396d7bca3a858002b21a2b8bde22a039f"
+    },
+    {
+      "bytes": 2128,
+      "path": "scripts/package_gpu_path.py",
+      "sha256": "4dba964fe9a551399c2700e42b4381e47a637199708f17e78c852f0846e00488"
+    },
+    {
+      "bytes": 2343,
+      "path": "scripts/run_gpu_path_a4500.sh",
+      "sha256": "24b1f61d4e92c0efc2e7cada993f897748ab237eff938bc9bc4fbd5c5eac4b08"
+    },
+    {
+      "bytes": 5795,
+      "path": "tests/test_pool_attention.py",
+      "sha256": "c81dd73810510bea1a7b3497f025ad652ed0b438f9131352e8b1071b97d34f23"
+    },
+    {
+      "bytes": 10161,
+      "path": "tests/test_transfer_t1.py",
+      "sha256": "3da83ccc8ab27312e4ee93bd639121cbfadadc79459d6902b3a15d032bde1653"
+    },
+    {
+      "bytes": 3687,
+      "path": "tests/test_gpu_kv_bridge.py",
+      "sha256": "97d4b2a4c823e390ce75e6d88185f17ae80eeb2bc2710b74c4118ab0bf403026"
+    },
+    {
+      "bytes": 5899,
+      "path": "tests/test_gpu_path_runner.py",
+      "sha256": "438b2ddf99a8cd81208683e814da83371c4a335f4b8031312a9105cfc5a06637"
+    },
+    {
+      "bytes": 11042,
+      "path": "tests/test_pool_p1.py",
+      "sha256": "e65106949eb52a63f53763de121e85f5ec820be556c799eac129df34d096d5bd"
+    },
+    {
+      "bytes": 1076462,
+      "path": "qwen_kv_gpu_bench.py",
+      "sha256": "12ff165e1b25390bd24759566f9509c2df0eca47d31a92d2cefc93f56488dd99"
+    }
+  ],
+  "status": "local_passed_actual_CUDA_pending",
+  "tests": {
+    "command": "TRITON_INTERPRET=1 python -m unittest tests.test_pool_attention tests.test_transfer_t1 tests.test_gpu_kv_bridge tests.test_gpu_path_runner tests.test_pool_p1 tests.test_pool_p1_runner tests.test_transfer_pool_gpu tests.test_standalone_build -v",
+    "discovered": 58,
+    "passed": 48,
+    "seconds": 89.897,
+    "skipped": 10,
+    "skipped_details": [
+      "test_actual_attention_uses_packed_prefix_and_raw_tail (tests.test_pool_attention.CudaTests.test_actual_attention_uses_packed_prefix_and_raw_tail) ... skipped 'actual CUDA unavailable'",
+      "test_actual_gpu_binary_counts_match_cpu_table (tests.test_transfer_t1.CudaTests.test_actual_gpu_binary_counts_match_cpu_table) ... skipped 'actual CUDA hardware unavailable'",
+      "test_actual_gpu_entropy_stream_is_exact_and_matches_cpu_byte_oracle (tests.test_transfer_t1.CudaTests.test_actual_gpu_entropy_stream_is_exact_and_matches_cpu_byte_oracle) ... skipped 'actual CUDA hardware unavailable'",
+      "test_gpu_entropy_core_preserves_all_65536_BF16_words (tests.test_transfer_t1.CudaTests.test_gpu_entropy_core_preserves_all_65536_BF16_words) ... skipped 'actual CUDA hardware unavailable'",
+      "test_parallel_gpu_lanes_preserve_special_words (tests.test_transfer_t1.CudaTests.test_parallel_gpu_lanes_preserve_special_words) ... skipped 'actual CUDA hardware unavailable'",
+      "test_actual_gpu_external_roundtrip_installs_attention_readable_pool (tests.test_gpu_kv_bridge.CudaTests.test_actual_gpu_external_roundtrip_installs_attention_readable_pool) ... skipped 'actual CUDA unavailable'",
+      "test_actual_gpu_capacity_is_unpublished (tests.test_pool_p1.CudaTests.test_actual_gpu_capacity_is_unpublished) ... skipped 'actual CUDA hardware unavailable; no CPU fallback'",
+      "test_actual_gpu_word_and_byte_parity (tests.test_pool_p1.CudaTests.test_actual_gpu_word_and_byte_parity) ... skipped 'actual CUDA hardware unavailable; no CPU fallback'",
+      "test_actual_cuda_roundtrip_matches_original_bytes (tests.test_transfer_pool_gpu.TensorPoolTests.test_actual_cuda_roundtrip_matches_original_bytes) ... skipped 'CUDA hardware unavailable; CPU tests are not GPU measurements'",
+      "test_real_capture_pages_all_layers_match_original_bytes (tests.test_transfer_pool_gpu.TensorPoolTests.test_real_capture_pages_all_layers_match_original_bytes) ... skipped 'fresh real-model integration captures are not present'"
+    ]
+  }
+}

@@ -88,7 +88,7 @@ class ReferenceTests(unittest.TestCase):
         g,w,s=sample();a=p.reference_encode(w,s,g)
         other=p.calibration(s.references,(s.widths%8)+1)
         with self.assertRaisesRegex(ValueError,'identity'):p.reference_unpack(a,other,[0])
-        for field,value in [(0,-16),(1,17),(2,3),(3,999999)]:
+        for field,value in [(0,-16),(0,(1<<63)-16),(1,17),(2,3),(3,999999)]:
             b=p.reference_encode(w,s,g);b.descriptors[0,field]=value
             with self.assertRaises(ValueError):p.reference_unpack(b,s,[0])
         for sid in [-1,g.sectors]:
@@ -134,7 +134,7 @@ class KernelInterpreterTests(unittest.TestCase):
         g,w,s=sample();v=interpreted_encode(w,s,g,16)
         out,status=interpreted_unpack(v,[0,-1,g.sectors],g)
         self.assertTrue(np.all(status!=0));np.testing.assert_array_equal(out,0)
-        for field,value in [(0,-16),(1,17),(2,3),(3,999999)]:
+        for field,value in [(0,-16),(0,(1<<63)-16),(1,17),(2,3),(3,999999)]:
             v=interpreted_encode(w,s,g,g.padded_raw_bytes);v[1][0,field]=value
             out,status=interpreted_unpack(v,[0],g)
             self.assertNotEqual(status[0],0);np.testing.assert_array_equal(out,0)
