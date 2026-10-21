@@ -1,5 +1,11 @@
 # A4500 GPU path results and follow-up
 
+Update: the compact-envelope follow-up completed on A4500. Qwen B now
+measures 8.853500 complete bpv (44.67% BF16 reduction), confirming the
+projection below. See the [next dispatch comparison](gpu_path_dispatch_a4500.md)
+for the new report, profiler-total correction and implementation controls.
+The original measurements and projections below are retained as history.
+
 The completed report is
 `benchmark_results/gpu_path_a4500_20261021_103014_3238265`, published in commit
 `1e8d5bd`. The recorded device is an NVIDIA RTX A4500, SM86, Torch

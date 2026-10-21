@@ -187,11 +187,13 @@ def attention_case(case,args,torch,device,tail_tokens):
         scope='Primary times are sequential layer calls, with the same FP32 arithmetic. All-layer batching is a separate throughput diagnostic. No whole-cache BF16 unpack inside packed attention. Not logits, generated tokens or a serving capacity result.')
 
 
-def isolated_decode(packet_path,identity,source_spec,output,tag,args,expected_words_sha256):
+def isolated_decode(packet_path,identity,source_spec,output,tag,args,expected_words_sha256,*,input_chunk=64,diagnose=False):
     identity_path=output/'storage'/(tag+'_identity.json');save(identity_path,identity)
     child_output=output/'isolated'/tag
     cmd=[sys.executable,str(Path(__file__).resolve()),'--decode-child',str(packet_path.resolve()),
-        '--identity-file',str(identity_path.resolve()),'--output',str(child_output.resolve()),'--device',args.device]
+        '--identity-file',str(identity_path.resolve()),'--output',str(child_output.resolve()),'--device',args.device,
+        '--predictor-input-chunk',str(input_chunk),'--warmup',str(args.warmup),'--repeats',str(args.repeats)]
+    if diagnose:cmd+=['--diagnostics']
     if source_spec['kind']=='fixture':cmd+=['--fixture',str(Path(source_spec['path']).resolve())]
     else:cmd+=['--base-state-file',str(Path(source_spec['base']).resolve()),'--adapter-state-file',str(Path(source_spec['adapter']).resolve())]
     begin=time.perf_counter();result=subprocess.run(cmd,cwd=ROOT,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
@@ -203,7 +205,7 @@ def isolated_decode(packet_path,identity,source_spec,output,tag,args,expected_wo
         scope='Fresh process receives only saved state, expected model identity and T packet; emits a decoded-word hash, not raw KV.')
 
 
-def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source_spec=None,*,diagnose=False):
+def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source_spec=None,*,diagnose=False,expected_T_sha256=None):
     g=case.layout;start=int(case.provenance['token_start'])
     ds,source,source_pool,stats=pool(case,torch,device,args.arena_ratio)
     oracle_report=parameter_oracle(engine,source,case,start)
@@ -215,6 +217,8 @@ def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source
     decoded,decode_timing=measure(lambda:engine.decode(packet),args,torch,device,g.raw_bytes)
     words,error,_=decoded;checked_status(error,'T1 decode');np.testing.assert_array_equal(words.cpu().numpy(),case.words);del decoded,words,error
     begin=time.perf_counter();wire=t1.export_packet(packet,model_identity);export_seconds=time.perf_counter()-begin
+    wire_sha256=hashlib.sha256(wire).hexdigest()
+    if expected_T_sha256 is not None and wire_sha256!=expected_T_sha256:raise AssertionError('prediction implementation changed complete T1 packet bytes')
     accounting=t1.packet_accounting(wire)
     # A matched framing control: identical entropy payload, lane directory and
     # identity binding; only the representation of that identity changes.
@@ -270,6 +274,8 @@ def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source
     np.testing.assert_allclose(answer.cpu().numpy(),attention.reference(q,case.words,g),rtol=4e-6,atol=4e-6)
     final_stats=p.arena_statistics(final,ds)
     result=dict(name=case.name,start=start,provenance=case.provenance,restored_attention_query_seed=903,parameter_oracle=oracle_report,original_words=int(case.words.size),original_bytes=g.raw_bytes,
+        predictor_input_chunk=engine.input_chunk,complete_T_sha256=wire_sha256,
+        packet_bytes_match_chunk64_reference=True if expected_T_sha256 is not None else None,
         raw_fallback=coding['raw'],T_payload_bytes=coding['payload'],T_directory_bytes=coding['directory'],
         complete_external_T_bytes=len(wire),complete_T_bpv=len(wire)*8/case.words.size,
         T_packet_accounting=accounting,legacy_full_identity_accounting=legacy_accounting,
@@ -290,18 +296,16 @@ def transfer_case(case,engine,args,torch,device,output,tag,model_identity,source
             scope='Diagnostic serial model only: extra GPU codec time versus P-to-raw/raw-to-P, unframed raw bytes, no overlap. Excludes CPU envelope/staging differences. Not a measured network result.')
     if source_spec is not None and not getattr(args,'skip_isolated',False):
         expected=hashlib.sha256(case.words.tobytes()).hexdigest()
-        result['isolated_GPU_decoder']=isolated_decode(output/'storage'/(tag+'.t1'),model_identity,source_spec,output,tag,args,expected)
+        result['isolated_GPU_decoder']=isolated_decode(output/'storage'/(tag+'.t1'),model_identity,source_spec,output,tag,args,expected,input_chunk=engine.input_chunk,diagnose=diagnose)
+        if diagnose:
+            result['bottleneck_diagnostics']=result['isolated_GPU_decoder']['bottleneck_diagnostics']
     if args.cpu_t0_control:
         begin=time.perf_counter();old,info=prob.encode_words(engine.base,engine.adapter,case.words,start)
         restored,decode_info=prob.decode(engine.base,engine.adapter,old)
         np.testing.assert_array_equal(restored,case.words)
         result['paired_CPU_T0']=dict(bytes=len(old),bpv=len(old)*8/case.words.size,encode_and_decode_wall_seconds=time.perf_counter()-begin,
             scope='CPU reference; same original words and frozen A/B state, different framing/finite-precision coder. Not GPU timing.')
-    if diagnose:
-        from scripts import gpu_path_diagnostics
-        diagnostic_words,diagnostic_error=bridge.unpack_words(final,ds)
-        checked_status(diagnostic_error,'diagnostic source pool')
-        result['bottleneck_diagnostics']=gpu_path_diagnostics.run(engine,diagnostic_words,start,model_identity,args,torch,device,measure)
+    if diagnose and 'bottleneck_diagnostics' not in result:raise ValueError('diagnostics require a saved-state fresh-process decoder')
     return result
 
 
@@ -317,7 +321,7 @@ def child(args):
         else:
             base=load_frozen_model(args.fixture);state=prob.empty_state(base,'A')
         report['CPU_state_load_seconds']=time.perf_counter()-begin
-        begin=time.perf_counter();engine=t1.Engine(base,state,device);torch.cuda.synchronize(device)
+        begin=time.perf_counter();engine=t1.Engine(base,state,device,input_chunk=args.predictor_input_chunk);torch.cuda.synchronize(device)
         report['cold_engine_initialize_seconds']=time.perf_counter()-begin
         identity=json.loads(args.identity_file.read_text());data=args.decode_child.read_bytes()
         begin=time.perf_counter();packet=t1.import_packet(data,engine,identity);torch.cuda.synchronize(device)
@@ -328,6 +332,10 @@ def child(args):
         report.update(status='completed',gpu_measured=True,decoded_words_sha256=hashlib.sha256(words.cpu().numpy().tobytes()).hexdigest(),
             original_words=words.numel(),raw_fallback=packet.raw,device=torch.cuda.get_device_name(device),
             state=engine.statistics(),peak_allocated_bytes=torch.cuda.max_memory_allocated(device),peak_reserved_bytes=torch.cuda.max_memory_reserved(device))
+        if args.diagnostics:
+            from scripts import gpu_path_diagnostics
+            report['bottleneck_diagnostics']=gpu_path_diagnostics.run(engine,words,packet.start,identity,args,torch,device,measure)
+            report['bottleneck_diagnostics']['execution_isolation']='fresh packet-only decoder process; exits after profiling; parent never enables profiler'
         code=0
     except Exception as e:report.update(status='failed',error=str(e),traceback=traceback.format_exc());code=1
     save(args.output/'decoder.json',report);print(json.dumps(report),flush=True);return code
@@ -338,19 +346,27 @@ def limited(cases,n):
     return [cases[i] for i in np.linspace(0,len(cases)-1,n,dtype=np.int64)]
 
 
+def input_chunks(value):
+    chunks=[int(x) for x in value.split(',')]
+    if not chunks or chunks[0]!=64 or any(x<0 for x in chunks) or len(set(chunks))!=len(chunks):
+        raise ValueError('predictor input chunks must be unique nonnegative integers beginning with the 64-column reference; 0 means all columns')
+    return chunks
+
+
 def highlights(r):
     def timing(x):
         return dict(wall_median_ms=x['wall_median_ms'],cuda_interval_median_ms=x['cuda_interval_median_ms'],
             incremental_peak_allocated_bytes=x['incremental_peak_allocated_bytes'],
             maximum_total_allocated_bytes=max(y['peak_allocated_bytes'] for y in x['samples']),
             maximum_total_reserved_bytes=max(y['peak_reserved_bytes'] for y in x['samples']))
-    h=dict(status=r['status'],coverage=r['coverage'],attention=[],transfer=[],B_vs_A=[],historical_P1=[])
+    h=dict(status=r['status'],coverage=r['coverage'],attention=[],transfer=[],B_vs_A=[],chunk_vs_64=[],historical_P1=[])
     for x in r['attention']:
         h['attention'].append(dict(dataset=x['dataset'],name=x['name'],tail_tokens=x['tail_tokens'],dense=timing(x['dense']),packed=timing(x['packed']),
             P1_packet_bpv=x['pool']['resident_packet_allocated_bpv'],P1_shared_calibration_bytes=x['pool']['calibration_device_bytes'],
             maximum_output_abs_difference=x['maximum_output_abs_difference']))
     for x in r['transfer']:
         row=dict(dataset=x['dataset'],name=x['name'],arm=x['arm'],complete_T_bpv=x['complete_T_bpv'],
+            predictor_input_chunk=x.get('predictor_input_chunk',64),packet_bytes_match_chunk64_reference=x.get('packet_bytes_match_chunk64_reference'),
             external_saving_fraction=x['external_saving_fraction'],raw_fallback=x['raw_fallback'],exact=x['exact'],
             composed_filesystem_cycle_ms=x['serial_P_T_filesystem_T_P_seconds']*1000)
         for key in ['kv_to_T_gpu_body','T_to_KV_gpu','P_to_T_gpu_body','T_to_P_gpu_composed','raw_control_P_to_words','raw_control_words_to_P']:row[key]=timing(x[key])
@@ -360,10 +376,18 @@ def highlights(r):
             if key in x:row[key]=x[key]
         h['transfer'].append(row)
         if x['arm']=='B':
-            paired=next((a for a in r['transfer'] if a['arm']=='A' and a['dataset']==x['dataset'] and a['name']==x['name']),None)
+            paired=next((a for a in r['transfer'] if a['arm']=='A' and a['dataset']==x['dataset'] and a['name']==x['name'] and a.get('predictor_input_chunk',64)==x.get('predictor_input_chunk',64)),None)
             if paired:h['B_vs_A'].append(dict(dataset=x['dataset'],name=x['name'],A_bytes=paired['complete_external_T_bytes'],B_bytes=x['complete_external_T_bytes'],
+                predictor_input_chunk=x.get('predictor_input_chunk',64),
                 B_packet_saving_fraction=1-x['complete_external_T_bytes']/paired['complete_external_T_bytes'],
                 scope='Paired T1 coder and source words; width adapter changes only. Separate from T0 and P1 rates.'))
+        if x.get('predictor_input_chunk',64)!=64:
+            paired=next((a for a in r['transfer'] if (a['dataset'],a['arm'],a['name'],a.get('predictor_input_chunk',64))==(x['dataset'],x['arm'],x['name'],64)),None)
+            if paired:h['chunk_vs_64'].append(dict(dataset=x['dataset'],name=x['name'],arm=x['arm'],predictor_input_chunk=x['predictor_input_chunk'],
+                complete_T_bytes_identical=x['complete_T_sha256']==paired['complete_T_sha256'],
+                encode_speedup=paired['kv_to_T_gpu_body']['wall_median_ms']/x['kv_to_T_gpu_body']['wall_median_ms'],
+                decode_speedup=paired['T_to_KV_gpu']['wall_median_ms']/x['T_to_KV_gpu']['wall_median_ms'],
+                scope='Same frozen state and complete T1 bytes. Warm unprofiled component medians; predictor transient memory differs.'))
     for x in r.get('previous_P1',{}).get('rows',[]):
         p0=x.get('p0') or {}
         for ar in x['arenas']:
@@ -383,28 +407,41 @@ def summary(r):
         '|---|---:|---:|---:|---:|']
     for x in r['attention']:
         lines.append(f"| {x['dataset']}/{x['name']} | {x['tail_tokens']} | {x['dense']['wall_median_ms']:.5f} | {x['packed']['wall_median_ms']:.5f} | {x['maximum_output_abs_difference']:.3g} |")
-    lines+=['','| Transfer case | Arm | T complete bpv | Raw fallback | KV to T ms | T to KV ms | P to T ms | T to P ms | Exact |',
-        '|---|---|---:|---|---:|---:|---:|---:|---|']
+    lines+=['','| Transfer case | Arm | Input chunk | T complete bpv | Raw fallback | KV to T ms | T to KV ms | P to T ms | T to P ms | Exact |',
+        '|---|---|---:|---:|---|---:|---:|---:|---:|---|']
     for x in r['transfer']:
-        lines.append(f"| {x['dataset']}/{x['name']} | {x['arm']} | {x['complete_T_bpv']:.5f} | {x['raw_fallback']} | {x['kv_to_T_gpu_body']['wall_median_ms']:.3f} | {x['T_to_KV_gpu']['wall_median_ms']:.3f} | {x['P_to_T_gpu_body']['wall_median_ms']:.3f} | {x['T_to_P_gpu_composed']['wall_median_ms']:.3f} | {x['exact']} |")
+        lines.append(f"| {x['dataset']}/{x['name']} | {x['arm']} | {x.get('predictor_input_chunk',64) or 'all'} | {x['complete_T_bpv']:.5f} | {x['raw_fallback']} | {x['kv_to_T_gpu_body']['wall_median_ms']:.3f} | {x['T_to_KV_gpu']['wall_median_ms']:.3f} | {x['P_to_T_gpu_body']['wall_median_ms']:.3f} | {x['T_to_P_gpu_composed']['wall_median_ms']:.3f} | {x['exact']} |")
     accounting_rows=[x for x in r['transfer'] if 'T_packet_accounting' in x]
     if accounting_rows:
         lines+=['','| Group | Complete bpv | Payload bpv | Directory + envelope bpv | Legacy full-identity bpv |',
             '|---|---:|---:|---:|---:|']
-        for dataset,arm in sorted({(x['dataset'],x['arm']) for x in accounting_rows}):
-            rows=[x for x in accounting_rows if (x['dataset'],x['arm'])==(dataset,arm)]
+        for dataset,arm,chunk in sorted({(x['dataset'],x['arm'],x.get('predictor_input_chunk',64)) for x in accounting_rows}):
+            rows=[x for x in accounting_rows if (x['dataset'],x['arm'],x.get('predictor_input_chunk',64))==(dataset,arm,chunk)]
             words=sum(x['original_words'] for x in rows)
             def rate(field):return sum(x['T_packet_accounting'][field] for x in rows)*8/words
             old=sum(x['legacy_full_identity_accounting']['complete_bytes'] for x in rows)*8/words
-            lines.append(f"| {dataset}/{arm} | {rate('complete_bytes'):.6f} | {rate('payload_bytes'):.6f} | {rate('directory_bytes')+rate('envelope_bytes'):.6f} | {old:.6f} |")
+            lines.append(f"| {dataset}/{arm}/chunk{chunk or 'all'} | {rate('complete_bytes'):.6f} | {rate('payload_bytes'):.6f} | {rate('directory_bytes')+rate('envelope_bytes'):.6f} | {old:.6f} |")
     diagnostic_rows=[x for x in r['transfer'] if 'bottleneck_diagnostics' in x]
     if diagnostic_rows:
         lines+=['','| Diagnostic encoder control | Parameters ms | Prepared entropy ms | Encode device events | Decode device events |',
             '|---|---:|---:|---:|---:|']
         for x in diagnostic_rows:
             d=x['bottleneck_diagnostics'];ep=d['encode_profile'];dp=d['decode_profile']
-            lines.append(f"| {x['dataset']}/{x['arm']}/{x['name']} | {d['parameter_replay_gpu']['wall_median_ms']:.3f} | {d['entropy_encode_with_prepared_parameters_gpu']['wall_median_ms']:.3f} | {ep.get('CUDA_device_event_count','unavailable')} | {dp.get('CUDA_device_event_count','unavailable')} |")
-        lines+=['','Prepared entropy uses parameters computed from known source KV; it is an encoder timing control. Actual causal decode remains packet-only. Profiled event totals are separate from the uninstrumented medians; missing CUDA profiler activity is explicit.']
+            ec=ep.get('CUDA_device_event_count','unavailable') if ep.get('CUDA_activity_observed') else 'unavailable'
+            dc=dp.get('CUDA_device_event_count','unavailable') if dp.get('CUDA_activity_observed') else 'unavailable'
+            lines.append(f"| {x['dataset']}/{x['arm']}/chunk{x.get('predictor_input_chunk',64) or 'all'}/{x['name']} | {d['parameter_replay_gpu']['wall_median_ms']:.3f} | {d['entropy_encode_with_prepared_parameters_gpu']['wall_median_ms']:.3f} | {ec} | {dc} |")
+        lines+=['','Prepared entropy is an encoder control. Actual causal decode remains packet-only. Instrumented totals are separate from normal medians; missing CUDA activity is explicit.']
+        if all(x['bottleneck_diagnostics'].get('execution_isolation') for x in diagnostic_rows):
+            lines+=['Diagnostics run only in fresh child processes; parent timings never enable profiling. Leaf CUDA activity excludes user annotation ranges.']
+        else:lines+=['Historical diagnostics ran inline and may include CUDA user-annotation ranges in device totals. Those totals are not kernel execution time; see docs/gpu_path_dispatch_a4500.md.']
+    paired=highlights(r)['chunk_vs_64']
+    if paired:
+        lines+=['','| Input-chunk comparison | Encode speedup | Decode speedup | Complete T bytes identical |',
+            '|---|---:|---:|---|']
+        for dataset,arm,chunk in sorted({(x['dataset'],x['arm'],x['predictor_input_chunk']) for x in paired}):
+            rows=[x for x in paired if (x['dataset'],x['arm'],x['predictor_input_chunk'])==(dataset,arm,chunk)]
+            lines.append(f"| {dataset}/{arm}/chunk{chunk or 'all'} | {np.median([x['encode_speedup'] for x in rows]):.3f}x | {np.median([x['decode_speedup'] for x in rows]):.3f}x | {all(x['complete_T_bytes_identical'] for x in rows)} |")
+        lines+=['','Comparison rows are medians of paired per-page speedup ratios. Larger prediction input chunks may need more transient GPU memory; full timing samples and peaks remain in results.json.']
     lines+=['','T1 is a new 12-bit binary-rANS stream with per-token restarts. Complete external bytes include the envelope, model/state identity digests, directory, checksum and payload. The independently expected full model identity is hashed and verified, and legacy full-identity envelopes remain readable. Shared state and measured scratch/peaks are separate. Raw fallback is explicitly identified.',
         '', 'T rates do not inherit the earlier CPU ~44% result. P rates and T rates are separate representations. GPU-body codec times exclude separately reported compressed-byte export/import and CPU envelope/checksum. The actual filesystem cycle is measured directly.',
         '', 'Attention uses seeded component queries, not model logits. The bridge temporarily materializes one bounded chunk; it is not a fused two-layer-scratch converter. Filesystem reads may hit the page cache. Native cache-writer/generation integration, concurrency, cold SSD and real network throughput remain unimplemented.']
@@ -428,6 +465,8 @@ def parser():
     a.add_argument('--skip-isolated',action='store_true',help='skip the fresh-process packet-only GPU decoder control')
     a.add_argument('--diagnostics',action='store_true',help='measure encoder substeps and collect CUDA operation summaries on selected pages')
     a.add_argument('--diagnostic-limit',type=int,default=2,help='diagnostic pages per dataset/arm, evenly sampled; 0 means all')
+    a.add_argument('--predictor-input-chunks',default='64',help='compare integer predictor reduction chunks, beginning with 64; e.g. 64,512,0, where 0 means all columns')
+    a.add_argument('--predictor-input-chunk',type=int,default=64,help=argparse.SUPPRESS)
     a.add_argument('--decode-child',type=Path);a.add_argument('--identity-file',type=Path)
     a.add_argument('--base-state-file',type=Path);a.add_argument('--adapter-state-file',type=Path)
     return a
@@ -436,6 +475,8 @@ def parser():
 def main(argv=None):
     args=parser().parse_args(argv)
     if args.decode_child:return child(args)
+    chunks=input_chunks(args.predictor_input_chunks)
+    if args.diagnostics and args.skip_isolated:raise ValueError('diagnostics require fresh-process decoding; remove --skip-isolated')
     if args.output.exists():raise ValueError('fresh output directory required')
     if args.repeats<1 or args.attention_repeats<1 or args.warmup<0 or args.attention_limit<0 or args.transfer_limit<0 or args.diagnostic_limit<0 or args.gqa_multiple<1 or not np.isfinite(args.arena_ratio) or args.arena_ratio<=0:raise ValueError('invalid measurement bounds')
     if not args.arms or any(x not in ('A','B') for x in args.arms.split(',')):raise ValueError('this baseline batch supports A,B only')
@@ -478,24 +519,35 @@ def main(argv=None):
                     except Exception as e:failure(stage,e)
                     checkpoint()
         r['coverage']['attention_component']=bool(r['attention'])
+        references={}
         for d in data:
             for arm,state in d['states'].items():
-                log(f"loading {d['name']} T1 arm {arm} state")
-                begin=time.perf_counter();engine=t1.Engine(d['base'],state,device);torch.cuda.synchronize(device)
-                r.setdefault('transfer_states',[]).append(dict(dataset=d['name'],arm=arm,cold_initialize_seconds=time.perf_counter()-begin,**engine.statistics()))
                 transfer_cases=limited(d['cases'],args.transfer_limit)
                 diagnostic_ids={id(c) for c in limited(transfer_cases,args.diagnostic_limit)} if args.diagnostics else set()
+                log(f"loading {d['name']} T1 arm {arm}; input chunks {chunks}")
+                begin=time.perf_counter();engine=t1.Engine(d['base'],state,device);torch.cuda.synchronize(device)
+                r.setdefault('transfer_states',[]).append(dict(dataset=d['name'],arm=arm,cold_initialize_seconds=time.perf_counter()-begin,
+                    predictor_input_chunk_variants=chunks,shared_across_input_chunk_variants=True,**engine.statistics()))
                 for case in transfer_cases:
-                    tag=re.sub(r'[^A-Za-z0-9_.-]+','_',d['name']+'_'+arm+'_'+case.name);stage='transfer/'+tag;log(stage)
-                    try:
-                        identity=case.provenance.get('model_identity',d['identity'])
-                        spec=dict(kind='fixture',path=args.fixture) if d['name']=='frozen_smol' else dict(kind='saved',base=args.captures_from/'calibration/base.npz',adapter=args.captures_from/'calibration'/(arm+'_decoder.npz'))
-                        r['transfer'].append(dict(dataset=d['name'],arm=arm,**transfer_case(case,engine,args,torch,device,args.output,tag,identity,spec,diagnose=id(case) in diagnostic_ids)))
-                    except Exception as e:failure(stage,e)
-                    checkpoint()
+                    for chunk in chunks:
+                        engine.input_chunk=chunk
+                        case_args=argparse.Namespace(**vars(args));case_args.cpu_t0_control=args.cpu_t0_control and chunk==64
+                        tag=re.sub(r'[^A-Za-z0-9_.-]+','_',d['name']+'_'+arm+'_chunk'+str(chunk)+'_'+case.name);stage='transfer/'+tag;log(stage)
+                        key=(d['name'],arm,case.name)
+                        try:
+                            if chunk!=64 and key not in references:raise RuntimeError('missing successful chunk64 packet reference')
+                            identity=case.provenance.get('model_identity',d['identity'])
+                            spec=dict(kind='fixture',path=args.fixture) if d['name']=='frozen_smol' else dict(kind='saved',base=args.captures_from/'calibration/base.npz',adapter=args.captures_from/'calibration'/(arm+'_decoder.npz'))
+                            row=dict(dataset=d['name'],arm=arm,**transfer_case(case,engine,case_args,torch,device,args.output,tag,identity,spec,
+                                diagnose=id(case) in diagnostic_ids,expected_T_sha256=references.get(key)))
+                            r['transfer'].append(row)
+                            if chunk==64:references[key]=row['complete_T_sha256']
+                        except Exception as e:failure(stage,e)
+                        checkpoint()
                 del engine
         r['coverage'].update(gpu_measured=bool(r['attention'] or r['transfer']),gpu_entropy=bool(r['transfer']),external_T_P_bridge=bool(r['transfer']),
-            model_coded_chunks=sum(not x['raw_fallback'] for x in r['transfer']),model_raw_fallback_chunks=sum(x['raw_fallback'] for x in r['transfer']))
+            model_coded_chunks=sum(not x['raw_fallback'] for x in r['transfer']),model_raw_fallback_chunks=sum(x['raw_fallback'] for x in r['transfer']),
+            predictor_input_chunk_variants=chunks,unique_source_arm_cases=len({(x['dataset'],x['arm'],x['name']) for x in r['transfer']}))
         r['status']='failed' if r['failures'] else 'completed'
     except Exception as e:r['status']='failed';r['error']=str(e);r['traceback']=traceback.format_exc()
     checkpoint();log(r['status']+': '+str(args.output/'summary.md'))

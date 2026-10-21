@@ -31,6 +31,8 @@ class DiagnosticTests(unittest.TestCase):
         cpu,cuda='CPU','CUDA'
         events=[SimpleNamespace(device_type=cuda,name='kernel',device_time_total=1500.),
             SimpleNamespace(device_type=cuda,name='kernel',device_time_total=2500.),
+            SimpleNamespace(device_type=cuda,name='T1/walk',device_time_total=9000.),
+            SimpleNamespace(device_type=cuda,name='another user range',device_time_total=8000.,is_user_annotation=True),
             SimpleNamespace(device_type=cpu,name='aten::parent',device_time_total=4000.)]
         averages=[SimpleNamespace(device_type=cpu,key='aten::mul',count=7,self_cpu_time_total=200.,cpu_time_total=300.,device_time_total=4000.),
             SimpleNamespace(device_type=cpu,key='T1/parameters',count=2,self_cpu_time_total=10.,cpu_time_total=400.,device_time_total=4000.)]
@@ -39,6 +41,7 @@ class DiagnosticTests(unittest.TestCase):
         r=diagnostics.summarize_profile(profiler,torch,.02)
         self.assertEqual(r['CUDA_device_event_count'],2)
         self.assertEqual(r['CUDA_device_event_total_ms'],4.)
+        self.assertEqual(r['excluded_CUDA_annotation_event_count'],2)
         self.assertEqual(r['Torch_operator_call_count'],7)
         self.assertEqual(r['profiled_synchronized_wall_ms'],20.)
         self.assertEqual(r['regions'][0]['name'],'T1/parameters')

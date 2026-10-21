@@ -35,7 +35,8 @@ class Packet:
 
 
 class Engine:
-    def __init__(self,base,state,device='cuda:0',*,_interpreter=False):
+    def __init__(self,base,state,device='cuda:0',*,input_chunk=64,_interpreter=False):
+        self.input_chunk=input_chunk
         t=_require_torch();d=t.device(device)
         if _interpreter:
             import os
@@ -93,6 +94,14 @@ class Engine:
         self.state_sha256=hashlib.sha256(prob.canonical(identity)).hexdigest()
         self.identity=identity
 
+    @property
+    def input_chunk(self):return self._input_chunk
+
+    @input_chunk.setter
+    def input_chunk(self,value):
+        if type(value) is not int or value<0:raise ValueError('input_chunk must be a nonnegative integer; 0 means all columns')
+        self._input_chunk=value
+
     def _shape(self,shape,start):
         layers,tokens,width=ref._shape(self.base,shape,start)
         if tokens>32:raise ValueError('T1 prototype accepts at most 32 tokens per independent chunk')
@@ -118,8 +127,9 @@ class Engine:
     def _mean(self,features,l,g,start):
         t=self.t;b=self.p.predictors[l][g];selected=features.index_select(1,b['columns'])
         acc=t.zeros((len(features),self.base.block_size),dtype=t.int64,device=self.device)
-        for begin in range(0,selected.shape[1],64):
-            acc+=(selected[:,None,begin:begin+64]*b['A'][None,:,begin:begin+64]).sum(2,dtype=t.int64)
+        step=self.input_chunk or max(1,selected.shape[1])
+        for begin in range(0,selected.shape[1],step):
+            acc+=(selected[:,None,begin:begin+step]*b['A'][None,:,begin:begin+step]).sum(2,dtype=t.int64)
         value=t.clamp(((acc+(1<<15))>>16)+b['b'],-self.feature_limit,self.feature_limit)
         if g*self.base.block_size<self.base.geometry['channels']:value=self._rope(value,g*self.base.block_size,start)
         return value
@@ -247,6 +257,7 @@ class Engine:
         base=self.p.storage_statistics()
         extra=sum(x.numel()*x.element_size() for x in [self.coefficients,self.thresholds,self.scales,self.boundaries,self.table])
         return dict(format=FORMAT,gpu=not self.interpreter,device=str(self.device),state_sha256=self.state_sha256,
+            predictor_input_chunk=self.input_chunk,
             persistent_device_bytes=base['persistent_tensor_bytes']+extra,base_predictor_device_bytes=base['persistent_tensor_bytes'],
             CPU_state_numeric_bytes=sum(x.nbytes for x in ref._arrays(self.base).values())+sum(x.nbytes for x in self.adapter.arrays().values()),
             feature_limit=self.feature_limit,scope='state only; encoder parameter replay, rANS lane scratch and chunk output are additional measured peaks')

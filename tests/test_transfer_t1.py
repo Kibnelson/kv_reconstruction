@@ -23,7 +23,46 @@ def model_and_words():
     return base,state,ref.words(test),test
 
 
+def check_input_chunk_equivalence(test,device,interpreter=False):
+    base,state,words,_=model_and_words();e=t1.Engine(base,state,device,_interpreter=interpreter)
+    identity=e.state_sha256;rng=np.random.default_rng(101)
+    # Exercise column counts beyond both candidate boundaries independently
+    # of the small causal fixture. Compare integer products with NumPy.
+    features=rng.integers(-(1<<24),1<<24,(3,769),dtype=np.int64)
+    source=torch.from_numpy(features).to(device)
+    for g in [0,1]:
+        old=e.p.predictors[0][g]
+        coefficients=rng.integers(-65536,65537,(8,769),dtype=np.int32)
+        bias=rng.integers(-4096,4097,8,dtype=np.int64)
+        e.p.predictors[0][g]=dict(old,A=torch.from_numpy(coefficients).to(device),
+            columns=torch.arange(769,dtype=torch.int64,device=device),b=torch.from_numpy(bias).to(device))
+        expected=np.clip(((features@coefficients.astype(np.int64).T+(1<<15))>>16)+bias,-e.feature_limit,e.feature_limit)
+        if g==0:
+            co,si=base.cosine[2:5],base.sine[2:5];a,b=expected[:,::2].copy(),expected[:,1::2].copy()
+            expected[:,::2]=(a*co-b*si+(1<<14))>>15
+            expected[:,1::2]=(a*si+b*co+(1<<14))>>15
+        for chunk in [64,512,0]:
+            e.input_chunk=chunk
+            np.testing.assert_array_equal(e._mean(source,0,g,2).cpu().numpy(),expected)
+        e.p.predictors[0][g]=old
+    # Complete stream and cross-implementation packet-only decoding use the
+    # unmodified, validated causal fixture and original source words.
+    source=torch.from_numpy(words).to(device);e.input_chunk=64
+    original=e.encode(source,raw_fallback=False)
+    for chunk in [512,0]:
+        e.input_chunk=chunk;packet=e.encode(source,raw_fallback=False)
+        np.testing.assert_array_equal(packet.payload.cpu().numpy(),original.payload.cpu().numpy())
+        np.testing.assert_array_equal(packet.directory.cpu().numpy(),original.directory.cpu().numpy())
+        decoded,error,_=e.decode(original)
+        np.testing.assert_array_equal(error.cpu().numpy(),0);np.testing.assert_array_equal(decoded.cpu().numpy(),words)
+        test.assertEqual(e.state_sha256,identity)
+
+
 class ReferenceTests(unittest.TestCase):
+    def test_input_chunk_requires_nonnegative_integer(self):
+        base,state,words,capture=model_and_words()
+        for invalid in [-1,True,1.5,'512']:
+            with self.assertRaises(ValueError):t1.Engine(base,state,'cpu',input_chunk=invalid)
     def test_identity_digest_binds_complete_canonical_manifest(self):
         identity={'model':'example','config':{'heads':8,'dimension':128}}
         reordered={'config':{'dimension':128,'heads':8},'model':'example'}
@@ -58,6 +97,8 @@ CUDA=torch is not None and torch.cuda.is_available() and importlib.util.find_spe
 
 @unittest.skipUnless(INTERPRETER,'explicit CPU kernel interpreter only')
 class InterpreterTests(unittest.TestCase):
+    def test_input_chunk_reductions_and_complete_packets_are_exact(self):
+        check_input_chunk_equivalence(self,'cpu',True)
     def engine(self):
         base,state,words,capture=model_and_words()
         return t1.Engine(base,state,'cpu',_interpreter=True),words,capture
@@ -146,6 +187,8 @@ class InterpreterTests(unittest.TestCase):
 
 @unittest.skipUnless(CUDA,'actual CUDA hardware unavailable')
 class CudaTests(unittest.TestCase):
+    def test_input_chunk_reductions_and_complete_packets_are_exact(self):
+        check_input_chunk_equivalence(self,'cuda')
     def test_gpu_entropy_core_preserves_all_65536_BF16_words(self):
         from qwen_kv_bench import transfer_t1_kernels as k
         tokens=32;channels=2048;group=32;cap=32*channels+16

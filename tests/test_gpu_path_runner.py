@@ -16,6 +16,44 @@ except ImportError:
 
 
 class RunnerTests(unittest.TestCase):
+    def test_failed_byte_parity_and_AB_pairing_are_preserved_per_input_chunk(self):
+        def timing(wall):return dict(wall_median_ms=wall,cuda_interval_median_ms=wall,incremental_peak_allocated_bytes=1,
+            samples=[dict(peak_allocated_bytes=10,peak_reserved_bytes=20)])
+        def row(arm,chunk,size,digest):
+            r=dict(dataset='software',name='test',arm=arm,predictor_input_chunk=chunk,complete_T_bpv=8.,external_saving_fraction=.5,
+                raw_fallback=False,exact=True,serial_P_T_filesystem_T_P_seconds=1.,serial_cycle_memory={},complete_external_T_bytes=size,complete_T_sha256=digest)
+            for key in ['kv_to_T_gpu_body','T_to_KV_gpu','P_to_T_gpu_body','T_to_P_gpu_composed','raw_control_P_to_words','raw_control_words_to_P']:r[key]=timing(10. if chunk==64 else 5.)
+            return r
+        # This synthetic failed report includes mismatched A bytes. Reporting
+        # must retain that failure and pair B with its corresponding variant.
+        r=dict(status='failed',coverage={'gpu_measured':False},attention=[],transfer=[row('A',64,1000,'A'),row('A',512,1200,'changed A'),row('B',64,900,'B'),row('B',512,900,'B')])
+        h=run.highlights(r)
+        self.assertFalse(h['chunk_vs_64'][0]['complete_T_bytes_identical'])
+        self.assertTrue(h['chunk_vs_64'][1]['complete_T_bytes_identical'])
+        self.assertAlmostEqual(h['B_vs_A'][1]['B_packet_saving_fraction'],.25)
+        self.assertEqual(h['B_vs_A'][1]['predictor_input_chunk'],512)
+        self.assertEqual(h['status'],'failed')
+
+    def test_input_chunk_comparisons_require_successful_reference_order(self):
+        self.assertEqual(run.input_chunks('64,512,0'),[64,512,0])
+        for bad in ['512,64','64,-1','64,64','64,','']:
+            with self.assertRaises(ValueError):run.input_chunks(bad)
+
+    def test_profiler_is_requested_only_in_the_fresh_decoder_process(self):
+        import argparse
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'storage').mkdir()
+            args=argparse.Namespace(device='cuda:0',warmup=1,repeats=3)
+            def child(cmd,**kwargs):
+                output=Path(cmd[cmd.index('--output')+1]);output.mkdir(parents=True)
+                (output/'decoder.json').write_text(json.dumps(dict(status='completed',gpu_measured=True,decoded_words_sha256='known hash',bottleneck_diagnostics={'test_only':True})))
+                return type('Result',(),{'returncode':0,'stdout':'synthetic child control'})()
+            with patch.object(run.subprocess,'run',side_effect=child) as process:
+                r=run.isolated_decode(root/'packet.t1',{'model':'synthetic'},dict(kind='fixture',path=root),root,'software',args,'known hash',input_chunk=512,diagnose=True)
+            cmd=process.call_args.args[0]
+            self.assertIn('--diagnostics',cmd)
+            self.assertEqual(cmd[cmd.index('--predictor-input-chunk')+1],'512')
+            self.assertFalse(r['original_KV_supplied'])
     def test_missing_cuda_is_recorded_as_failure_without_cpu_success(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(run.p,'_cuda_torch',side_effect=RuntimeError('CUDA unavailable')):
             out=Path(tmp)/'report'
@@ -90,6 +128,13 @@ class OrchestrationTests(unittest.TestCase):
             self.assertEqual(accounting['complete_bytes'],result['complete_external_T_bytes'])
             self.assertEqual(accounting['complete_bytes'],accounting['payload_bytes']+accounting['directory_bytes']+accounting['envelope_bytes'])
             self.assertEqual(result['identity_compaction_saved_bytes'],result['legacy_full_identity_accounting']['complete_bytes']-accounting['complete_bytes'])
+            # The parent delegates selected diagnostics, never enabling its
+            # own profiler even when a requested child profile is unavailable.
+            with patch.object(run,'isolated_decode',return_value={'bottleneck_diagnostics':{'test_only_child':True}}),patch('scripts.gpu_path_diagnostics.run',side_effect=AssertionError('parent must not profile')):
+                second=run.transfer_case(case,e,args,torch,torch.device('cpu'),Path(tmp),'software_tuned',{'model':'synthetic'},dict(kind='fixture'),
+                    diagnose=True,expected_T_sha256=result['complete_T_sha256'])
+            self.assertTrue(second['packet_bytes_match_chunk64_reference'])
+            self.assertTrue(second['bottleneck_diagnostics']['test_only_child'])
 
 
 if __name__=='__main__':unittest.main()

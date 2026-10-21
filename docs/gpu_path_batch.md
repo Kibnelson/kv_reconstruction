@@ -1,9 +1,11 @@
 # GPU KV path: attention, T1 and external restore batch
 
-The first full A4500 batch passed. See the
-[results review](gpu_path_a4500_20261021_review.md) for measured rates,
-latency limits, shared-state accounting and the compact-identity/profiling
-follow-up. Use `--diagnostics` with the command below for that next batch.
+Both full A4500 batches passed. Compact Qwen B T1 packets now measure
+8.853500 bpv, a 44.67% BF16 reduction. See the
+[dispatch comparison](gpu_path_dispatch_a4500.md) for these results, the
+profiler annotation correction and the next 64/512/all-column timing batch.
+The [earlier review](gpu_path_a4500_20261021_review.md) retains the original
+framing and state-accounting comparison.
 
 The user has approved batching related implementation and testing without a
 separate approval after each step. This batch connects the component paths
@@ -179,7 +181,16 @@ summaries for actual encode and causal decode. By default this samples the
 first and last selected pages per dataset/arm. `--diagnostic-limit 0` profiles
 all selected pages. Profiler times are separate from normal medians; missing
 CUDA profiler activity is explicitly recorded. Reports contain operation names
-and times, not tensor contents or raw trace files.
+and times, not tensor contents or raw trace files. Diagnostics execute only
+in a fresh packet-only decoder child; parent timings never enable profiling.
+CUDA annotation ranges are excluded from leaf activity totals. Old reports
+whose totals include `T1/*` ranges must not be used as kernel-time estimates.
+
+Add `--predictor-input-chunks 64,512,0` to compare the original 64-column
+integer reduction with 512-column and all-column (`0`) reductions. The
+prediction group remains 32 channels. Candidates share the frozen state and
+must produce identical complete T1 packet bytes. Actual transient-memory
+peaks are charged. See the dispatch guide for the full command.
 
 ## Local checks and remaining integration
 

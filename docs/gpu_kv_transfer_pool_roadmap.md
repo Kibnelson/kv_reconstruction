@@ -75,7 +75,7 @@ an efficient attention cache.
 | Existing transfer stream, called T0 here | CPU entropy reference, 8.828674 complete bpv for Qwen B | Retained as a matched reference; T1 is a separate GPU ABI |
 | Existing pool records, called P0 here | Exact GPU tensor pack/unpack; byte parity with the original records | Attention tile access, production allocation, raw tail, overflow and serving integration |
 | Resident ABI P1 | Actual A4500 pack, selected reads, raw tail and fused attention; 13.05 allocated packet bpv on the SmolLM fixture | Reusable serving allocation, native cache writer, model continuation and concurrency |
-| GPU wire ABI T1 | Actual GPU probabilities/entropy, exact isolated decode, file restore to P1; 9.023300 complete bpv for Qwen B | Reduce codec latency; measure compact identity framing; fused bounded-scratch conversion and transport integration |
+| GPU wire ABI T1 | Actual GPU probabilities/entropy, exact isolated decode, file restore to P1; compact envelopes measure 8.853500 complete bpv for Qwen B | Reduce prediction/entropy latency; compare exact input-reduction chunks; fused bounded-scratch conversion and transport integration |
 
 The Qwen four-layer T0 study records arm B at 8.828674 complete packet
 bits/value with CPU entropy coding. The new A4500 batch reuses the same

@@ -1,0 +1,127 @@
+{
+  "checks": {
+    "CPU_only_input_validation": true,
+    "bash_syntax": true,
+    "git_diff_check": true,
+    "historical_report_scope_compatibility": true,
+    "py_compile": true,
+    "standalone_rebuild_and_check": true
+  },
+  "coverage": {
+    "CPU_complete_packet_and_cross_variant_decode": true,
+    "CUDA_annotations_excluded_by_regression": true,
+    "NumPy_769_column_integer_oracle": true,
+    "compact_packets_already_measured_on_A4500": true,
+    "frozen_30_layer_360_group_parameter_replay_exact": true,
+    "new_input_chunk_GPU_measured": false,
+    "profiling_delegated_to_packet_only_child": true
+  },
+  "date": "2026-10-21",
+  "files": [
+    {
+      "bytes": 22507,
+      "path": "README.md",
+      "sha256": "6da7d0ae1db68bfe0195bec9866dca931773039381dbe0284596dd6fef3d63ec"
+    },
+    {
+      "bytes": 25301,
+      "path": "docs/gpu_kv_transfer_pool_roadmap.md",
+      "sha256": "3da194ae501bedf5a0b9b8432a15d06cccc9f8abe56f77393e6f957d398fea3f"
+    },
+    {
+      "bytes": 8748,
+      "path": "docs/gpu_path_a4500_20261021_review.md",
+      "sha256": "d66e38e83fbed9e753ef7994fe553913248ead68b4eea1945d441df7a00d5c30"
+    },
+    {
+      "bytes": 12424,
+      "path": "docs/gpu_path_batch.md",
+      "sha256": "2c68cf60da4de0e6082bed7bfe7a966be5ac7f34f0b91ad28ea5af2a24faba0d"
+    },
+    {
+      "bytes": 7840,
+      "path": "docs/gpu_path_dispatch_a4500.md",
+      "sha256": "e68cf9e2ccd6a98fc6ff2001d0f9a052b9a76cb2d80dfb3c4dbf626884ed5d61"
+    },
+    {
+      "bytes": 20720,
+      "path": "qwen_kv_bench/transfer_t1.py",
+      "sha256": "8d4442730f90c56d6ac3631ed1cedebb32b87f621110f4e6d8a03d2886cd0548"
+    },
+    {
+      "bytes": 45438,
+      "path": "scripts/bench_gpu_path.py",
+      "sha256": "c5a167943102f5959a036653d8708d522716a88a011c3c78a3ef82ca88f94665"
+    },
+    {
+      "bytes": 6513,
+      "path": "scripts/gpu_path_diagnostics.py",
+      "sha256": "ff47a01997d49536226ed4128965c4ed7f557c86c89881ccfce5932efa12bedb"
+    },
+    {
+      "bytes": 15470,
+      "path": "tests/test_transfer_t1.py",
+      "sha256": "11ee3ee923430f2e0addf205c890535baa796ab0b80b18c168f34390b8e29dcb"
+    },
+    {
+      "bytes": 10144,
+      "path": "tests/test_gpu_path_runner.py",
+      "sha256": "f770a06d4ec46c67ccbbcf93acab870454c03f289585c2e0b06d4f4d8bb8e579"
+    },
+    {
+      "bytes": 4572,
+      "path": "tests/test_gpu_path_diagnostics.py",
+      "sha256": "c9c5ac8241a169354ad67c0b60da67aa3fd5e012b31840a4066eddda6fc99c12"
+    },
+    {
+      "bytes": 1077495,
+      "path": "qwen_kv_gpu_bench.py",
+      "sha256": "92bfdabdcf1ca9b64b29d8e44044d70cb0613dc7623601f6771b3858f229abc3"
+    }
+  ],
+  "format": "gpu_path_dispatch_local_validation_v1",
+  "input_chunks": [
+    64,
+    512,
+    0
+  ],
+  "limitations": [
+    "New input-chunk variant CUDA correctness, timings and peaks require the A4500 batch.",
+    "Old inline profile totals include CUDA annotations and are not kernel execution times.",
+    "Fewer mean reductions are operation counts, not measured speedups.",
+    "All-column products use more temporary memory; measured peaks must be assessed.",
+    "Native generation, concurrency, real network and cold SSD remain outside this batch."
+  ],
+  "reference_commit": "9df187eb2854d3cde7ed5275a49f6ceb564fd4e6",
+  "reference_results_sha256": "59593d3b22eff41bbfa3b154857e3538414d934b0493eba632e183e212f42caf",
+  "standalone_publication": {
+    "local_generated_sha256": "92bfdabdcf1ca9b64b29d8e44044d70cb0613dc7623601f6771b3858f229abc3",
+    "regeneration": "run_gpu_path_a4500.sh rebuilds/checks and publishes the standalone before tests",
+    "remote_artifact": "predecessor_until_host_regeneration"
+  },
+  "status": "CPU_checks_passed_new_GPU_variants_pending",
+  "tests": {
+    "elapsed_seconds": 106.468,
+    "explicit_Triton_CPU_interpreter": true,
+    "passed": 58,
+    "skipped": 11,
+    "total": 69
+  },
+  "unchanged_GPU_kernel_sources": [
+    {
+      "path": "qwen_kv_bench/pool_p1_kernels.py",
+      "sha256": "40b429bdd98332e75c183b63e1c41f4c9829c43a0c4df68f8d6a274f5772b2d7",
+      "unchanged_from_compact_A4500_run": true
+    },
+    {
+      "path": "qwen_kv_bench/pool_attention_kernels.py",
+      "sha256": "55ae69408455268902e0c776fdebe6f4a9625914646cd89f067a1266653c008b",
+      "unchanged_from_compact_A4500_run": true
+    },
+    {
+      "path": "qwen_kv_bench/transfer_t1_kernels.py",
+      "sha256": "eec4dfa9c39f5b6c85b2974f56f8f222f9e9520e518b6f01210329f18ec96d11",
+      "unchanged_from_compact_A4500_run": true
+    }
+  ]
+}
