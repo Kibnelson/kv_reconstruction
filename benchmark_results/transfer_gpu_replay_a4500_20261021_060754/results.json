@@ -1,0 +1,1819 @@
+{
+  "aggregate": {
+    "all_pool_exact": true,
+    "all_predictor_mu_exact": true,
+    "cpu_transfer_packet_bits_per_value": 9.430598958333333,
+    "pages": 4,
+    "pool_complete_wire_bits_per_value": 11.486469184027778,
+    "pool_payload_bits_per_value": 11.472233072916667,
+    "unique_source_values": 1474560
+  },
+  "arguments": {
+    "coefficient_dtype": "int32",
+    "components": "pool,predictor",
+    "device": "cuda:0",
+    "input_chunk": 64,
+    "max_pages": null,
+    "output": "runs/transfer_gpu_replay_a4500",
+    "reference_run": null,
+    "repeats": 5,
+    "replay_fixture": "benchmark_fixtures/team_transfer_smol_replay_v1",
+    "skip_cpu_transfer_validation": false,
+    "threads": 1,
+    "tiles_per_batch": 16,
+    "token_chunk": 32,
+    "variant": "block32",
+    "warmup": 1
+  },
+  "cold_state_initialization": {
+    "cpu_full_decoder_array_bytes": 51795464,
+    "cpu_npz_load_seconds": 0.26784250140190125,
+    "pool_device_state_initialization_seconds": 0.0012757256627082825,
+    "pool_device_tensor_bytes": 23040,
+    "predictor": {
+      "coefficient_dtype_policy": "int32",
+      "coefficient_dtypes": [
+        "torch.int32"
+      ],
+      "coefficient_tensor_bytes": 25214976,
+      "component": "fixed-point predictor and feature replay only; entropy codec is CPU",
+      "device": "cuda:0",
+      "guards": "device scalar synchronizations and conservative integer overflow checks are enabled",
+      "input_chunk": 64,
+      "persistent_tensor_bytes": 27237376,
+      "product_scratch_upper_bound_bytes": 524288,
+      "scratch_scope": "product tensor only; excludes selected features, accumulation, outputs and allocator overhead",
+      "source_state_sha256": "ee4a83c56954004630be87ca05720f20aa660c3cebc44686b24dd2ba5333fcca",
+      "token_chunk": 32
+    },
+    "predictor_device_state_initialization_seconds": 0.507209924980998,
+    "scope": "one cold construction; includes validation, Python and copies; not pure PCIe timing",
+    "serialized_decoder_state_bytes": 17187807
+  },
+  "coverage": {
+    "compressed_attention": false,
+    "device_pool_decode": true,
+    "device_pool_encode": true,
+    "device_predictor_replay": true,
+    "gpu_transfer_entropy_coder": false,
+    "model_forward_measured": false,
+    "predictor_context": "original known KV, not entropy-decoded symbols"
+  },
+  "device": {
+    "compute_capability": [
+      8,
+      6
+    ],
+    "cuda_available": true,
+    "name": "NVIDIA RTX A4500",
+    "selected": "cuda:0",
+    "torch": "2.11.0+cu128",
+    "torch_cuda": "12.8",
+    "total_memory_bytes": 20993015808
+  },
+  "explicit_cpu_validation": false,
+  "format": "transfer_gpu_component_replay_v1",
+  "gpu_tested": true,
+  "gpu_validated": true,
+  "provenance": {
+    "files_checked": 30,
+    "fixture_format": "transfer_gpu_replay_fixture_v1",
+    "fixture_gpu_validated": false,
+    "input": "frozen replay fixture",
+    "manifest": "/home/nelson/kv_reconstruction/benchmark_fixtures/team_transfer_smol_replay_v1/manifest.json",
+    "manifest_sha256": "6b4c2d95d823265388d4cda484023f94847ba25cd023de5814e80f7797bc0254"
+  },
+  "rows": [
+    {
+      "case": "test_antarctic_story",
+      "cpu_transfer": {
+        "bits_per_value": 9.649348958333333,
+        "codec_device": "cpu",
+        "entropy_stream_bytes": 444216,
+        "framing_bytes": 426,
+        "metadata_bytes": 0,
+        "packet_bytes": 444642,
+        "resident_full_decoder_array_bytes": 51795464,
+        "validation": {
+          "bit_exact": true,
+          "gpu": false,
+          "performed": true,
+          "seconds": 5.6038633696734905
+        }
+      },
+      "name": "page_000",
+      "pool": {
+        "bit_exact": true,
+        "decode": {
+          "cuda_event_median_ms": 14.87667179107666,
+          "peak_incremental_allocated_bytes": 3997696,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 14.785632133483887,
+              "peak_allocated_bytes": 32763904,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 33554432,
+              "synchronized_wall_seconds": 0.014826694503426552
+            },
+            {
+              "cuda_event_ms": 14.702560424804688,
+              "peak_allocated_bytes": 32763904,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 33554432,
+              "synchronized_wall_seconds": 0.014725444838404655
+            },
+            {
+              "cuda_event_ms": 14.87667179107666,
+              "peak_allocated_bytes": 32763904,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 33554432,
+              "synchronized_wall_seconds": 0.014899570494890213
+            },
+            {
+              "cuda_event_ms": 14.899007797241211,
+              "peak_allocated_bytes": 32763904,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 33554432,
+              "synchronized_wall_seconds": 0.014922639355063438
+            },
+            {
+              "cuda_event_ms": 14.96998405456543,
+              "peak_allocated_bytes": 32763904,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 33554432,
+              "synchronized_wall_seconds": 0.01499282568693161
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.014899570494890213,
+          "warmup": 1
+        },
+        "encode": {
+          "cuda_event_median_ms": 15.411199569702148,
+          "peak_incremental_allocated_bytes": 2414080,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 15.70083236694336,
+              "peak_allocated_bytes": 30642688,
+              "peak_incremental_allocated_bytes": 2414080,
+              "peak_reserved_bytes": 31457280,
+              "synchronized_wall_seconds": 0.015744348987936974
+            },
+            {
+              "cuda_event_ms": 15.375359535217285,
+              "peak_allocated_bytes": 30642688,
+              "peak_incremental_allocated_bytes": 2414080,
+              "peak_reserved_bytes": 31457280,
+              "synchronized_wall_seconds": 0.015398118644952774
+            },
+            {
+              "cuda_event_ms": 15.399935722351074,
+              "peak_allocated_bytes": 30642688,
+              "peak_incremental_allocated_bytes": 2414080,
+              "peak_reserved_bytes": 31457280,
+              "synchronized_wall_seconds": 0.015427110716700554
+            },
+            {
+              "cuda_event_ms": 15.411199569702148,
+              "peak_allocated_bytes": 30642688,
+              "peak_incremental_allocated_bytes": 2414080,
+              "peak_reserved_bytes": 31457280,
+              "synchronized_wall_seconds": 0.01543254591524601
+            },
+            {
+              "cuda_event_ms": 15.555583953857422,
+              "peak_allocated_bytes": 30642688,
+              "peak_incremental_allocated_bytes": 2414080,
+              "peak_reserved_bytes": 31457280,
+              "synchronized_wall_seconds": 0.015580188482999802
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.01543254591524601,
+          "warmup": 1
+        },
+        "fixture_offsets_equal": true,
+        "fixture_payload_equal": true,
+        "h2d": {
+          "bit_exact": true,
+          "complete_pool_wire": {
+            "copied_bytes": 537612,
+            "cuda_event_median_ms": 0.0272000003606081,
+            "effective_GB_per_second": 14.04722074960549,
+            "peak_incremental_allocated_bytes": 0,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 0.02848000079393387,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 4.279986023902893e-05
+              },
+              {
+                "cuda_event_ms": 0.027744000777602196,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 4.0704384446144104e-05
+              },
+              {
+                "cuda_event_ms": 0.02703999914228916,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 3.798492252826691e-05
+              },
+              {
+                "cuda_event_ms": 0.02703999914228916,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 3.809109330177307e-05
+              },
+              {
+                "cuda_event_ms": 0.0272000003606081,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 3.8271769881248474e-05
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 3.8271769881248474e-05,
+            "warmup": 1
+          },
+          "complete_pool_wire_then_unpack": {
+            "cuda_event_median_ms": 14.833919525146484,
+            "peak_incremental_allocated_bytes": 3997696,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 14.740480422973633,
+                "peak_allocated_bytes": 34776576,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 35651584,
+                "synchronized_wall_seconds": 0.014768889173865318
+              },
+              {
+                "cuda_event_ms": 14.833919525146484,
+                "peak_allocated_bytes": 34776576,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 35651584,
+                "synchronized_wall_seconds": 0.014857197180390358
+              },
+              {
+                "cuda_event_ms": 14.825599670410156,
+                "peak_allocated_bytes": 34776576,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 35651584,
+                "synchronized_wall_seconds": 0.01484869234263897
+              },
+              {
+                "cuda_event_ms": 14.879743576049805,
+                "peak_allocated_bytes": 34776576,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 35651584,
+                "synchronized_wall_seconds": 0.014904310926795006
+              },
+              {
+                "cuda_event_ms": 14.86143970489502,
+                "peak_allocated_bytes": 34776576,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 35651584,
+                "synchronized_wall_seconds": 0.01488388329744339
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 0.014857197180390358,
+            "warmup": 1
+          },
+          "cpu_pinned_and_destination_preparation_seconds": 0.0008726362138986588,
+          "host_descriptor_parsed_before_copy": true,
+          "measured": true,
+          "pinned_sources": true,
+          "raw_bf16": {
+            "copied_bytes": 737280,
+            "cuda_event_median_ms": 0.03590400144457817,
+            "effective_GB_per_second": 14.951995844798851,
+            "peak_incremental_allocated_bytes": 0,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 0.03836800158023834,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 6.157159805297852e-05
+              },
+              {
+                "cuda_event_ms": 0.03619199991226196,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 5.031004548072815e-05
+              },
+              {
+                "cuda_event_ms": 0.035711999982595444,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 4.825368523597717e-05
+              },
+              {
+                "cuda_event_ms": 0.03590400144457817,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 4.9309805035591125e-05
+              },
+              {
+                "cuda_event_ms": 0.03577600046992302,
+                "peak_allocated_bytes": 30778880,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 33554432,
+                "synchronized_wall_seconds": 4.786066710948944e-05
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 4.9309805035591125e-05,
+            "warmup": 1
+          },
+          "same_preallocated_copy_conditions": true,
+          "shared_pool_state_already_resident": true,
+          "wire_to_raw_byte_ratio": 0.7291829427083333
+        },
+        "host_wire_serialization_seconds_including_D2H": 0.0006652269512414932,
+        "original_payload_and_offsets_equal": true,
+        "stats": {
+          "block_index_bytes": 488,
+          "blocks": 60,
+          "device": "cuda:0",
+          "escape_count": 35464,
+          "escape_counts": [
+            330,
+            327,
+            406,
+            422,
+            453,
+            525,
+            744,
+            790,
+            737,
+            837,
+            756,
+            798,
+            691,
+            840,
+            678,
+            731,
+            726,
+            752,
+            749,
+            735,
+            572,
+            596,
+            482,
+            420,
+            670,
+            385,
+            604,
+            370,
+            836,
+            477,
+            740,
+            407,
+            718,
+            466,
+            815,
+            515,
+            747,
+            395,
+            688,
+            444,
+            822,
+            468,
+            682,
+            388,
+            735,
+            402,
+            732,
+            388,
+            685,
+            348,
+            685,
+            347,
+            722,
+            430,
+            620,
+            403,
+            651,
+            379,
+            750,
+            453
+          ],
+          "escape_header_bytes": 120,
+          "format": "team_pool_original_v1",
+          "geometry_metadata": "shape/tile/format supplied out of band; not serialized in payload",
+          "gpu_attention_kernel": false,
+          "host_synchronization": "one allocation-size item per batch; validation/stats also synchronize",
+          "indexed_bits_per_value": 11.66328125,
+          "payload_bits_per_value": 11.652690972222222,
+          "payload_bytes": 536956,
+          "physical_packet_tensor_bytes": 537444,
+          "physical_state_tensor_bytes": 23040,
+          "raw_bf16_bytes": 737280,
+          "shape": [
+            30,
+            32,
+            384
+          ],
+          "state_width_sums_host_integers": 30,
+          "tile_tokens": 16
+        },
+        "wire": {
+          "format": "team_pool_original_v1",
+          "header_bytes": 168,
+          "index_bytes": 488,
+          "offset_dtype": "little-endian int64",
+          "offsets_count": 61,
+          "payload_bytes": 536956,
+          "payload_start": 656,
+          "shape": [
+            30,
+            32,
+            384
+          ],
+          "tile_tokens": 16,
+          "wire_bits_per_value": 11.666927083333333,
+          "wire_bytes": 537612
+        }
+      },
+      "predictor": {
+        "cpu_oracle_seconds": 0.6200338713824749,
+        "exact_mu": true,
+        "scope": "feature/mean replay with known KV; no probability model or entropy coder",
+        "timing": {
+          "cuda_event_median_ms": 174.12518310546875,
+          "peak_incremental_allocated_bytes": 4686336,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 174.34291076660156,
+              "peak_allocated_bytes": 34189824,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17438635788857937
+            },
+            {
+              "cuda_event_ms": 174.12518310546875,
+              "peak_allocated_bytes": 34189824,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.1741569433361292
+            },
+            {
+              "cuda_event_ms": 174.3155517578125,
+              "peak_allocated_bytes": 34189824,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17435037903487682
+            },
+            {
+              "cuda_event_ms": 173.86598205566406,
+              "peak_allocated_bytes": 34189824,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17388991825282574
+            },
+            {
+              "cuda_event_ms": 174.01763916015625,
+              "peak_allocated_bytes": 34189824,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.1740406695753336
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.1741569433361292,
+          "warmup": 1
+        },
+        "values_compared": 368640
+      },
+      "raw_bf16_bytes": 737280,
+      "shape": [
+        30,
+        32,
+        384
+      ],
+      "start": 0,
+      "values": 368640
+    },
+    {
+      "case": "test_antarctic_story",
+      "cpu_transfer": {
+        "bits_per_value": 9.1015625,
+        "codec_device": "cpu",
+        "entropy_stream_bytes": 418972,
+        "framing_bytes": 428,
+        "metadata_bytes": 0,
+        "packet_bytes": 419400,
+        "resident_full_decoder_array_bytes": 51795464,
+        "validation": {
+          "bit_exact": true,
+          "gpu": false,
+          "performed": true,
+          "seconds": 5.751221466809511
+        }
+      },
+      "name": "page_001",
+      "pool": {
+        "bit_exact": true,
+        "decode": {
+          "cuda_event_median_ms": 14.724960327148438,
+          "peak_incremental_allocated_bytes": 3997696,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 14.752832412719727,
+              "peak_allocated_bytes": 36435968,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014781275764107704
+            },
+            {
+              "cuda_event_ms": 14.751903533935547,
+              "peak_allocated_bytes": 36435968,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014774752780795097
+            },
+            {
+              "cuda_event_ms": 14.724960327148438,
+              "peak_allocated_bytes": 36435968,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014748988673090935
+            },
+            {
+              "cuda_event_ms": 14.713024139404297,
+              "peak_allocated_bytes": 36435968,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014735324308276176
+            },
+            {
+              "cuda_event_ms": 14.6943998336792,
+              "peak_allocated_bytes": 36435968,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014717072248458862
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.014748988673090935,
+          "warmup": 1
+        },
+        "encode": {
+          "cuda_event_median_ms": 15.430656433105469,
+          "peak_incremental_allocated_bytes": 2402304,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 15.394783973693848,
+              "peak_allocated_bytes": 34854912,
+              "peak_incremental_allocated_bytes": 2402304,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015431411564350128
+            },
+            {
+              "cuda_event_ms": 15.417344093322754,
+              "peak_allocated_bytes": 34854912,
+              "peak_incremental_allocated_bytes": 2402304,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.0154439527541399
+            },
+            {
+              "cuda_event_ms": 15.481856346130371,
+              "peak_allocated_bytes": 34854912,
+              "peak_incremental_allocated_bytes": 2402304,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.01550818420946598
+            },
+            {
+              "cuda_event_ms": 15.453503608703613,
+              "peak_allocated_bytes": 34854912,
+              "peak_incremental_allocated_bytes": 2402304,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015474796295166016
+            },
+            {
+              "cuda_event_ms": 15.430656433105469,
+              "peak_allocated_bytes": 34854912,
+              "peak_incremental_allocated_bytes": 2402304,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015452176332473755
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.015452176332473755,
+          "warmup": 1
+        },
+        "fixture_offsets_equal": true,
+        "fixture_payload_equal": true,
+        "h2d": {
+          "bit_exact": true,
+          "complete_pool_wire": {
+            "copied_bytes": 523123,
+            "cuda_event_median_ms": 0.02672000043094158,
+            "effective_GB_per_second": 13.561713366081221,
+            "peak_incremental_allocated_bytes": 0,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 0.02723200060427189,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.1484832763671875e-05
+              },
+              {
+                "cuda_event_ms": 0.02659199945628643,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.857351839542389e-05
+              },
+              {
+                "cuda_event_ms": 0.027615999802947044,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.090927541255951e-05
+              },
+              {
+                "cuda_event_ms": 0.026655999943614006,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.781355917453766e-05
+              },
+              {
+                "cuda_event_ms": 0.02672000043094158,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.775954246520996e-05
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 3.857351839542389e-05,
+            "warmup": 1
+          },
+          "complete_pool_wire_then_unpack": {
+            "cuda_event_median_ms": 14.809280395507812,
+            "peak_incremental_allocated_bytes": 3997696,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 14.692352294921875,
+                "peak_allocated_bytes": 37696512,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014721821993589401
+              },
+              {
+                "cuda_event_ms": 14.843903541564941,
+                "peak_allocated_bytes": 37696512,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014865955337882042
+              },
+              {
+                "cuda_event_ms": 14.809280395507812,
+                "peak_allocated_bytes": 37696512,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014832127839326859
+              },
+              {
+                "cuda_event_ms": 14.799872398376465,
+                "peak_allocated_bytes": 37696512,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014827964827418327
+              },
+              {
+                "cuda_event_ms": 14.887167930603027,
+                "peak_allocated_bytes": 37696512,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.01491139829158783
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 0.014832127839326859,
+            "warmup": 1
+          },
+          "cpu_pinned_and_destination_preparation_seconds": 0.00022483058273792267,
+          "host_descriptor_parsed_before_copy": true,
+          "measured": true,
+          "pinned_sources": true,
+          "raw_bf16": {
+            "copied_bytes": 737280,
+            "cuda_event_median_ms": 0.03548799827694893,
+            "effective_GB_per_second": 15.401120034215012,
+            "peak_incremental_allocated_bytes": 0,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 0.04169600084424019,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 6.414391100406647e-05
+              },
+              {
+                "cuda_event_ms": 0.03587200120091438,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.9091875553131104e-05
+              },
+              {
+                "cuda_event_ms": 0.03548799827694893,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.787184298038483e-05
+              },
+              {
+                "cuda_event_ms": 0.03545600175857544,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.6916306018829346e-05
+              },
+              {
+                "cuda_event_ms": 0.035360001027584076,
+                "peak_allocated_bytes": 33698816,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.690699279308319e-05
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 4.787184298038483e-05,
+            "warmup": 1
+          },
+          "same_preallocated_copy_conditions": true,
+          "shared_pool_state_already_resident": true,
+          "wire_to_raw_byte_ratio": 0.7095309787326389
+        },
+        "host_wire_serialization_seconds_including_D2H": 0.0002382565289735794,
+        "original_payload_and_offsets_equal": true,
+        "stats": {
+          "block_index_bytes": 488,
+          "blocks": 60,
+          "device": "cuda:0",
+          "escape_count": 20975,
+          "escape_counts": [
+            350,
+            353,
+            398,
+            376,
+            427,
+            359,
+            517,
+            348,
+            525,
+            327,
+            524,
+            345,
+            505,
+            349,
+            480,
+            337,
+            480,
+            321,
+            498,
+            358,
+            428,
+            359,
+            360,
+            325,
+            327,
+            371,
+            387,
+            338,
+            290,
+            293,
+            309,
+            271,
+            306,
+            325,
+            322,
+            317,
+            272,
+            308,
+            297,
+            246,
+            280,
+            301,
+            312,
+            278,
+            342,
+            335,
+            322,
+            295,
+            310,
+            298,
+            357,
+            324,
+            315,
+            335,
+            315,
+            291,
+            326,
+            338,
+            346,
+            327
+          ],
+          "escape_header_bytes": 120,
+          "format": "team_pool_original_v1",
+          "geometry_metadata": "shape/tile/format supplied out of band; not serialized in payload",
+          "gpu_attention_kernel": false,
+          "host_synchronization": "one allocation-size item per batch; validation/stats also synchronize",
+          "indexed_bits_per_value": 11.34884982638889,
+          "payload_bits_per_value": 11.338259548611111,
+          "payload_bytes": 522467,
+          "physical_packet_tensor_bytes": 522955,
+          "physical_state_tensor_bytes": 23040,
+          "raw_bf16_bytes": 737280,
+          "shape": [
+            30,
+            32,
+            384
+          ],
+          "state_width_sums_host_integers": 30,
+          "tile_tokens": 16
+        },
+        "wire": {
+          "format": "team_pool_original_v1",
+          "header_bytes": 168,
+          "index_bytes": 488,
+          "offset_dtype": "little-endian int64",
+          "offsets_count": 61,
+          "payload_bytes": 522467,
+          "payload_start": 656,
+          "shape": [
+            30,
+            32,
+            384
+          ],
+          "tile_tokens": 16,
+          "wire_bits_per_value": 11.352495659722223,
+          "wire_bytes": 523123
+        }
+      },
+      "predictor": {
+        "cpu_oracle_seconds": 0.623430360108614,
+        "exact_mu": true,
+        "scope": "feature/mean replay with known KV; no probability model or entropy coder",
+        "timing": {
+          "cuda_event_median_ms": 173.90386962890625,
+          "peak_incremental_allocated_bytes": 4686336,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 173.98594665527344,
+              "peak_allocated_bytes": 37124608,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17402244918048382
+            },
+            {
+              "cuda_event_ms": 173.90386962890625,
+              "peak_allocated_bytes": 37124608,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17393301241099834
+            },
+            {
+              "cuda_event_ms": 173.9008026123047,
+              "peak_allocated_bytes": 37124608,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17393315955996513
+            },
+            {
+              "cuda_event_ms": 173.9438018798828,
+              "peak_allocated_bytes": 37124608,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17396732605993748
+            },
+            {
+              "cuda_event_ms": 173.79519653320312,
+              "peak_allocated_bytes": 37124608,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.1738244704902172
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.17393315955996513,
+          "warmup": 1
+        },
+        "values_compared": 368640
+      },
+      "raw_bf16_bytes": 737280,
+      "shape": [
+        30,
+        32,
+        384
+      ],
+      "start": 480,
+      "values": 368640
+    },
+    {
+      "case": "test_rust_log_parser",
+      "cpu_transfer": {
+        "bits_per_value": 9.635720486111111,
+        "codec_device": "cpu",
+        "entropy_stream_bytes": 443588,
+        "framing_bytes": 426,
+        "metadata_bytes": 0,
+        "packet_bytes": 444014,
+        "resident_full_decoder_array_bytes": 51795464,
+        "validation": {
+          "bit_exact": true,
+          "gpu": false,
+          "performed": true,
+          "seconds": 5.6408396400511265
+        }
+      },
+      "name": "page_002",
+      "pool": {
+        "bit_exact": true,
+        "decode": {
+          "cuda_event_median_ms": 14.842016220092773,
+          "peak_incremental_allocated_bytes": 3997696,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 14.856224060058594,
+              "peak_allocated_bytes": 36448256,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014886824414134026
+            },
+            {
+              "cuda_event_ms": 14.842016220092773,
+              "peak_allocated_bytes": 36448256,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014890147373080254
+            },
+            {
+              "cuda_event_ms": 14.879743576049805,
+              "peak_allocated_bytes": 36448256,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.01490357331931591
+            },
+            {
+              "cuda_event_ms": 14.781536102294922,
+              "peak_allocated_bytes": 36448256,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014804167672991753
+            },
+            {
+              "cuda_event_ms": 14.769375801086426,
+              "peak_allocated_bytes": 36448256,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014791669324040413
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.014886824414134026,
+          "warmup": 1
+        },
+        "encode": {
+          "cuda_event_median_ms": 15.517536163330078,
+          "peak_incremental_allocated_bytes": 2412544,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 15.857824325561523,
+              "peak_allocated_bytes": 34850816,
+              "peak_incremental_allocated_bytes": 2412544,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.01589866913855076
+            },
+            {
+              "cuda_event_ms": 15.429759979248047,
+              "peak_allocated_bytes": 34850816,
+              "peak_incremental_allocated_bytes": 2412544,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015452483668923378
+            },
+            {
+              "cuda_event_ms": 15.517536163330078,
+              "peak_allocated_bytes": 34850816,
+              "peak_incremental_allocated_bytes": 2412544,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.01553908921778202
+            },
+            {
+              "cuda_event_ms": 15.455231666564941,
+              "peak_allocated_bytes": 34850816,
+              "peak_incremental_allocated_bytes": 2412544,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015476962551474571
+            },
+            {
+              "cuda_event_ms": 15.541248321533203,
+              "peak_allocated_bytes": 34850816,
+              "peak_incremental_allocated_bytes": 2412544,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015562014654278755
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.01553908921778202,
+          "warmup": 1
+        },
+        "fixture_offsets_equal": true,
+        "fixture_payload_equal": true,
+        "h2d": {
+          "bit_exact": true,
+          "complete_pool_wire": {
+            "copied_bytes": 535333,
+            "cuda_event_median_ms": 0.027295999228954315,
+            "effective_GB_per_second": 13.798958898295371,
+            "peak_incremental_allocated_bytes": 0,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 0.02755199931561947,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.101358354091644e-05
+              },
+              {
+                "cuda_event_ms": 0.027008000761270523,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.879517316818237e-05
+              },
+              {
+                "cuda_event_ms": 0.02876799926161766,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.281289875507355e-05
+              },
+              {
+                "cuda_event_ms": 0.027295999228954315,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.862008452415466e-05
+              },
+              {
+                "cuda_event_ms": 0.02703999914228916,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.795512020587921e-05
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 3.879517316818237e-05,
+            "warmup": 1
+          },
+          "complete_pool_wire_then_unpack": {
+            "cuda_event_median_ms": 14.853119850158691,
+            "peak_incremental_allocated_bytes": 3997696,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 15.05072021484375,
+                "peak_allocated_bytes": 37721088,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.015086447820067406
+              },
+              {
+                "cuda_event_ms": 14.917695999145508,
+                "peak_allocated_bytes": 37721088,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014939980581402779
+              },
+              {
+                "cuda_event_ms": 14.826496124267578,
+                "peak_allocated_bytes": 37721088,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.01484929770231247
+              },
+              {
+                "cuda_event_ms": 14.845696449279785,
+                "peak_allocated_bytes": 37721088,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014867570251226425
+              },
+              {
+                "cuda_event_ms": 14.853119850158691,
+                "peak_allocated_bytes": 37721088,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.01487705297768116
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 0.01487705297768116,
+            "warmup": 1
+          },
+          "cpu_pinned_and_destination_preparation_seconds": 0.00018709339201450348,
+          "host_descriptor_parsed_before_copy": true,
+          "measured": true,
+          "pinned_sources": true,
+          "raw_bf16": {
+            "copied_bytes": 737280,
+            "cuda_event_median_ms": 0.03577600046992302,
+            "effective_GB_per_second": 15.378382454615952,
+            "peak_incremental_allocated_bytes": 0,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 0.03766399994492531,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 6.084330379962921e-05
+              },
+              {
+                "cuda_event_ms": 0.03596799820661545,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.971213638782501e-05
+              },
+              {
+                "cuda_event_ms": 0.03577600046992302,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.79426234960556e-05
+              },
+              {
+                "cuda_event_ms": 0.03532800078392029,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.6664848923683167e-05
+              },
+              {
+                "cuda_event_ms": 0.035360001027584076,
+                "peak_allocated_bytes": 33723392,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.624761641025543e-05
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 4.79426234960556e-05,
+            "warmup": 1
+          },
+          "same_preallocated_copy_conditions": true,
+          "shared_pool_state_already_resident": true,
+          "wire_to_raw_byte_ratio": 0.7260918511284722
+        },
+        "host_wire_serialization_seconds_including_D2H": 0.00023027509450912476,
+        "original_payload_and_offsets_equal": true,
+        "stats": {
+          "block_index_bytes": 488,
+          "blocks": 60,
+          "device": "cuda:0",
+          "escape_count": 33185,
+          "escape_counts": [
+            344,
+            288,
+            415,
+            348,
+            494,
+            351,
+            892,
+            315,
+            875,
+            290,
+            906,
+            388,
+            851,
+            324,
+            800,
+            312,
+            825,
+            364,
+            840,
+            336,
+            664,
+            331,
+            512,
+            374,
+            670,
+            333,
+            653,
+            376,
+            896,
+            474,
+            768,
+            409,
+            732,
+            434,
+            881,
+            451,
+            784,
+            414,
+            719,
+            422,
+            806,
+            488,
+            706,
+            401,
+            759,
+            402,
+            768,
+            366,
+            704,
+            411,
+            723,
+            342,
+            780,
+            401,
+            705,
+            353,
+            695,
+            376,
+            733,
+            411
+          ],
+          "escape_header_bytes": 120,
+          "format": "team_pool_original_v1",
+          "geometry_metadata": "shape/tile/format supplied out of band; not serialized in payload",
+          "gpu_attention_kernel": false,
+          "host_synchronization": "one allocation-size item per batch; validation/stats also synchronize",
+          "indexed_bits_per_value": 11.613823784722221,
+          "payload_bits_per_value": 11.603233506944445,
+          "payload_bytes": 534677,
+          "physical_packet_tensor_bytes": 535165,
+          "physical_state_tensor_bytes": 23040,
+          "raw_bf16_bytes": 737280,
+          "shape": [
+            30,
+            32,
+            384
+          ],
+          "state_width_sums_host_integers": 30,
+          "tile_tokens": 16
+        },
+        "wire": {
+          "format": "team_pool_original_v1",
+          "header_bytes": 168,
+          "index_bytes": 488,
+          "offset_dtype": "little-endian int64",
+          "offsets_count": 61,
+          "payload_bytes": 534677,
+          "payload_start": 656,
+          "shape": [
+            30,
+            32,
+            384
+          ],
+          "tile_tokens": 16,
+          "wire_bits_per_value": 11.617469618055555,
+          "wire_bytes": 535333
+        }
+      },
+      "predictor": {
+        "cpu_oracle_seconds": 0.6235173232853413,
+        "exact_mu": true,
+        "scope": "feature/mean replay with known KV; no probability model or entropy coder",
+        "timing": {
+          "cuda_event_median_ms": 173.771484375,
+          "peak_incremental_allocated_bytes": 4686336,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 173.72909545898438,
+              "peak_allocated_bytes": 37136896,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17376882582902908
+            },
+            {
+              "cuda_event_ms": 173.771484375,
+              "peak_allocated_bytes": 37136896,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.1737948227673769
+            },
+            {
+              "cuda_event_ms": 174.56105041503906,
+              "peak_allocated_bytes": 37136896,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17458335496485233
+            },
+            {
+              "cuda_event_ms": 173.21798706054688,
+              "peak_allocated_bytes": 37136896,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17324088886380196
+            },
+            {
+              "cuda_event_ms": 207.11756896972656,
+              "peak_allocated_bytes": 37136896,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.20714659243822098
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.1737948227673769,
+          "warmup": 1
+        },
+        "values_compared": 368640
+      },
+      "raw_bf16_bytes": 737280,
+      "shape": [
+        30,
+        32,
+        384
+      ],
+      "start": 0,
+      "values": 368640
+    },
+    {
+      "case": "test_rust_log_parser",
+      "cpu_transfer": {
+        "bits_per_value": 9.33576388888889,
+        "codec_device": "cpu",
+        "entropy_stream_bytes": 429764,
+        "framing_bytes": 428,
+        "metadata_bytes": 0,
+        "packet_bytes": 430192,
+        "resident_full_decoder_array_bytes": 51795464,
+        "validation": {
+          "bit_exact": true,
+          "gpu": false,
+          "performed": true,
+          "seconds": 5.527735685929656
+        }
+      },
+      "name": "page_003",
+      "pool": {
+        "bit_exact": true,
+        "decode": {
+          "cuda_event_median_ms": 14.78656005859375,
+          "peak_incremental_allocated_bytes": 3997696,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 14.792767524719238,
+              "peak_allocated_bytes": 36433920,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014821385964751244
+            },
+            {
+              "cuda_event_ms": 14.775424003601074,
+              "peak_allocated_bytes": 36433920,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014798559248447418
+            },
+            {
+              "cuda_event_ms": 14.850943565368652,
+              "peak_allocated_bytes": 36433920,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014875194057822227
+            },
+            {
+              "cuda_event_ms": 14.751551628112793,
+              "peak_allocated_bytes": 36433920,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.014773916453123093
+            },
+            {
+              "cuda_event_ms": 14.78656005859375,
+              "peak_allocated_bytes": 36433920,
+              "peak_incremental_allocated_bytes": 3997696,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.01480787992477417
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.01480787992477417,
+          "warmup": 1
+        },
+        "encode": {
+          "cuda_event_median_ms": 15.546431541442871,
+          "peak_incremental_allocated_bytes": 2396160,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 15.525888442993164,
+              "peak_allocated_bytes": 34846720,
+              "peak_incremental_allocated_bytes": 2396160,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015564659610390663
+            },
+            {
+              "cuda_event_ms": 15.619071960449219,
+              "peak_allocated_bytes": 34846720,
+              "peak_incremental_allocated_bytes": 2396160,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015640972182154655
+            },
+            {
+              "cuda_event_ms": 15.499296188354492,
+              "peak_allocated_bytes": 34846720,
+              "peak_incremental_allocated_bytes": 2396160,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.01552189327776432
+            },
+            {
+              "cuda_event_ms": 15.599616050720215,
+              "peak_allocated_bytes": 34846720,
+              "peak_incremental_allocated_bytes": 2396160,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015621593222022057
+            },
+            {
+              "cuda_event_ms": 15.546431541442871,
+              "peak_allocated_bytes": 34846720,
+              "peak_incremental_allocated_bytes": 2396160,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.015568461269140244
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.015568461269140244,
+          "warmup": 1
+        },
+        "fixture_offsets_equal": true,
+        "fixture_payload_equal": true,
+        "h2d": {
+          "bit_exact": true,
+          "complete_pool_wire": {
+            "copied_bytes": 521118,
+            "cuda_event_median_ms": 0.02691200003027916,
+            "effective_GB_per_second": 13.421592512334662,
+            "peak_incremental_allocated_bytes": 0,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 0.027103999629616737,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.2436644434928894e-05
+              },
+              {
+                "cuda_event_ms": 0.02691200003027916,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.88268381357193e-05
+              },
+              {
+                "cuda_event_ms": 0.02751999907195568,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.08124178647995e-05
+              },
+              {
+                "cuda_event_ms": 0.026688000187277794,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.83816659450531e-05
+              },
+              {
+                "cuda_event_ms": 0.026335999369621277,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 3.746338188648224e-05
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 3.88268381357193e-05,
+            "warmup": 1
+          },
+          "complete_pool_wire_then_unpack": {
+            "cuda_event_median_ms": 14.836735725402832,
+            "peak_incremental_allocated_bytes": 3997696,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 14.851072311401367,
+                "peak_allocated_bytes": 37692416,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014881094917654991
+              },
+              {
+                "cuda_event_ms": 14.836735725402832,
+                "peak_allocated_bytes": 37692416,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014859184622764587
+              },
+              {
+                "cuda_event_ms": 14.899104118347168,
+                "peak_allocated_bytes": 37692416,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.01492278091609478
+              },
+              {
+                "cuda_event_ms": 14.815232276916504,
+                "peak_allocated_bytes": 37692416,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014838263392448425
+              },
+              {
+                "cuda_event_ms": 14.78656005859375,
+                "peak_allocated_bytes": 37692416,
+                "peak_incremental_allocated_bytes": 3997696,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 0.014810403808951378
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 0.014859184622764587,
+            "warmup": 1
+          },
+          "cpu_pinned_and_destination_preparation_seconds": 0.000208364799618721,
+          "host_descriptor_parsed_before_copy": true,
+          "measured": true,
+          "pinned_sources": true,
+          "raw_bf16": {
+            "copied_bytes": 737280,
+            "cuda_event_median_ms": 0.035711999982595444,
+            "effective_GB_per_second": 15.428734593621517,
+            "peak_incremental_allocated_bytes": 0,
+            "repeats": 5,
+            "samples": [
+              {
+                "cuda_event_ms": 0.03763199970126152,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 6.06440007686615e-05
+              },
+              {
+                "cuda_event_ms": 0.03619199991226196,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.9915164709091187e-05
+              },
+              {
+                "cuda_event_ms": 0.035711999982595444,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.77861613035202e-05
+              },
+              {
+                "cuda_event_ms": 0.03551999852061272,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.7223642468452454e-05
+              },
+              {
+                "cuda_event_ms": 0.03513599932193756,
+                "peak_allocated_bytes": 33694720,
+                "peak_incremental_allocated_bytes": 0,
+                "peak_reserved_bytes": 56623104,
+                "synchronized_wall_seconds": 4.657730460166931e-05
+              }
+            ],
+            "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+            "wall_median_seconds": 4.77861613035202e-05,
+            "warmup": 1
+          },
+          "same_preallocated_copy_conditions": true,
+          "shared_pool_state_already_resident": true,
+          "wire_to_raw_byte_ratio": 0.7068115234375
+        },
+        "host_wire_serialization_seconds_including_D2H": 0.00022815726697444916,
+        "original_payload_and_offsets_equal": true,
+        "stats": {
+          "block_index_bytes": 488,
+          "blocks": 60,
+          "device": "cuda:0",
+          "escape_count": 18970,
+          "escape_counts": [
+            303,
+            309,
+            299,
+            297,
+            290,
+            312,
+            279,
+            282,
+            330,
+            328,
+            329,
+            282,
+            311,
+            328,
+            276,
+            270,
+            317,
+            335,
+            293,
+            342,
+            275,
+            323,
+            348,
+            331,
+            350,
+            303,
+            404,
+            322,
+            341,
+            347,
+            321,
+            310,
+            318,
+            324,
+            269,
+            342,
+            349,
+            336,
+            291,
+            277,
+            341,
+            336,
+            394,
+            348,
+            308,
+            313,
+            281,
+            274,
+            298,
+            301,
+            332,
+            299,
+            309,
+            281,
+            345,
+            298,
+            297,
+            319,
+            372,
+            331
+          ],
+          "escape_header_bytes": 120,
+          "format": "team_pool_original_v1",
+          "geometry_metadata": "shape/tile/format supplied out of band; not serialized in payload",
+          "gpu_attention_kernel": false,
+          "host_synchronization": "one allocation-size item per batch; validation/stats also synchronize",
+          "indexed_bits_per_value": 11.305338541666666,
+          "payload_bits_per_value": 11.29474826388889,
+          "payload_bytes": 520462,
+          "physical_packet_tensor_bytes": 520950,
+          "physical_state_tensor_bytes": 23040,
+          "raw_bf16_bytes": 737280,
+          "shape": [
+            30,
+            32,
+            384
+          ],
+          "state_width_sums_host_integers": 30,
+          "tile_tokens": 16
+        },
+        "wire": {
+          "format": "team_pool_original_v1",
+          "header_bytes": 168,
+          "index_bytes": 488,
+          "offset_dtype": "little-endian int64",
+          "offsets_count": 61,
+          "payload_bytes": 520462,
+          "payload_start": 656,
+          "shape": [
+            30,
+            32,
+            384
+          ],
+          "tile_tokens": 16,
+          "wire_bits_per_value": 11.308984375,
+          "wire_bytes": 521118
+        }
+      },
+      "predictor": {
+        "cpu_oracle_seconds": 0.6207658965140581,
+        "exact_mu": true,
+        "scope": "feature/mean replay with known KV; no probability model or entropy coder",
+        "timing": {
+          "cuda_event_median_ms": 174.2530517578125,
+          "peak_incremental_allocated_bytes": 4686336,
+          "repeats": 5,
+          "samples": [
+            {
+              "cuda_event_ms": 174.67494201660156,
+              "peak_allocated_bytes": 37122560,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.1747264713048935
+            },
+            {
+              "cuda_event_ms": 174.28172302246094,
+              "peak_allocated_bytes": 37122560,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17430564388632774
+            },
+            {
+              "cuda_event_ms": 174.0521240234375,
+              "peak_allocated_bytes": 37122560,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17407469637691975
+            },
+            {
+              "cuda_event_ms": 174.2530517578125,
+              "peak_allocated_bytes": 37122560,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17427662014961243
+            },
+            {
+              "cuda_event_ms": 173.44076538085938,
+              "peak_allocated_bytes": 37122560,
+              "peak_incremental_allocated_bytes": 4686336,
+              "peak_reserved_bytes": 56623104,
+              "synchronized_wall_seconds": 0.17346397042274475
+            }
+          ],
+          "scope": "high-level tensor call with enabled validation and resident inputs/state; CUDA events measure stream interval including launch gaps, synchronized wall includes host orchestration",
+          "wall_median_seconds": 0.17427662014961243,
+          "warmup": 1
+        },
+        "values_compared": 368640
+      },
+      "raw_bf16_bytes": 737280,
+      "shape": [
+        30,
+        32,
+        384
+      ],
+      "start": 480,
+      "values": 368640
+    }
+  ],
+  "sources": [
+    {
+      "path": "scripts/bench_transfer_gpu.py",
+      "sha256": "993d4b32447504662f61cc62764e3082ccc6b0b761c618fb11438600178b15e6"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_pool_gpu.py",
+      "sha256": "e5d70977aedddf6f2e553747cff8995c6d156d27d5947666b5b2923368c0c761"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_gpu_predictor.py",
+      "sha256": "76e663ec7cf64679f2e45e50ad460f14379356cc523a28ddb6883074b2d2beaa"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_reference.py",
+      "sha256": "c2e67b275af2df776fa020402063b874164ae6d3edc8a1dcd5efd65af37070c3"
+    },
+    {
+      "path": "experiments/team_transfer_original/combined.py",
+      "sha256": "b44a63d32c1d3144436a01205701a26478fed7a63c8bf27777932a3436354cf3"
+    }
+  ],
+  "status": "completed"
+}
