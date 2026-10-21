@@ -1,0 +1,889 @@
+{
+  "all_model_cases_have_exact_full_capacity_roundtrip": true,
+  "arguments": {
+    "arena_ratios": [
+      0.8,
+      1.0
+    ],
+    "captures_from": null,
+    "compare_p0": false,
+    "cpu_oracle": true,
+    "device": "cuda:0",
+    "fixture": null,
+    "output": "runs/pool_p1_oracle_publication_20261021",
+    "page_starts": [
+      0,
+      512,
+      1024,
+      -1
+    ],
+    "page_tokens": 32,
+    "repeats": 20,
+    "tile_counts": [
+      1,
+      8,
+      32
+    ],
+    "tile_tokens": 16,
+    "warmup": 3
+  },
+  "coverage": {
+    "compressed_attention": false,
+    "cpu_oracle": true,
+    "gpu_T_to_P": false,
+    "gpu_head_tile_unpack": false,
+    "gpu_measured": false,
+    "gpu_pool_pack": false,
+    "gpu_transfer_entropy": false,
+    "serving_capacity": false
+  },
+  "device": {
+    "gpu": false,
+    "selected": "cpu_oracle"
+  },
+  "format": "pool_p1_measurement_v1",
+  "input_identity": {
+    "kind": "frozen_fixture",
+    "manifest_sha256": "6b4c2d95d823265388d4cda484023f94847ba25cd023de5814e80f7797bc0254",
+    "path": "/workspace/scratch/cf461553fac4/kv_pool_p1/benchmark_fixtures/team_transfer_smol_replay_v1",
+    "required_files_verified": [
+      "page_000_words.npy",
+      "page_001_words.npy",
+      "page_002_words.npy",
+      "page_003_words.npy",
+      "pool_state.npz"
+    ],
+    "scope": "Same source words as historical P0 replay; verifies required words and pool calibration only, not unused T packets/predictor state; not fresh Qwen or serving execution"
+  },
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "rows": [
+    {
+      "arenas": [
+        {
+          "arena_ratio_of_padded_raw": 0.8,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 13.05,
+            "allocated_packet_bytes": 601344,
+            "allocated_packet_plus_calibration_bytes": 624384,
+            "arena_capacity_bytes": 589824,
+            "calibration_device_bytes": 23040,
+            "descriptor_bytes": 11520,
+            "encode_scan_workspace_bytes": 2880,
+            "fit": true,
+            "packed_sectors": 360,
+            "padded_raw_bytes": 737280,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 737280,
+            "raw_sectors": 0,
+            "required_payload_bpv": 11.716666666666667,
+            "required_payload_bytes": 539904,
+            "required_payload_plus_directory_bytes": 551424,
+            "stored_escape_bytes": 35464,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        },
+        {
+          "arena_ratio_of_padded_raw": 1.0,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 16.25,
+            "allocated_packet_bytes": 748800,
+            "allocated_packet_plus_calibration_bytes": 771840,
+            "arena_capacity_bytes": 737280,
+            "calibration_device_bytes": 23040,
+            "descriptor_bytes": 11520,
+            "encode_scan_workspace_bytes": 2880,
+            "fit": true,
+            "packed_sectors": 360,
+            "padded_raw_bytes": 737280,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 737280,
+            "raw_sectors": 0,
+            "required_payload_bpv": 11.716666666666667,
+            "required_payload_bytes": 539904,
+            "required_payload_plus_directory_bytes": 551424,
+            "stored_escape_bytes": 35464,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        }
+      ],
+      "calibration_sha256": "80b6a5fca5624682448ed23deab54272579ff876d65f389448ba2a589167c8e6",
+      "cpu_oracle_seconds": 0.8711110809999809,
+      "gpu_measured": false,
+      "layout": {
+        "alignment": 16,
+        "dense_bit_order": "lsb-first uint32 little endian",
+        "descriptor_fields": [
+          "offset",
+          "allocated_bytes",
+          "mode_raw0_packed1_invalid_minus1",
+          "stored_escape_count"
+        ],
+        "format": "kv_pool_head_sectors_v1",
+        "head_dim": 64,
+        "heads": 3,
+        "layers": 30,
+        "padded_tail_words": 0,
+        "sector_order": "layer,page,K_then_V_head",
+        "tile_tokens": 16,
+        "tokens": 32
+      },
+      "name": "page_000",
+      "original_words": 368640,
+      "provenance": {
+        "fixture_manifest_sha256": "6b4c2d95d823265388d4cda484023f94847ba25cd023de5814e80f7797bc0254",
+        "key_order": "HF split halves converted to adjacent pairs; values unchanged",
+        "model_identity": {
+          "capture_device": "cpu",
+          "codec_device": "cpu",
+          "config_sha256": "1d556eab73b69c7f11f64c557a2f9c6f440bd4c6b89bb2584a6b498c92603843",
+          "local_weights": [
+            {
+              "bytes": 269060552,
+              "name": "model.safetensors",
+              "sha256": "80521b40281d6ce74e35c9282c22539e75aa0ac8578892b2a59955ef78d55da1"
+            }
+          ],
+          "model": "../.smoke_model",
+          "revision": null,
+          "torch": "2.14.1+cpu",
+          "transformers": "4.57.6"
+        },
+        "original_words_sha256": "c610d18c65e2d7bd849cad05b29ce600454d45bacad7f53d3b5e11d288c1e638",
+        "source": "frozen SmolLM component fixture",
+        "token_start": 0,
+        "word_file_sha256": "ec83475cb9f6ac04bc35891d7c78e713d27d320f02309a2adc67cfe826547b06"
+      },
+      "required_payload_bytes": 539904,
+      "software_case": false
+    },
+    {
+      "arenas": [
+        {
+          "arena_ratio_of_padded_raw": 0.8,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 13.05,
+            "allocated_packet_bytes": 601344,
+            "allocated_packet_plus_calibration_bytes": 624384,
+            "arena_capacity_bytes": 589824,
+            "calibration_device_bytes": 23040,
+            "descriptor_bytes": 11520,
+            "encode_scan_workspace_bytes": 2880,
+            "fit": true,
+            "packed_sectors": 360,
+            "padded_raw_bytes": 737280,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 737280,
+            "raw_sectors": 0,
+            "required_payload_bpv": 11.397569444444445,
+            "required_payload_bytes": 525200,
+            "required_payload_plus_directory_bytes": 536720,
+            "stored_escape_bytes": 20975,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        },
+        {
+          "arena_ratio_of_padded_raw": 1.0,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 16.25,
+            "allocated_packet_bytes": 748800,
+            "allocated_packet_plus_calibration_bytes": 771840,
+            "arena_capacity_bytes": 737280,
+            "calibration_device_bytes": 23040,
+            "descriptor_bytes": 11520,
+            "encode_scan_workspace_bytes": 2880,
+            "fit": true,
+            "packed_sectors": 360,
+            "padded_raw_bytes": 737280,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 737280,
+            "raw_sectors": 0,
+            "required_payload_bpv": 11.397569444444445,
+            "required_payload_bytes": 525200,
+            "required_payload_plus_directory_bytes": 536720,
+            "stored_escape_bytes": 20975,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        }
+      ],
+      "calibration_sha256": "80b6a5fca5624682448ed23deab54272579ff876d65f389448ba2a589167c8e6",
+      "cpu_oracle_seconds": 0.8851422900006582,
+      "gpu_measured": false,
+      "layout": {
+        "alignment": 16,
+        "dense_bit_order": "lsb-first uint32 little endian",
+        "descriptor_fields": [
+          "offset",
+          "allocated_bytes",
+          "mode_raw0_packed1_invalid_minus1",
+          "stored_escape_count"
+        ],
+        "format": "kv_pool_head_sectors_v1",
+        "head_dim": 64,
+        "heads": 3,
+        "layers": 30,
+        "padded_tail_words": 0,
+        "sector_order": "layer,page,K_then_V_head",
+        "tile_tokens": 16,
+        "tokens": 32
+      },
+      "name": "page_001",
+      "original_words": 368640,
+      "provenance": {
+        "fixture_manifest_sha256": "6b4c2d95d823265388d4cda484023f94847ba25cd023de5814e80f7797bc0254",
+        "key_order": "HF split halves converted to adjacent pairs; values unchanged",
+        "model_identity": {
+          "capture_device": "cpu",
+          "codec_device": "cpu",
+          "config_sha256": "1d556eab73b69c7f11f64c557a2f9c6f440bd4c6b89bb2584a6b498c92603843",
+          "local_weights": [
+            {
+              "bytes": 269060552,
+              "name": "model.safetensors",
+              "sha256": "80521b40281d6ce74e35c9282c22539e75aa0ac8578892b2a59955ef78d55da1"
+            }
+          ],
+          "model": "../.smoke_model",
+          "revision": null,
+          "torch": "2.14.1+cpu",
+          "transformers": "4.57.6"
+        },
+        "original_words_sha256": "fd9c6e0c771e395a748404b6153fb3bba45cc20de7581ec82d22c1905bb11d07",
+        "source": "frozen SmolLM component fixture",
+        "token_start": 480,
+        "word_file_sha256": "f4d297de7755d237871af759b3a874b95b556d5629e41ce41d0e2131f0a2e47f"
+      },
+      "required_payload_bytes": 525200,
+      "software_case": false
+    },
+    {
+      "arenas": [
+        {
+          "arena_ratio_of_padded_raw": 0.8,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 13.05,
+            "allocated_packet_bytes": 601344,
+            "allocated_packet_plus_calibration_bytes": 624384,
+            "arena_capacity_bytes": 589824,
+            "calibration_device_bytes": 23040,
+            "descriptor_bytes": 11520,
+            "encode_scan_workspace_bytes": 2880,
+            "fit": true,
+            "packed_sectors": 360,
+            "padded_raw_bytes": 737280,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 737280,
+            "raw_sectors": 0,
+            "required_payload_bpv": 11.665277777777778,
+            "required_payload_bytes": 537536,
+            "required_payload_plus_directory_bytes": 549056,
+            "stored_escape_bytes": 33185,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        },
+        {
+          "arena_ratio_of_padded_raw": 1.0,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 16.25,
+            "allocated_packet_bytes": 748800,
+            "allocated_packet_plus_calibration_bytes": 771840,
+            "arena_capacity_bytes": 737280,
+            "calibration_device_bytes": 23040,
+            "descriptor_bytes": 11520,
+            "encode_scan_workspace_bytes": 2880,
+            "fit": true,
+            "packed_sectors": 360,
+            "padded_raw_bytes": 737280,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 737280,
+            "raw_sectors": 0,
+            "required_payload_bpv": 11.665277777777778,
+            "required_payload_bytes": 537536,
+            "required_payload_plus_directory_bytes": 549056,
+            "stored_escape_bytes": 33185,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        }
+      ],
+      "calibration_sha256": "80b6a5fca5624682448ed23deab54272579ff876d65f389448ba2a589167c8e6",
+      "cpu_oracle_seconds": 0.8972309350010619,
+      "gpu_measured": false,
+      "layout": {
+        "alignment": 16,
+        "dense_bit_order": "lsb-first uint32 little endian",
+        "descriptor_fields": [
+          "offset",
+          "allocated_bytes",
+          "mode_raw0_packed1_invalid_minus1",
+          "stored_escape_count"
+        ],
+        "format": "kv_pool_head_sectors_v1",
+        "head_dim": 64,
+        "heads": 3,
+        "layers": 30,
+        "padded_tail_words": 0,
+        "sector_order": "layer,page,K_then_V_head",
+        "tile_tokens": 16,
+        "tokens": 32
+      },
+      "name": "page_002",
+      "original_words": 368640,
+      "provenance": {
+        "fixture_manifest_sha256": "6b4c2d95d823265388d4cda484023f94847ba25cd023de5814e80f7797bc0254",
+        "key_order": "HF split halves converted to adjacent pairs; values unchanged",
+        "model_identity": {
+          "capture_device": "cpu",
+          "codec_device": "cpu",
+          "config_sha256": "1d556eab73b69c7f11f64c557a2f9c6f440bd4c6b89bb2584a6b498c92603843",
+          "local_weights": [
+            {
+              "bytes": 269060552,
+              "name": "model.safetensors",
+              "sha256": "80521b40281d6ce74e35c9282c22539e75aa0ac8578892b2a59955ef78d55da1"
+            }
+          ],
+          "model": "../.smoke_model",
+          "revision": null,
+          "torch": "2.14.1+cpu",
+          "transformers": "4.57.6"
+        },
+        "original_words_sha256": "6fa30efa177cc230ab29fe8384a11f5a3fb258a70b7f786f8e7c9f7cf7143bda",
+        "source": "frozen SmolLM component fixture",
+        "token_start": 0,
+        "word_file_sha256": "9875af891604ed7feff13593adee1f6afff549f6eb5a50151c9ad5688a8a7cd2"
+      },
+      "required_payload_bytes": 537536,
+      "software_case": false
+    },
+    {
+      "arenas": [
+        {
+          "arena_ratio_of_padded_raw": 0.8,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 13.05,
+            "allocated_packet_bytes": 601344,
+            "allocated_packet_plus_calibration_bytes": 624384,
+            "arena_capacity_bytes": 589824,
+            "calibration_device_bytes": 23040,
+            "descriptor_bytes": 11520,
+            "encode_scan_workspace_bytes": 2880,
+            "fit": true,
+            "packed_sectors": 360,
+            "padded_raw_bytes": 737280,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 737280,
+            "raw_sectors": 0,
+            "required_payload_bpv": 11.360763888888888,
+            "required_payload_bytes": 523504,
+            "required_payload_plus_directory_bytes": 535024,
+            "stored_escape_bytes": 18970,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        },
+        {
+          "arena_ratio_of_padded_raw": 1.0,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 16.25,
+            "allocated_packet_bytes": 748800,
+            "allocated_packet_plus_calibration_bytes": 771840,
+            "arena_capacity_bytes": 737280,
+            "calibration_device_bytes": 23040,
+            "descriptor_bytes": 11520,
+            "encode_scan_workspace_bytes": 2880,
+            "fit": true,
+            "packed_sectors": 360,
+            "padded_raw_bytes": 737280,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 737280,
+            "raw_sectors": 0,
+            "required_payload_bpv": 11.360763888888888,
+            "required_payload_bytes": 523504,
+            "required_payload_plus_directory_bytes": 535024,
+            "stored_escape_bytes": 18970,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        }
+      ],
+      "calibration_sha256": "80b6a5fca5624682448ed23deab54272579ff876d65f389448ba2a589167c8e6",
+      "cpu_oracle_seconds": 0.839590176999991,
+      "gpu_measured": false,
+      "layout": {
+        "alignment": 16,
+        "dense_bit_order": "lsb-first uint32 little endian",
+        "descriptor_fields": [
+          "offset",
+          "allocated_bytes",
+          "mode_raw0_packed1_invalid_minus1",
+          "stored_escape_count"
+        ],
+        "format": "kv_pool_head_sectors_v1",
+        "head_dim": 64,
+        "heads": 3,
+        "layers": 30,
+        "padded_tail_words": 0,
+        "sector_order": "layer,page,K_then_V_head",
+        "tile_tokens": 16,
+        "tokens": 32
+      },
+      "name": "page_003",
+      "original_words": 368640,
+      "provenance": {
+        "fixture_manifest_sha256": "6b4c2d95d823265388d4cda484023f94847ba25cd023de5814e80f7797bc0254",
+        "key_order": "HF split halves converted to adjacent pairs; values unchanged",
+        "model_identity": {
+          "capture_device": "cpu",
+          "codec_device": "cpu",
+          "config_sha256": "1d556eab73b69c7f11f64c557a2f9c6f440bd4c6b89bb2584a6b498c92603843",
+          "local_weights": [
+            {
+              "bytes": 269060552,
+              "name": "model.safetensors",
+              "sha256": "80521b40281d6ce74e35c9282c22539e75aa0ac8578892b2a59955ef78d55da1"
+            }
+          ],
+          "model": "../.smoke_model",
+          "revision": null,
+          "torch": "2.14.1+cpu",
+          "transformers": "4.57.6"
+        },
+        "original_words_sha256": "d2f17100fc6f2648747071ef1d4e2e41c60720134075442bbdde44d9fbe9840c",
+        "source": "frozen SmolLM component fixture",
+        "token_start": 480,
+        "word_file_sha256": "6d4ae06180918222b08e427fb941645cf2a5547f8d5f362dccb5ae07e67f8a3d"
+      },
+      "required_payload_bytes": 523504,
+      "software_case": false
+    },
+    {
+      "arenas": [
+        {
+          "arena_ratio_of_padded_raw": 0.8,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 17.68421052631579,
+            "allocated_packet_bytes": 2688,
+            "allocated_packet_plus_calibration_bytes": 2816,
+            "arena_capacity_bytes": 2048,
+            "calibration_device_bytes": 128,
+            "descriptor_bytes": 640,
+            "encode_scan_workspace_bytes": 160,
+            "fit": true,
+            "packed_sectors": 20,
+            "padded_raw_bytes": 2560,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 2432,
+            "raw_sectors": 0,
+            "required_payload_bpv": 10.526315789473685,
+            "required_payload_bytes": 1600,
+            "required_payload_plus_directory_bytes": 2240,
+            "stored_escape_bytes": 0,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        },
+        {
+          "arena_ratio_of_padded_raw": 1.0,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 21.05263157894737,
+            "allocated_packet_bytes": 3200,
+            "allocated_packet_plus_calibration_bytes": 3328,
+            "arena_capacity_bytes": 2560,
+            "calibration_device_bytes": 128,
+            "descriptor_bytes": 640,
+            "encode_scan_workspace_bytes": 160,
+            "fit": true,
+            "packed_sectors": 20,
+            "padded_raw_bytes": 2560,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 2432,
+            "raw_sectors": 0,
+            "required_payload_bpv": 10.526315789473685,
+            "required_payload_bytes": 1600,
+            "required_payload_plus_directory_bytes": 2240,
+            "stored_escape_bytes": 0,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        }
+      ],
+      "calibration_sha256": "83c5259719ae0731d957867c498d6f476ced32677e4d4895ab53c839a6bcfcfd",
+      "cpu_oracle_seconds": 0.004364729998997063,
+      "gpu_measured": false,
+      "layout": {
+        "alignment": 16,
+        "dense_bit_order": "lsb-first uint32 little endian",
+        "descriptor_fields": [
+          "offset",
+          "allocated_bytes",
+          "mode_raw0_packed1_invalid_minus1",
+          "stored_escape_count"
+        ],
+        "format": "kv_pool_head_sectors_v1",
+        "head_dim": 16,
+        "heads": 2,
+        "layers": 1,
+        "padded_tail_words": 0,
+        "sector_order": "layer,page,K_then_V_head",
+        "tile_tokens": 4,
+        "tokens": 19
+      },
+      "name": "no_escapes_tail",
+      "original_words": 1216,
+      "provenance": {
+        "scope": "synthetic software case, not model rate"
+      },
+      "required_payload_bytes": 1600,
+      "software_case": true
+    },
+    {
+      "arenas": [
+        {
+          "arena_ratio_of_padded_raw": 0.8,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": false,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 16.8125,
+            "allocated_packet_bytes": 4304,
+            "allocated_packet_plus_calibration_bytes": 4432,
+            "arena_capacity_bytes": 3280,
+            "calibration_device_bytes": 128,
+            "descriptor_bytes": 1024,
+            "encode_scan_workspace_bytes": 256,
+            "fit": false,
+            "packed_sectors": 0,
+            "padded_raw_bytes": 4096,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 4096,
+            "raw_sectors": 25,
+            "required_payload_bpv": 16.0,
+            "required_payload_bytes": 4096,
+            "required_payload_plus_directory_bytes": 5120,
+            "stored_escape_bytes": 0,
+            "unpublished_sectors": 7
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        },
+        {
+          "arena_ratio_of_padded_raw": 1.0,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 20.0,
+            "allocated_packet_bytes": 5120,
+            "allocated_packet_plus_calibration_bytes": 5248,
+            "arena_capacity_bytes": 4096,
+            "calibration_device_bytes": 128,
+            "descriptor_bytes": 1024,
+            "encode_scan_workspace_bytes": 256,
+            "fit": true,
+            "packed_sectors": 0,
+            "padded_raw_bytes": 4096,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 4096,
+            "raw_sectors": 32,
+            "required_payload_bpv": 16.0,
+            "required_payload_bytes": 4096,
+            "required_payload_plus_directory_bytes": 5120,
+            "stored_escape_bytes": 0,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        }
+      ],
+      "calibration_sha256": "01e62edc40deacdadf08ecf7d29eb0b2277d6d593d3086cdb85489772090ecfd",
+      "cpu_oracle_seconds": 0.001991082999666105,
+      "gpu_measured": false,
+      "layout": {
+        "alignment": 16,
+        "dense_bit_order": "lsb-first uint32 little endian",
+        "descriptor_fields": [
+          "offset",
+          "allocated_bytes",
+          "mode_raw0_packed1_invalid_minus1",
+          "stored_escape_count"
+        ],
+        "format": "kv_pool_head_sectors_v1",
+        "head_dim": 16,
+        "heads": 2,
+        "layers": 1,
+        "padded_tail_words": 0,
+        "sector_order": "layer,page,K_then_V_head",
+        "tile_tokens": 4,
+        "tokens": 32
+      },
+      "name": "raw_escape_stress",
+      "original_words": 2048,
+      "provenance": {
+        "scope": "synthetic software case, not model rate"
+      },
+      "required_payload_bytes": 4096,
+      "software_case": true
+    },
+    {
+      "arenas": [
+        {
+          "arena_ratio_of_padded_raw": 0.8,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": false,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 16.80078125,
+            "allocated_packet_bytes": 275264,
+            "allocated_packet_plus_calibration_bytes": 275776,
+            "arena_capacity_bytes": 209728,
+            "calibration_device_bytes": 512,
+            "descriptor_bytes": 65536,
+            "encode_scan_workspace_bytes": 16384,
+            "fit": false,
+            "packed_sectors": 1877,
+            "padded_raw_bytes": 262144,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 262144,
+            "raw_sectors": 0,
+            "required_payload_bpv": 13.96875,
+            "required_payload_bytes": 228864,
+            "required_payload_plus_directory_bytes": 294400,
+            "stored_escape_bytes": 59808,
+            "unpublished_sectors": 171
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        },
+        {
+          "arena_ratio_of_padded_raw": 1.0,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 20.0,
+            "allocated_packet_bytes": 327680,
+            "allocated_packet_plus_calibration_bytes": 328192,
+            "arena_capacity_bytes": 262144,
+            "calibration_device_bytes": 512,
+            "descriptor_bytes": 65536,
+            "encode_scan_workspace_bytes": 16384,
+            "fit": true,
+            "packed_sectors": 2048,
+            "padded_raw_bytes": 262144,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 262144,
+            "raw_sectors": 0,
+            "required_payload_bpv": 13.96875,
+            "required_payload_bytes": 228864,
+            "required_payload_plus_directory_bytes": 294400,
+            "stored_escape_bytes": 65280,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        }
+      ],
+      "calibration_sha256": "39c1f4e5986b9a6c7d119e449fdaefef70cb76b7d494a53029d883cb6e113ccd",
+      "cpu_oracle_seconds": 0.3782301880000887,
+      "gpu_measured": false,
+      "layout": {
+        "alignment": 16,
+        "dense_bit_order": "lsb-first uint32 little endian",
+        "descriptor_fields": [
+          "offset",
+          "allocated_bytes",
+          "mode_raw0_packed1_invalid_minus1",
+          "stored_escape_count"
+        ],
+        "format": "kv_pool_head_sectors_v1",
+        "head_dim": 16,
+        "heads": 8,
+        "layers": 1,
+        "padded_tail_words": 0,
+        "sector_order": "layer,page,K_then_V_head",
+        "tile_tokens": 4,
+        "tokens": 512
+      },
+      "name": "all_bf16_patterns_packed",
+      "original_words": 131072,
+      "provenance": {
+        "scope": "all 65536 bit patterns in packed/escape sectors"
+      },
+      "required_payload_bytes": 228864,
+      "software_case": true
+    },
+    {
+      "arenas": [
+        {
+          "arena_ratio_of_padded_raw": 0.8,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": false,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 16.80078125,
+            "allocated_packet_bytes": 137632,
+            "allocated_packet_plus_calibration_bytes": 138144,
+            "arena_capacity_bytes": 104864,
+            "calibration_device_bytes": 512,
+            "descriptor_bytes": 32768,
+            "encode_scan_workspace_bytes": 8192,
+            "fit": false,
+            "packed_sectors": 0,
+            "padded_raw_bytes": 131072,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 131072,
+            "raw_sectors": 819,
+            "required_payload_bpv": 16.0,
+            "required_payload_bytes": 131072,
+            "required_payload_plus_directory_bytes": 163840,
+            "stored_escape_bytes": 0,
+            "unpublished_sectors": 205
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        },
+        {
+          "arena_ratio_of_padded_raw": 1.0,
+          "byte_oracle_equal": null,
+          "full_sector_unpack": null,
+          "kv_to_p": null,
+          "original_words_exact": true,
+          "selected_tile_reads": [],
+          "stats": {
+            "allocated_packet_bpv": 20.0,
+            "allocated_packet_bytes": 163840,
+            "allocated_packet_plus_calibration_bytes": 164352,
+            "arena_capacity_bytes": 131072,
+            "calibration_device_bytes": 512,
+            "descriptor_bytes": 32768,
+            "encode_scan_workspace_bytes": 8192,
+            "fit": true,
+            "packed_sectors": 0,
+            "padded_raw_bytes": 131072,
+            "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+            "raw_original_bytes": 131072,
+            "raw_sectors": 1024,
+            "required_payload_bpv": 16.0,
+            "required_payload_bytes": 131072,
+            "required_payload_plus_directory_bytes": 163840,
+            "stored_escape_bytes": 0,
+            "unpublished_sectors": 0
+          },
+          "validation_scope": "NumPy byte oracle only; no kernel execution"
+        }
+      ],
+      "calibration_sha256": "f05a1a58340b34169c7a191330693ed73feecb2cd54486a547bfa303b5cc16a9",
+      "cpu_oracle_seconds": 0.0518753590004053,
+      "gpu_measured": false,
+      "layout": {
+        "alignment": 16,
+        "dense_bit_order": "lsb-first uint32 little endian",
+        "descriptor_fields": [
+          "offset",
+          "allocated_bytes",
+          "mode_raw0_packed1_invalid_minus1",
+          "stored_escape_count"
+        ],
+        "format": "kv_pool_head_sectors_v1",
+        "head_dim": 16,
+        "heads": 8,
+        "layers": 1,
+        "padded_tail_words": 0,
+        "sector_order": "layer,page,K_then_V_head",
+        "tile_tokens": 4,
+        "tokens": 256
+      },
+      "name": "all_bf16_patterns_raw",
+      "original_words": 65536,
+      "provenance": {
+        "scope": "all 65536 bit patterns in raw fallback sectors"
+      },
+      "required_payload_bytes": 131072,
+      "software_case": true
+    }
+  ],
+  "sources": [
+    {
+      "path": "qwen_kv_bench/pool_p1.py",
+      "sha256": "34e7750689f80e0b9528360d8743f7afc215f1df81dbb6a04238094510cec6a1"
+    },
+    {
+      "path": "qwen_kv_bench/pool_p1_kernels.py",
+      "sha256": "ab2a9031b129c51dc96673fe4705801955fbc5ed02336fe5ec666fb827de4e3c"
+    },
+    {
+      "path": "scripts/bench_pool_p1.py",
+      "sha256": "80b560fb73a1f5b26adbde5cd75721aaaa27beded569c99f10963931fb49770c"
+    },
+    {
+      "path": "scripts/bench_team_pool_reference.py",
+      "sha256": "4ce6c3080fa479e025fb3716f796c9cf677c98dc3143d4846af9684f81ee0e08"
+    },
+    {
+      "path": "experiments/team_transfer_original/combined.py",
+      "sha256": "b44a63d32c1d3144436a01205701a26478fed7a63c8bf27777932a3436354cf3"
+    }
+  ],
+  "status": "completed",
+  "unique_model_words": 1474560
+}

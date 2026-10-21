@@ -1,0 +1,220 @@
+{
+  "cuda_request_check": {
+    "coverage": {
+      "compressed_attention": false,
+      "cpu_oracle": false,
+      "gpu_T_to_P": false,
+      "gpu_head_tile_unpack": false,
+      "gpu_measured": false,
+      "gpu_pool_pack": false,
+      "gpu_transfer_entropy": false,
+      "serving_capacity": false
+    },
+    "error": "P1 requires an available CUDA device; no CPU fallback. Use the explicit NumPy reference for CPU validation.",
+    "exit_code": 1,
+    "status": "failed"
+  },
+  "date": "2026-10-21",
+  "format": "pool_p1_local_validation_v1",
+  "frozen_model_oracle": {
+    "cpu_only": true,
+    "exact": true,
+    "mean_required_payload_bpv": 11.535069444444444,
+    "original_words": 1474560,
+    "pages": 4,
+    "qualification": "CPU byte-ledger projections; required payload excludes reservation slack, directory, calibration and workspace. Arena plus directory is 13.05 bpv; calibration adds 0.5 bpv on these isolated pages. No actual GPU allocator measurements.",
+    "rows_at_80_percent_arena": [
+      {
+        "allocated_packet_bpv": 13.05,
+        "allocated_packet_bytes": 601344,
+        "allocated_packet_plus_calibration_bytes": 624384,
+        "arena_capacity_bytes": 589824,
+        "calibration_device_bytes": 23040,
+        "descriptor_bytes": 11520,
+        "encode_scan_workspace_bytes": 2880,
+        "fit": true,
+        "original_words": 368640,
+        "packed_sectors": 360,
+        "padded_raw_bytes": 737280,
+        "page": "page_000",
+        "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+        "raw_original_bytes": 737280,
+        "raw_sectors": 0,
+        "required_payload_bpv": 11.716666666666667,
+        "required_payload_bytes": 539904,
+        "required_payload_plus_directory_bytes": 551424,
+        "stored_escape_bytes": 35464,
+        "unpublished_sectors": 0
+      },
+      {
+        "allocated_packet_bpv": 13.05,
+        "allocated_packet_bytes": 601344,
+        "allocated_packet_plus_calibration_bytes": 624384,
+        "arena_capacity_bytes": 589824,
+        "calibration_device_bytes": 23040,
+        "descriptor_bytes": 11520,
+        "encode_scan_workspace_bytes": 2880,
+        "fit": true,
+        "original_words": 368640,
+        "packed_sectors": 360,
+        "padded_raw_bytes": 737280,
+        "page": "page_001",
+        "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+        "raw_original_bytes": 737280,
+        "raw_sectors": 0,
+        "required_payload_bpv": 11.397569444444445,
+        "required_payload_bytes": 525200,
+        "required_payload_plus_directory_bytes": 536720,
+        "stored_escape_bytes": 20975,
+        "unpublished_sectors": 0
+      },
+      {
+        "allocated_packet_bpv": 13.05,
+        "allocated_packet_bytes": 601344,
+        "allocated_packet_plus_calibration_bytes": 624384,
+        "arena_capacity_bytes": 589824,
+        "calibration_device_bytes": 23040,
+        "descriptor_bytes": 11520,
+        "encode_scan_workspace_bytes": 2880,
+        "fit": true,
+        "original_words": 368640,
+        "packed_sectors": 360,
+        "padded_raw_bytes": 737280,
+        "page": "page_002",
+        "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+        "raw_original_bytes": 737280,
+        "raw_sectors": 0,
+        "required_payload_bpv": 11.665277777777778,
+        "required_payload_bytes": 537536,
+        "required_payload_plus_directory_bytes": 549056,
+        "stored_escape_bytes": 33185,
+        "unpublished_sectors": 0
+      },
+      {
+        "allocated_packet_bpv": 13.05,
+        "allocated_packet_bytes": 601344,
+        "allocated_packet_plus_calibration_bytes": 624384,
+        "arena_capacity_bytes": 589824,
+        "calibration_device_bytes": 23040,
+        "descriptor_bytes": 11520,
+        "encode_scan_workspace_bytes": 2880,
+        "fit": true,
+        "original_words": 368640,
+        "packed_sectors": 360,
+        "padded_raw_bytes": 737280,
+        "page": "page_003",
+        "qualification": "Actual arena capacity, directory and shared calibration are charged; scan workspace, original input and output tiles are separate. No serving-capacity claim.",
+        "raw_original_bytes": 737280,
+        "raw_sectors": 0,
+        "required_payload_bpv": 11.360763888888888,
+        "required_payload_bytes": 523504,
+        "required_payload_plus_directory_bytes": 535024,
+        "stored_escape_bytes": 18970,
+        "unpublished_sectors": 0
+      }
+    ],
+    "source_fixture_manifest_sha256": "6b4c2d95d823265388d4cda484023f94847ba25cd023de5814e80f7797bc0254"
+  },
+  "gpu_executed": false,
+  "gpu_timing_measured": false,
+  "offline_compilation": {
+    "compiled_kernel_variants": 12,
+    "cuda_executed": false,
+    "details": "compile_sm86.json",
+    "target": "NVIDIA SM86",
+    "triton": "3.6.0"
+  },
+  "pending": [
+    "Actual A4500 kernel execution and byte/word parity",
+    "Synchronized CUDA/wall KV-to-P and head-tile unpack timing",
+    "Actual GPU peak allocated/reserved memory",
+    "P0 paired GPU controls on same words"
+  ],
+  "scope": "Task 1 bounded P1 arena and selected head-tile unpack only; no T entropy/T-to-P/attention/serving measurements",
+  "sources": [
+    {
+      "bytes": 21923,
+      "path": "README.md",
+      "sha256": "db95208d5337172c343551a313689b15dda312623e77959517d49065cfe6577d"
+    },
+    {
+      "bytes": 1055716,
+      "path": "qwen_kv_gpu_bench.py",
+      "sha256": "316664c0aaf2918b45ee5cf5651115b03c91b3df26a5180bbe89f233a7395e2e"
+    },
+    {
+      "bytes": 16348,
+      "path": "qwen_kv_bench/pool_p1.py",
+      "sha256": "34e7750689f80e0b9528360d8743f7afc215f1df81dbb6a04238094510cec6a1"
+    },
+    {
+      "bytes": 7930,
+      "path": "qwen_kv_bench/pool_p1_kernels.py",
+      "sha256": "ab2a9031b129c51dc96673fe4705801955fbc5ed02336fe5ec666fb827de4e3c"
+    },
+    {
+      "bytes": 22091,
+      "path": "scripts/bench_pool_p1.py",
+      "sha256": "80b560fb73a1f5b26adbde5cd75721aaaa27beded569c99f10963931fb49770c"
+    },
+    {
+      "bytes": 2390,
+      "path": "scripts/check_pool_p1_kernels.py",
+      "sha256": "2755a8b192f827f692b6da6f20ea1e67f9d97e8900f0cfaf98ade534669a9300"
+    },
+    {
+      "bytes": 11012,
+      "path": "tests/test_pool_p1.py",
+      "sha256": "220bcb0751e4f727bf0199fdf3e6bfc463020fae2f20b7cd726274243c484658"
+    },
+    {
+      "bytes": 3225,
+      "path": "tests/test_pool_p1_runner.py",
+      "sha256": "cff727803f5fbff882cd843883b12f6fd1f1eeedb2047fdbf053375c6204ae3c"
+    },
+    {
+      "bytes": 10964,
+      "path": "docs/block32_probability_a4500_review.md",
+      "sha256": "34c0465814e835502371a1099861269b4d6220b86391ee33c9666f465bd79272"
+    },
+    {
+      "bytes": 24628,
+      "path": "docs/gpu_kv_transfer_pool_roadmap.md",
+      "sha256": "09719abc3cd09c80743304ead48303c7d813c071d430d531aa703d70eb6d8f43"
+    },
+    {
+      "bytes": 13248,
+      "path": "docs/gpu_kv_research_and_timing.md",
+      "sha256": "045aced6bdb10cfbe1096e5e351024638b5a11ab5afa4e5d10e66a1e178518c4"
+    },
+    {
+      "bytes": 8331,
+      "path": "docs/pool_p1_gpu.md",
+      "sha256": "75e22b583a8bfc85a3429dab2a337b29e7fbb5e7bd1a752e3d7d84d5aa663f21"
+    }
+  ],
+  "standalone": {
+    "check_passed": true,
+    "source_file": "qwen_kv_gpu_bench.py"
+  },
+  "status": "local_checks_passed_cuda_pending",
+  "tests": {
+    "command": "TRITON_INTERPRET=1 python -m unittest tests.test_pool_p1 tests.test_pool_p1_runner tests.test_transfer_pool_gpu tests.test_standalone_build -v",
+    "discovered": 34,
+    "duration_seconds": 61.644,
+    "interpreter": {
+      "backend": "Triton 3.6.0 CPU interpreter with Torch 2.14.1+cpu",
+      "cuda": false,
+      "scope": "Actual Triton source interpreted on CPU, including mixed widths, all 65536 patterns in raw/packed, invalid descriptors/capacity, Qwen head128/N2048, and actual frozen page_000",
+      "tests_passed": 6
+    },
+    "passed": 30,
+    "skipped": 4,
+    "skipped_cases": [
+      "test_actual_gpu_capacity_is_unpublished (tests.test_pool_p1.CudaTests.test_actual_gpu_capacity_is_unpublished) ... skipped 'actual CUDA hardware unavailable; no CPU fallback'",
+      "test_actual_gpu_word_and_byte_parity (tests.test_pool_p1.CudaTests.test_actual_gpu_word_and_byte_parity) ... skipped 'actual CUDA hardware unavailable; no CPU fallback'",
+      "test_actual_cuda_roundtrip_matches_original_bytes (tests.test_transfer_pool_gpu.TensorPoolTests.test_actual_cuda_roundtrip_matches_original_bytes) ... skipped 'CUDA hardware unavailable; CPU tests are not GPU measurements'",
+      "test_real_capture_pages_all_layers_match_original_bytes (tests.test_transfer_pool_gpu.TensorPoolTests.test_real_capture_pages_all_layers_match_original_bytes) ... skipped 'fresh real-model integration captures are not present'"
+    ]
+  }
+}
