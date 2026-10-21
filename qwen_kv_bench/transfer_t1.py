@@ -32,11 +32,13 @@ class Packet:
     raw:bool
     encoder_error:object=None
     encoder_workspace_capacity_bytes:int=0
+    encoder_probability_cache_bytes:int=0
 
 
 class Engine:
-    def __init__(self,base,state,device='cuda:0',*,input_chunk=64,_interpreter=False):
+    def __init__(self,base,state,device='cuda:0',*,input_chunk=64,entropy_backend='scalar',_interpreter=False):
         self.input_chunk=input_chunk
+        self.entropy_backend=entropy_backend
         t=_require_torch();d=t.device(device)
         if _interpreter:
             import os
@@ -101,6 +103,14 @@ class Engine:
     def input_chunk(self,value):
         if type(value) is not int or value<0:raise ValueError('input_chunk must be a nonnegative integer; 0 means all columns')
         self._input_chunk=value
+
+    @property
+    def entropy_backend(self):return self._entropy_backend
+
+    @entropy_backend.setter
+    def entropy_backend(self,value):
+        if value not in ('scalar','cached'):raise ValueError('entropy_backend must be scalar or cached')
+        self._entropy_backend=value
 
     def _shape(self,shape,start):
         layers,tokens,width=ref._shape(self.base,shape,start)
@@ -185,7 +195,7 @@ class Engine:
                 fixed,mu,inverse,off=self._parameters(features,None if l==0 else words[l-1],sums,last,ch,l,g,start)
                 if packet is not None:
                     k.decode_group[(tokens,)](packet.payload,packet.directory,xs,position,error,mu,inverse,self.boundaries,self.table,words,
-                        T=tokens,C=width,LAYER=l,CH=ch,GROUP=self.base.block_size,SIZE=packet.payload.numel(),num_warps=1,enable_fp_fusion=False)
+                        T=tokens,C=width,LAYER=l,CH=ch,GROUP=self.base.block_size,SIZE=packet.payload.numel(),REUSE_MASS=self.entropy_backend=='cached',num_warps=1,enable_fp_fusion=False)
                 if packet is None or trace:records.append((l,g,mu,inverse,off))
                 last=self._advance(words[l,:,ch:ch+self.base.block_size],fixed,l,g,start,features,offset,sums)
             previous=features[:,offset:]
@@ -218,9 +228,16 @@ class Engine:
         # Each binary symbol emits at most two bytes; 16 symbols per word.
         cap=32*layers*width+16
         scratch=t.empty((tokens,cap),dtype=t.uint8,device=self.device)
+        probability_cache=t.empty((tokens,self.base.block_size,16),dtype=t.uint16,device=self.device) if self.entropy_backend=='cached' else None
         for l,g,mu,inverse,off in reversed(parameters):
-            k.encode_group[(tokens,)](words,mu,inverse,self.boundaries,self.table,xs,count,scratch,error,
-                T=tokens,C=width,LAYER=l,CH=g*self.base.block_size,GROUP=self.base.block_size,CAP=cap,num_warps=1,enable_fp_fusion=False)
+            if probability_cache is not None:
+                k.prepare_frequencies[((tokens*self.base.block_size*16+255)//256,)](words,mu,inverse,self.boundaries,self.table,probability_cache,
+                    T=tokens,C=width,LAYER=l,CH=g*self.base.block_size,GROUP=self.base.block_size,BLOCK=256,num_warps=4,enable_fp_fusion=False)
+                k.encode_group_cached[(tokens,)](words,probability_cache,xs,count,scratch,error,
+                    T=tokens,C=width,LAYER=l,CH=g*self.base.block_size,GROUP=self.base.block_size,CAP=cap,num_warps=1)
+            else:
+                k.encode_group[(tokens,)](words,mu,inverse,self.boundaries,self.table,xs,count,scratch,error,
+                    T=tokens,C=width,LAYER=l,CH=g*self.base.block_size,GROUP=self.base.block_size,CAP=cap,num_warps=1,enable_fp_fusion=False)
         ends=t.cumsum(count+4,dim=0)
         # Only an allocation length crosses to the CPU. It is charged inside
         # encode timing; no KV/probability/context tensor leaves the GPU.
@@ -232,7 +249,8 @@ class Engine:
         else:
             data=t.empty(size,dtype=t.uint8,device=self.device);directory=t.empty((tokens,2),dtype=t.int64,device=self.device)
             k.compact_lanes[(tokens,)](scratch,xs,count,ends,directory,data,CAP=cap,BLOCK=256,num_warps=4)
-        return Packet(data,directory,tuple(words.shape),start,self.state_sha256,raw,error,tokens*cap)
+        return Packet(data,directory,tuple(words.shape),start,self.state_sha256,raw,error,tokens*cap,
+            0 if probability_cache is None else probability_cache.numel()*probability_cache.element_size())
 
     def decode(self,packet,*,trace=False):
         with contextlib.nullcontext() if self.interpreter else self.t.cuda.device(self.device):
@@ -258,6 +276,7 @@ class Engine:
         extra=sum(x.numel()*x.element_size() for x in [self.coefficients,self.thresholds,self.scales,self.boundaries,self.table])
         return dict(format=FORMAT,gpu=not self.interpreter,device=str(self.device),state_sha256=self.state_sha256,
             predictor_input_chunk=self.input_chunk,
+            entropy_backend=self.entropy_backend,
             persistent_device_bytes=base['persistent_tensor_bytes']+extra,base_predictor_device_bytes=base['persistent_tensor_bytes'],
             CPU_state_numeric_bytes=sum(x.nbytes for x in ref._arrays(self.base).values())+sum(x.nbytes for x in self.adapter.arrays().values()),
             feature_limit=self.feature_limit,scope='state only; encoder parameter replay, rANS lane scratch and chunk output are additional measured peaks')

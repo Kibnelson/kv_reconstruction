@@ -58,7 +58,45 @@ def check_input_chunk_equivalence(test,device,interpreter=False):
         test.assertEqual(e.state_sha256,identity)
 
 
+def check_entropy_cache_equivalence(test,device,interpreter=False):
+    from qwen_kv_bench import transfer_t1_kernels as k
+    base,state,words,_=model_and_words();e=t1.Engine(base,state,device,_interpreter=interpreter)
+    rng=np.random.default_rng(102);words=rng.integers(0,65536,(2,3,16),dtype=np.uint16)
+    words[0,0,:8]=[0,32768,0x7f80,0xff80,0x7fc1,0xffff,1,32769]
+    source=torch.from_numpy(words).to(device);records=e._walk(source,0)
+    ranks=rng.integers(0,65536,257,dtype=np.int64);probe_words=oracle.word_of(ranks)
+    probe_mu=rng.normal(size=257);probe_inverse=2.**rng.uniform(-16,16,257)
+    probe_args=[torch.from_numpy(x.copy()).to(device) for x in [probe_words,probe_mu,probe_inverse]]
+    probe=torch.empty((1,257,16),dtype=torch.uint16,device=device)
+    k.prepare_frequencies[(17,)](*probe_args,e.boundaries,e.table,probe,T=1,C=257,LAYER=0,CH=0,GROUP=257,BLOCK=256,num_warps=4,enable_fp_fusion=False)
+    for plane in range(16):
+        prefix=ranks&(65535^((1<<(plane+1))-1))
+        np.testing.assert_array_equal(probe.cpu().numpy()[0,:,plane],oracle.frequency(prefix,plane,probe_mu,probe_inverse))
+    l,g,mu,inverse,_=records[-1];cache=torch.empty((3,8,16),dtype=torch.uint16,device=device)
+    k.prepare_frequencies[(2,)](source,mu,inverse,e.boundaries,e.table,cache,T=3,C=16,LAYER=l,CH=g*8,GROUP=8,BLOCK=256,num_warps=4,enable_fp_fusion=False)
+    rank=oracle.ordered(words[l,:,g*8:g*8+8]);actual=cache.cpu().numpy()
+    for plane in range(16):
+        prefix=rank&(65535^((1<<(plane+1))-1))
+        np.testing.assert_array_equal(actual[:,:,plane],oracle.frequency(prefix,plane,mu.cpu().numpy(),inverse.cpu().numpy()))
+    original=e.encode(source,raw_fallback=False);identity=e.state_sha256
+    wire=t1.export_packet(original,{'model':'synthetic'})
+    e.entropy_backend='cached';cached=e.encode(source,raw_fallback=False)
+    test.assertEqual(cached.encoder_probability_cache_bytes,3*8*16*2)
+    test.assertEqual(t1.export_packet(cached,{'model':'synthetic'}),wire)
+    for packet in [original,cached]:
+        out,error,_=e.decode(packet)
+        np.testing.assert_array_equal(error.cpu().numpy(),0);np.testing.assert_array_equal(out.cpu().numpy(),words)
+    e.entropy_backend='scalar';out,error,_=e.decode(cached)
+    np.testing.assert_array_equal(error.cpu().numpy(),0);np.testing.assert_array_equal(out.cpu().numpy(),words)
+    test.assertEqual(e.state_sha256,identity)
+    cached.directory[1,1]=3;e.entropy_backend='cached'
+    _,error,_=e.decode(cached);test.assertNotEqual(error[1].item(),0)
+
+
 class ReferenceTests(unittest.TestCase):
+    def test_entropy_backend_is_explicit(self):
+        base,state,words,capture=model_and_words()
+        with self.assertRaises(ValueError):t1.Engine(base,state,'cpu',entropy_backend='unknown')
     def test_input_chunk_requires_nonnegative_integer(self):
         base,state,words,capture=model_and_words()
         for invalid in [-1,True,1.5,'512']:
@@ -97,6 +135,8 @@ CUDA=torch is not None and torch.cuda.is_available() and importlib.util.find_spe
 
 @unittest.skipUnless(INTERPRETER,'explicit CPU kernel interpreter only')
 class InterpreterTests(unittest.TestCase):
+    def test_cached_probabilities_bytes_and_cross_backend_decode_are_exact(self):
+        check_entropy_cache_equivalence(self,'cpu',True)
     def test_input_chunk_reductions_and_complete_packets_are_exact(self):
         check_input_chunk_equivalence(self,'cpu',True)
     def engine(self):
@@ -187,6 +227,8 @@ class InterpreterTests(unittest.TestCase):
 
 @unittest.skipUnless(CUDA,'actual CUDA hardware unavailable')
 class CudaTests(unittest.TestCase):
+    def test_cached_probabilities_bytes_and_cross_backend_decode_are_exact(self):
+        check_entropy_cache_equivalence(self,'cuda')
     def test_input_chunk_reductions_and_complete_packets_are_exact(self):
         check_input_chunk_equivalence(self,'cuda')
     def test_gpu_entropy_core_preserves_all_65536_BF16_words(self):
@@ -195,20 +237,27 @@ class CudaTests(unittest.TestCase):
         w=np.arange(65536,dtype=np.uint16).reshape(1,tokens,channels)
         source=torch.from_numpy(w).cuda();mu=torch.zeros((tokens,group),dtype=torch.float64,device='cuda');inv=torch.ones_like(mu)
         bd=torch.from_numpy(oracle.BD.copy()).cuda();ft=torch.from_numpy(oracle.F_TAB.copy()).cuda()
-        xs=torch.full((tokens,),1<<23,dtype=torch.int64,device='cuda');count=torch.zeros_like(xs);err=torch.zeros(tokens,dtype=torch.int32,device='cuda')
-        buffer=torch.empty((tokens,cap),dtype=torch.uint8,device='cuda')
-        for ch in reversed(range(0,channels,group)):
-            k.encode_group[(tokens,)](source,mu,inv,bd,ft,xs,count,buffer,err,T=tokens,C=channels,LAYER=0,CH=ch,GROUP=group,CAP=cap,num_warps=1,enable_fp_fusion=False)
-        ends=torch.cumsum(count+4,0);data=torch.empty(int(ends[-1].item()),dtype=torch.uint8,device='cuda');directory=torch.empty((tokens,2),dtype=torch.int64,device='cuda')
-        k.compact_lanes[(tokens,)](buffer,xs,count,ends,directory,data,CAP=cap,BLOCK=256,num_warps=4)
-        np.testing.assert_array_equal(err.cpu().numpy(),0)
-        position=torch.empty_like(xs)
-        k.initialize_decoder[(tokens,)](data,directory,xs,position,err,SIZE=data.numel(),num_warps=1)
-        out=torch.empty_like(source)
-        for ch in range(0,channels,group):
-            k.decode_group[(tokens,)](data,directory,xs,position,err,mu,inv,bd,ft,out,T=tokens,C=channels,LAYER=0,CH=ch,GROUP=group,SIZE=data.numel(),num_warps=1,enable_fp_fusion=False)
-        k.finish_decoder[(tokens,)](xs,position,directory,err,num_warps=1)
-        np.testing.assert_array_equal(err.cpu().numpy(),0);np.testing.assert_array_equal(out.cpu().numpy(),w)
+        reference=None
+        for cached in [False,True]:
+            xs=torch.full((tokens,),1<<23,dtype=torch.int64,device='cuda');count=torch.zeros_like(xs);err=torch.zeros(tokens,dtype=torch.int32,device='cuda')
+            buffer=torch.empty((tokens,cap),dtype=torch.uint8,device='cuda');cache=torch.empty((tokens,group,16),dtype=torch.uint16,device='cuda')
+            for ch in reversed(range(0,channels,group)):
+                if cached:
+                    k.prepare_frequencies[(64,)](source,mu,inv,bd,ft,cache,T=tokens,C=channels,LAYER=0,CH=ch,GROUP=group,BLOCK=256,num_warps=4,enable_fp_fusion=False)
+                    k.encode_group_cached[(tokens,)](source,cache,xs,count,buffer,err,T=tokens,C=channels,LAYER=0,CH=ch,GROUP=group,CAP=cap,num_warps=1)
+                else:k.encode_group[(tokens,)](source,mu,inv,bd,ft,xs,count,buffer,err,T=tokens,C=channels,LAYER=0,CH=ch,GROUP=group,CAP=cap,num_warps=1,enable_fp_fusion=False)
+            ends=torch.cumsum(count+4,0);data=torch.empty(int(ends[-1].item()),dtype=torch.uint8,device='cuda');directory=torch.empty((tokens,2),dtype=torch.int64,device='cuda')
+            k.compact_lanes[(tokens,)](buffer,xs,count,ends,directory,data,CAP=cap,BLOCK=256,num_warps=4)
+            np.testing.assert_array_equal(err.cpu().numpy(),0)
+            if reference is None:reference=(data.cpu().numpy().copy(),directory.cpu().numpy().copy())
+            else:
+                np.testing.assert_array_equal(data.cpu().numpy(),reference[0]);np.testing.assert_array_equal(directory.cpu().numpy(),reference[1])
+            position=torch.empty_like(xs);k.initialize_decoder[(tokens,)](data,directory,xs,position,err,SIZE=data.numel(),num_warps=1)
+            out=torch.empty_like(source)
+            for ch in range(0,channels,group):
+                k.decode_group[(tokens,)](data,directory,xs,position,err,mu,inv,bd,ft,out,T=tokens,C=channels,LAYER=0,CH=ch,GROUP=group,SIZE=data.numel(),REUSE_MASS=cached,num_warps=1,enable_fp_fusion=False)
+            k.finish_decoder[(tokens,)](xs,position,directory,err,num_warps=1)
+            np.testing.assert_array_equal(err.cpu().numpy(),0);np.testing.assert_array_equal(out.cpu().numpy(),w)
 
     def test_actual_gpu_binary_counts_match_cpu_table(self):
         from qwen_kv_bench.transfer_t1_kernels import probe_frequency

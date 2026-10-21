@@ -1,5 +1,11 @@
 # A4500: compact T1 confirmed, prediction dispatch comparison
 
+Update: the 64/512/all comparison passed on A4500 in commit `e3e296d`.
+Qwen B's paired all-column speedups are 1.583x encode and 1.612x decode,
+with identical complete T1 bytes. See the [entropy comparison](gpu_path_entropy_a4500.md)
+for measured memory costs, the choice of a 512-column control and the next
+exact probability-scheduling experiment. The original plan below is historical.
+
 The completed compact-envelope run is
 `benchmark_results/gpu_path_a4500_20261021_110229_3928210`, published in
 commit `9df187e`. All eight actual CUDA tests passed. Its 24 attention cases

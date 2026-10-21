@@ -33,11 +33,23 @@ class RunnerTests(unittest.TestCase):
         self.assertAlmostEqual(h['B_vs_A'][1]['B_packet_saving_fraction'],.25)
         self.assertEqual(h['B_vs_A'][1]['predictor_input_chunk'],512)
         self.assertEqual(h['status'],'failed')
+        import copy
+        cached=copy.deepcopy(r['transfer'][1]);cached['entropy_backend']='cached'
+        cached['kv_to_T_gpu_body']['wall_median_ms']=2.5
+        r['transfer'].append(cached)
+        comparison=run.highlights(r)['entropy_vs_scalar'][0]
+        self.assertEqual(comparison['predictor_input_chunk'],512)
+        self.assertEqual(comparison['encode_speedup'],2.)
+        self.assertTrue(comparison['complete_T_bytes_identical'])
 
     def test_input_chunk_comparisons_require_successful_reference_order(self):
         self.assertEqual(run.input_chunks('64,512,0'),[64,512,0])
-        for bad in ['512,64','64,-1','64,64','64,','']:
+        self.assertEqual(run.input_chunks('512'),[512])
+        for bad in ['64,-1','64,64','64,','']:
             with self.assertRaises(ValueError):run.input_chunks(bad)
+        self.assertEqual(run.entropy_backends('scalar,cached'),['scalar','cached'])
+        for bad in ['cached','scalar,scalar','scalar,unknown']:
+            with self.assertRaises(ValueError):run.entropy_backends(bad)
 
     def test_profiler_is_requested_only_in_the_fresh_decoder_process(self):
         import argparse
@@ -49,10 +61,11 @@ class RunnerTests(unittest.TestCase):
                 (output/'decoder.json').write_text(json.dumps(dict(status='completed',gpu_measured=True,decoded_words_sha256='known hash',bottleneck_diagnostics={'test_only':True})))
                 return type('Result',(),{'returncode':0,'stdout':'synthetic child control'})()
             with patch.object(run.subprocess,'run',side_effect=child) as process:
-                r=run.isolated_decode(root/'packet.t1',{'model':'synthetic'},dict(kind='fixture',path=root),root,'software',args,'known hash',input_chunk=512,diagnose=True)
+                r=run.isolated_decode(root/'packet.t1',{'model':'synthetic'},dict(kind='fixture',path=root),root,'software',args,'known hash',input_chunk=512,entropy_backend='cached',diagnose=True)
             cmd=process.call_args.args[0]
             self.assertIn('--diagnostics',cmd)
             self.assertEqual(cmd[cmd.index('--predictor-input-chunk')+1],'512')
+            self.assertEqual(cmd[cmd.index('--entropy-backend')+1],'cached')
             self.assertFalse(r['original_KV_supplied'])
     def test_missing_cuda_is_recorded_as_failure_without_cpu_success(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(run.p,'_cuda_torch',side_effect=RuntimeError('CUDA unavailable')):
@@ -131,9 +144,12 @@ class OrchestrationTests(unittest.TestCase):
             # The parent delegates selected diagnostics, never enabling its
             # own profiler even when a requested child profile is unavailable.
             with patch.object(run,'isolated_decode',return_value={'bottleneck_diagnostics':{'test_only_child':True}}),patch('scripts.gpu_path_diagnostics.run',side_effect=AssertionError('parent must not profile')):
+                e.input_chunk=512;e.entropy_backend='cached'
                 second=run.transfer_case(case,e,args,torch,torch.device('cpu'),Path(tmp),'software_tuned',{'model':'synthetic'},dict(kind='fixture'),
-                    diagnose=True,expected_T_sha256=result['complete_T_sha256'])
-            self.assertTrue(second['packet_bytes_match_chunk64_reference'])
+                    diagnose=True,expected_T_sha256=result['complete_T_sha256'],reference_input_chunk=512)
+            self.assertTrue(second['packet_bytes_match_reference'])
+            self.assertIsNone(second['packet_bytes_match_chunk64_reference'])
+            self.assertGreater(second['encoder_probability_cache_capacity_bytes'],0)
             self.assertTrue(second['bottleneck_diagnostics']['test_only_child'])
 
 

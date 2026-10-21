@@ -1,5 +1,10 @@
 # GPU KV path: attention, T1 and external restore batch
 
+The input-chunk A4500 comparison also passed: nine CUDA tests, 24 attention
+cases and 60 exact transfer cases. See the
+[entropy scheduling guide](gpu_path_entropy_a4500.md) for measured speed/memory
+tradeoffs and the next matched scalar/cached experiment at input chunk512.
+
 Both full A4500 batches passed. Compact Qwen B T1 packets now measure
 8.853500 bpv, a 44.67% BF16 reduction. See the
 [dispatch comparison](gpu_path_dispatch_a4500.md) for these results, the
@@ -191,6 +196,13 @@ integer reduction with 512-column and all-column (`0`) reductions. The
 prediction group remains 32 channels. Candidates share the frozen state and
 must produce identical complete T1 packet bytes. Actual transient-memory
 peaks are charged. See the dispatch guide for the full command.
+
+The first requested input chunk is the packet reference. Add
+`--entropy-backends scalar,cached` to compare scalar entropy kernels with
+parallel encoder frequencies and cached decoder CDF endpoints. Both must
+produce identical T1 bytes; this is not a new probability model. The focused
+next command uses `--predictor-input-chunks 512` for both backends. Probability
+cache workspace and preparation launches are included in timings and peaks.
 
 ## Local checks and remaining integration
 

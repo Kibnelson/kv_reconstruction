@@ -1,0 +1,83 @@
+{
+  "status": "passed_local_checks_GPU_pending",
+  "cuda_executed": false,
+  "base_commit": "e3e296d82f2f71fb1f4aabe6bf8c0690e733bc10",
+  "runtime": {
+    "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+    "numpy": "2.3.5",
+    "torch": "2.14.1+cpu",
+    "triton": "3.6.0",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.39"
+  },
+  "tests": {
+    "discovered": 72,
+    "passed": 60,
+    "skipped": 12,
+    "elapsed_seconds": 115.863,
+    "skips_scope": "Eleven tests require actual CUDA; one requires fresh real-model captures. Skipped tests are not GPU validation."
+  },
+  "checks": {
+    "interpreter_probability_oracle_all_planes_and_masked_tail": true,
+    "byte_identical_scalar_cached_packet_and_cross_decode": true,
+    "corrupt_lane_rejected": true,
+    "CPU_interpreter_file_pool_attention_bridge": true,
+    "historical_60_case_report_compatibility": true,
+    "CPU_input_validation": "inputs_validated_cpu_only",
+    "SM86_compiled_kernel_variants": 26,
+    "python_compile": true,
+    "bash_syntax": true,
+    "diff_whitespace": true,
+    "standalone_build_check": true
+  },
+  "encoder_probability_cache": {
+    "layout": "UINT16[tokens,group,16], reused across groups",
+    "capacity_at_32_tokens_group32_bytes": 32768,
+    "transmitted": false,
+    "shared_state": false
+  },
+  "pending": [
+    "Actual CUDA execution of the cached backend, including all 65,536 BF16 words",
+    "Paired scalar/cached A4500 timing and memory at input chunk512",
+    "Native model generation, concurrency, cold SSD, real network"
+  ],
+  "sources": [
+    {
+      "path": "qwen_kv_bench/transfer_t1.py",
+      "bytes": 22038,
+      "sha256": "0f93d0e757122647b031a2067e777709243aa2ff9ae1201d7cf5039103ca5272"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_t1_kernels.py",
+      "bytes": 8745,
+      "sha256": "ed46da64dde8fcae2c404dfc146b1cc46499b26f4b445c6379330cf5bb864d18"
+    },
+    {
+      "path": "scripts/bench_gpu_path.py",
+      "bytes": 49581,
+      "sha256": "065bb6541cabeb2331968231e4359231b069a4df1538bdcfd5789158d8afe1b1"
+    },
+    {
+      "path": "scripts/check_gpu_path_kernels.py",
+      "bytes": 3306,
+      "sha256": "59020fca3b008ed52d3029eb75ba457840b92507ec5a9ab944088de31cc01f39"
+    },
+    {
+      "path": "tests/test_transfer_t1.py",
+      "bytes": 19282,
+      "sha256": "a70ce225839aa8ff74b5b6fb4ce1cedcd681f47c8f1cbb5ea0ed533836e97b56"
+    },
+    {
+      "path": "tests/test_gpu_path_runner.py",
+      "bytes": 11203,
+      "sha256": "c037c24f5182e76fc8eb013cd70be3410efde7c1fa19f635a7012161746fb834"
+    },
+    {
+      "path": "qwen_kv_gpu_bench.py",
+      "bytes": 1078342,
+      "sha256": "903448e563ea6e96a7b596a865227361130f137b24a1c21297643d0018f6a4f2"
+    }
+  ],
+  "publication": {
+    "generated_standalone": "Built and checked locally. The source publication excludes the generated runner; the A4500 helper rebuilds and commits it before GPU tests."
+  }
+}

@@ -31,7 +31,10 @@ def compile_all():
     common=dict(MU='*fp64',INV='*fp64',BD='*fp64',FT='*i64')
     for group in [8,32]:
         check(k.encode_group,dict(W='*u16',STATE='*i64',COUNT='*i64',BUFFER='*u8',ERROR='*i32',LAYER='i32',CH='i32',**common),dict(T=32,C=384,GROUP=group,CAP=400000),1,f'group{group}')
-        check(k.decode_group,dict(DATA='*u8',DIRECTORY='*i64',STATE='*i64',POSITION='*i64',ERROR='*i32',OUT='*u16',LAYER='i32',CH='i32',SIZE='i64',**common),dict(T=32,C=384,GROUP=group),1,f'group{group}')
+        check(k.prepare_frequencies,dict(W='*u16',F0='*u16',LAYER='i32',CH='i32',**common),dict(T=32,C=384,GROUP=group,BLOCK=256),4,f'group{group}')
+        check(k.encode_group_cached,dict(W='*u16',F0='*u16',STATE='*i64',COUNT='*i64',BUFFER='*u8',ERROR='*i32',LAYER='i32',CH='i32'),dict(T=32,C=384,GROUP=group,CAP=400000),1,f'group{group}')
+        for reuse in [False,True]:
+            check(k.decode_group,dict(DATA='*u8',DIRECTORY='*i64',STATE='*i64',POSITION='*i64',ERROR='*i32',OUT='*u16',LAYER='i32',CH='i32',SIZE='i64',**common),dict(T=32,C=384,GROUP=group,REUSE_MASS=reuse),1,f'group{group}_reuse{reuse}')
     check(k.compact_lanes,dict(BUFFER='*u8',STATE='*i64',COUNT='*i64',ENDS='*i64',DIRECTORY='*i64',DATA='*u8'),dict(CAP=400000,BLOCK=256))
     check(k.initialize_decoder,dict(DATA='*u8',DIRECTORY='*i64',STATE='*i64',POSITION='*i64',ERROR='*i32',SIZE='i64'),{},1)
     check(k.finish_decoder,dict(STATE='*i64',POSITION='*i64',DIRECTORY='*i64',ERROR='*i32'),{},1)

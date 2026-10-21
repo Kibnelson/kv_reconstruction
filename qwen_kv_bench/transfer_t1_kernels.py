@@ -43,6 +43,42 @@ def probe_frequency(RANK, MU, INV, BD, FT, OUT, COUNT:tl.constexpr, PLANE:tl.con
 
 
 @triton.jit(do_not_specialize=['LAYER','CH'])
+def prepare_frequencies(W,MU,INV,BD,FT,F0,T:tl.constexpr,C:tl.constexpr,LAYER,CH,
+                        GROUP:tl.constexpr,BLOCK:tl.constexpr):
+    # Known encoder words allow all higher-bit conditional probabilities to
+    # be evaluated in parallel. Their ordering and 12-bit counts are unchanged.
+    i=tl.program_id(0)*BLOCK+tl.arange(0,BLOCK);valid=i<T*GROUP*16
+    plane=i%16;word_index=i//16;token=word_index//GROUP;channel=word_index%GROUP
+    word=tl.load(W+(LAYER*T+token)*C+CH+channel,valid,other=0).to(tl.int32)
+    rank=tl.where((word&32768)!=0,65535^word,32768^word)
+    mu=tl.load(MU+word_index,valid,other=0);inverse=tl.load(INV+word_index,valid,other=1)
+    prefix=rank&(65535^((1<<(plane+1))-1))
+    f0=frequency(prefix,plane,mu,inverse,BD,FT)
+    tl.store(F0+i,f0.to(tl.uint16),valid)
+
+
+@triton.jit(do_not_specialize=['LAYER','CH'])
+def encode_group_cached(W,F0,STATE,COUNT,BUFFER,ERROR,T:tl.constexpr,C:tl.constexpr,LAYER,CH,
+                        GROUP:tl.constexpr,CAP:tl.constexpr):
+    lane=tl.program_id(0)
+    state=tl.load(STATE+lane);used=tl.load(COUNT+lane);error=tl.load(ERROR+lane)
+    for j in range(GROUP-1,-1,-1):
+        word=tl.load(W+(LAYER*T+lane)*C+CH+j).to(tl.int32)
+        rank=tl.where((word&32768)!=0,65535^word,32768^word)
+        for plane in range(16):
+            f0=tl.load(F0+(lane*GROUP+j)*16+plane).to(tl.int64)
+            bit=(rank>>plane)&1
+            f=tl.where(bit==0,f0,4096-f0);start=tl.where(bit==0,0,f0)
+            limit=f*524288
+            while state>=limit:
+                tl.store(BUFFER+lane*CAP+used,(state&255).to(tl.uint8),used<CAP)
+                error=error|tl.where(used<CAP,0,1)
+                used+=1;state=state>>8
+            state=(state//f)*4096+(state%f)+start
+    tl.store(STATE+lane,state);tl.store(COUNT+lane,used);tl.store(ERROR+lane,error)
+
+
+@triton.jit(do_not_specialize=['LAYER','CH'])
 def encode_group(W,MU,INV,BD,FT,STATE,COUNT,BUFFER,ERROR,
                  T:tl.constexpr,C:tl.constexpr,LAYER,CH,
                  GROUP:tl.constexpr,CAP:tl.constexpr):
@@ -99,7 +135,7 @@ def initialize_decoder(DATA,DIRECTORY,STATE,POSITION,ERROR,SIZE):
 @triton.jit(do_not_specialize=['LAYER','CH','SIZE'])
 def decode_group(DATA,DIRECTORY,STATE,POSITION,ERROR,MU,INV,BD,FT,OUT,
                  T:tl.constexpr,C:tl.constexpr,LAYER,CH,
-                 GROUP:tl.constexpr,SIZE):
+                 GROUP:tl.constexpr,SIZE,REUSE_MASS:tl.constexpr=False):
     lane=tl.program_id(0)
     offset=tl.load(DIRECTORY+lane*2);length=tl.load(DIRECTORY+lane*2+1)
     state=tl.load(STATE+lane);pos=tl.load(POSITION+lane);error=tl.load(ERROR+lane)
@@ -110,12 +146,20 @@ def decode_group(DATA,DIRECTORY,STATE,POSITION,ERROR,MU,INV,BD,FT,OUT,
         for j in range(GROUP):
             rank=tl.full((),0,tl.int32)
             mu=tl.load(MU+lane*GROUP+j);inv=tl.load(INV+lane*GROUP+j)
+            if REUSE_MASS:
+                low=_mass(tl.full((),0,tl.int32),mu,inv,BD,FT)
+                high=_mass(tl.full((),65536,tl.int32),mu,inv,BD,FT)
             for step in range(16):
                 plane=15-step
-                f0=frequency(rank,plane,mu,inv,BD,FT)
+                if REUSE_MASS:
+                    mid=_mass(rank+(1<<plane),mu,inv,BD,FT)
+                    f0=tl.minimum(tl.maximum(((mid-low)*4096)//(high-low),1),4095)
+                else:f0=frequency(rank,plane,mu,inv,BD,FT)
                 slot=state&4095;bit=(slot>=f0).to(tl.int32)
                 f=tl.where(bit==0,f0,4096-f0);start=tl.where(bit==0,0,f0)
                 state=f*(state>>12)+slot-start
+                if REUSE_MASS:
+                    low=tl.where(bit==0,low,mid);high=tl.where(bit==0,mid,high)
                 rank=rank|(bit<<plane)
                 # At most two bytes are needed for a valid 12-bit symbol.
                 # Bounded iteration prevents a malformed stream from hanging.
