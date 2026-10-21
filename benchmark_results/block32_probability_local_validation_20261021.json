@@ -1,0 +1,83 @@
+{
+  "actual_prefill_hook_software_check": {
+    "A_entropy_payloads_match_original_reference": true,
+    "all_original_words_exact": true,
+    "all_packet_only_processes_pass": true,
+    "arm_page_checks": 16,
+    "capture_device": "cpu",
+    "captured_source": "actual Qwen3 BF16 observational attention-input hooks",
+    "frozen_mean_state_unchanged": true,
+    "model": "random tiny Qwen3; software validation only",
+    "pages_per_arm": 4,
+    "raw_fallback_pages": 0,
+    "unique_original_BF16_words": 32768,
+    "weights_sha256": "528e0c0167fec6e75eea8c0bab836f1160db5c7ac48a89f2c57a9ee864b47dce"
+  },
+  "all_executed_source_hashes_match": true,
+  "date": "2026-10-21",
+  "device_parity": {
+    "Torch_CPU_integer_mean_offset_and_hint_checks_pass": true,
+    "actual_CUDA_tested": false
+  },
+  "format": "block32_probability_local_validation_v1",
+  "package_validation": {
+    "checks": 116,
+    "scope": "packet hashes, component/rate arithmetic and recorded parity/independent-process evidence; no new GPU execution or packet re-decode"
+  },
+  "retained_diagnostics": [
+    "paired stream gain minus charged hint bits",
+    "per-layer K/V ideal-rate screens",
+    "early/later groups",
+    "TRAIN-mean and shuffled-context attribution",
+    "selected and forced hint sensitivity",
+    "hint occupancy",
+    "residual tails and diagnostic 31-bit error groups",
+    "timing/state/peak memory ledgers"
+  ],
+  "scope": "software validation only; no pretrained compression claim and no CUDA hardware result",
+  "sources": [
+    {
+      "path": "scripts/bench_transfer_probability.py",
+      "sha256": "272dd7f09db524c826795115d6edce1e5fa5befe454ddd977858371c09d556f6"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_probability.py",
+      "sha256": "1db09c9b20dfda294236654798a57364a71fc59b35de4ed893d6e047428f9ede"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_probability_gpu.py",
+      "sha256": "1c6ab41fe01a714c4158b75b072f5f1c1aa0bfb5427b0e00540b07843d63a0ca"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_reference.py",
+      "sha256": "c2e67b275af2df776fa020402063b874164ae6d3edc8a1dcd5efd65af37070c3"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_coset.py",
+      "sha256": "47849be17f45e5b20e785930454c8468c2b29d67fd79a4855ad91e8235f5b4e3"
+    },
+    {
+      "path": "qwen_kv_bench/transfer_gpu_predictor.py",
+      "sha256": "76e663ec7cf64679f2e45e50ad460f14379356cc523a28ddb6883074b2d2beaa"
+    },
+    {
+      "path": "scripts/bench_transfer_extensions.py",
+      "sha256": "2df32f25ac117c5aa4da98ec38be1c6e7fb84e19901d593e47abf0d884ce725d"
+    },
+    {
+      "path": "qwen_kv_bench/model_runtime.py",
+      "sha256": "340e162efffac90ae3909fe28b40506e591beca058ed009a566f82a57b1cc46f"
+    },
+    {
+      "path": "qwen_kv_bench/fixtures.py",
+      "sha256": "8ae18cac2a197df461d44d75790ad3937116711cbee60690d9b530453b431a65"
+    }
+  ],
+  "standalone_source_check_pass": true,
+  "tests": {
+    "log_sha256": "a6a1b7682cbd3f8646c7e5416eab4cbaaa389508936a228e298bb4edcb5529c5",
+    "passed": 38,
+    "skipped_actual_CUDA": 2,
+    "total": 40
+  }
+}
