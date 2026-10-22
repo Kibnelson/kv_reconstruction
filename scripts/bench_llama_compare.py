@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Lossless and lossy KV transfer codecs on one model's KV: ours against SplitZip, ExANS, AQUA-KV and KIVI styles.
 
-Default model: meta-llama/Llama-3.2-3B (gated on Hugging Face: accept the license and log in first).
+Default model: unsloth/Llama-3.2-3B at revision d4446454d87d51aa42e1fb174f25acc5f8762331, the ungated copy of the
+original BF16 Llama-3.2-3B weights that AQUA-KV's README points to. It is the same pinned checkpoint as
+scripts/run_llama_official_a4500.py (branch experiment/llama32_official_gpu), so no Hugging Face login is needed and
+an existing cache is reused.
 
     python scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare
 
@@ -35,6 +38,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 TEXTS = ROOT / "benchmark_fixtures" / "llama_compare_texts"
+DEFAULT_MODEL = "unsloth/Llama-3.2-3B"                          # ungated copy of the original BF16 weights
+DEFAULT_REVISION = "d4446454d87d51aa42e1fb174f25acc5f8762331"  # same pin as scripts/run_llama_official_a4500.py
 ROLES = {
     "train0": "pep-0484.rst", "train1": "code_typing.py.txt", "train2": "code_inspect.py.txt",
     "train3": "code_subprocess.py.txt", "train4": "code_tarfile.py.txt", "train5": "code_logging.py.txt",
@@ -218,8 +223,8 @@ def stage_report(args, out):
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--model", default="meta-llama/Llama-3.2-3B")
-    p.add_argument("--revision", default=None, help="pin a Hugging Face revision (recommended for shared results)")
+    p.add_argument("--model", default=DEFAULT_MODEL)
+    p.add_argument("--revision", default=DEFAULT_REVISION, help="Hugging Face revision; 'none' for the latest")
     p.add_argument("--device", default="cuda")
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--texts", type=Path, default=TEXTS)
@@ -237,6 +242,8 @@ def parser():
 
 def main(argv=None):
     args = parser().parse_args(argv)
+    if Path(args.model).is_dir():          # a local checkout has no Hugging Face revision
+        args.revision = None
     args.configs = [c for c in args.configs.split(",") if c]
     args.kappas = [float(k) for k in args.kappas.split(",") if k]
     stages = [s for s in args.stages.split(",") if s]

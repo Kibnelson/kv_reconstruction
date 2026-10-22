@@ -12,13 +12,16 @@ results are reproduced at the end for reference.
 
 ## Run on the NVIDIA NUC
 
-Llama-3.2-3B is gated on Hugging Face. Accept Meta's license with the account you use, then log in once:
+The default checkpoint is `unsloth/Llama-3.2-3B` at revision `d4446454d87d51aa42e1fb174f25acc5f8762331`. It is the
+ungated copy of the original BF16 Llama-3.2-3B weights that AQUA-KV's README points to, and the same pin as
+`scripts/run_llama_official_a4500.py` on `experiment/llama32_official_gpu`. No Hugging Face login is needed, and a
+NUC that ran the official study already has it cached. `meta-llama/Llama-3.2-3B` is gated, so use `--model` only
+with an account that has access.
 
 ```bash
 cd ~/kv_reconstruction
-git fetch origin && git checkout llama32-3b-lossy-lossless-compare
+git fetch origin && git checkout llama32-3b-lossy-lossless-compare && git pull
 source .venv/bin/activate                      # the CUDA environment from README.md
-huggingface-cli login
 python -m unittest discover -s kv_compare -p 'test_*.py' -v      # CPU, tiny random Llama, no download
 python scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare
 ```
