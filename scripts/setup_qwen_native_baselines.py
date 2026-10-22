@@ -38,7 +38,9 @@ def find_nvcc(explicit=None):
     for key in ['CUDA_HOME','CUDA_PATH']:
         if os.environ.get(key):candidates.append(str(Path(os.environ[key])/'bin/nvcc'))
     candidates+=['/usr/local/cuda/bin/nvcc']
-    return next((str(Path(p).resolve()) for p in candidates if p and Path(p).is_file()),None)
+    # Preserve the composed toolkit path: resolving its nvcc symlink would
+    # make nvcc infer its root from an individual component archive instead.
+    return next((str(Path(p).absolute()) for p in candidates if p and Path(p).is_file()),None)
 
 
 def exans_build_source(directory):
@@ -103,7 +105,7 @@ def main():
             if name=='exans':info['build']=build_exans(root/name,find_nvcc(args.nvcc),args.arch)
             else:
                 from qwen_kv_bench.matched_aqua import load_upstream
-                load_upstream(root/name)
+                info['native_unpack']=load_upstream(root/name).unpack_metadata
             report[name]=info
         except Exception as error:report[name]=dict(status='unavailable',commit=commit,reason=repr(error))
     root.mkdir(parents=True,exist_ok=True)

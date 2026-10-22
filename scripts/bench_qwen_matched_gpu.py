@@ -278,7 +278,8 @@ def adapter_for(name, track, output, device, train_entries=None, seed=71, baseli
         geometry=dict(layers=first['layers'],heads=first['Hk'],head_dim=first['hd'],theta=first['base'])
         identity=matched.digest(dict(entries=train_entries,selection=selection,geometry=geometry,bits=bits,
             model=manifest['model_identity'],upstream=AQUA_COMMIT,quanto=QUANTO_VERSION,damping=1e-3,
-            adapter_sha256=sha_file(Path(aqua.__file__))))
+            adapter_sha256=sha_file(Path(aqua.__file__)),
+            unpack_adapter_sha256=sha_file(ROOT/'qwen_kv_bench/quanto_unpack.py')))
         path=baseline_root/'native_calibration'/track/(name+'.npz')
         if not path.exists():
             log(f'{track}/{name}: fit released AQUA predictor on reconstructed TRAIN KV')
@@ -641,6 +642,8 @@ def main():
             ROOT/'scripts/run_qwen_matched_a4500.sh',ROOT/'scripts/setup_qwen_matched_baselines.py',
             ROOT/'scripts/repair_qwen_matched_a4500.sh',
             ROOT/'scripts/setup_qwen_native_baselines.py',ROOT/'scripts/compare_qwen_native_a4500.sh',
+            ROOT/'scripts/setup_qwen_cuda_toolchain.py',ROOT/'qwen_kv_bench/quanto_unpack.py',
+            ROOT/'tests/test_qwen_cuda_toolchain.py',
             ROOT/'qwen_kv_bench/matched_aqua.py',ROOT/'qwen_kv_bench/matched_exans.py',
             ROOT/'qwen_kv_bench/native_baseline_sources.py',ROOT/'tests/test_qwen_native_baselines.py',
             ROOT/'scripts/package_qwen_matched_gpu.py',ROOT/'tests/test_qwen_matched_gpu.py']}))

@@ -1,0 +1,37 @@
+{
+  "commit": "de6c38bcc5438475bd1abf1e9b3d154cef414ef6",
+  "source_sha256": {
+    "crates/openlake_kv_client/cuda/src/expans_codec.cu": "4e43cd11f0ed294b467e90b96597988a9f26a84942e44de9031d769357d24dff",
+    "crates/openlake_kv_client/cuda/src/expans_kernels.cuh": "7380e32e8cdd5e9958ac58b68085aef0de8a4f08c21b2dc2d529e28aa86f18d0",
+    "crates/openlake_kv_client/cuda/include/openlake/expans_codec.h": "a6f1b4cf993d45ddbf4d56a12c54af30080d347860dcd1be83e5c1189d98dba5",
+    "LICENSE": "2cc5b0edcac471328efc7aad74b07002f4bafb4837bebd4456e9332b797b500b"
+  },
+  "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+  "arch": "86",
+  "nvcomp": "5.3.0.16",
+  "nvcomp_library_sha256": "3f1e969bb2a767fea4b5bd91169831e7b8b15742ff74d997b7ce357dbe986316",
+  "library_sha256": "3e7fd109f1ccd435ce6a30f8de63f1539cc1f0914520c583fa3ac7517ac86788",
+  "command": [
+    "/workspace/scratch/cf461553fac4/native_baseline_validation/cuda128_bootstrap/toolkit/bin/nvcc",
+    "-std=c++17",
+    "-O3",
+    "--shared",
+    "-Xcompiler=-fPIC",
+    "--expt-relaxed-constexpr",
+    "-gencode",
+    "arch=compute_86,code=sm_86",
+    "-I/workspace/scratch/cf461553fac4/native_baseline_validation/openlake/crates/openlake_kv_client/cuda/include",
+    "-I/workspace/scratch/cf461553fac4/native_baseline_validation/openlake/crates/openlake_kv_client/cuda/src",
+    "-I/workspace/scratch/cf461553fac4/nvcomp_validation/wheel53/nvidia/libnvcomp/include",
+    "/workspace/scratch/cf461553fac4/native_baseline_validation/openlake/build/expans_codec_compat.cu",
+    "-L/workspace/scratch/cf461553fac4/nvcomp_validation/wheel53/nvidia/libnvcomp/lib64",
+    "-l:libnvcomp.so.5",
+    "-Xlinker=-rpath",
+    "-Xlinker=/workspace/scratch/cf461553fac4/nvcomp_validation/wheel53/nvidia/libnvcomp/lib64",
+    "-o",
+    "/workspace/scratch/cf461553fac4/native_baseline_validation/openlake/libopenlake_expans.part.so"
+  ],
+  "host_build_fix": "allocation-error macro uses codec.get() for unique_ptr; one error-path argument only",
+  "build_source_sha256": "2479835a5fbe11499f4a1cb3f2792779bb07b9e3af3c00b1eb4c93ec9d4c9f52",
+  "kernels_unmodified": true
+}

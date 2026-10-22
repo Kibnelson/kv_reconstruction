@@ -5,6 +5,8 @@ Only their HF Cache base and rotary helper are supplied locally: the released
 code targets Transformers 4.46, while this experiment uses 4.57/Qwen3. No HIGGS
 imports, HF model patches, recent-token buffer or attention sinks are used.
 This is a lossy, single-page codec adaptation, not paper serving reproduction.
+Native Quanto unpack kernel bodies are unchanged; a small build adapter adds
+the current CUDA stream and device guard to their host launches.
 """
 import ast
 import importlib.util
@@ -38,6 +40,8 @@ def load_upstream(root):
     from optimum import quanto
     if quanto.__version__ != QUANTO_VERSION:raise RuntimeError('install pinned optimum-quanto=='+QUANTO_VERSION)
     verify_sources(root, AQUA_FILES)
+    from .quanto_unpack import ensure_cuda_unpack
+    unpack_metadata=ensure_cuda_unpack()
     ns=dict(torch=torch, nn=torch.nn, TypeVar=TypeVar, Any=Any, Dict=Dict, Optional=Optional, Tuple=Tuple,
         MaxOptimizer=quanto.MaxOptimizer, qint2=quanto.qint2, qint4=quanto.qint4,
         quantize_weight=quanto.quantize_weight, apply_rotary_pos_emb=_rotary,
@@ -48,7 +52,7 @@ def load_upstream(root):
     # This small module has no optional model/quantizer dependencies.
     spec=importlib.util.spec_from_file_location('_matched_aqua_linear',Path(root)/'aquakv/linear_utils.py')
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-    return SimpleNamespace(**ns, fit_linear_regression=module.fit_linear_regression)
+    return SimpleNamespace(**ns, fit_linear_regression=module.fit_linear_regression,unpack_metadata=unpack_metadata)
 
 
 def rope(positions, head_dim, theta, device):
@@ -191,6 +195,7 @@ class Aqua(matched.Adapter):
     def statistics(self):
         n=sum(p.numel()*p.element_size() for d in (self.kp,self.vp) for m in d.values() for p in m.parameters())
         return dict(persistent_device_bytes=n,lossless=False,upstream_commit=AQUA_COMMIT,quantizer='upstream Quanto',
+            native_unpack=self.api.unpack_metadata,
             residual_bits=self.meta['bits'],group_size=64,calibration=self.meta,
             integration='unchanged upstream method bodies; local HF Cache base/rotary compatibility and portable framing',
             retained_state='raw unrotated first layer, packed residuals, scales, shifts, BF16 cos/sin; all charged',

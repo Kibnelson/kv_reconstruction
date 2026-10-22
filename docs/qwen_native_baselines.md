@@ -54,6 +54,15 @@ wrapper adds portable serialization. No upstream method body is rewritten.
 Loading only the selected definitions avoids importing unused HIGGS/CUDA
 Hadamard dependencies; the original source files remain unchanged.
 
+Quanto 0.2.6's native unpack launches on stream 0. The matched benchmark uses
+a nondefault Torch stream. An unpack-only build keeps the original 2/4-bit
+GPU kernel bodies and uses a small C interface with explicit device/stream
+arguments for their host launches. The installed package is unchanged. This
+avoids PyTorch/Python development headers and compiling unused AWQ/Marlin
+weight GEMMs and their extra library headers. Original and
+compiled source hashes and build metadata are recorded. Preflight includes
+a delayed producer on a nonblocking stream to expose stale reads.
+
 The configuration uses per-token Quanto groups of 64, 2- or 4-bit residual
 quantization, BF16 linear predictor weights, and an unquantized first layer.
 K is predicted from reconstructed previous-layer K; V uses reconstructed
@@ -128,19 +137,28 @@ bash scripts/compare_qwen_native_a4500.sh \
 )
 ```
 
-The helper installs pinned optional packages with `--no-deps`, downloads
-checked source files and builds native ExANS. It preserves Torch, NumPy,
-Triton and Transformers. A **CUDA 12 toolkit with `nvcc`** and a working host
-C++ compiler are needed to build ExANS and Quanto's native unpack extension.
-Set `CUDA_HOME` to the toolkit directory if it is not discoverable.
-The CUDA driver and a CUDA-enabled Torch wheel alone do not supply `nvcc`.
-The default compilation target is SM86 for the A4500.
+The helper provisions **CUDA 12.8 build tools locally** when a complete 12.8
+toolkit is not found. It downloads SHA256-pinned NVIDIA nvcc 12.8.93, cudart
+12.8.90 and CCCL 12.8.90 archives, about **81 MB total**, into
+`runs/_matched_baselines/cuda12_8/`. Their expanded components remain there;
+no administrator access or system installation is needed. It writes and
+sources a process-local environment before setup, compilation, tests and
+timing, so later Quanto compilation also sees the toolkit. Existing Torch,
+NumPy, Triton, Transformers and the NVIDIA driver are preserved. A host C++
+compiler (`c++` or `CXX`) is still required; the driver and Torch wheel alone
+do not supply a CUDA compiler. The compilation target is SM86 for the A4500.
+
+The earlier `nvcc not found` stop occurred before GPU preflight or timing;
+it is an environment/setup failure, not a codec or compression result.
+After pulling the update, rerun the same command above. Captures and fitted
+exact-codec predictors are reused; no original run is overwritten.
 
 Before any calibration or timed comparison, actual-GPU preflight tests require:
 
 - our causal predictor/byte checks;
 - AQUA 2/4-bit reconstructed-context fitting, packed payload accounting and a
   fresh packet-only decoder on a nondefault CUDA stream;
+- native Quanto unpack on a deliberately delayed nondefault-stream producer;
 - native SplitZip reconstruction of every BF16 pattern;
 - a **real compressed ExANS record** containing all BF16 patterns, plus
   incompressible overflow with exact raw fallback and fresh decoding.
@@ -152,7 +170,7 @@ are only populated by an actual CUDA run. Compilation and CPU checks are not
 GPU measurements.
 
 Outputs go into a new `runs/qwen_native_compare_a4500_*` directory. The
-publishable allowlist contains reports, provenance and logs; original KV,
+publishable allowlist contains reports, toolchain provenance and logs; original KV,
 token IDs, calibration tensors and compressed payload files are excluded.
 With `--publish-results` the helper commits the regenerated standalone runner
 and small report package, then pushes this experiment branch.

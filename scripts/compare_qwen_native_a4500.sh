@@ -23,6 +23,10 @@ mkdir -p "$run_dir"
 python scripts/build_standalone.py
 python scripts/build_standalone.py --check
 status=0
+python scripts/setup_qwen_cuda_toolchain.py 2>&1 | tee "$run_dir/toolchain_setup.log" || status=$?
+if (( status )); then printf 'CUDA toolchain setup stopped; see %s/toolchain_setup.log\n' "$run_dir" >&2; exit "$status"; fi
+source runs/_matched_baselines/cuda_env.sh
+cp runs/_matched_baselines/cuda12_8/toolchain.json "$run_dir/toolchain.json"
 python scripts/setup_qwen_matched_baselines.py --install-nvcomp 2>&1 | tee "$run_dir/base_setup.log" || status=$?
 python scripts/setup_qwen_native_baselines.py --install 2>&1 | tee "$run_dir/native_setup.log" || status=$?
 python - "$run_dir" <<'PY'

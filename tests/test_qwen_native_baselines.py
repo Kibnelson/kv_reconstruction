@@ -118,6 +118,23 @@ class ReferenceTests(unittest.TestCase):
 class CudaTests(unittest.TestCase):
     # Optional dependencies are REQUIRED for this explicitly invoked comparison.
     # Missing sources, build/runtime errors and absent libraries fail preflight.
+    def test_quanto_unpack_waits_for_delayed_producer_on_current_stream(self):
+        from qwen_kv_bench.quanto_unpack import ensure_cuda_unpack
+        self.assertEqual(ensure_cuda_unpack()['backend'],'native Quanto unpack only')
+        # Warm native dispatch/allocation first, then delay the producer on a
+        # nonblocking stream. A kernel launched on stream 0 reads stale data.
+        warm=torch.zeros((17,64),dtype=torch.uint8,device='cuda:0')
+        torch.ops.quanto.unpack(warm,2);torch.cuda.synchronize()
+        stream=torch.cuda.Stream()
+        for bits in (2,4):
+            data=torch.zeros_like(warm);torch.cuda.synchronize()
+            with torch.cuda.stream(stream):
+                torch.cuda._sleep(2_000_000)
+                data.fill_(0xe4)
+                decoded=torch.ops.quanto.unpack(data,bits)
+                expected=torch.cat([(data>>(i*bits))&((1<<bits)-1) for i in range(8//bits)])
+            stream.synchronize();self.assertTrue(torch.equal(decoded,expected))
+
     def test_aqua_both_widths_reconstructed_training_and_packet_only_decode(self):
         with torch.cuda.stream(torch.cuda.Stream()):check_aqua(self,'cuda:0')
 

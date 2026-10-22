@@ -1,0 +1,59 @@
+{
+  "format": "qwen_cuda_toolchain_local_validation_v1",
+  "gpu_measured": false,
+  "tests": {
+    "run": 42,
+    "passed": 33,
+    "skipped_cuda": 9,
+    "failed": 0,
+    "seconds": 17.65,
+    "log": "tests.log"
+  },
+  "toolchain": {
+    "status": "passed",
+    "cuda": "12.8",
+    "nvcc": "12.8.93",
+    "downloaded_verified_bytes": 81298228,
+    "provisioning": "actual project-local NVIDIA download, extraction, executable modes, lib/lib64 overlay and environment export",
+    "cached_rerun": "passed without another download",
+    "manifest": "toolchain.json"
+  },
+  "native_compilation": {
+    "exans": {
+      "status": "compiled_and_linked_sm86",
+      "manifest": "exans_build.json"
+    },
+    "quanto": {
+      "status": "compiled_and_linked_sm86",
+      "manifest": "quanto_build.json",
+      "gpu_kernel_bodies": "unchanged upstream 2/4-bit kernels",
+      "host_adapter": "explicit current stream/device through C ABI; no Torch/Python development headers"
+    }
+  },
+  "checks": [
+    "SHA256-pinned official compiler/runtime/CCCL archives and real SM86 shared-library builds",
+    "archive traversal rejection, hardlink executable modes and lib64 aliases",
+    "corrupt cache replacement, invalid download hash rejection and shell-quoted environment",
+    "existing toolkit reuse without downloads or package changes",
+    "Quanto kernel body preservation and unpinned source refusal",
+    "AQUA reconstruction/packing, exact codec and SplitZip software regression tests",
+    "native-GPU delayed-producer test added; requires A4500 execution",
+    "Bash syntax, Python compilation, deterministic standalone build/check and git diff checks"
+  ],
+  "limits": [
+    "no local CUDA hardware; no GPU numerical or timing results",
+    "new delayed-stream GPU test and all real GPU paths must pass on A4500",
+    "source-only publication; A4500 helper regenerates the standalone bundle"
+  ],
+  "files_sha256": {
+    "scripts/setup_qwen_cuda_toolchain.py": "c6f383bdf3026e1af6261d878762ca3cb6415a020c33606bff96b0fc7e5c9f39",
+    "qwen_kv_bench/quanto_unpack.py": "73c807535b6f3d3aebefb7ee6e9c1c2ef9ef5e693aaa6fdb76990fa80d2e896d",
+    "qwen_kv_bench/matched_aqua.py": "7365853930ca54f71d740419a2b88a5ccb7d23aa0e643c8a7cf061e02a20301e",
+    "scripts/setup_qwen_native_baselines.py": "89dbae9806fe285f76d72f15175acc995f96aeb00ea169e5607662668e61830e",
+    "scripts/compare_qwen_native_a4500.sh": "5a7dfb10c5947bef14572a496a01ee7fb7af81d6e0e510575a49f81cac13b87e",
+    "scripts/package_qwen_matched_gpu.py": "d570daebbb35c9bd229365a38d1a99a0d88d27a85ae7b83b313be140c9804544",
+    "scripts/bench_qwen_matched_gpu.py": "306eea651487fbba347bba77bfeb3043073f9117574bb5da84e1558da44260f7",
+    "tests/test_qwen_native_baselines.py": "649c9a86cc636804cc1b420939563a239f1aa68a23812f73df3d37da6cd68458",
+    "tests/test_qwen_cuda_toolchain.py": "2cdc7a1ee223f2434585c9b1c3a56c35188a993cc28af27aa6bc1a460a0e54a1"
+  }
+}

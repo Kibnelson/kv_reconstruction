@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import zipfile
 
-FILES=('results.json','summary.md','source_manifest.json','cuda_tests.log','baseline_setup.json')
+FILES=('results.json','summary.md','source_manifest.json','cuda_tests.log','baseline_setup.json','toolchain.json')
 
 
 def package(source,destination):
