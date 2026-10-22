@@ -1,9 +1,12 @@
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 from qwen_kv_bench import matched_transfer as matched
@@ -75,6 +78,43 @@ def check_permutation_packet(test,device,interpreter=False):
 
 
 class ReferenceTests(unittest.TestCase):
+    @unittest.skipUnless(torch is not None,'Torch unavailable')
+    def test_numpy2_with_legacy_nvcomp_is_refused_before_device_setup(self):
+        import types
+        nvidia=types.ModuleType('nvidia');nvcomp=types.ModuleType('nvidia.nvcomp');nvidia.nvcomp=nvcomp
+        with mock.patch.dict('sys.modules',{'nvidia':nvidia,'nvidia.nvcomp':nvcomp}), \
+                mock.patch('importlib.metadata.version',return_value='4.2.0.14'), \
+                mock.patch.object(np,'__version__','2.3.5'), \
+                mock.patch.object(torch.cuda,'current_stream',side_effect=AssertionError('device must not be touched')):
+            with self.assertRaisesRegex(RuntimeError,'misreads NumPy 2'):
+                matched.Nvcomp('Bitcomp',torch.device('cpu'))
+
+    def test_fixed_width_arm_uses_original_frozen_means_without_refitting(self):
+        train,scale,_=captures();base=ref.fit([train],scale,mode='strong_layers',block_size=8,max_positions=128)
+        with tempfile.TemporaryDirectory() as tmp:
+            directory=Path(tmp)/'calibration/wikitext2';directory.mkdir(parents=True)
+            p=directory/'strong_layers8_base.npz';ref.save_model(base,p)
+            runner.write(directory/'fit_manifest.json',dict(arms={'original_B':dict(mode='strong_layers',group=8,
+                base_file_sha256=runner.sha_file(p))}))
+            with mock.patch.dict(runner.FIXED_WIDTH_ABLATIONS,{'strong_layers8_A':('strong_layers',8,'A')}), \
+                    mock.patch.object(ref,'fit',side_effect=AssertionError('no refitting')), \
+                    mock.patch.object(matched,'Predictive') as predictor:
+                runner.adapter_for('strong_layers8_A','wikitext2',Path(tmp),'cpu')
+                args=predictor.call_args.args
+                self.assertEqual(args[1].state_sha256,base.state_sha256);self.assertEqual(args[2].arm,'A')
+                self.assertEqual(args[2].base_sha256,base.state_sha256)
+                p.write_bytes(p.read_bytes()+b'changed')
+                with self.assertRaisesRegex(ValueError,'differs from the original fit manifest'):
+                    runner.adapter_for('strong_layers8_A','wikitext2',Path(tmp),'cpu')
+
+    def test_reused_capture_report_cannot_overwrite_the_original(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp);report=path/'results.json';report.write_text('original evidence')
+            r=subprocess.run([sys.executable,str(Path(runner.__file__)), '--output',tmp,
+                '--captures-from',tmp,'--phase','bench'],capture_output=True,text=True)
+            self.assertEqual(r.returncode,2)
+            self.assertIn('original report is preserved',r.stderr)
+            self.assertEqual(report.read_text(),'original evidence')
     def test_distinct_layers_deduplicated_and_causal(self):
         self.assertEqual([ref.context_layers('strong_layers',l) for l in range(6)],
                          [(),(0,),(0,1),(0,1,2),(0,2,3),(0,3,4)])
@@ -134,6 +174,9 @@ class ReferenceTests(unittest.TestCase):
             self.assertEqual(comparison['encode_speedup_vs_block32_B'],.5)
             self.assertEqual(comparison['decode_speedup_vs_block32_B'],.25)
             self.assertIn('unmeasured',(Path(tmp)/'summary.md').read_text())
+        result['rows'][0]['method']='block32_A';runner.summarize(result)
+        self.assertEqual(result['comparisons_vs_block32_B'],[])
+        self.assertAlmostEqual(result['comparisons_vs_block32_A'][0]['bpv_saved_vs_block32_A'],1.6)
 
     @unittest.skipUnless(torch is not None,'Torch unavailable')
     def test_raw_framing_and_publishable_allowlist(self):
@@ -194,6 +237,27 @@ class CudaTests(unittest.TestCase):
         words=ref.words(capture);packet=engine.encode(torch.from_numpy(words.copy()).to('cuda:0'),7,raw_fallback=False)
         decoded,error,_=engine.decode(packet)
         np.testing.assert_array_equal(decoded.cpu().numpy(),words);np.testing.assert_array_equal(error.cpu().numpy(),0)
+
+
+@unittest.skipUnless(CUDA,'actual CUDA hardware unavailable')
+class CudaNativeTests(unittest.TestCase):
+    def check_codec(self,algorithm):
+        try:import nvidia.nvcomp
+        except ImportError as error:self.skipTest('optional native library unavailable: '+str(error))
+        device=torch.device('cuda:0');stream=torch.cuda.Stream(device=device)
+        # All BF16 patterns, including NaN payloads, infinities and signed zero.
+        words=np.arange(65536,dtype=np.uint16).reshape(2,16,2048)
+        with torch.cuda.stream(stream):
+            adapter=matched.Nvcomp(algorithm,device);source=torch.from_numpy(words.copy()).to(device)
+            record=adapter.encode(source,0)
+            wire,_=matched.export_record(adapter,record,{'model':'native smoke; every BF16 pattern'})
+            del record,source,adapter
+            fresh=matched.Nvcomp(algorithm,device)
+            output=fresh.decode(matched.import_record(fresh,wire,{'model':'native smoke; every BF16 pattern'}))
+            torch.cuda.synchronize(device);np.testing.assert_array_equal(output.cpu().numpy(),words)
+
+    def test_bitcomp_typed_word_roundtrip_before_capture_or_fit(self):self.check_codec('Bitcomp')
+    def test_cascaded_typed_word_roundtrip_before_capture_or_fit(self):self.check_codec('Cascaded')
 
 
 if __name__=='__main__':unittest.main()

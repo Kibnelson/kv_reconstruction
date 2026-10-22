@@ -30,6 +30,11 @@ PREDICTORS = {
     'block32_A': ('block',32,'A'), 'block32_B': ('block',32,'B'),
     'previous32_B': ('previous',32,'B'), 'aqua_style32_B': ('aqua',32,'B'),
     'strong_layers32_B': ('strong_layers',32,'B'), 'strong_layers64_B': ('strong_layers',64,'B')}
+# These arms derive fixed widths directly from already-fitted base files.
+# They require no new model capture or coefficient fit.
+FIXED_WIDTH_ABLATIONS = {
+    'previous32_A': ('previous',32,'A'), 'aqua_style32_A': ('aqua',32,'A'),
+    'strong_layers32_A': ('strong_layers',32,'A'), 'strong_layers64_A': ('strong_layers',64,'A')}
 DEFAULT_METHODS = 'raw_bf16,'+','.join(PREDICTORS)+',splitzip_native,nvcomp_bitcomp,nvcomp_cascaded'
 PRESETS = {
     'pilot': dict(layers=4, train_cases=4, train_tokens=1024, scale_tokens=1024,
@@ -241,10 +246,21 @@ def fit(args, output, manifest):
 def adapter_for(name, track, output, device, train_entries=None, seed=71):
     if name=='raw_bf16':return matched.Raw(device)
     directory=output/'calibration'/track
-    if name in PREDICTORS:
-        mode,group,_=PREDICTORS[name]
-        return matched.Predictive(name,ref.load_model(directory/(mode+str(group)+'_base.npz')),
-                                  prob.load_state(directory/(name+'_state.npz')),device)
+    if name in PREDICTORS or name in FIXED_WIDTH_ABLATIONS:
+        mode,group,arm=(PREDICTORS|FIXED_WIDTH_ABLATIONS)[name]
+        bp=directory/(mode+str(group)+'_base.npz')
+        metadata=json.loads((directory/'fit_manifest.json').read_text())
+        compatible=[v for v in metadata['arms'].values() if v['mode']==mode and v['group']==group]
+        if not compatible or any(v['base_file_sha256']!=sha_file(bp) for v in compatible):
+            raise ValueError('frozen mean predictor file differs from the original fit manifest')
+        base=ref.load_model(bp)
+        if name in FIXED_WIDTH_ABLATIONS:state=prob.empty_state(base,'A')
+        else:
+            sp=directory/(name+'_state.npz')
+            if metadata['arms'][name]['state_file_sha256']!=sha_file(sp):
+                raise ValueError('frozen width state differs from the original fit manifest')
+            state=prob.load_state(sp)
+        return matched.Predictive(name,base,state,device)
     if name.startswith('nvcomp_'):return matched.Nvcomp(name.split('_')[1].title(),device)
     if name=='splitzip_native':
         import torch
@@ -345,17 +361,18 @@ def summarize(result):
             decode_wall_ms_mean_of_medians=float(np.mean([r['decode']['wall_median_ms'] for r in rs])),
             raw_chunks=sum(r['raw_chunks'] for r in rs),exact=all(r['exact'] for r in rs)))
     result['aggregates']=aggregates
-    reference={(r['track'],r['request_tokens']):r for r in aggregates if r['method']=='block32_B'}
-    comparisons=[]
-    for r in aggregates:
-        base=reference.get((r['track'],r['request_tokens']))
-        if base is None or r is base or not r['exact']:continue
-        comparisons.append(dict(track=r['track'],method=r['method'],request_tokens=r['request_tokens'],
-            bpv_saved_vs_block32_B=base['complete_bpv']-r['complete_bpv'],
-            saving_percentage_points_vs_block32_B=(base['complete_bpv']-r['complete_bpv'])*100/16,
-            encode_speedup_vs_block32_B=base['encode_wall_ms_mean_of_medians']/r['encode_wall_ms_mean_of_medians'],
-            decode_speedup_vs_block32_B=base['decode_wall_ms_mean_of_medians']/r['decode_wall_ms_mean_of_medians']))
-    result['comparisons_vs_block32_B']=comparisons
+    for control in ['block32_A','block32_B']:
+        reference={(r['track'],r['request_tokens']):r for r in aggregates if r['method']==control}
+        comparisons=[]
+        for r in aggregates:
+            base=reference.get((r['track'],r['request_tokens']))
+            if base is None or r is base or not r['exact']:continue
+            comparisons.append(dict(track=r['track'],method=r['method'],request_tokens=r['request_tokens'],**{
+                'bpv_saved_vs_'+control:base['complete_bpv']-r['complete_bpv'],
+                'saving_percentage_points_vs_'+control:(base['complete_bpv']-r['complete_bpv'])*100/16,
+                'encode_speedup_vs_'+control:base['encode_wall_ms_mean_of_medians']/r['encode_wall_ms_mean_of_medians'],
+                'decode_speedup_vs_'+control:base['decode_wall_ms_mean_of_medians']/r['decode_wall_ms_mean_of_medians']}))
+        result['comparisons_vs_'+control]=comparisons
     return aggregates
 
 
@@ -368,13 +385,14 @@ def save_report(output,result):
         '|---|---|---:|---:|---:|---:|---:|---|']
     for r in aggregates:
         lines.append(f"| {r['track']} | {r['method']} | {r['request_tokens']} | {r['complete_bpv']:.5f} | {r['saving_percent']:.2f}% | {r['encode_wall_ms_mean_of_medians']:.3f} | {r['decode_wall_ms_mean_of_medians']:.3f} | {r['exact']} |")
-    stronger=[c for c in result['comparisons_vs_block32_B'] if c['method'].startswith('strong_layers')]
-    if stronger:
-        lines+=['','| Track | Added context | Tokens | bpv saved vs B | Encode speedup | Decode speedup |',
-                '|---|---|---:|---:|---:|---:|']
-        for c in stronger:
-            lines.append(f"| {c['track']} | {c['method']} | {c['request_tokens']} | {c['bpv_saved_vs_block32_B']:+.5f} | {c['encode_speedup_vs_block32_B']:.3f}× | {c['decode_speedup_vs_block32_B']:.3f}× |")
-        lines+=['','Positive bpv differences mean smaller complete packets. Speedup below 1 means slower. Inspect both tracks and shared state before promoting a candidate.']
+    for control in ['block32_A','block32_B']:
+        stronger=[c for c in result['comparisons_vs_'+control] if c['method'].startswith('strong_layers')]
+        if stronger:
+            lines+=['',f'| Track | Added context | Tokens | bpv saved vs {control} | Encode speedup | Decode speedup |',
+                    '|---|---|---:|---:|---:|---:|']
+            for c in stronger:
+                lines.append(f"| {c['track']} | {c['method']} | {c['request_tokens']} | {c['bpv_saved_vs_'+control]:+.5f} | {c['encode_speedup_vs_'+control]:.3f}× | {c['decode_speedup_vs_'+control]:.3f}× |")
+    lines+=['','Positive bpv differences mean smaller complete packets. Speedup below 1 means slower. Compare against fixed-width A as well as B before promoting a candidate.']
     states=[(t,m,v) for t,methods in result['availability'].items() for m,v in methods.items() if v['status']=='available']
     if states:
         lines+=['','| Track | Method | Shared GPU state MiB |','|---|---|---:|']
@@ -398,7 +416,8 @@ def save_report(output,result):
     (output/'summary.md').write_text('\n'.join(lines)+'\n')
 
 
-def bench(args,output,manifest,result,torch,device):
+def bench(args,output,manifest,result,torch,device,source_root=None):
+    source_root=output if source_root is None else source_root
     for track in args.tracks:
         entries=[e for e in manifest['entries'] if e['track']==track]
         cases=requests([e for e in entries if e['split']=='test'],args.request_tokens)
@@ -407,19 +426,19 @@ def bench(args,output,manifest,result,torch,device):
             adapter=None
             try:
                 log(track+'/'+name+': initialize frozen decoder state')
-                begin=time.perf_counter();adapter=adapter_for(name,track,output,device,
+                begin=time.perf_counter();adapter=adapter_for(name,track,source_root,device,
                     [e for e in entries if e['split']=='train'],args.seed)
                 torch.cuda.synchronize(device)
                 result['availability'][track][name]=dict(status='available',cold_initialization_seconds=time.perf_counter()-begin,
                                                          **adapter.statistics())
             except Exception as error:
-                if name in PREDICTORS or name=='raw_bf16':raise
+                if name in PREDICTORS or name in FIXED_WIDTH_ABLATIONS or name=='raw_bf16':raise
                 result['availability'][track][name]=dict(status='unavailable',reason=repr(error))
                 log(name+' unavailable: '+str(error));save_report(output,result);continue
             try:
                 for i,(e,start,n) in enumerate(cases):
                     log(f'{track}/{name}: {e["name"]} tokens {start}:{start+n} ({i+1}/{len(cases)})')
-                    a=load_capture(output,e);original=ref.words(a)[:,start:start+n].copy();raw_bytes=original.nbytes
+                    a=load_capture(source_root,e);original=ref.words(a)[:,start:start+n].copy();raw_bytes=original.nbytes
                     torch.cuda.synchronize(device);begin=time.perf_counter()
                     source=torch.from_numpy(original).to(device);torch.cuda.synchronize(device)
                     upload_seconds=time.perf_counter()-begin
@@ -472,18 +491,25 @@ def main():
     p.add_argument('--request-tokens',default='32,128');p.add_argument('--warmup',type=int)
     p.add_argument('--repeats',type=int);p.add_argument('--seed',type=int,default=71)
     p.add_argument('--device',default='cuda:0');p.add_argument('--phase',choices=['capture','fit','bench','all'],default='all')
+    p.add_argument('--captures-from',type=Path,help='bench only: reuse frozen captures/calibration and write a separate report')
     args=p.parse_args();args.tracks=args.tracks.split(',');args.methods=args.methods.split(',')
     if args.warmup is None:args.warmup=3 if args.preset=='full' else 1
     if args.repeats is None:args.repeats=10 if args.preset=='full' else 3
     args.request_tokens=list(map(int,args.request_tokens.split(',')))
-    allowed=set(DEFAULT_METHODS.split(','))
+    allowed=set(DEFAULT_METHODS.split(','))|set(FIXED_WIDTH_ABLATIONS)
     if (not args.tracks or len(set(args.tracks))!=len(args.tracks) or set(args.tracks)-{'wikitext2','c4'}
             or not args.methods or len(set(args.methods))!=len(args.methods) or set(args.methods)-allowed
             or args.warmup<0 or args.repeats<1 or not args.request_tokens or min(args.request_tokens)<1):
         p.error('invalid tracks, methods, sizes or timing count')
-    output=args.output.resolve();output.mkdir(parents=True,exist_ok=True)
+    if args.captures_from and args.phase!='bench':p.error('--captures-from requires --phase bench; no refitting is performed')
+    if set(args.methods)&set(FIXED_WIDTH_ABLATIONS) and args.phase!='bench':p.error('fixed-width ablations reuse fitted means; use --phase bench')
+    output=args.output.resolve()
+    if args.captures_from and (output==args.captures_from.resolve() or (output/'results.json').exists()):
+        p.error('use a fresh output directory; the original report is preserved')
+    output.mkdir(parents=True,exist_ok=True)
+    source_root=args.captures_from.resolve() if args.captures_from else output
     result=dict(format='qwen_matched_gpu_report_v1',status='running',gpu_measured=False,
-        protocol=vars(args)|{'output':str(output)},rows=[],availability={},failures=[],
+        protocol=vars(args)|{'output':str(output),'captures_from':str(source_root) if args.captures_from else None},rows=[],availability={},failures=[],
         limits=['pilot/full presets are explicitly different from paper sampling',
                 'strong_layers is a first controlled ablation, not full strong-and-fast',
                 'ExANS and speculative FP8 model-copy adapters pending',
@@ -498,7 +524,7 @@ def main():
             torch=torch.__version__,cuda=torch.version.cuda,triton=importlib.metadata.version('triton'),
             python=platform.python_version(),total_memory_bytes=torch.cuda.get_device_properties(device).total_memory)
         result['software']={}
-        for package in ['transformers','datasets','numpy','huggingface-hub','nvidia-nvcomp-cu12']:
+        for package in ['transformers','datasets','numpy','huggingface-hub','nvidia-nvcomp-cu12','nvidia-libnvcomp-cu12']:
             try:result['software'][package]=importlib.metadata.version(package)
             except importlib.metadata.PackageNotFoundError:result['software'][package]='not installed'
         try:
@@ -508,21 +534,24 @@ def main():
                 scope='all physical GPUs; Torch device selection follows CUDA_VISIBLE_DEVICES')
         except Exception as error:result['nvidia_smi_initial']=dict(unavailable=repr(error))
         if args.phase in ('capture','all'):manifest=capture(args,output,torch,device)
-        else:manifest=json.loads((output/'capture_manifest.json').read_text())
+        else:manifest=json.loads((source_root/'capture_manifest.json').read_text())
         expected=dict(model=MODEL,model_revision=REVISION,tracks=args.tracks,preset=args.preset,seed=args.seed,**PRESETS[args.preset])
         if manifest['protocol']!=expected:raise ValueError('arguments differ from frozen capture protocol')
-        for e in manifest['entries']:load_capture(output,e,verify=True)
+        for e in manifest['entries']:load_capture(source_root,e,verify=True)
         result['data']=manifest
         result['coverage']={t:coverage([e for e in manifest['entries'] if e['track']==t and e['split']=='test'],args.request_tokens) for t in args.tracks}
         if args.phase in ('fit','all'):result['calibration']=fit(args,output,manifest)
         if args.phase in ('bench','all'):
             if args.phase=='bench':
-                result['calibration']={t:json.loads((output/'calibration'/t/'fit_manifest.json').read_text()) for t in args.tracks}
+                result['calibration']={t:json.loads((source_root/'calibration'/t/'fit_manifest.json').read_text()) for t in args.tracks}
+                result['frozen_source']=dict(capture_manifest_sha256=sha_file(source_root/'capture_manifest.json'),
+                    calibration_manifests_sha256={t:sha_file(source_root/'calibration'/t/'fit_manifest.json') for t in args.tracks},
+                    scope='original captures and fitted means reused without refitting; fixed-width A states derived from saved base widths')
             # An explicit nondefault stream is accepted by nvCOMP and is also
             # the current Torch stream for all copies, kernels and events.
             bench_stream=torch.cuda.Stream(device=device)
             with torch.cuda.stream(bench_stream):
-                bench(args,output,manifest,result,torch,device)
+                bench(args,output,manifest,result,torch,device,source_root)
         result['status']='failed' if result['failures'] else ('completed' if args.phase in ('all','bench') else args.phase+'_completed')
         if result['status']=='completed' and any(v['status']=='unavailable' for ms in result['availability'].values() for v in ms.values()):
             result['status']='completed_with_unavailable_baselines'
@@ -536,6 +565,7 @@ def main():
             ROOT/'qwen_kv_bench/transfer_reference.py',ROOT/'qwen_kv_bench/transfer_probability.py',ROOT/'qwen_kv_bench/transfer_t1_kernels.py',
             ROOT/'qwen_kv_bench/transfer_gpu_predictor.py',ROOT/'qwen_kv_bench/model_runtime.py',
             ROOT/'scripts/run_qwen_matched_a4500.sh',ROOT/'scripts/setup_qwen_matched_baselines.py',
+            ROOT/'scripts/repair_qwen_matched_a4500.sh',
             ROOT/'scripts/package_qwen_matched_gpu.py',ROOT/'tests/test_qwen_matched_gpu.py']}))
         save_report(output,result)
     log('completed: '+str(output/'summary.md'))

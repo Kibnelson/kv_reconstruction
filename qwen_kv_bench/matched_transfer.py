@@ -22,6 +22,7 @@ FORMAT = 'qwen_matched_transfer_v1'
 MAGIC = b'KVMTCH01'
 HEADER = struct.Struct('<8sI32s')
 SPLITZIP_COMMIT = '42c743118a29db3270ae6a921a4a4eecb20cad04'
+NVCOMP_VERSION = '5.3.0.16'
 # Hash of the unmodified upstream codec_gpu.py, filled/checked by setup.
 SPLITZIP_SHA256 = 'e28fe3263e8906b26d59789cbc5bccf14edc8391b0dae986aafaf34adb2d392c'
 DTYPES = {'uint8': np.dtype('u1'), 'uint16': np.dtype('<u2'),
@@ -179,7 +180,8 @@ class Predictive(Adapter):
 
     def statistics(self):
         return dict(self.engine.statistics(), layout_permutation='included in encode and decode',
-                    chunk_tokens=32, predictor_mode=self.engine.base.mode, group_channels=self.engine.base.block_size)
+                    chunk_tokens=32, predictor_mode=self.engine.base.mode, group_channels=self.engine.base.block_size,
+                    mean_state_sha256=self.engine.base.state_sha256, width_arm=self.engine.adapter.arm)
 
 
 def load_splitzip(path):
@@ -250,6 +252,8 @@ class Nvcomp(Adapter):
         import importlib.metadata
         self.device = device; self.nvcomp = nvcomp; self.name = 'nvcomp_'+algorithm.lower()
         self.version = importlib.metadata.version('nvidia-nvcomp-cu12')
+        if int(self.version.split('.')[0]) < 5 and int(np.__version__.split('.')[0]) >= 2:
+            raise RuntimeError('nvCOMP 4.x misreads NumPy 2 dtype metadata; install the pinned nvCOMP '+NVCOMP_VERSION+' wrapper and runtime')
         self.stream = int(torch.cuda.current_stream(device).cuda_stream)
         self.codec = nvcomp.Codec(algorithm=algorithm, device_id=device.index or 0,
                                  cuda_stream=self.stream, data_type='<i2')
@@ -257,7 +261,10 @@ class Nvcomp(Adapter):
 
     def encode(self, words, start):
         import torch
-        array = self.codec.encode(self.nvcomp.as_array(words.reshape(-1).view(torch.int16), cuda_stream=self.stream))
+        source = self.nvcomp.as_array(words.reshape(-1).view(torch.int16), cuda_stream=self.stream)
+        if np.dtype(source.dtype) != np.dtype('<i2') or source.item_size != 2 or source.buffer_size != words.numel()*2:
+            raise RuntimeError('nvCOMP input dtype/byte count differs from the original int16 word view')
+        array = self.codec.encode(source)
         data = torch.from_dlpack(array).view(torch.uint8).reshape(-1)
         if data.numel()!=array.buffer_size:raise ValueError('nvCOMP array accounting mismatch')
         return Record(tuple(words.shape), start, dict(compressed=data))
@@ -265,7 +272,7 @@ class Nvcomp(Adapter):
     def decode(self, record):
         import torch
         validate_record(record)
-        array = self.codec.decode(self.nvcomp.as_array(record.parts['compressed'], cuda_stream=self.stream))
+        array = self.codec.decode(self.nvcomp.as_array(record.parts['compressed'], cuda_stream=self.stream), data_type='|u1')
         return torch.from_dlpack(array).view(torch.uint16).reshape(record.shape)
 
     def statistics(self):

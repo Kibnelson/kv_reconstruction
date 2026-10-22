@@ -1,0 +1,59 @@
+{
+  "format": "qwen_matched_repair_software_validation_v1",
+  "status": "passed_software_checks",
+  "cuda_executed": false,
+  "tests": {
+    "run": 26,
+    "passed": 21,
+    "skipped_cuda": 5,
+    "seconds": 17.386
+  },
+  "syntax": {
+    "bash": "passed",
+    "python": "passed",
+    "git_diff_check": "passed"
+  },
+  "dtype_metadata_probe": {
+    "cuda_executed": false,
+    "method": "CPU-only call to SDK 4.2.0 native type parsing/validation, Python 3.12",
+    "sdk_package": "nvidia-nvcomp-cu12==4.2.0.14",
+    "numpy_2_3_5": {
+      "<i2": "Unknown output data type",
+      "<i4": "Unknown output data type",
+      "<f2": "Unknown output data type",
+      "|u1": "accepted"
+    },
+    "numpy_1_26_4": {
+      "<i2": "accepted",
+      "<i4": "accepted",
+      "<f2": "accepted",
+      "|u1": "accepted"
+    }
+  },
+  "updated_sdk": {
+    "wrapper": "5.3.0.16",
+    "separate_runtime": "5.3.0.16",
+    "host_import": "passed with NumPy 2.3.5",
+    "actual_cuda_roundtrip": "not measured locally; required A4500 preflight covers every BF16 word pattern"
+  },
+  "frozen_mean_reuse": {
+    "no_refit_test": "passed",
+    "base_file_hash_mismatch_rejected": true,
+    "original_report_overwrite_rejected": true
+  },
+  "standalone": {
+    "rebuilt_and_checked_locally": true,
+    "sha256": "54835ea79bffda3f806b5bf3ebaa50f582950345f2b626d0744316c00f91e229",
+    "publication": "source only; A4500 helper rebuilds and commits generated runner with results"
+  },
+  "files": {
+    "qwen_kv_bench/matched_transfer.py": "1f2556e8ef0544672fc4a4d31ed2255ffe5bef23eb443aa3d179257ac9808e61",
+    "scripts/bench_qwen_matched_gpu.py": "0737838e5713be959de187fc5e1a2e69833b2ceabd21fad88453e388278d68a6",
+    "scripts/setup_qwen_matched_baselines.py": "863b18db99d2f5dae2ed3457d7041110bba2b5dd0b1435ea941f18c85431ea15",
+    "scripts/run_qwen_matched_a4500.sh": "e79d435a2804dd4ebabef4ce284478b71a11ef51f290cf749d7252679ed13c06",
+    "scripts/repair_qwen_matched_a4500.sh": "af3613b63a8fca61ee7e4f03f1cab84eb09e5b047c8d054a0a2d7127c406242c",
+    "tests/test_qwen_matched_gpu.py": "d2170db2274b515dc918c4b76d1c9295650815364bd6cd015ab22133c682db56",
+    "docs/qwen_matched_gpu_comparison.md": "d1388473ac695f356dbdc517457ddccc286e28c729d2e47e764b72bc96aaf081",
+    "docs/qwen_matched_a4500_pilot_review.md": "e36cf39db998732082ad22f0c697e8ee0512f2981b39f2b6ebd487e1e58cb210"
+  }
+}

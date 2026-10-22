@@ -37,7 +37,7 @@ python scripts/setup_qwen_matched_baselines.py --install-nvcomp
 cp runs/_matched_baselines/setup.json "$run_dir/baseline_setup.json"
 
 status=0
-python -m unittest tests.test_transfer_t1.CudaTests tests.test_qwen_matched_gpu.CudaTests -v \
+python -m unittest tests.test_transfer_t1.CudaTests tests.test_qwen_matched_gpu.CudaTests tests.test_qwen_matched_gpu.CudaNativeTests -v \
   2>&1 | tee "$run_dir/cuda_tests.log" || status=$?
 if (( status == 0 )); then
   python -u scripts/bench_qwen_matched_gpu.py --output "$run_dir" --preset "$preset" "${extra[@]}" || status=$?

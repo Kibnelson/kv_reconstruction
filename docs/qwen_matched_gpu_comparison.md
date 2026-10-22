@@ -170,3 +170,22 @@ matched overhead accounting after this first GPU comparison.
 - [Speculative KV coding methodology](https://blog.doubleword.ai/speculative-kv-coding)
 - [AQUA-KV](https://arxiv.org/abs/2501.19392)
 - [NVIDIA nvCOMP Python interface](https://docs.nvidia.com/cuda/nvcomp/py_api.html)
+
+## Continuing from the first A4500 pilot
+
+See [the pilot review](qwen_matched_a4500_pilot_review.md) for the measured
+regressions and native baseline failure. The repair uses nvCOMP 5.3.0.16 plus
+its separately pinned runtime, with native CUDA round trips before benchmarking.
+
+`repair_qwen_matched_a4500.sh runs/ORIGINAL_RUN --publish-results` reuses the
+original captures and frozen mean predictors, adds fixed-width A ablations,
+and writes a separate report. It performs no prefill or coefficient fitting.
+The original B states are not recalibrated. Do not use an ordinary full-phase
+resume to apply this repair, because that verifies the fitting source identity.
+
+For a manual equivalent, use `bench_qwen_matched_gpu.py --phase bench
+--captures-from runs/ORIGINAL_RUN --output runs/FRESH_REPORT` with the desired
+`--methods`. The extra fixed-width names are `previous32_A`, `aqua_style32_A`,
+`strong_layers32_A` and `strong_layers64_A`. They derive their A state from the
+stored base widths; no new calibration stream is needed. The original report
+and all calibration arrays remain unchanged.

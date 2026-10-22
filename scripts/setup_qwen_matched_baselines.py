@@ -14,7 +14,7 @@ import urllib.request
 
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
-from qwen_kv_bench.matched_transfer import SPLITZIP_COMMIT,SPLITZIP_SHA256
+from qwen_kv_bench.matched_transfer import SPLITZIP_COMMIT,SPLITZIP_SHA256,NVCOMP_VERSION
 
 
 def main():
@@ -33,10 +33,13 @@ def main():
         report['splitzip'].update(status='ready',source_sha256=SPLITZIP_SHA256)
     except Exception as error:report['splitzip']['reason']=repr(error)
     if args.install_nvcomp:
-        # This CUDA-12 release supports Python 3.12 on the A4500 host and
-        # does not depend on or replace Torch/Triton.
-        r=subprocess.run([sys.executable,'-m','pip','install','--no-deps','nvidia-nvcomp-cu12==4.2.0.14'])
-        report['nvcomp']=dict(status='installed' if r.returncode==0 else 'unavailable',version='4.2.0.14',returncode=r.returncode)
+        # nvCOMP 4.2's dtype parser misreads NumPy 2 metadata. Pin the newer
+        # wrapper AND its separately distributed runtime. --no-deps preserves
+        # the existing Torch/Triton/NumPy installation.
+        packages=[name+'=='+NVCOMP_VERSION for name in ['nvidia-nvcomp-cu12','nvidia-libnvcomp-cu12']]
+        r=subprocess.run([sys.executable,'-m','pip','install','--no-deps',*packages])
+        report['nvcomp']=dict(status='installed' if r.returncode==0 else 'unavailable',version=NVCOMP_VERSION,
+                             packages=packages,returncode=r.returncode)
     (directory.parent/'setup.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
     # Optional native baseline failures are recorded; the core experiment
