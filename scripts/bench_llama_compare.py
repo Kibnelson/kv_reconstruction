@@ -44,8 +44,36 @@ TRAIN = [f"train{i}" for i in range(6)]
 TESTS = ["test_text", "test_code"]
 
 
+LOG_PATH = None
+
+
 def log(message):
-    print(time.strftime("%H:%M:%S"), message, flush=True)
+    line = f"{time.strftime('%H:%M:%S')} {message}"
+    print(line, flush=True)
+    if LOG_PATH is not None:
+        with open(LOG_PATH, "a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+
+
+def environment(args):
+    """Versions, device and source commit, recorded with every run."""
+    import platform
+    import subprocess
+    import torch
+    import transformers
+    info = {"python": platform.python_version(), "platform": platform.platform(), "torch": torch.__version__,
+            "cuda_runtime": torch.version.cuda, "transformers": transformers.__version__, "numpy": np.__version__,
+            "device": args.device}
+    if str(args.device).startswith("cuda") and torch.cuda.is_available():
+        info["gpu"] = torch.cuda.get_device_name(torch.device(args.device))
+        info["gpu_memory_bytes"] = torch.cuda.get_device_properties(torch.device(args.device)).total_memory
+    try:
+        info["git_commit"] = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        info["git_dirty"] = bool(subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain", "--untracked-files=no"],
+                                                capture_output=True, text=True).stdout.strip())
+    except OSError:
+        info["git_commit"] = None
+    return info
 
 
 def stage_capture(args, out):
@@ -217,7 +245,15 @@ def main(argv=None):
         if (out / "captures").exists() and any((out / "captures").iterdir()):
             raise SystemExit(f"{out}/captures is not empty; use a fresh --output or drop the capture stage")
         out.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
+    global LOG_PATH
+    LOG_PATH = out / "run.log"
+    started = time.time()
     (out / "run_args.json").write_text(json.dumps({k: str(v) for k, v in vars(args).items()}, indent=1))
+    env = environment(args)
+    env["stages"] = stages
+    (out / "environment.json").write_text(json.dumps(env, indent=1))
+    log(f"run started: stages {stages}; {env.get('gpu', env['device'])}; commit {env.get('git_commit')}")
     if "capture" in stages:
         stage_capture(args, out)
     if "lossless" in stages:
@@ -226,6 +262,8 @@ def main(argv=None):
         stage_lossy(args, out)
     if "report" in stages:
         stage_report(args, out)
+    log(f"run finished in {time.time() - started:.0f} s")
+    log(f"share it: python scripts/package_llama_compare.py {out} --destination benchmark_results/<name>")
 
 
 if __name__ == "__main__":

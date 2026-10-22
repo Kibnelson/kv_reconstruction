@@ -23,7 +23,22 @@ python -m unittest discover -s kv_compare -p 'test_*.py' -v      # CPU, tiny ran
 python scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare
 ```
 
-Share `runs/llama32_3b_compare/summary.md`, `lossless.json`, `lossy.json` and `captures/meta.json`.
+### Commit the results to this branch
+
+Package the small result files into `benchmark_results/` and push them to this branch for review. The captured KV stays local.
+
+```bash
+NAME=llama32_3b_compare_a4500_$(date +%Y%m%d_%H%M)
+python scripts/package_llama_compare.py runs/llama32_3b_compare --destination benchmark_results/$NAME
+git add benchmark_results/$NAME
+git commit -m "Add Llama-3.2-3B codec comparison results ($NAME)"
+git push
+```
+
+The package holds `summary.md`, `lossless.json`, `lossy.json`, `run_args.json`, `environment.json` (GPU,
+versions, source commit), `run.log` and `capture_meta.json`, plus `manifest.json` with SHA256 hashes. Before
+copying, the packager checks that the reports agree with the summary and that the exact KV reproduced the
+baseline.
 
 | Stage | What it does | Approximate size |
 | --- | --- | --- |

@@ -153,5 +153,28 @@ class TinyLlamaTests(unittest.TestCase):
         self.assertTrue(math.isfinite(lossy))
 
 
+class PackageTests(unittest.TestCase):
+    def test_package_copies_small_files_and_refuses_overwrite(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import package_llama_compare as pk
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp) / "run"
+            (run / "captures").mkdir(parents=True)
+            (run / "captures" / "meta.json").write_text("{}")
+            (run / "captures" / "x_K_bits.npy").write_bytes(b"not copied")
+            (run / "run_args.json").write_text("{}")
+            (run / "environment.json").write_text("{}")
+            (run / "lossless.json").write_text(json.dumps({"layers": 2, "methods": {"ExANS-style": {}}}))
+            (run / "summary.md").write_text("| ExANS-style | 10.7 |\n")
+            dest = Path(tmp) / "out"
+            self.assertEqual(pk.main([str(run), "--destination", str(dest)]), 0)
+            self.assertTrue((dest / "capture_meta.json").is_file())
+            self.assertFalse(any(p.suffix == ".npy" for p in dest.iterdir()))
+            manifest = json.loads((dest / "manifest.json").read_text())
+            self.assertIn("lossless.json", manifest["files"])
+            with self.assertRaises(SystemExit):
+                pk.main([str(run), "--destination", str(dest)])
+
+
 if __name__ == "__main__":
     unittest.main()
