@@ -58,7 +58,19 @@ def _geometry(capture):
     base = float(capture["base"])
     if min(layers, tokens, channels, heads, dim) <= 0 or dim % 2 or channels != heads * dim or not np.isfinite(base) or base <= 1:
         raise ValueError("invalid ACT geometry")
-    return dict(layers=layers, channels=channels, heads=heads, head_dim=dim, base=base)
+    result = dict(layers=layers, channels=channels, heads=heads, head_dim=dim, base=base)
+    if "rope_inv_freq" in capture:
+        frequency = np.asarray(capture["rope_inv_freq"], dtype=np.float64)
+        if frequency.shape != (dim // 2,) or not np.isfinite(frequency).all() or np.any(frequency <= 0):
+            raise ValueError("invalid captured RoPE inverse frequencies")
+        result["rope_inv_freq"] = frequency.tolist()
+    return result
+
+
+def _rope_frequencies(geometry):
+    if "rope_inv_freq" in geometry:
+        return np.asarray(geometry["rope_inv_freq"], dtype=np.float64)
+    return geometry["base"] ** (-np.arange(0, geometry["head_dim"], 2, dtype=np.float64) / geometry["head_dim"])
 
 
 def _positions(capture):
@@ -80,7 +92,7 @@ def _fixed(value, name="features"):
 def _rope_float(values, geometry, positions, inverse=False):
     dim = geometry["head_dim"]
     k = values.reshape(len(values), geometry["heads"], dim)
-    angles = positions[:, None] * geometry["base"] ** (-np.arange(0, dim, 2, dtype=np.float64) / dim)[None, :]
+    angles = positions[:, None] * _rope_frequencies(geometry)[None, :]
     cosine, sine = np.cos(angles)[:, None], np.sin(angles)[:, None]
     if inverse:
         sine = -sine
@@ -287,7 +299,7 @@ def fit(train, scale, mode="block", block_size=32, metadata_train=None, metadata
     if max_positions < needed or max_positions > 1 << 20:
         raise ValueError("max_positions does not cover calibration positions")
     geometry = dict(geometry, max_positions=max_positions)
-    angles = np.arange(max_positions, dtype=np.float64)[:, None] * geometry["base"] ** (-np.arange(0, geometry["head_dim"], 2, dtype=np.float64) / geometry["head_dim"])[None, :]
+    angles = np.arange(max_positions, dtype=np.float64)[:, None] * _rope_frequencies(geometry)[None, :]
     cosine = np.rint(np.cos(angles) * (1 << 15)).astype(np.int64)
     sine = np.rint(np.sin(angles) * (1 << 15)).astype(np.int64)
     f_tab = np.rint(2.0 ** 32 / (1 + np.exp(-(-32.0 + np.arange(16385) / 256)))).astype(np.int64)

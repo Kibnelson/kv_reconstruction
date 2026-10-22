@@ -1,0 +1,26 @@
+{
+  "upstream_commit": "de6c38bcc5438475bd1abf1e9b3d154cef414ef6",
+  "command": [
+    "/workspace/scratch/cf461553fac4/native_baseline_validation/cuda128_bootstrap/toolkit/bin/nvcc",
+    "-std=c++17",
+    "-O3",
+    "--shared",
+    "-Xcompiler=-fPIC",
+    "--expt-relaxed-constexpr",
+    "-gencode",
+    "arch=compute_86,code=sm_86",
+    "-I/workspace/scratch/cf461553fac4/native_baseline_validation/openlake/crates/openlake_kv_client/cuda/include",
+    "-I/workspace/scratch/cf461553fac4/native_baseline_validation/openlake/crates/openlake_kv_client/cuda/src",
+    "-I/workspace/scratch/cf461553fac4/nvcomp_validation/wheel53/nvidia/libnvcomp/include",
+    "/workspace/scratch/cf461553fac4/native_baseline_validation/openlake/crates/openlake_kv_client/cuda/src/expans_codec.cu",
+    "-L/workspace/scratch/cf461553fac4/nvcomp_validation/wheel53/nvidia/libnvcomp/lib64",
+    "-l:libnvcomp.so.5",
+    "-o",
+    "/workspace/scratch/cf461553fac4/llama_exans_original.so"
+  ],
+  "returncode": 2,
+  "source_sha256": "4e43cd11f0ed294b467e90b96597988a9f26a84942e44de9031d769357d24dff",
+  "source_modified": false,
+  "gpu_measured": false,
+  "scope": "Host compilation check only; unmodified source fails unique_ptr to raw pointer conversion"
+}

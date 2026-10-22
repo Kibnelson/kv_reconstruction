@@ -4,6 +4,11 @@ Updated 2026-10-22. This protocol supersedes the adapted page comparison as
 the basis for claims about AQUA-KV, SplitZip and ExANS. Historical source,
 measurements and reports remain unchanged.
 
+The user has subsequently selected Llama-3.2-3B for a separate common-model
+GPU test. See [the Llama official run](llama32_official_gpu.md). The fixed-Qwen
+rules below continue to describe the Qwen track; Qwen results and calibration
+are not reused as Llama results.
+
 ## Fixed model and comparison rule
 
 Use `Qwen/Qwen3-4B-Instruct-2507`, revision

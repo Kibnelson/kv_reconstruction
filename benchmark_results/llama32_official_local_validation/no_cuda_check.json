@@ -1,0 +1,18 @@
+{
+  "returncode": 1,
+  "gpu_measured": false,
+  "status": "partial_or_blocked",
+  "stages": {
+    "hardware": {
+      "status": "blocked",
+      "started": "2026-10-22T12:31:46.391786+00:00",
+      "completed": "2026-10-22T12:31:51.402373+00:00",
+      "reason": "Actual CUDA required; no CPU or Triton interpreter fallback",
+      "traceback": "Traceback (most recent call last):\n  File \"/workspace/scratch/cf461553fac4/kv_llama_official/scripts/run_llama_official_a4500.py\", line 121, in stage\n    info=action() or {}\n         ^^^^^^^^\n  File \"/workspace/scratch/cf461553fac4/kv_llama_official/scripts/run_llama_official_a4500.py\", line 165, in hardware\n    torch=cuda()\n          ^^^^^^\n  File \"/workspace/scratch/cf461553fac4/kv_llama_official/scripts/llama_official_worker.py\", line 36, in cuda\n    raise RuntimeError('Actual CUDA required; no CPU or Triton interpreter fallback')\nRuntimeError: Actual CUDA required; no CPU or Triton interpreter fallback\n"
+    },
+    "model": {
+      "status": "blocked",
+      "reason": "Dependency did not complete: hardware"
+    }
+  }
+}

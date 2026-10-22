@@ -1,0 +1,18 @@
+[2026-10-22T12:31:51.402765+00:00] hardware: BLOCKED: Actual CUDA required; no CPU or Triton interpreter fallback
+# Llama-3.2-3B official GPU evaluation
+
+Status: **partial_or_blocked**. GPU measured: **False**.
+
+Model: `unsloth/Llama-3.2-3B` at `d4446454d87d51aa42e1fb174f25acc5f8762331`; original BF16, all 28 layers.
+
+| Stage | Status | Detail |
+|---|---|---|
+| hardware | blocked | Actual CUDA required; no CPU or Triton interpreter fallback |
+| model | blocked | Dependency did not complete: hardware |
+
+Official SplitZip results are native codec metrics. Our results include separate payload and framed bytes, synchronized wall samples and CUDA intervals.
+AQUA PPL, native codec throughput and our packet latency have different scopes; no cross-scope speed ranking is produced.
+Blocked stages have no substituted, synthetic, CPU-estimated or adapted performance results.
+This base-model test does not measure LongBench, compressed attention, T-to-P conversion, SSD/network or serving throughput.
+
+Resume: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python scripts/run_llama_official_a4500.py --resume /tmp/tmpnq_uzbv1/no_cuda --stages splitzip,ours,exans,aqua
