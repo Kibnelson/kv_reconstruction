@@ -1,0 +1,157 @@
+"""CPU tests on a tiny random Llama (no downloads): capture, RoPE geometry, lossless and lossy codecs, quality.
+
+    python -m unittest discover -s kv_compare -p 'test_*.py' -v
+"""
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+try:
+    import torch
+    from transformers import LlamaConfig, LlamaForCausalLM
+except ImportError:  # pragma: no cover
+    torch = None
+
+NAMES = [f"train{i}" for i in range(6)] + ["tables", "test_text", "test_code"]
+
+
+def tiny_model():
+    torch.manual_seed(0)
+    cfg = LlamaConfig(vocab_size=97, hidden_size=64, intermediate_size=96, num_hidden_layers=4,
+                      num_attention_heads=4, num_key_value_heads=2, head_dim=16, max_position_embeddings=2048,
+                      rope_theta=500000.0,
+                      rope_scaling={"rope_type": "llama3", "factor": 8.0, "low_freq_factor": 1.0,
+                                    "high_freq_factor": 4.0, "original_max_position_embeddings": 64})
+    model = LlamaForCausalLM(cfg).to(torch.bfloat16).eval()
+    return model
+
+
+def doc_ids(seed, n, vocab=97):
+    rng = np.random.default_rng(seed)
+    base = rng.integers(0, vocab, size=40)
+    ids = np.concatenate([base[rng.integers(0, 40, size=n // 2)], rng.integers(0, vocab, size=n - n // 2)])
+    return [int(v) for v in ids]
+
+
+@unittest.skipIf(torch is None, "PyTorch and Transformers are required")
+class TinyLlamaTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from kv_compare.capture import capture_ids, model_meta
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name) / "captures"
+        cls.model = tiny_model()
+        cls.device = torch.device("cpu")
+        meta = model_meta(cls.model, "tiny-random-llama", None)
+        reports = []
+        cls.tokens = 320
+        for i, name in enumerate(NAMES):
+            reports.append(capture_ids(cls.model, doc_ids(i, cls.tokens), cls.root, name, cls.device,
+                                       queries=name.startswith("train")))
+        (cls.root / "meta.json").write_text(json.dumps(dict(meta, tokens=cls.tokens, captures=reports)))
+        from kv_compare.predict import Study
+        cls.study = Study(cls.root, "cpu", NAMES[:6], "tables", ["test_text", "test_code"], log=lambda m: None)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_capture_shapes_and_meta(self):
+        meta = json.loads((self.root / "meta.json").read_text())
+        self.assertEqual((meta["kv_heads"], meta["head_dim"], meta["query_heads"]), (2, 16, 4))
+        K = np.load(self.root / "test_text_K_bits.npy")
+        self.assertEqual(K.shape, (4, self.tokens, 32))
+        self.assertEqual(np.load(self.root / "train0_Q_bits.npy").shape, (4, self.tokens, 64))
+        self.assertFalse((self.root / "test_text_Q_bits.npy").exists())
+
+    def test_rope_inverse_matches_pre_rope_keys(self):
+        """De-rotating the cached keys must give the k_proj outputs (up to BF16 rounding)."""
+        from kv_compare.core import words_to_float
+        captured = {}
+        layer = 2
+        def keep(module, inputs, output):
+            captured["k"] = output.detach()[0].float()     # observe only: returning None keeps the output
+        hook = self.model.model.layers[layer].self_attn.k_proj.register_forward_hook(keep)
+        ids = doc_ids(0, self.tokens)
+        with torch.inference_mode():
+            self.model(torch.tensor([ids]), use_cache=True)
+        hook.remove()
+        doc = self.study.train[0]
+        x = words_to_float(doc.words(layer, self.study.device))
+        f = self.study.rope.derotate_row(x, self.study.positions(x.shape[0]))[:, : self.study.C]
+        ref = captured["k"].double()
+        err = (f - ref).abs().max() / ref.abs().max()
+        self.assertLess(float(err), 0.03)
+        back = self.study.rope.rotate_row(self.study.rope.derotate_row(x, self.study.positions(x.shape[0])), self.study.positions(x.shape[0]))
+        self.assertLess(float((back - x).abs().max()), 1e-9)
+
+    def test_pivot_order_and_groups_keep_rope_pairs(self):
+        from kv_compare.predict import CONFIGS
+        F = self.study.fit(3, CONFIGS["fast"])
+        perm = F.perm.cpu().numpy()
+        self.assertEqual(sorted(perm.tolist()), list(range(self.study.W)))
+        starts = F.starts.cpu().numpy()
+        pos = np.empty_like(perm); pos[perm] = np.arange(len(perm))
+        partner = self.study.partner.cpu().numpy()
+        for c in range(self.study.C):
+            self.assertEqual(starts[pos[c]], starts[pos[partner[c]]])
+        self.assertTrue(np.all(starts <= np.arange(len(starts))))
+
+    def test_lossless_costs(self):
+        from kv_compare.baselines import exans_bits, splitzip_codebook, splitzip_token_bits
+        from kv_compare.predict import CONFIGS
+        inside = splitzip_codebook(self.study.train, self.study.L)
+        doc = self.study.tests[0]
+        sz = splitzip_token_bits(doc, self.study.L, inside)
+        self.assertTrue(np.all(sz >= 12))
+        ex = exans_bits(doc, range(self.study.L), 0, 256)
+        self.assertTrue(8 < ex < 16)
+        for name in ("prev", "block", "nohint", "fast"):
+            per_layer, _ = self.study.lossless(CONFIGS[name])
+            v = per_layer["test_text"].numpy()
+            self.assertTrue(np.isfinite(v).all(), name)
+            self.assertLess(float(v.mean()), 16.5, name)
+
+    def test_lossy_and_quality(self):
+        from kv_compare import baselines
+        from kv_compare.core import words_to_float
+        from kv_compare.predict import CONFIGS
+        from kv_compare.quality import continuation_nll, matrices_from_doc, matrices_from_values
+        fits = {}
+        cfg = CONFIGS["fast"]
+        self.study.lossless(cfg, fits)
+        doc = self.study.tests[0]
+        P, M = 192, 96
+        rec, rate = self.study.lossy(cfg, fits, doc, P, 1.0)
+        exact = torch.stack([words_to_float(doc.words(l, self.study.device, P)) for l in range(self.study.L)])
+        self.assertEqual(tuple(rec.shape), tuple(exact.shape))
+        self.assertTrue(0 < rate < 16)
+        # error bound: half a step (step = 1 x the channel's spread) plus BF16 rounding of the reconstruction
+        spread = torch.stack([fits[l].spread for l in range(self.study.L)])[:, None, :]
+        bound = 0.5 * spread + exact.abs() * 2.0 ** -8 + 1e-12
+        self.assertTrue(bool(((rec.double() - exact).abs() <= bound * 1.0001).all()))
+        aqua = baselines.aqua_fit(self.study, self.study.L)
+        for out, r in (baselines.aqua_style(self.study, aqua, doc, P, 3), baselines.kivi_style(self.study, doc, P, 3),
+                       baselines.fp8_cast(self.study, doc, P)):
+            self.assertEqual(tuple(out.shape), tuple(exact.shape))
+            self.assertTrue(torch.isfinite(out).all())
+        base = continuation_nll(self.model, doc.ids, P, M, self.device)
+        same = continuation_nll(self.model, doc.ids, P, M, self.device, matrices_from_doc(doc, P))
+        self.assertEqual(base, same)
+        lossy = continuation_nll(self.model, doc.ids, P, M, self.device, matrices_from_values(rec, self.study.C))
+        self.assertTrue(math.isfinite(lossy))
+
+
+if __name__ == "__main__":
+    unittest.main()

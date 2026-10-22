@@ -1,0 +1,96 @@
+# Lossless and lossy KV transfer on Llama-3.2-3B: ours against SplitZip, ExANS, AQUA-KV and KIVI
+
+`scripts/bench_llama_compare.py` captures Llama-3.2-3B KV once and runs every method on the same words:
+
+- **Lossless:** our predictive codec against SplitZip-style and ExANS-style exponent coding, in bits per value.
+- **Lossy:** our codec run closed loop with a quantized residual, against AQUA-KV-style, KIVI-style and FP8-cast
+  baselines. Each method is scored by bits per value and by how much worse the model continues the text
+  when it reads that method's KV.
+
+The implementation is in `kv_compare/`. The protocol and document roles match the SmolLM2-135M study, whose
+results are reproduced at the end for reference.
+
+## Run on the NVIDIA NUC
+
+Llama-3.2-3B is gated on Hugging Face. Accept Meta's license with the account you use, then log in once:
+
+```bash
+cd ~/kv_reconstruction
+git fetch origin && git checkout llama32-3b-lossy-lossless-compare
+source .venv/bin/activate                      # the CUDA environment from README.md
+huggingface-cli login
+python -m unittest discover -s kv_compare -p 'test_*.py' -v      # CPU, tiny random Llama, no download
+python scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare
+```
+
+Share `runs/llama32_3b_compare/summary.md`, `lossless.json`, `lossy.json` and `captures/meta.json`.
+
+| Stage | What it does | Approximate size |
+| --- | --- | --- |
+| `capture` | Prefills 9 documents of 8,192 tokens. Saves BF16 K/V words in cache order, plus q_proj outputs for the six calibration documents (needed for the attention input). | about 8.5 GB of KV and 8.5 GB of queries |
+| `lossless` | Exact per-word costs on the two test documents, for whole documents and the four 256-token reference chunks. | — |
+| `lossy` | Codes the first 3,072 tokens of each test document with every lossy method. The model then processes the next 512 tokens using that KV. Feeding the exact KV back must reproduce the baseline exactly; this is checked on every run. | — |
+| `report` | Writes `summary.md`. | — |
+
+Useful options:
+
+- `--stages lossless,lossy,report` reuses existing captures in the same `--output`.
+- `--revision <commit>` pins the model weights.
+- `--no-queries` skips the 8.5 GB query capture. The strong-and-fast configuration then runs without its attention input.
+- `--configs`, `--kappas`, `--prompt-tokens` and `--continuation-tokens` change the sweep.
+- `--max-layers N --stages capture,lossless` gives a quick partial-layer smoke run.
+
+Each stage's elapsed time is logged. GPU codec speed is not measured here; see the speed protocol in the team spec.
+
+## Methods
+
+| Method | Lossless? | How it predicts or codes | Rate |
+| --- | --- | --- | --- |
+| SplitZip-style | yes | One top-16 exponent codebook calibrated on the calibration documents; sign and mantissa byte raw; escapes cost 24 bits | computed |
+| ExANS-style | yes | Exponents centred per 256-token block and per layer K/V, block-local entropy model; sign and mantissa byte raw | computed, with model and table overheads |
+| Ours, `prev` | yes | Layer l−1 of the same token, whole layer in one step (the "44%" version) | computed −log2 P |
+| Ours, `block` | yes | Adds earlier 128-channel groups of the same layer (16 steps) | computed −log2 P |
+| Ours, `nohint` | yes | Adds layer 0, layer l−2, the token's earlier occurrence and the adaptive spread | computed −log2 P |
+| Ours, `fast` | yes | Layers 0, l−2, l−1 and the recomputed attention of layer l−1 (queries predicted from the token's own KV, window of the last 64 tokens plus token 0); pivoted channel order; 8 steps; adaptive spread | computed −log2 P |
+| Ours, step k | no | The `fast` predictor run closed loop on the receiver's reconstructed KV. The residual is quantized with step k × the channel's typical error and entropy-coded. Each value's error is at most half a step plus BF16 rounding. | computed −log2 P |
+| AQUA-KV-style, b-bit | no | Closed loop: keys from the previous layer's keys, values from the previous layer's values plus current keys (RoPE removed). b-bit min-max residual per token and 64 channels; layer 0 direct at 4 bits | b + 0.5 |
+| KIVI-style, b-bit | no | Keys per channel over 128-token blocks, values per token over 64 channels | b + 0.375 |
+| FP8 cast | no | e4m3, no scale | 8 |
+
+Notes:
+
+- The reference range coder matched computed costs within 0.011 bits per value in every SmolLM2 test.
+- AQUA-KV quantizes its residual with HIGGS, a vector quantizer. That is more accurate than our scalar stand-in at the same bits, so the AQUA-KV-style rows understate the real method. In particular, the 2-bit stand-in can diverge.
+
+## Reference: SmolLM2-135M (same protocol, NumPy implementation)
+
+Lossless, bits per value, averaged over the four reference chunks (all 30 layers):
+
+| Method | Bits per value |
+| --- | --- |
+| SplitZip-style | 12.01 |
+| ExANS-style | 10.75 |
+| Our 44% version | 9.02 (round trip) |
+| Our Block32 | 8.36 (round trip) |
+| Our strongest no-hint | 7.83 (round trip) |
+| Our strong-and-fast | ≈7.77 (cost test on layers 13 and 25) |
+
+Lossy, on a 3,072-token prompt with quality measured on the next 512 tokens:
+
+| Method | Bits per value (text / code) | Perplexity change (text / code) |
+| --- | --- | --- |
+| Ours, step 0.5 | 4.12 / 3.87 | −0.0% / +0.8% |
+| Ours, step 1 | 3.22 / 3.01 | −0.2% / +0.4% |
+| Ours, step 2 | 2.50 / 2.36 | +2.0% / +3.7% |
+| AQUA-KV-style, 4-bit | 4.50 | +2.2% / +0.5% |
+| KIVI-style, 4-bit | 4.38 | −0.3% / +1.2% |
+| KIVI-style, 3-bit | 3.38 | +4.9% / +7.1% |
+| FP8 cast | 8.00 | −0.2% / +0.4% |
+
+The SmolLM2 lossy predictor used layers 0, l−2 and l−1 with 12 natural-order steps, without the attention input. Perplexity differences under about ±0.5% are within noise for 511 scored tokens.
+
+## What to look for on Llama-3.2-3B
+
+- **Lossless ordering.** Does the SmolLM2 ordering hold (ExANS-style > prev > block > nohint ≥ fast)?
+- **Rate-quality frontier.** At equal perplexity change, how many bits does each lossy method need?
+- **Compute.** The predictor's multiply-adds per value, listed in `summary.md`. Llama-3.2-3B has a 2,048-wide KV layer, the same as Llama-3.1-8B, so the strong configurations cost about 9,000–15,000 multiply-adds per value. That cost decides whether a GPU kernel can keep up with the link.

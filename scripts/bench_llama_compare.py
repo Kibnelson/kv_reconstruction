@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""Lossless and lossy KV transfer codecs on one model's KV: ours against SplitZip, ExANS, AQUA-KV and KIVI styles.
+
+Default model: meta-llama/Llama-3.2-3B (gated on Hugging Face: accept the license and log in first).
+
+    python scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare
+
+Stages (all by default; --stages picks a subset, reusing earlier outputs in the same directory):
+  capture    prefill nine documents (8,192 tokens each) and save BF16 KV words; calibration documents also
+             save q_proj outputs for the attention input
+  lossless   exact per-word costs: SplitZip-style, ExANS-style and our configurations (prev, block, nohint,
+             fast) on the two test documents (whole documents and the four 256-token reference chunks)
+  lossy      the first --prompt-tokens tokens of each test document coded by every lossy method; the model then
+             processes the next --continuation-tokens tokens with that KV; perplexity change vs exact KV
+  report     summary.md and results.json
+
+Document roles (same protocol as the SmolLM2 study): calibration = PEP 484 and six CPython modules, scales =
+dataclasses.py, tests = PEP 8 (text) and argparse.py (code). Costs are computed -log2 P (the reference range
+coder matched computed costs within 0.011 bits per value on SmolLM2); rates of the fixed-rate baselines include
+their scale/offset overhead. GPU timings are not part of this benchmark.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+from pathlib import Path
+import sys
+import time
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+TEXTS = ROOT / "benchmark_fixtures" / "llama_compare_texts"
+ROLES = {
+    "train0": "pep-0484.rst", "train1": "code_typing.py.txt", "train2": "code_inspect.py.txt",
+    "train3": "code_subprocess.py.txt", "train4": "code_tarfile.py.txt", "train5": "code_logging.py.txt",
+    "tables": "code_dataclasses.py.txt", "test_text": "pep-0008.rst", "test_code": "code_argparse.py.txt",
+}
+TRAIN = [f"train{i}" for i in range(6)]
+TESTS = ["test_text", "test_code"]
+
+
+def log(message):
+    print(time.strftime("%H:%M:%S"), message, flush=True)
+
+
+def stage_capture(args, out):
+    import torch
+    from kv_compare.capture import capture_documents, load_model, model_meta
+    device = torch.device(args.device)
+    tokenizer, model = load_model(args.model, args.revision, device)
+    documents = {name: Path(args.texts) / ROLES[name] for name in ROLES}
+    meta = model_meta(model, args.model, args.revision)
+    queries = set(TRAIN) if not args.no_queries else set()
+    return capture_documents(model, tokenizer, documents, out / "captures", device, args.tokens, queries, meta, log)
+
+
+def chunk_spans(tokens):
+    spans = [(0, 256)]
+    if tokens >= 4352:
+        spans.append((4096, 4352))
+    return spans
+
+
+def stage_lossless(args, out):
+    import torch
+    from kv_compare.baselines import exans_bits, splitzip_codebook, splitzip_token_bits
+    from kv_compare.predict import CONFIGS, LABELS, Study, macs_per_value
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    L = study.L
+    spans = chunk_spans(study.tests[0].tokens)
+    result = {"layers": L, "spans": spans, "methods": {}}
+
+    def summarize(per_layer):            # {doc: [L, N]} -> whole, chunks, per-layer
+        whole = {d: float(np.mean(v)) for d, v in per_layer.items()}
+        chunks = {f"{d} {a}-{b - 1}": float(np.mean(v[:, a:b])) for d, v in per_layer.items() for a, b in spans}
+        layers = {d: [float(x) for x in np.mean(v, 1)] for d, v in per_layer.items()}
+        return {"whole": whole, "chunks": chunks, "chunk_average": float(np.mean(list(chunks.values()))), "per_layer": layers}
+
+    inside = splitzip_codebook(study.train, L)
+    sz = {d.name: splitzip_token_bits(d, L, inside) for d in study.tests}
+    result["methods"]["SplitZip-style"] = dict(summarize(sz), macs_per_value=0, lossless=True)
+    ex = {"whole": {d.name: exans_bits(d, range(L), 0, d.tokens) for d in study.tests},
+          "chunks": {f"{d.name} {a}-{b - 1}": exans_bits(d, range(L), a, b) for d in study.tests for a, b in spans}}
+    ex["chunk_average"] = float(np.mean(list(ex["chunks"].values())))
+    result["methods"]["ExANS-style"] = dict(ex, macs_per_value=0, lossless=True)
+    log(f"SplitZip-style {result['methods']['SplitZip-style']['chunk_average']:.3f}, ExANS-style {ex['chunk_average']:.3f}")
+    for name in args.configs:
+        cfg = CONFIGS[name]
+        if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
+            log(f"skip {name}: no calibration queries captured")
+            continue
+        begin = time.time()
+        per_layer, _ = study.lossless(cfg)
+        entry = summarize({d: v.numpy() for d, v in per_layer.items()})
+        entry.update(label=LABELS[name], macs_per_value=macs_per_value(name, study.Hk, study.hd, study.Hq),
+                     lossless=True, seconds=time.time() - begin)
+        result["methods"][LABELS[name]] = entry
+        log(f"{LABELS[name]}: {entry['chunk_average']:.3f} bits/value (chunk average)")
+        study._f.clear(); study._att.clear(); study._qmap.clear()
+        torch.cuda.empty_cache() if study.device.type == "cuda" else None
+    (out / "lossless.json").write_text(json.dumps(result, indent=1))
+    return result
+
+
+def stage_lossy(args, out):
+    import torch
+    from kv_compare import baselines
+    from kv_compare.capture import load_model
+    from kv_compare.core import words_to_float
+    from kv_compare.predict import CONFIGS, Study
+    from kv_compare.quality import continuation_nll, matrices_from_doc, matrices_from_values
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    cfg = CONFIGS[args.lossy_config]
+    if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
+        log(f"{args.lossy_config} needs calibration queries; using fast_noatt")
+        cfg = CONFIGS["fast_noatt"]
+    log(f"fitting our predictor ({cfg.name}) for closed-loop coding")
+    fits = {}
+    study.lossless(cfg, fits)
+    study._f.clear(); study._att.clear()
+    log("fitting AQUA-KV-style predictors")
+    aqua = baselines.aqua_fit(study, study.L)
+    study._f.clear()
+    device = torch.device(args.device)
+    _, model = load_model(args.model, args.revision, device)
+    P, M = args.prompt_tokens, args.continuation_tokens
+    result = {"prompt_tokens": P, "continuation_tokens": M, "lossy_config": cfg.name, "documents": {}}
+    for doc in study.tests:
+        base = continuation_nll(model, doc.ids, P, M, device)
+        check = continuation_nll(model, doc.ids, P, M, device, matrices_from_doc(doc, P))
+        if check != base:
+            raise RuntimeError(f"exact prompt KV did not reproduce the baseline ({check} vs {base})")
+        exact = torch.stack([words_to_float(doc.words(l, study.device, P)).to(torch.float32).cpu() for l in range(study.L)])
+        rows = {"exact KV": {"bits": 16.0, "nll": base, "ppl": float(np.exp(base)), "ppl_change_pct": 0.0, "rel_error": 0.0}}
+        methods = [(f"Ours, step {k}", lambda k=k: study.lossy(cfg, fits, doc, P, k)) for k in args.kappas]
+        methods += [(f"AQUA-KV-style, {b}-bit", lambda b=b: baselines.aqua_style(study, aqua, doc, P, b)) for b in (2, 3, 4)]
+        methods += [(f"KIVI-style, {b}-bit", lambda b=b: baselines.kivi_style(study, doc, P, b)) for b in (2, 3, 4)]
+        methods += [("FP8 cast", lambda: baselines.fp8_cast(study, doc, P))]
+        for label, run in methods:
+            rec, rate = run()
+            num = sum(float(((rec[l].double() - exact[l].double()) ** 2).sum()) for l in range(study.L))
+            den = sum(float((exact[l].double() ** 2).sum()) for l in range(study.L))
+            rel = math.sqrt(num / den)
+            nll = continuation_nll(model, doc.ids, P, M, device, matrices_from_values(rec, study.C))
+            rows[label] = {"bits": float(rate), "nll": nll, "ppl": float(np.exp(nll)),
+                           "ppl_change_pct": float(100 * (np.exp(nll - base) - 1)), "rel_error": rel}
+            log(f"{doc.name} {label}: {rate:.3f} bits/value, KV error {100 * rel:.2f}%, perplexity {rows[label]['ppl_change_pct']:+.2f}%")
+            study._f.clear()
+        result["documents"][doc.name] = rows
+    (out / "lossy.json").write_text(json.dumps(result, indent=1))
+    return result
+
+
+def stage_report(args, out):
+    lines = [f"# KV transfer codecs on {args.model}", ""]
+    meta = json.loads((out / "captures" / "meta.json").read_text())
+    lines.append(f"Captures: {len(meta['captures'])} documents x {meta['tokens']} tokens; {meta['layers']} layers, "
+                 f"{meta['kv_heads']} KV heads x {meta['head_dim']}; torch {meta['torch']}, transformers {meta['transformers']}.")
+    lines.append("")
+    if (out / "lossless.json").is_file():
+        res = json.loads((out / "lossless.json").read_text())
+        lines += ["## Lossless (bits per value; BF16 = 16)", "",
+                  "| Method | Four-chunk average | PEP 8 whole | argparse.py whole | Predictor multiply-adds per value |",
+                  "| --- | --- | --- | --- | --- |"]
+        for name, m in res["methods"].items():
+            w = m["whole"]
+            lines.append(f"| {name} | {m['chunk_average']:.3f} | {w.get('test_text', float('nan')):.3f} | "
+                         f"{w.get('test_code', float('nan')):.3f} | {m['macs_per_value']:,.0f} |")
+        lines.append("")
+    if (out / "lossy.json").is_file():
+        res = json.loads((out / "lossy.json").read_text())
+        docs = list(res["documents"])
+        lines += [f"## Lossy (prompt {res['prompt_tokens']} tokens; quality = perplexity of the next "
+                  f"{res['continuation_tokens']} tokens with the transferred KV)", "",
+                  "| Method | Bits per value | KV relative error | Perplexity change |", "| --- | --- | --- | --- |"]
+        for label in res["documents"][docs[0]]:
+            r = [res["documents"][d][label] for d in docs]
+            lines.append(f"| {label} | " + " / ".join(f"{x['bits']:.2f}" for x in r) + " | " +
+                         " / ".join(f"{100 * x['rel_error']:.2f}%" for x in r) + " | " +
+                         " / ".join(f"{x['ppl_change_pct']:+.2f}%" for x in r) + " |")
+        lines += ["", f"Values are {' / '.join(docs)}."]
+    (out / "summary.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
+def parser():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--model", default="meta-llama/Llama-3.2-3B")
+    p.add_argument("--revision", default=None, help="pin a Hugging Face revision (recommended for shared results)")
+    p.add_argument("--device", default="cuda")
+    p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--texts", type=Path, default=TEXTS)
+    p.add_argument("--tokens", type=int, default=8192)
+    p.add_argument("--stages", default="capture,lossless,lossy,report")
+    p.add_argument("--configs", default="prev,block,nohint,fast")
+    p.add_argument("--lossy-config", default="fast")
+    p.add_argument("--kappas", default="0.25,0.5,1,2,4")
+    p.add_argument("--prompt-tokens", type=int, default=3072)
+    p.add_argument("--continuation-tokens", type=int, default=512)
+    p.add_argument("--max-layers", type=int, default=None, help="lossless stage only: first N layers (smoke tests)")
+    p.add_argument("--no-queries", action="store_true", help="skip q_proj capture (drops the attention input)")
+    return p
+
+
+def main(argv=None):
+    args = parser().parse_args(argv)
+    args.configs = [c for c in args.configs.split(",") if c]
+    args.kappas = [float(k) for k in args.kappas.split(",") if k]
+    stages = [s for s in args.stages.split(",") if s]
+    out = args.output
+    if "capture" in stages:
+        if (out / "captures").exists() and any((out / "captures").iterdir()):
+            raise SystemExit(f"{out}/captures is not empty; use a fresh --output or drop the capture stage")
+        out.mkdir(parents=True, exist_ok=True)
+    (out / "run_args.json").write_text(json.dumps({k: str(v) for k, v in vars(args).items()}, indent=1))
+    if "capture" in stages:
+        stage_capture(args, out)
+    if "lossless" in stages:
+        stage_lossless(args, out)
+    if "lossy" in stages:
+        stage_lossy(args, out)
+    if "report" in stages:
+        stage_report(args, out)
+
+
+if __name__ == "__main__":
+    main()
