@@ -1,0 +1,693 @@
+{
+  "format": "llama32_official_gpu_v1",
+  "status": "failed",
+  "gpu_measured": true,
+  "created": "2026-10-22T12:50:30.605174+00:00",
+  "model": "unsloth/Llama-3.2-3B",
+  "revision": "d4446454d87d51aa42e1fb174f25acc5f8762331",
+  "layers": 28,
+  "requested": [
+    "splitzip",
+    "ours",
+    "exans",
+    "aqua"
+  ],
+  "stages": {
+    "hardware": {
+      "status": "completed",
+      "started": "2026-10-22T12:50:30.607015+00:00",
+      "completed": "2026-10-22T12:50:31.694353+00:00",
+      "artifacts": {
+        "hardware.json": "5144762296439134a69033797f920f2ad993f4f3ce59ff89ea15a6ef30d43898"
+      },
+      "scope": "actual CUDA required before downloading model weights or installing baseline environments"
+    },
+    "model": {
+      "status": "completed",
+      "started": "2026-10-22T12:50:31.694614+00:00",
+      "completed": "2026-10-22T12:58:32.049741+00:00",
+      "artifacts": {
+        "model_manifest.json": "dda3045190585a0c76d9fb2fc91a6e070997a37e8b7653e65f6cbc97e2f86a88"
+      }
+    },
+    "toolchain": {
+      "status": "completed",
+      "started": "2026-10-22T12:58:32.051278+00:00",
+      "completed": "2026-10-22T12:58:40.339695+00:00",
+      "artifacts": {
+        "toolchain.json": "8effe586da002eea6ef9d9f10f543712340e232b171b7049f30964c089152d94"
+      }
+    },
+    "splitzip_env": {
+      "status": "completed",
+      "started": "2026-10-22T12:58:40.340022+00:00",
+      "completed": "2026-10-22T13:06:04.156060+00:00"
+    },
+    "splitzip_preflight": {
+      "status": "completed",
+      "started": "2026-10-22T13:06:04.157257+00:00",
+      "completed": "2026-10-22T13:06:14.276574+00:00",
+      "artifacts": {
+        "splitzip_preflight.json": "f46b2f8ed59b6a019f7a9cd4528fa24f69462f52cb76d2bafca61ee805d2f7ed"
+      },
+      "scope": "actual CUDA kernel and full WikiText2 text/token identity; no codec performance claim"
+    },
+    "capture": {
+      "status": "completed",
+      "started": "2026-10-22T13:06:14.277123+00:00",
+      "completed": "2026-10-22T13:06:46.173154+00:00",
+      "artifacts": {
+        "captures/manifest.json": "49b412485b3c90dae42709231f8d57bb3db3f74268fc560faac9baad7ede9fb5"
+      },
+      "scope": "all 28 original BF16 layers; TRAIN/validation/TEST separated"
+    },
+    "splitzip": {
+      "status": "completed",
+      "started": "2026-10-22T13:06:46.173832+00:00",
+      "completed": "2026-10-22T13:06:52.698256+00:00",
+      "artifacts": {
+        "splitzip_case_0.json": "4feb808e8b58e95e43bbb148e86eebb7adcb87efc4c2ab5f87e74c8542d611bd",
+        "splitzip_case_1.json": "6f95077cc0de349700b2ac74cc7e6d3ff1e82c1efe00cd418d0f811dcde0b530"
+      },
+      "scope": "unchanged author benchmark; two identical-to-ours TEST word slices; native codec byte/timing scope"
+    },
+    "ours": {
+      "status": "completed",
+      "started": "2026-10-22T13:06:52.708724+00:00",
+      "completed": "2026-10-22T13:36:26.022146+00:00",
+      "artifacts": {
+        "ours/results.json": "c2449842feb412c710b46fdade263e3e0a94340fd42b07a3cafbc0e78864908c"
+      },
+      "scope": "fresh Block32 A fit and exact packet restore, all 28 layers; no AQUA adapter"
+    },
+    "exans": {
+      "status": "blocked",
+      "started": "2026-10-22T13:36:26.024145+00:00",
+      "completed": "2026-10-22T13:36:41.308568+00:00",
+      "reason": "exans_build_official exited 2; see logs/exans_build_official.log",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_official_a4500.py\", line 122, in stage\n    info=action() or {}\n         ^^^^^^^^\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_official_a4500.py\", line 328, in exans\n    self.command('exans_build_official',['cmake','--build',build,'--target','openlake_expans_test','-j','2'])\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_official_a4500.py\", line 106, in command\n    if code: raise RuntimeError(f'{name} exited {code}; see {path.relative_to(self.out)}')\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: exans_build_official exited 2; see logs/exans_build_official.log\n"
+    },
+    "aqua_env": {
+      "status": "completed",
+      "started": "2026-10-22T13:36:41.311720+00:00",
+      "completed": "2026-10-22T13:45:09.565332+00:00"
+    },
+    "aqua_preflight": {
+      "status": "completed",
+      "started": "2026-10-22T13:45:09.566387+00:00",
+      "completed": "2026-10-22T13:45:15.385327+00:00",
+      "artifacts": {
+        "aqua_preflight.json": "b476947355d43855dd13e2181567a1d111da63a039866299295118cdf0fc53f5"
+      },
+      "scope": "actual CUDA kernel and full WikiText2 text/token identity; no codec performance claim"
+    },
+    "aqua": {
+      "status": "failed",
+      "started": "2026-10-22T13:45:15.386633+00:00",
+      "completed": "2026-10-22T13:45:17.795810+00:00",
+      "reason": "aqua_train_official exited 1; see logs/aqua_train_official.log",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_official_a4500.py\", line 122, in stage\n    info=action() or {}\n         ^^^^^^^^\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_official_a4500.py\", line 296, in aqua\n    self.command('aqua_train_official',[py,src/'train_predictors.py',*common,\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_official_a4500.py\", line 106, in command\n    if code: raise RuntimeError(f'{name} exited {code}; see {path.relative_to(self.out)}')\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: aqua_train_official exited 1; see logs/aqua_train_official.log\n"
+    }
+  },
+  "protocol": {
+    "aqua": "official HIGGS-2, first layer HIGGS-4; 256x8192 pajama, holdout 32; WikiText2 PPL, prefix4/recent128",
+    "splitzip": "official benchmark; chunk1024, warmup10, iters50, repeats5; saved original BF16 input; TRAIN calibration only",
+    "ours": "Block32 A, fresh TRAIN fit; all 28 layers; first/last1024 of first8192 WikiText2 TEST tokens",
+    "exans": "unchanged official CMake build/test only; no invented Qwen/Llama performance wrapper"
+  },
+  "source_files": {
+    "scripts/run_llama_official_a4500.py": "fa49ab96c7e7da647c79603bad64fe65a6ef88d8563f5dec2badc709bc6e1fbd",
+    "scripts/llama_official_worker.py": "6a56cf1cc01b9872565b84a0f7afc975089a4dc57d2ba2853b9e2521e6dc04f2",
+    "qwen_kv_bench/transfer_reference.py": "7ec12ee146a549827dab487aca851c2596d85941782fd01e01f56100c47ffe37",
+    "qwen_kv_bench/transfer_probability.py": "e526b7971b8b0d3cd5dfda24f8b7d929eeac411bd2bc79b7f2a17c194ae8d065",
+    "qwen_kv_bench/transfer_t1.py": "f107030fdd24394366105b150e22d691db346991119e5abe1e43af3e29db989c",
+    "qwen_kv_bench/transfer_t1_kernels.py": "ed46da64dde8fcae2c404dfc146b1cc46499b26f4b445c6379330cf5bb864d18",
+    "qwen_kv_bench/transfer_gpu_predictor.py": "cbabeaf5a36b151022a4c1cafb463d3e110293114719ee0c9112f1b0b0cd3c73",
+    "scripts/setup_qwen_cuda_toolchain.py": "c6f383bdf3026e1af6261d878762ca3cb6415a020c33606bff96b0fc7e5c9f39",
+    "qwen_kv_bench/matched_transfer.py": "24e8bdd19962522e04a5737c09bb5792815a84d12a1664faf01350bee0bb5462",
+    "qwen_kv_bench/model_runtime.py": "340e162efffac90ae3909fe28b40506e591beca058ed009a566f82a57b1cc46f",
+    "scripts/bench_qwen_matched_gpu.py": "306eea651487fbba347bba77bfeb3043073f9117574bb5da84e1558da44260f7"
+  },
+  "scope": "Official-code new-model evaluation; not reproduction of every paper setting or a serving benchmark",
+  "commands": [
+    {
+      "name": "cuda_tools",
+      "argv": [
+        "/home/nelson/kv_reconstruction/.venv/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/setup_qwen_cuda_toolchain.py"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/cuda_tools.log"
+    },
+    {
+      "name": "splitzip_init",
+      "argv": [
+        "git",
+        "init",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_init.log"
+    },
+    {
+      "name": "splitzip_remote",
+      "argv": [
+        "git",
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/Intelligent-Microsystems-Lab/SplitZip.git"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip",
+      "log": "logs/splitzip_remote.log"
+    },
+    {
+      "name": "splitzip_fetch",
+      "argv": [
+        "git",
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        "42c743118a29db3270ae6a921a4a4eecb20cad04"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip",
+      "log": "logs/splitzip_fetch.log"
+    },
+    {
+      "name": "splitzip_checkout",
+      "argv": [
+        "git",
+        "checkout",
+        "--detach",
+        "FETCH_HEAD"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip",
+      "log": "logs/splitzip_checkout.log"
+    },
+    {
+      "name": "splitzip_build_prerequisites",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "packaging",
+        "wheel",
+        "ninja"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_build_prerequisites.log"
+    },
+    {
+      "name": "splitzip_requirements",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--no-build-isolation",
+        "-c",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/constraints.txt",
+        "-r",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip/requirements.txt"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_requirements.log"
+    },
+    {
+      "name": "ours_dependencies",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "constriction==0.5.0"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/ours_dependencies.log"
+    },
+    {
+      "name": "splitzip_pip_check",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_pip_check.log"
+    },
+    {
+      "name": "splitzip_verify_versions",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "-c",
+        "import importlib.metadata,json,sys; wanted=json.loads(sys.argv[1]); got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted)",
+        "{\"torch\": \"2.9.0\", \"transformers\": \"4.57.1\", \"triton\": \"3.5.0\", \"datasets\": \"2.19.2\"}"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_verify_versions.log"
+    },
+    {
+      "name": "splitzip_gpu_preflight",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/llama_official_worker.py",
+        "preflight",
+        "--manifest",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/model_manifest.json",
+        "--output",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/splitzip_preflight.json"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_gpu_preflight.log"
+    },
+    {
+      "name": "splitzip_verify_versions",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "-c",
+        "import importlib.metadata,json,sys; wanted=json.loads(sys.argv[1]); got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted)",
+        "{\"torch\": \"2.9.0\", \"transformers\": \"4.57.1\", \"triton\": \"3.5.0\", \"datasets\": \"2.19.2\"}"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_verify_versions.attempt1.log"
+    },
+    {
+      "name": "capture_original_llama",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/llama_official_worker.py",
+        "capture",
+        "--manifest",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/model_manifest.json",
+        "--output",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/captures"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/capture_original_llama.log"
+    },
+    {
+      "name": "splitzip_verify_versions",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "-c",
+        "import importlib.metadata,json,sys; wanted=json.loads(sys.argv[1]); got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted)",
+        "{\"torch\": \"2.9.0\", \"transformers\": \"4.57.1\", \"triton\": \"3.5.0\", \"datasets\": \"2.19.2\"}"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_verify_versions.attempt2.log"
+    },
+    {
+      "name": "splitzip_case_0",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip/bench_codec_throughput.py",
+        "--device",
+        "cuda:0",
+        "--input",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/captures/test_00000.pt",
+        "--calibration-input",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/captures/splitzip_train.pt",
+        "--numel",
+        "58720256",
+        "--chunk-size",
+        "1024",
+        "--warmup",
+        "10",
+        "--iters",
+        "50",
+        "--repeats",
+        "5",
+        "--output",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/splitzip_case_0.json"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip",
+      "log": "logs/splitzip_case_0.log"
+    },
+    {
+      "name": "splitzip_case_1",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip/bench_codec_throughput.py",
+        "--device",
+        "cuda:0",
+        "--input",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/captures/test_07168.pt",
+        "--calibration-input",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/captures/splitzip_train.pt",
+        "--numel",
+        "58720256",
+        "--chunk-size",
+        "1024",
+        "--warmup",
+        "10",
+        "--iters",
+        "50",
+        "--repeats",
+        "5",
+        "--output",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/splitzip_case_1.json"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip",
+      "log": "logs/splitzip_case_1.log"
+    },
+    {
+      "name": "splitzip_verify_versions",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "-c",
+        "import importlib.metadata,json,sys; wanted=json.loads(sys.argv[1]); got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted)",
+        "{\"torch\": \"2.9.0\", \"transformers\": \"4.57.1\", \"triton\": \"3.5.0\", \"datasets\": \"2.19.2\"}"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/splitzip_verify_versions.attempt3.log"
+    },
+    {
+      "name": "ours_full_model_gpu",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/splitzip/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/llama_official_worker.py",
+        "ours",
+        "--manifest",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/model_manifest.json",
+        "--captures",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/captures",
+        "--output",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/ours"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/ours_full_model_gpu.log"
+    },
+    {
+      "name": "exans_init",
+      "argv": [
+        "git",
+        "init",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/exans"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/exans_init.log"
+    },
+    {
+      "name": "exans_remote",
+      "argv": [
+        "git",
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/openlake-project/openlake.git"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/exans",
+      "log": "logs/exans_remote.log"
+    },
+    {
+      "name": "exans_fetch",
+      "argv": [
+        "git",
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        "de6c38bcc5438475bd1abf1e9b3d154cef414ef6"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/exans",
+      "log": "logs/exans_fetch.log"
+    },
+    {
+      "name": "exans_checkout",
+      "argv": [
+        "git",
+        "checkout",
+        "--detach",
+        "FETCH_HEAD"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/exans",
+      "log": "logs/exans_checkout.log"
+    },
+    {
+      "name": "exans_configure_official",
+      "argv": [
+        "cmake",
+        "-S",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/exans/crates/openlake_kv_client/cuda",
+        "-B",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/exans_build",
+        "-DOPENLAKE_EXPANS_BUILD=ON",
+        "-DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON",
+        "-DCMAKE_CUDA_ARCHITECTURES=86",
+        "-DNVCOMP_ROOT=/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/nvidia/libnvcomp"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/exans_configure_official.log"
+    },
+    {
+      "name": "exans_build_official",
+      "argv": [
+        "cmake",
+        "--build",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/exans_build",
+        "--target",
+        "openlake_expans_test",
+        "-j",
+        "2"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/exans_build_official.log"
+    },
+    {
+      "name": "aqua_init",
+      "argv": [
+        "git",
+        "init",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/aqua_init.log"
+    },
+    {
+      "name": "aqua_remote",
+      "argv": [
+        "git",
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/goodevening13/aquakv.git"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua",
+      "log": "logs/aqua_remote.log"
+    },
+    {
+      "name": "aqua_fetch",
+      "argv": [
+        "git",
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        "e744183f2f3a4a90381f20a6975456871fd1ae29"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua",
+      "log": "logs/aqua_fetch.log"
+    },
+    {
+      "name": "aqua_checkout",
+      "argv": [
+        "git",
+        "checkout",
+        "--detach",
+        "FETCH_HEAD"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua",
+      "log": "logs/aqua_checkout.log"
+    },
+    {
+      "name": "aqua_build_prerequisites",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "packaging",
+        "wheel",
+        "ninja"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/aqua_build_prerequisites.log"
+    },
+    {
+      "name": "aqua_torch",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "torch==2.5.1",
+        "numpy==1.26.4"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/aqua_torch.log"
+    },
+    {
+      "name": "aqua_requirements",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--no-build-isolation",
+        "-c",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/constraints.txt",
+        "-r",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/requirements.txt"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/aqua_requirements.log"
+    },
+    {
+      "name": "hadamard_init",
+      "argv": [
+        "git",
+        "init",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/hadamard"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/hadamard_init.log"
+    },
+    {
+      "name": "hadamard_remote",
+      "argv": [
+        "git",
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/Dao-AILab/fast-hadamard-transform.git"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/hadamard",
+      "log": "logs/hadamard_remote.log"
+    },
+    {
+      "name": "hadamard_fetch",
+      "argv": [
+        "git",
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        "e7706faf8d1c3b9f241e36860640ad1dac644ede"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/hadamard",
+      "log": "logs/hadamard_fetch.log"
+    },
+    {
+      "name": "hadamard_checkout",
+      "argv": [
+        "git",
+        "checkout",
+        "--detach",
+        "FETCH_HEAD"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/hadamard",
+      "log": "logs/hadamard_checkout.log"
+    },
+    {
+      "name": "hadamard_install",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--no-build-isolation",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/hadamard"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/hadamard_install.log"
+    },
+    {
+      "name": "aqua_import",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "train_predictors.py",
+        "--help"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua",
+      "log": "logs/aqua_import.log"
+    },
+    {
+      "name": "aqua_pip_check",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/aqua_pip_check.log"
+    },
+    {
+      "name": "aqua_verify_versions",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import importlib.metadata,json,sys; wanted=json.loads(sys.argv[1]); got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted)",
+        "{\"torch\": \"2.5.1\", \"transformers\": \"4.46.3\", \"datasets\": \"2.20.0\"}"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/aqua_verify_versions.log"
+    },
+    {
+      "name": "aqua_gpu_preflight",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/llama_official_worker.py",
+        "preflight",
+        "--manifest",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/model_manifest.json",
+        "--output",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/aqua_preflight.json"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/aqua_gpu_preflight.log"
+    },
+    {
+      "name": "aqua_verify_versions",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import importlib.metadata,json,sys; wanted=json.loads(sys.argv[1]); got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted)",
+        "{\"torch\": \"2.5.1\", \"transformers\": \"4.46.3\", \"datasets\": \"2.20.0\"}"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction",
+      "log": "logs/aqua_verify_versions.attempt1.log"
+    },
+    {
+      "name": "aqua_train_official",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/train_predictors.py",
+        "--model_name",
+        "/home/nelson/.cache/huggingface/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331",
+        "--model_seqlen",
+        "8192",
+        "--edenn_d",
+        "2",
+        "--edenn_n",
+        "16",
+        "--hadamard_groupsize",
+        "1024",
+        "--dataset",
+        "pajama",
+        "--total_nsamples",
+        "256",
+        "--valid_nsamples",
+        "32",
+        "--offload_activations",
+        "--predictors_output_path",
+        "/home/nelson/kv_reconstruction/runs/llama32_official_a4500_20261022_125030/aqua_predictors.pt"
+      ],
+      "cwd": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua",
+      "log": "logs/aqua_train_official.log"
+    }
+  ]
+}
