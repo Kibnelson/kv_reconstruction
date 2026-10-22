@@ -1,0 +1,52 @@
+{
+  "format": "llama_aqua_loader_fix_local_validation_v1",
+  "gpu_measured": false,
+  "source_parent_commit": "3827c84c4b40d8d3ffc4daf7df6dba0ba4c86639",
+  "files_sha256": {
+    "scripts/run_llama_official_a4500.py": "afb5597bfaefdf89f79501e490ed96fd9c7c413ce239369fa5362dd327457d52",
+    "tests/test_llama_official.py": "89e70be3302f06645b695e8ab9adf26d6a6a15363257c32bb2c66d940862ee78",
+    "docs/llama32_official_gpu.md": "2d4a434d218a989c163a4c96532a8fb9ab7ef041655a7d4eb8c2bf608ebe8f75"
+  },
+  "runtime_addition": {
+    "accelerate": "1.1.1"
+  },
+  "author_core_versions_preserved": {
+    "torch": "2.5.1",
+    "transformers": "4.46.3",
+    "datasets": "2.20.0"
+  },
+  "tests": {
+    "command": "python -m unittest tests.test_llama_official -v",
+    "passed": 15,
+    "failed": 0,
+    "skipped": 0,
+    "scope": "CPU codec regressions and software protocol/environment mocks, not an actual baseline installation or CUDA benchmark"
+  },
+  "checks": {
+    "python_compile": true,
+    "git_diff_check": true,
+    "standalone_source_check": true,
+    "no_cuda_guard": {
+      "requested": [
+        "exans",
+        "aqua"
+      ],
+      "expected_exit": 1,
+      "observed_exit": 1,
+      "gpu_measured": false,
+      "stages": [
+        "hardware",
+        "model"
+      ],
+      "download_or_install_commands": 0
+    },
+    "selected_method_stages": [
+      "exans",
+      "aqua"
+    ],
+    "capture_and_completed_codec_stages_skipped": true,
+    "aqua_training_failure_and_attempt_logs_packaged": true,
+    "unrelated_environment_profile_drift_rejected": true
+  },
+  "pending": "Actual A4500 environment repair and official AQUA calibration/PPL; unchanged ExANS may remain blocked by its upstream compile error."
+}

@@ -50,6 +50,13 @@ environments under ignored `runs/_llama_official/envs/`:
   used by these datasets versions. Our additional dependency is constriction0.5.0.
 - AQUA's fast-Hadamard dependency uses the pinned, unchanged Dao-AILab source
   at `e7706faf8d1c3b9f241e36860640ad1dac644ede`.
+- AQUA's model loader calls `from_pretrained(low_cpu_mem_usage=True)` but its
+  requirements omit Accelerate. The environment now adds `accelerate==1.1.1`
+  while constraining Torch2.5.1, Transformers4.46.3 and Datasets2.20.0. Cached
+  environments with the original matching profile receive this dependency
+  without rebuilding FlashAttention or fast-Hadamard. Other profile changes
+  are rejected. Runtime versions and the pip installation report are saved;
+  the author source files and calibration settings are unchanged.
 
 Baseline commits are the same as the preceding source audit. Git commit and
 tracked-file cleanliness are checked. There is no AST method extraction,
@@ -100,3 +107,45 @@ Completed-stage evidence is checksum-verified. Source/protocol changes require
 a new run directory. Reports use an explicit allowlist: raw/compressed KV,
 tokens, model weights and predictor tensors are never published. The prior
 Qwen reports remain separate and unchanged.
+
+## ExANS and AQUA only after the first Llama run
+
+The report at commit `3827c84` already contains completed SplitZip and Block32
+measurements. Its AQUA training stopped at model loading because Accelerate
+was missing. The `torch.load` FutureWarning was not the cause of that failure.
+Its ExANS build stopped at the unchanged upstream `unique_ptr` conversion
+error. The official source remains pinned; this update does not patch it.
+
+Run just the two remaining method stages in a **new output directory**:
+
+```bash
+(
+set -euo pipefail
+cd ~/kv_reconstruction
+git fetch origin
+git switch experiment/llama32_official_gpu
+git pull --ff-only origin experiment/llama32_official_gpu
+source .venv/bin/activate
+unset TRITON_INTERPRET
+
+python -u scripts/run_llama_official_a4500.py \
+  --stages exans,aqua --publish-results
+)
+```
+
+This reuses the cached BF16 model and environments. It runs neither KV capture
+nor SplitZip/Block32 codec benchmarks. The lightweight SplitZip-environment
+GPU/token preflight is still used to check the complete WikiText2 token
+identity against AQUA. ExANS runs before AQUA; an ExANS build failure does not
+prevent AQUA calibration and evaluation. ExANS cannot produce a valid model
+performance result while the official build remains blocked.
+
+Do not pass the old run to `--resume`: this source update changes its identity
+and its original requested stages. The first report is preserved, and the
+new report records the same pinned model revision and TEST identity. A resume
+of the new run must retain `--stages exans,aqua`.
+
+New report bundles include AQUA training logs and all numbered training
+attempts, runtime installation and environment evidence, official PPL logs
+and ExANS build diagnostics. A blocked ExANS stage still makes the two-method
+run partial; the helper publishes the available report and exits 1.

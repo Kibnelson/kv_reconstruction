@@ -112,6 +112,38 @@ class ProtocolTests(unittest.TestCase):
             dest=root/'report';runner.package(src,dest)
             self.assertEqual({p.name for p in dest.iterdir()},{'results.json','summary.md','package_manifest.json'})
 
+    def test_report_keeps_aqua_failure_attempts_and_runtime_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);src=root/'run';(src/'logs').mkdir(parents=True)
+            expected={'results.json':'{}','aqua_environment.json':'{"installed":{"accelerate":"1.1.1"}}',
+                'aqua_runtime_install.json':'{"install":[]}',
+                'logs/aqua_train_official.log':'missing Accelerate',
+                'logs/aqua_train_official.attempt1.log':'later failure',
+                'logs/aqua_runtime_install.log':'installed',
+                'logs/exans_build_official.log':'compile error'}
+            for name,content in expected.items(): (src/name).write_text(content)
+            (src/'logs/raw_tokens.log').write_text('not a report artifact')
+            dest=root/'report';runner.package(src,dest)
+            manifest=json.loads((dest/'package_manifest.json').read_text())['files']
+            self.assertEqual(set(manifest),set(expected))
+            for name,content in expected.items():
+                self.assertEqual((dest/name).read_text(),content)
+                self.assertEqual(manifest[name],runner.sha(src/name))
+
+    def test_exans_aqua_selection_skips_capture_and_both_completed_codecs(self):
+        with tempfile.TemporaryDirectory() as tmp,mock.patch.object(runner,'SOURCE_FILES',[]):
+            run=runner.Run(Path(tmp)/'out',['exans','aqua'])
+            (run.out/'model_manifest.json').write_text(json.dumps({'snapshot':tmp}))
+            (run.out/'toolchain.json').write_text(json.dumps({'cuda_home':tmp}))
+            stages=[]
+            def stage(name,action,dependencies=()):
+                stages.append(name)
+                run.result['stages'][name]={'status':'completed'}
+            run.stage=stage;run.execute()
+            self.assertEqual([s for s in stages if s in {'splitzip','ours','exans','aqua'}],['exans','aqua'])
+            self.assertNotIn('capture',stages)
+            self.assertLess(stages.index('exans'),stages.index('aqua'))
+
     def test_official_aqua_command_retains_full_calibration_and_buffers(self):
         with tempfile.TemporaryDirectory() as tmp:
             run=runner.Run.__new__(runner.Run);run.out=Path(tmp);run.sources={'aqua':Path(tmp)}
@@ -136,6 +168,60 @@ class ProtocolTests(unittest.TestCase):
                 self.assertEqual(cmd[cmd.index('--prefix_size')+1],'4')
                 self.assertEqual(cmd[cmd.index('--recent_buffer_size')+1],'128')
             self.assertEqual(result['raw_perplexity'],7.)
+
+
+class RuntimeEnvironmentTests(unittest.TestCase):
+    def cached_run(self,root):
+        run=runner.Run.__new__(runner.Run);run.out=root/'out';run.out.mkdir()
+        source=root/'author';source.mkdir();(source/'requirements.txt').write_text('torch==2.5.1\n')
+        envroot=root/'env';envroot.mkdir()
+        run.sources={'aqua':source};run.python={'aqua':envroot/'bin/python'}
+        run.checkout=lambda name:source
+        profile=dict(source=runner.SOURCES['aqua'][1],requirements_sha256=runner.sha(source/'requirements.txt'),
+            extra_constraints={'pyarrow':'20.0.0','numpy':'1.26.4'},hadamard=runner.SOURCES['hadamard'][1])
+        stamp=envroot/'official_profile.json';runner.write(stamp,profile)
+        return run,envroot,stamp,profile
+
+    def test_cached_environment_adds_loader_without_rebuilding_author_dependencies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run,envroot,stamp,profile=self.cached_run(Path(tmp));commands=[]
+            def command(name,argv,cwd=None):
+                commands.append((name,list(map(str,argv))))
+                log=run.out/(name+'.log')
+                log.write_text(json.dumps({'accelerate':'1.1.1','torch':'2.5.1'}))
+                return log
+            run.command=command
+            with mock.patch.object(runner,'check_sources'):
+                evidence=run.setup_env('aqua')
+            names=[name for name,_ in commands]
+            self.assertIn('aqua_runtime_install',names)
+            self.assertNotIn('aqua_requirements',names)
+            self.assertNotIn('hadamard_install',names)
+            install=next(argv for name,argv in commands if name=='aqua_runtime_install')
+            self.assertIn('accelerate==1.1.1',install)
+            self.assertIn('torch==2.5.1',(envroot/'loader_constraints.txt').read_text())
+            self.assertEqual(json.loads(stamp.read_text()),dict(profile,runtime_requirements=runner.AQUA_RUNTIME))
+            recorded=json.loads((run.out/'aqua_environment.json').read_text())
+            self.assertEqual(recorded['installed']['accelerate'],'1.1.1')
+            self.assertIn('aqua_environment.json',evidence['artifacts'])
+
+    def test_failed_runtime_install_cannot_update_environment_stamp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run,_,stamp,_=self.cached_run(Path(tmp));original=stamp.read_bytes()
+            run.verify_env=lambda name,**kw:None
+            def fail(name,argv,cwd=None): raise RuntimeError('installation failed')
+            run.command=fail
+            with self.assertRaisesRegex(RuntimeError,'installation failed'): run.setup_env('aqua')
+            self.assertEqual(stamp.read_bytes(),original)
+            self.assertFalse((run.out/'aqua_environment.json').exists())
+
+    def test_unrelated_environment_profile_drift_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run,_,stamp,profile=self.cached_run(Path(tmp))
+            runner.write(stamp,dict(profile,source='different author revision'))
+            run.command=mock.Mock()
+            with self.assertRaisesRegex(ValueError,'profile changed'):run.setup_env('aqua')
+            run.command.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()

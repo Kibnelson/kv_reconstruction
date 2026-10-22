@@ -37,6 +37,7 @@ SOURCE_FILES=['scripts/run_llama_official_a4500.py','scripts/llama_official_work
     'qwen_kv_bench/transfer_gpu_predictor.py','scripts/setup_qwen_cuda_toolchain.py',
     'qwen_kv_bench/matched_transfer.py','qwen_kv_bench/model_runtime.py',
     'scripts/bench_qwen_matched_gpu.py']
+AQUA_RUNTIME={'accelerate':'1.1.1'}
 
 
 def now(): return dt.datetime.now(dt.timezone.utc).isoformat()
@@ -209,12 +210,20 @@ class Run:
     def setup_env(self,name):
         src=self.checkout(name);py=self.python[name];envroot=py.parent.parent
         stamp=envroot/'official_profile.json'
-        profile=dict(source=SOURCES[name][1],requirements_sha256=sha(src/'requirements.txt'),
+        original_profile=dict(source=SOURCES[name][1],requirements_sha256=sha(src/'requirements.txt'),
             extra_constraints={'pyarrow':'20.0.0','numpy':'1.26.4'},
             hadamard=SOURCES['hadamard'][1] if name=='aqua' else None)
+        profile=dict(original_profile,runtime_requirements=AQUA_RUNTIME) if name=='aqua' else original_profile
         if stamp.exists():
-            if json.loads(stamp.read_text())!=profile: raise ValueError('Environment profile changed')
-            self.command(name+'_pip_check',[py,'-m','pip','check']);return
+            old=json.loads(stamp.read_text())
+            # The only accepted migration adds the missing loader dependency.
+            # Author sources, framework versions and all other constraints stay pinned.
+            if old!=profile and not (name=='aqua' and old==original_profile):
+                raise ValueError('Environment profile changed')
+            if name=='aqua': self.ensure_aqua_runtime(py,envroot)
+            self.command(name+'_pip_check',[py,'-m','pip','check'])
+            self.verify_env(name)
+            return self.record_environment(name,profile,stamp)
         if not py.exists(): venv.EnvBuilder(with_pip=True).create(envroot)
         constraints=envroot/'constraints.txt';constraints.write_text('numpy==1.26.4\npyarrow==20.0.0\n')
         self.command(name+'_build_prerequisites',[py,'-m','pip','install','packaging','wheel','ninja'])
@@ -222,6 +231,7 @@ class Run:
             self.command(name+'_torch',[py,'-m','pip','install','torch==2.5.1','numpy==1.26.4'])
         self.command(name+'_requirements',[py,'-m','pip','install','--no-build-isolation','-c',constraints,'-r',src/'requirements.txt'])
         if name=='aqua':
+            self.ensure_aqua_runtime(py,envroot)
             had=self.checkout('hadamard')
             self.command('hadamard_install',[py,'-m','pip','install','--no-build-isolation',had])
             check_sources(had,SOURCES['hadamard'][1])
@@ -229,7 +239,27 @@ class Run:
         else:
             self.command('ours_dependencies',[py,'-m','pip','install','constriction==0.5.0'])
         self.command(name+'_pip_check',[py,'-m','pip','check'])
-        check_sources(src,SOURCES[name][1]);write(stamp,profile)
+        self.verify_env(name)
+        return self.record_environment(name,profile,stamp)
+
+    def ensure_aqua_runtime(self,py,envroot):
+        # Upstream calls from_pretrained(low_cpu_mem_usage=True) but omits
+        # Accelerate from requirements.txt. Install it without relaxing author pins.
+        self.verify_env('aqua',include_runtime=False)
+        constraints=envroot/'loader_constraints.txt'
+        constraints.write_text('torch==2.5.1\ntransformers==4.46.3\ndatasets==2.20.0\nnumpy==1.26.4\npyarrow==20.0.0\n')
+        self.command('aqua_runtime_install',[py,'-m','pip','install','--no-input','-c',constraints,
+            '--report',self.out/'aqua_runtime_install.json',
+            *[f'{name}=={version}' for name,version in AQUA_RUNTIME.items()]])
+
+    def record_environment(self,name,profile,stamp):
+        script=("import importlib.metadata,json; "
+            "print(json.dumps({d.metadata['Name']:d.version for d in importlib.metadata.distributions() if d.metadata['Name']},sort_keys=True))")
+        log=self.command(name+'_environment',[self.python[name],'-c',script])
+        path=self.out/(name+'_environment.json')
+        write(path,dict(profile=profile,installed=json.loads(log.read_text())))
+        write(stamp,profile)
+        return dict(artifacts=self.artifacts(path))
 
     def preflight(self,name):
         self.verify_env(name)
@@ -238,7 +268,7 @@ class Run:
             'preflight','--manifest',self.out/'model_manifest.json','--output',path])
         return dict(artifacts=self.artifacts(path),scope='actual CUDA kernel and full WikiText2 text/token identity; no codec performance claim')
 
-    def verify_env(self,name):
+    def verify_env(self,name,*,include_runtime=True):
         check_sources(self.sources[name],SOURCES[name][1])
         # Recheck pinned direct dependencies when resuming a partially run batch.
         script=("import importlib.metadata,json,sys; wanted=json.loads(sys.argv[1]); "
@@ -246,6 +276,10 @@ class Run:
                 "assert got==wanted,(got,wanted)")
         wanted={'torch':'2.5.1','transformers':'4.46.3','datasets':'2.20.0'} if name=='aqua' else {
             'torch':'2.9.0','transformers':'4.57.1','triton':'3.5.0','datasets':'2.19.2'}
+        if name=='aqua' and include_runtime:
+            wanted.update(AQUA_RUNTIME)
+            script+=("; import accelerate; from transformers.utils import is_accelerate_available; "
+                "assert is_accelerate_available(), 'Transformers cannot use Accelerate'")
         self.command(name+'_verify_versions',[self.python[name],'-c',script,json.dumps(wanted)])
 
     def capture(self):
@@ -361,8 +395,12 @@ def package(output,destination):
     destination.mkdir(parents=True)
     import shutil
     files=['results.json','summary.md','source_manifest.json','hardware.json','toolchain.json','model_manifest.json',
-        'splitzip_preflight.json','aqua_preflight.json','splitzip_case_0.json','splitzip_case_1.json','ours/results.json']
-    for path in ['aqua_ppl_raw_official.log','aqua_ppl_higgs2_official.log','exans_build_official.log','exans_configure_official.log']:
+        'splitzip_preflight.json','aqua_preflight.json','splitzip_case_0.json','splitzip_case_1.json','ours/results.json',
+        'aqua_environment.json','splitzip_environment.json','aqua_runtime_install.json']
+    for path in ['aqua_train_official.log','aqua_ppl_raw_official.log','aqua_ppl_higgs2_official.log',
+            'aqua_runtime_install.log','aqua_pip_check.log','aqua_verify_versions.log','aqua_environment.log',
+            'aqua_requirements.log','aqua_import.log','aqua_gpu_preflight.log','hadamard_install.log',
+            'exans_build_official.log','exans_configure_official.log','exans_smoke_official.log']:
         files.extend(str(p.relative_to(output)) for p in (output/'logs').glob(path.replace('.log','*.log')))
     for relative in files:
         source=output/relative
