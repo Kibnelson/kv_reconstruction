@@ -26,7 +26,8 @@ NVCOMP_VERSION = '5.3.0.16'
 # Hash of the unmodified upstream codec_gpu.py, filled/checked by setup.
 SPLITZIP_SHA256 = 'e28fe3263e8906b26d59789cbc5bccf14edc8391b0dae986aafaf34adb2d392c'
 DTYPES = {'uint8': np.dtype('u1'), 'uint16': np.dtype('<u2'),
-          'int32': np.dtype('<i4'), 'int64': np.dtype('<i8')}
+          'int32': np.dtype('<i4'), 'int64': np.dtype('<i8'),
+          'float32': np.dtype('<f4')}
 
 
 def digest(value):
@@ -119,6 +120,8 @@ def import_record(adapter, wire, model_identity):
 
 
 class Adapter:
+    lossless = True
+
     def check_encode(self, record):
         if any(bool(x.any().item()) for x in record.errors):
             raise RuntimeError('GPU encoder reported an error')

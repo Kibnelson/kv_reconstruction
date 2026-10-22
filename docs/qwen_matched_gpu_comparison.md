@@ -31,9 +31,13 @@ The previous-only and AQUA-style labels describe their mean predictors. All B
 arms still use earlier-group error context for width adaptation. This holds the
 width rule fixed while comparing the mean dependency structure.
 
-AQUA-style here is an exact-coder predictor ablation, not a reproduction of
-the published lossy AQUA-KV system. Speculative FP8 model-copy coding and ExANS
-are pending adapters. No CPU cost estimate can populate a GPU result row.
+AQUA-style here is an exact-coder predictor ablation. A separate comparison
+now adds released AQUA-KV cache/Quanto residual method bodies (2/4 bits) and
+the native pinned OpenLake ExANS v2 CUDA codec. See
+[the four-family run](qwen_native_baselines.md) for integration changes,
+lossy quality metrics, fixed-block padding and the A4500 command.
+Speculative FP8 model-copy coding remains pending. No CPU cost estimate can
+populate a GPU result row.
 
 ## Model, data and presets
 

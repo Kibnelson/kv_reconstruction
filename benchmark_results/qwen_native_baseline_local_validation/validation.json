@@ -1,0 +1,62 @@
+{
+  "format": "qwen_native_baselines_software_validation_v1",
+  "gpu_measured": false,
+  "tests": {
+    "run": 35,
+    "passed": 27,
+    "skipped_cuda": 8,
+    "failed": 0,
+    "seconds": 17.331,
+    "log": "tests.log"
+  },
+  "native_exans_compile": {
+    "status": "passed",
+    "architecture": "sm_86",
+    "nvcc": "12.9.86",
+    "nvcomp": "5.3.0.16",
+    "manifest": "exans_build.json",
+    "kernel_source": "unchanged upstream kernels",
+    "host_build_fix": "one allocation-error argument codec -> codec.get()",
+    "runtime_GPU_execution": false,
+    "exported_C_ABI": [
+      "openlake_expans_create",
+      "openlake_expans_destroy",
+      "openlake_expans_last_error",
+      "openlake_expans_encode",
+      "openlake_expans_decode"
+    ]
+  },
+  "software_environment": {
+    "torch": "2.14.1+cpu",
+    "numpy": "2.3.5",
+    "triton": "3.6.0 (interpreter tests only)",
+    "quanto": "0.2.6"
+  },
+  "validation": [
+    "released AQUA Quanto 2/4-bit path; multihead nonzero-position portable reconstruction from a fresh decoder",
+    "AQUA packed-plane padding, raw anchor, both BF16 affine parameters and cos/sin byte accounting",
+    "later AQUA predictor fits consume reconstructed TRAIN K/V",
+    "AQUA state corruption rejected; lossy methods excluded from exact-codec rankings",
+    "ExANS native header and physical-block checks; portable raw overflow fallback",
+    "existing exact-codec predictor, oracle-byte, causal decode and SplitZip interpreter tests",
+    "native ExANS compiled and linked; all five C exports present",
+    "benchmark refuses CPU execution with gpu_measured=false",
+    "Bash syntax, Python compilation, git diff checks and deterministic standalone build/check passed"
+  ],
+  "limits": [
+    "no local CUDA hardware; 8 CUDA tests skipped",
+    "no new measured Qwen compression, GPU timing, downstream quality or serving result",
+    "A4500 helper requires all requested native implementations before the timed run",
+    "generated standalone built locally; source-only publication, A4500 helper regenerates it before testing"
+  ],
+  "files_sha256": {
+    "qwen_kv_bench/matched_transfer.py": "24e8bdd19962522e04a5737c09bb5792815a84d12a1664faf01350bee0bb5462",
+    "qwen_kv_bench/matched_aqua.py": "a94e429f56ddb36b492cf2ea6f807eaaa317766538613e38e55e72f2ef6ae83d",
+    "qwen_kv_bench/matched_exans.py": "0889191441c6f186130154d8bba05044140e2da493ea4d912a96ed017621fe61",
+    "qwen_kv_bench/native_baseline_sources.py": "ae91de42d23dc2fcca800d4acc3f49473e0c06d0a2e7a18698a5a7cfed6e1444",
+    "scripts/bench_qwen_matched_gpu.py": "4e40169000fc8d3b20a0c048a261f65b99aa9fca40b4be5290a3130df91358cd",
+    "scripts/setup_qwen_native_baselines.py": "65e22fd5cfb7f6eeaafea3dc255ddcdafa85d13b928472e09c5f05279bdedd50",
+    "scripts/compare_qwen_native_a4500.sh": "f0d5ada8da8909333dc77cde422fe18c12d0c4412b183fbf7b25d98073584b1a",
+    "tests/test_qwen_native_baselines.py": "155c7df6772e044d487b7c58ba7716eb5b9886cbf802d340a12ec191783523a7"
+  }
+}
