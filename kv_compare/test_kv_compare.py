@@ -27,7 +27,8 @@ NAMES = [f"train{i}" for i in range(6)] + ["tables", "test_text", "test_code"]
 
 
 def tiny_model():
-    torch.manual_seed(0)
+    import os
+    torch.manual_seed(int(os.environ.get("KV_COMPARE_TEST_SEED", "0")))
     cfg = LlamaConfig(vocab_size=97, hidden_size=64, intermediate_size=96, num_hidden_layers=4,
                       num_attention_heads=4, num_key_value_heads=2, head_dim=16, max_position_embeddings=2048,
                       rope_theta=500000.0,
@@ -137,9 +138,10 @@ class TinyLlamaTests(unittest.TestCase):
         exact = torch.stack([words_to_float(doc.words(l, self.study.device, P)) for l in range(self.study.L)])
         self.assertEqual(tuple(rec.shape), tuple(exact.shape))
         self.assertTrue(0 < rate < 16)
-        # error bound: half a step (step = 1 x the channel's spread) plus BF16 rounding of the reconstruction
+        # error bound: half a step (step = 1 x the channel's spread) plus BF16 rounding of the reconstruction,
+        # which is at most half a BF16 step of the pre-rounding value, |x| + step/2 in magnitude
         spread = torch.stack([fits[l].spread for l in range(self.study.L)])[:, None, :]
-        bound = 0.5 * spread + exact.abs() * 2.0 ** -8 + 1e-12
+        bound = 0.5 * spread + (exact.abs() + 0.5 * spread) * 2.0 ** -8 + 1e-12
         self.assertTrue(bool(((rec.double() - exact).abs() <= bound * 1.0001).all()))
         aqua = baselines.aqua_fit(self.study, self.study.L)
         for out, r in (baselines.aqua_style(self.study, aqua, doc, P, 3), baselines.kivi_style(self.study, doc, P, 3),
