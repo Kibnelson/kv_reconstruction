@@ -1,5 +1,10 @@
 # Matched Qwen GPU comparison
 
+**Scope update, 2026-10-22:** this document describes the historical matched
+page/predictor experiment. Claims about official AQUA-KV, SplitZip or ExANS
+performance now follow [the unchanged-author protocol](qwen_official_baseline_protocol.md),
+with the Qwen3 model fixed and unsupported baselines recorded as blocked.
+
 This first experiment isolates stronger decoder-available layer inputs while
 holding the existing exact GPU entropy coder fixed. It does not implement or
 claim the team's 51.4% strong-and-fast result. That number is a SmolLM2 coding

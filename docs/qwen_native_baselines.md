@@ -1,5 +1,11 @@
 # AQUA-KV, SplitZip and ExANS versus the exact codec
 
+**Historical adapted page experiment.** For the current requirement to keep
+the Qwen3 model and run author implementations/procedures unchanged, use
+[the official baseline protocol](qwen_official_baseline_protocol.md).
+The results and commands below retain their original exploratory scope;
+they are not the official-baseline comparison under that requirement.
+
 This experiment compares the same held-out Qwen BF16 words, with complete
 portable packets, synchronized GPU encode/decode latency and frozen decoder
 state. It reuses the captures from the earlier matched A4500 pilot. It does
