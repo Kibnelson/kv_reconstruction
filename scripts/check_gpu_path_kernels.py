@@ -29,7 +29,7 @@ def compile_all():
                 c=dict(PACKED=packed,CAPACITY=1000000,T=32,C=2*h*d,HEADS=h,QHEADS=4*h,D=d,TILE=tile,PAGES=(32+tile-1)//tile,N=tile*d,SECTORS=2*h*((32+tile-1)//tile)*2,TAIL=tail,SCALE=d**-.5)
                 check(attention,sig,c,label=f'D{d}_packed{packed}_tail{tail}')
     common=dict(MU='*fp64',INV='*fp64',BD='*fp64',FT='*i64')
-    for group in [8,32]:
+    for group in [8,32,64]:
         check(k.encode_group,dict(W='*u16',STATE='*i64',COUNT='*i64',BUFFER='*u8',ERROR='*i32',LAYER='i32',CH='i32',**common),dict(T=32,C=384,GROUP=group,CAP=400000),1,f'group{group}')
         check(k.prepare_frequencies,dict(W='*u16',F0='*u16',LAYER='i32',CH='i32',**common),dict(T=32,C=384,GROUP=group,BLOCK=256),4,f'group{group}')
         check(k.encode_group_cached,dict(W='*u16',F0='*u16',STATE='*i64',COUNT='*i64',BUFFER='*u8',ERROR='*i32',LAYER='i32',CH='i32'),dict(T=32,C=384,GROUP=group,CAP=400000),1,f'group{group}')

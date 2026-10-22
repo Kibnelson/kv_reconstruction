@@ -232,6 +232,17 @@ def load_model(path):
     return model
 
 
+def context_layers(mode, layer):
+    """Earlier same-token layers available to a packet-only decoder.
+
+    The strong-layer ablation adds layer 0 and l-2, deduplicating coincident
+    inputs in the first layers. It has no dependency on another token/page.
+    """
+    if mode == "strong_layers":
+        return tuple(sorted({0, layer - 2, layer - 1} & set(range(layer))))
+    return (layer - 1,) if layer else ()
+
+
 def _context_columns(mode, layer, ch0, channels, rank):
     previous = 2 * channels if layer else 0
     metadata = list(range(previous, previous + rank))
@@ -244,6 +255,8 @@ def _context_columns(mode, layer, ch0, channels, rank):
         if ch0 < channels:
             return (list(range(channels)) if layer else []) + metadata
         return (list(range(channels, 2 * channels)) if layer else []) + metadata + list(range(current, current + channels))
+    if mode == "strong_layers":
+        current = len(context_layers(mode, layer)) * 2 * channels + rank
     return list(range(current + ch0))
 
 
@@ -255,7 +268,7 @@ def fit(train, scale, mode="block", block_size=32, metadata_train=None, metadata
     Their reconstructed numeric features are codes /128.  They must have the
     same layer/token shape as their corresponding ACT capture.
     """
-    if not train or mode not in ("mean", "previous", "aqua", "block") or not np.isfinite(ridge) or ridge <= 0:
+    if not train or mode not in ("mean", "previous", "aqua", "block", "strong_layers") or not np.isfinite(ridge) or ridge <= 0:
         raise ValueError("invalid predictor fit configuration")
     geometry = _geometry(train[0]); channels = geometry["channels"]; nv = 2 * channels
     if block_size <= 0 or block_size % 2 or channels % block_size:
@@ -282,7 +295,8 @@ def fit(train, scale, mode="block", block_size=32, metadata_train=None, metadata
     model = TransferModel(geometry, mode, int(block_size), rank, [], cosine, sine, f_tab)
     for layer in range(geometry["layers"]):
         cur = np.concatenate([canonical_features(d, layer) for d in train])
-        previous = np.concatenate([canonical_features(d, layer - 1) for d in train]) if layer else np.empty((len(cur), 0))
+        sources = context_layers(mode, layer)
+        previous = np.concatenate([np.concatenate([canonical_features(d, s) for s in sources], axis=1) for d in train]) if sources else np.empty((len(cur), 0))
         meta = np.concatenate([m[layer] for m in metas]).astype(np.float64) / METADATA_DIVISOR
         joint = np.concatenate((previous, meta, cur), axis=1)
         mean = joint.mean(axis=0); centered = joint - mean
@@ -291,7 +305,7 @@ def fit(train, scale, mode="block", block_size=32, metadata_train=None, metadata
         covariance += regularization * np.eye(len(covariance))
         npast = previous.shape[1] + rank
         full_a = None
-        if mode == "block":
+        if mode in ("block", "strong_layers"):
             lower = np.linalg.cholesky(covariance)
             inverse = np.linalg.solve(lower, np.eye(len(lower)))
             rows = np.arange(npast, npast + nv)
@@ -300,16 +314,25 @@ def fit(train, scale, mode="block", block_size=32, metadata_train=None, metadata
         scale_words = words(scale, layer)
         scale_positions = _positions(scale)
         scale_cur = _all_fixed(scale_words, scale_positions, model)
-        scale_previous = _all_fixed(words(scale, layer - 1), scale_positions, model) if layer else np.empty((len(scale_cur), 0), dtype=np.int64)
+        scale_previous = np.concatenate([_all_fixed(words(scale, s), scale_positions, model) for s in sources], axis=1) if sources else np.empty((len(scale_cur), 0), dtype=np.int64)
         scale_features = np.concatenate((scale_previous, scale_meta[layer].astype(np.int64) * (65536 // METADATA_DIVISOR), scale_cur), axis=1)
         blocks = []
+        solved_contexts = {}
         for ch0 in range(0, nv, block_size):
             columns = np.asarray(_context_columns(mode, layer, ch0, channels, rank), dtype=np.int32)
             rows = np.arange(npast + ch0, npast + ch0 + block_size)
             if full_a is not None:
                 coefficient = full_a[ch0:ch0 + block_size, columns]
             elif len(columns):
-                coefficient = np.linalg.solve(covariance[np.ix_(columns, columns)], covariance[np.ix_(columns, rows)]).T
+                # Previous-only and AQUA-style groups repeat the same context.
+                # Factor each distinct system once, for all output channels,
+                # rather than repeating a dense solve for every channel group.
+                key = tuple(columns)
+                if key not in solved_contexts:
+                    targets = np.arange(npast, npast + nv)
+                    solved_contexts[key] = np.linalg.solve(covariance[np.ix_(columns, columns)],
+                        covariance[np.ix_(columns, targets)]).T
+                coefficient = solved_contexts[key][ch0:ch0 + block_size]
             else:
                 coefficient = np.empty((block_size, 0))
             bias = mean[rows] - coefficient @ mean[columns]
@@ -346,9 +369,13 @@ def _run(model, shape, start, metadata, correction, residue_bits, source=None, c
     layers, tokens, nv = shape
     positions = np.arange(start, start + tokens)
     previous = np.empty((tokens, 0), dtype=np.int64)
+    history = {}
     output = np.empty(shape, dtype=np.uint16)
     ideal = 0.0; layer_bits = []; per_block = []
     for layer in range(layers):
+        if model.mode == "strong_layers":
+            sources = context_layers(model.mode, layer)
+            previous = np.concatenate([history[s] for s in sources], axis=1) if sources else np.empty((tokens, 0), dtype=np.int64)
         current = np.zeros((tokens, nv), dtype=np.int64)
         offset = previous.shape[1] + model.metadata_rank
         features = np.concatenate((previous, metadata[layer].astype(np.int64) * (65536 // METADATA_DIVISOR), current), axis=1)
@@ -367,6 +394,9 @@ def _run(model, shape, start, metadata, correction, residue_bits, source=None, c
             total_layer += bits
             per_block.append(dict(layer=layer, channel_start=ch0, values=int(recovered.size), ideal_bits=float(bits)))
         previous = features[:, offset:].copy()
+        if model.mode == "strong_layers":
+            history[layer] = previous
+            history = {s: v for s, v in history.items() if s == 0 or s >= layer - 1}
         ideal += total_layer; layer_bits.append(float(total_layer))
     stream = coder.get_compressed().astype("<u4").tobytes() if encoding else None
     return output, stream, dict(ideal_bits=float(ideal), layer_ideal_bits=layer_bits, block_diagnostics=per_block)

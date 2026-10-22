@@ -1,4 +1,4 @@
-"""GPU T1 feasibility path: causal Block32 A/B parameters and binary rANS.
+"""GPU T1 feasibility path: frozen causal A/B parameters and binary rANS.
 
 All KV arithmetic, probability construction and entropy coding run on the
 selected CUDA device. CPU control reads the final byte count to size the
@@ -46,8 +46,8 @@ class Engine:
                 raise RuntimeError('CPU validation requires the explicit Triton interpreter')
         elif d.type!='cuda' or not t.cuda.is_available():
             raise RuntimeError('T1 requires CUDA; no CPU entropy fallback')
-        if base.metadata_rank or base.mode!='block' or state.arm not in ('A','B') or state.hint_bits:
-            raise ValueError('T1 supports metadata-free frozen block A/B only')
+        if base.metadata_rank or base.mode not in ('block','previous','aqua','mean','strong_layers') or state.arm not in ('A','B') or state.hint_bits:
+            raise ValueError('T1 requires a supported metadata-free frozen predictor and A/B widths')
         actual_base=ref._state_digest(base)
         if base.state_sha256 and base.state_sha256!=actual_base:raise ValueError('base state changed after calibration')
         base.state_sha256=actual_base
@@ -67,7 +67,7 @@ class Engine:
         for l,blocks in enumerate(base.predictors):
             if len(blocks)!=width//base.block_size:raise ValueError('wrong predictor group count')
             for g,block in enumerate(blocks):
-                columns=np.asarray(block['columns']);available=(width if l else 0)+g*base.block_size
+                columns=np.asarray(block['columns']);available=len(ref.context_layers(base.mode,l))*width+g*base.block_size
                 if columns.ndim!=1 or columns.dtype.kind not in 'iu' or np.any(columns<0) or np.any(columns>=available):
                     raise ValueError('predictor refers to unavailable decoder context')
                 if block['A'].shape!=(base.block_size,len(columns)) or block['b'].shape!=(base.block_size,) or block['inv_s'].shape!=(base.block_size,):
@@ -182,12 +182,15 @@ class Engine:
 
     def _walk(self,words,start,packet=None,trace=False):
         t=self.t;layers,tokens,width=self._shape(tuple(words.shape),start);previous=t.empty((tokens,0),dtype=t.int64,device=self.device)
-        records=[]
+        records=[];history={}
         if packet is not None:
             from . import transfer_t1_kernels as k
             xs=t.empty(tokens,dtype=t.int64,device=self.device);position=t.empty_like(xs);error=t.empty(tokens,dtype=t.int32,device=self.device)
             k.initialize_decoder[(tokens,)](packet.payload,packet.directory,xs,position,error,SIZE=packet.payload.numel(),num_warps=1)
         for l in range(layers):
+            if self.base.mode=='strong_layers':
+                sources=ref.context_layers(self.base.mode,l)
+                previous=t.cat([history[s] for s in sources],1) if sources else t.empty((tokens,0),dtype=t.int64,device=self.device)
             features=t.cat((previous,t.zeros((tokens,width),dtype=t.int64,device=self.device)),1)
             offset=previous.shape[1];sums=t.zeros((tokens,3),dtype=t.int64,device=self.device);last=t.zeros(tokens,dtype=t.int64,device=self.device)
             for g in range(len(self.base.predictors[l])):
@@ -199,6 +202,9 @@ class Engine:
                 if packet is None or trace:records.append((l,g,mu,inverse,off))
                 last=self._advance(words[l,:,ch:ch+self.base.block_size],fixed,l,g,start,features,offset,sums)
             previous=features[:,offset:]
+            if self.base.mode=='strong_layers':
+                history[l]=previous
+                history={s:v for s,v in history.items() if s==0 or s>=l-1}
         if packet is not None:
             k.finish_decoder[(tokens,)](xs,position,packet.directory,error,num_warps=1)
             return words,error,records

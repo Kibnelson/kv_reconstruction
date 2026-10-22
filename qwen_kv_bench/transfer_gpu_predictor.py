@@ -63,7 +63,11 @@ def numpy_prediction_sweep(model, known_words, start=0, metadata=None):
     positions = np.arange(start, start + tokens)
     previous = np.empty((tokens, 0), dtype=np.int64)
     output = np.empty(source.shape, dtype=np.float64)
+    history = {}
     for layer in range(layers):
+        if model.mode == 'strong_layers':
+            sources = reference.context_layers(model.mode, layer)
+            previous = np.concatenate([history[s] for s in sources], axis=1) if sources else np.empty((tokens, 0), np.int64)
         fixed = reference._all_fixed(source[layer], positions, model)
         meta = metadata[layer].astype(np.int64) * 512
         features = np.concatenate((previous, meta, np.zeros((tokens, width), dtype=np.int64)), axis=1)
@@ -73,6 +77,9 @@ def numpy_prediction_sweep(model, known_words, start=0, metadata=None):
             output[layer, :, ch0:ch0 + model.block_size] = reference._predict(features, block, ch0, positions, model)
             features[:, offset + ch0:offset + ch0 + model.block_size] = fixed[:, ch0:ch0 + model.block_size]
         previous = features[:, offset:]
+        if model.mode == 'strong_layers':
+            history[layer] = previous
+            history = {s: v for s, v in history.items() if s == 0 or s >= layer-1}
     return output
 
 
@@ -95,6 +102,7 @@ class TorchTransferPredictor:
         result = cls()
         result.device = selected_device
         result.geometry = copy.deepcopy(model.geometry)
+        result.mode = model.mode
         result.block_size = model.block_size
         result.metadata_rank = model.metadata_rank
         result.state_sha256 = model.state_sha256
@@ -195,7 +203,8 @@ class TorchTransferPredictor:
             raise ValueError("invalid layer, block, or feature shape")
         self._positions(positions, len(features))
         block = self.predictors[layer][block_index]
-        expected_features = (2 * self.geometry["channels"] if layer else 0) + self.metadata_rank + 2 * self.geometry["channels"]
+        from .transfer_reference import context_layers
+        expected_features = (len(context_layers(self.mode, layer)) + 1) * 2 * self.geometry["channels"] + self.metadata_rank
         if features.shape[1] != expected_features:
             raise ValueError("feature width differs from frozen state")
         selected = features.index_select(1, block["columns"])
@@ -241,7 +250,12 @@ class TorchTransferPredictor:
             raise ValueError("metadata supplied to metadata-free predictor")
         previous = t.empty((tokens, 0), dtype=t.int64, device=self.device)
         means = t.empty(known_words.shape, dtype=t.float64, device=self.device)
+        from .transfer_reference import context_layers
+        history = {}
         for layer in range(layers):
+            if self.mode == 'strong_layers':
+                sources = context_layers(self.mode, layer)
+                previous = t.cat([history[s] for s in sources], dim=1) if sources else t.empty((tokens, 0), dtype=t.int64, device=self.device)
             fixed = self.canonical_features(known_words[layer], positions)
             meta = metadata[layer].to(t.int64) * 512 if self.metadata_rank else t.empty((tokens, 0), dtype=t.int64, device=self.device)
             features = t.cat((previous, meta, t.zeros((tokens, width), dtype=t.int64, device=self.device)), dim=1)
@@ -251,6 +265,9 @@ class TorchTransferPredictor:
                 means[layer, :, ch0:ch0 + self.block_size] = self.predict_block(features, layer, index, positions)
                 features[:, offset + ch0:offset + ch0 + self.block_size] = fixed[:, ch0:ch0 + self.block_size]
             previous = features[:, offset:]
+            if self.mode == 'strong_layers':
+                history[layer] = previous
+                history = {s: v for s, v in history.items() if s == 0 or s >= layer-1}
         return means
 
     def storage_statistics(self):

@@ -102,8 +102,10 @@ def load_state(path):
 
 
 def empty_state(base, arm="A", hint_bits=0):
-    if base.mode != "block" or base.metadata_rank:
-        raise ValueError("experiment requires a metadata-free Block32 base")
+    if base.mode not in ('block','previous','aqua','mean','strong_layers') or base.metadata_rank:
+        raise ValueError("experiment requires a supported metadata-free causal base")
+    if arm in ('C','D') and base.mode != 'block':
+        raise ValueError('hint arms require the original block predictor')
     if arm not in ARMS or hint_bits not in (0, 1, 2, 4):
         raise ValueError("invalid probability arm")
     if (arm in ('A','B')) != (hint_bits==0):
@@ -207,9 +209,15 @@ def _buckets(recovered, mu, thresholds):
 def trace(base, capture, state=None):
     """TRAIN/DEV analysis replay. Never represented as packet decompression."""
     state = state or empty_state(base, "B")
+    if state.arm == 'A':
+        state = empty_state(base, 'B')  # A has no error-bucket tables.
     source = ref.words(capture); positions = ref._positions(capture)
     previous = np.empty((len(positions), 0), np.int64); previous_words = None; rows = []
+    history = {}
     for layer, blocks in enumerate(base.predictors):
+        if base.mode == 'strong_layers':
+            sources=ref.context_layers(base.mode,layer)
+            previous=np.concatenate([history[s] for s in sources],axis=1) if sources else np.empty((len(positions),0),np.int64)
         current = ref._all_fixed(source[layer], positions, base)
         features = np.concatenate((previous, np.zeros_like(current)), axis=1)
         errors=[]; signed=[]; large=[]; last=None
@@ -228,6 +236,9 @@ def trace(base, capture, state=None):
             errors.append(last); signed.append(sign); large.append(big)
             features[:, previous.shape[1]+ch:previous.shape[1]+ch+base.block_size] = current[:, ch:ch+base.block_size]
         previous = current; previous_words = source[layer]
+        if base.mode == 'strong_layers':
+            history[layer]=current
+            history={s:v for s,v in history.items() if s==0 or s>=layer-1}
     return rows
 
 
@@ -345,9 +356,12 @@ def _run(base,state,shape,start,ids,source=None,stream=None,backend=None):
     layers,tokens,width=ref._shape(base,shape,start); positions=np.arange(start,start+tokens)
     encoding=source is not None
     coder=ref._constriction().stream.queue.RangeEncoder() if encoding else ref._constriction().stream.queue.RangeDecoder(np.frombuffer(stream,dtype="<u4"))
-    output=np.empty(shape,np.uint16); previous=np.empty((tokens,0),np.int64); previous_words=None
+    output=np.empty(shape,np.uint16); previous=np.empty((tokens,0),np.int64); previous_words=None;history={}
     parameter_hash=hashlib.sha256(); prediction_seconds=0.; entropy_seconds=0.; context_seconds=0.; clamp_count=0
     for l,blocks in enumerate(base.predictors):
+        if base.mode=='strong_layers':
+            sources=ref.context_layers(base.mode,l)
+            previous=np.concatenate([history[s] for s in sources],axis=1) if sources else np.empty((tokens,0),np.int64)
         features=np.concatenate((previous,np.zeros((tokens,width),np.int64)),axis=1)
         errors=[]; signed=[]; large=[]; last=None
         for g,b in enumerate(blocks):
@@ -371,6 +385,9 @@ def _run(base,state,shape,start,ids,source=None,stream=None,backend=None):
             features[:,previous.shape[1]+ch:previous.shape[1]+ch+base.block_size]=ref._rope_int(fixed,ch,positions,base,True) if ch<base.geometry["channels"] else fixed
             context_seconds+=time.perf_counter()-begin
         previous=features[:,previous.shape[1]:].copy(); previous_words=output[l]
+        if base.mode=='strong_layers':
+            history[l]=previous
+            history={s:v for s,v in history.items() if s==0 or s>=l-1}
     wire=coder.get_compressed().astype("<u4").tobytes() if encoding else None
     return output,wire,dict(parameter_sha256=parameter_hash.hexdigest(),parameter_seconds=prediction_seconds,
         cpu_probability_entropy_seconds=entropy_seconds,cpu_context_seconds=context_seconds,
