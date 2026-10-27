@@ -311,11 +311,14 @@ if triton is not None:
 class SliceCoder:
     """Encode/decode BF16 words given float32 predictions and spreads (all on one device)."""
 
-    def __init__(self, device, values_per_stream=2048, block=128, fuse=False):
+    def __init__(self, device, values_per_stream=2048, block=128, warps=None, fuse=False):
+        """block: lanes (streams) per Triton program; warps: warps per program (default one thread per lane;
+        fewer warps give each thread several lanes, i.e. independent rANS chains to interleave)."""
         if triton is None:
             raise RuntimeError("Triton is required for the GPU coder")
         self.device = torch.device(device)
         self.V, self.BLOCK = int(values_per_stream), int(block)
+        self.warps = max(1, self.BLOCK // 32) if warps is None else int(warps)
         self.cum, self.off, self.K, self.lut = slice_tables(self.device)
         self.opts = {} if fuse else {"enable_fp_fusion": False}
 
@@ -326,9 +329,8 @@ class SliceCoder:
         return S, programs, cap
 
     def _launch(self, kernel, grid, *args, **kw):
-        warps = max(1, self.BLOCK // 32)         # one thread per lane (Triton's default of 4 warps replicates small blocks)
-        try:
-            return kernel[grid](*args, **kw, num_warps=warps, **self.opts)
+        try:                                     # explicit warps: Triton's default of 4 replicates small blocks
+            return kernel[grid](*args, **kw, num_warps=self.warps, **self.opts)
         except TypeError:                        # launch options unsupported (e.g. interpreter): plain launch
             return kernel[grid](*args, **kw)
 

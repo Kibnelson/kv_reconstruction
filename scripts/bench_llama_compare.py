@@ -280,7 +280,7 @@ def stage_gpu_speed(args, out):
     import gc
     import torch
     from kv_compare.gpu_coder import SliceCoder
-    from kv_compare.gpu_speed import coder_inputs, coder_rows, predictor_rows
+    from kv_compare.gpu_speed import coder_inputs, coder_rows, overlap_row, predictor_layer, predictor_rows
     from kv_compare.predict import CONFIGS, Study
     device = torch.device(args.device)
     meta = json.loads((out / "captures" / "meta.json").read_text())
@@ -311,8 +311,23 @@ def stage_gpu_speed(args, out):
     gc.collect()
     torch.cuda.empty_cache() if device.type == "cuda" else None
     if device.type == "cuda" or os.environ.get("TRITON_INTERPRET") == "1":
-        rows += coder_rows(SliceCoder, device, data, args.speed_settings, log,
+        crows = coder_rows(SliceCoder, device, data, args.speed_settings, log,
                            max_values=None if device.type == "cuda" else 4096)
+        rows += crows
+        ok = [r for r in crows if r["bit_exact"]]
+        if device.type == "cuda" and ok:
+            best = max(ok, key=lambda r: r["decode_gvalues_per_s"])
+            lite = next(v for v in variants if v["label"] == "P, 16 pivot steps")
+            gen = torch.Generator(device=device).manual_seed(1)
+            fmt = "int8x8" if "int8x8" in args.speed_formats else args.speed_formats[0]
+            layer_fn, _ = predictor_layer(Hk, hd, Hq, args.speed_tokens, device, lite, fmt, gen)
+            try:
+                row = overlap_row(SliceCoder, device, data, (best["values_per_stream"], best["block"], best["warps"]),
+                                  layer_fn, log)
+                row.update(predictor=f"{lite['label']} ({fmt})")
+                rows.append(row)
+            except Exception as exc:
+                log(f"  overlap: not measured ({exc!r})")
     else:
         log("gpu_speed: the coder needs a CUDA GPU (or TRITON_INTERPRET=1 for a slow CPU check); skipped")
     bits = {}
@@ -332,6 +347,7 @@ def speed_lines(out):
     res = json.loads((out / "gpu_speed.json").read_text())
     pred = [r for r in res["rows"] if r["part"] == "predictor"]
     coder = [r for r in res["rows"] if r["part"] == "coder"]
+    over = [r for r in res["rows"] if r["part"] == "overlap"]
     lines = [f"## GPU speed ({res['gpu']})", "",
              f"Kernel time only (CUDA-event medians after warm-up), like the published SplitZip and ExANS GB/s; GB/s "
              f"counts raw BF16 bytes (2 per value). Predictor: one layer of {res['tokens_per_layer']} tokens, random "
@@ -347,10 +363,10 @@ def speed_lines(out):
     if coder:
         lines += ["", f"Value-slice coder (Triton) on {coder[0]['values']:,} real values ({res['coder_config']} "
                   f"predictions, layers {res['coder_layers']}); the round trip must be bit-exact.", "",
-                  "| Values per stream x lanes per program | Bit-exact | Stream bits/value | Exact model bits/value | Encode GB/s | Decode GB/s |",
+                  "| Values per stream x lanes per program (warps) | Bit-exact | Stream bits/value | Exact model bits/value | Encode GB/s | Decode GB/s |",
                   "| --- | --- | --- | --- | --- | --- |"]
         for r in coder:
-            lines.append(f"| {r['values_per_stream']} x {r['block']} | {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | "
+            lines.append(f"| {r['values_per_stream']} x {r['block']} ({r.get('warps', max(1, r['block'] // 32))}) | {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | "
                          f"{r['exact_model_bits_per_value']:.4f} | {r['encode_gb_per_s']:.1f} | {r['decode_gb_per_s']:.1f} |")
     ok = [r for r in coder if r["bit_exact"]]
     if ok and pred:
@@ -369,6 +385,13 @@ def speed_lines(out):
             b = res["bits_per_value"].get(v)
             link = f"{g * b:.0f} Gb/s" if b else "n/a"
             lines.append(f"| {v} ({p_['format']}) | {'n/a' if b is None else f'{b:.3f}'} | {g:.1f} | {2 * g:.1f} | {link} |")
+    for r in over:
+        b = res["bits_per_value"].get(r["predictor"].split(" (")[0])
+        lines += ["", f"Overlap ({r['predictor']} on one CUDA stream, the coder decoding on another, as a pipelined "
+                  f"decoder would on different token blocks): predictor {r['predictor_ms']:.2f} ms + decode "
+                  f"{r['decode_ms']:.2f} ms one after the other, {r['both_ms']:.2f} ms together, so "
+                  f"{r['overlapped_gvalues_per_s']:.1f} G values/s ({2 * r['overlapped_gvalues_per_s']:.1f} GB/s)"
+                  + (f", keeping up with a {r['overlapped_gvalues_per_s'] * b:.0f} Gb/s link." if b else ".")]
     lines += ["", "Reference: " + res["splitzip_reference"] + ".", ""]
     return lines
 
@@ -453,8 +476,9 @@ def parser():
     p.add_argument("--speed-formats", default="fp32,bf16,int8x16,int8x8")
     p.add_argument("--speed-config", default="lite", help="gpu_speed: configuration whose predictions feed the coder")
     p.add_argument("--speed-layers", default="4,12,20,27", help="gpu_speed: test-document layers coded")
-    p.add_argument("--speed-settings", default="1024x64,2048x128,4096x128",
-                   help="gpu_speed: coder settings, values per stream x lanes per program")
+    p.add_argument("--speed-settings", default="1024x32,1024x64x1,1024x128x1,1024x64,2048x64x1",
+                   help="gpu_speed: coder settings, values per stream x lanes per program [x warps per program; "
+                        "default one thread per lane, fewer warps interleave several lanes per thread]")
     return p
 
 
@@ -485,6 +509,8 @@ def main(argv=None):
     args.speed_formats = [f for f in args.speed_formats.split(",") if f]
     args.speed_layers = [int(l) for l in args.speed_layers.split(",") if l]
     args.speed_settings = [tuple(int(x) for x in t.split("x")) for t in args.speed_settings.split(",") if t]
+    if any(len(t) not in (2, 3) for t in args.speed_settings):
+        raise SystemExit("--speed-settings takes VxB or VxBxW items (values per stream x lanes x warps)")
     stages = [s for s in args.stages.split(",") if s]
     out = args.output
     if "capture" in stages:

@@ -107,6 +107,29 @@ def attention_input(T, W, Hk, hd, Hq, device, dtype, gen, chunk=1024):
     return run
 
 
+def predictor_layer(Hk, hd, Hq, T, device, v, fmt, gen):
+    """Callables (whole layer, products only) predicting one layer of T tokens for variant v in format fmt."""
+    W = 2 * Hk * hd
+    gsz = W // v["steps"]
+    parts = []
+    if v["ne"]:
+        if v.get("rank"):
+            parts += [Product(fmt, T, v["ne"], v["rank"], device, gen), Product(fmt, T, v["rank"], W, device, gen)]
+        else:
+            parts.append(Product(fmt, T, v["ne"], W, device, gen))
+    parts += [Product(fmt, T, g * gsz, gsz, device, gen) for g in range(1, v["steps"])]
+    att = None
+    if v.get("att"):
+        att = attention_input(T, W, Hk, hd, Hq, device, torch.float32 if fmt == "fp32" else torch.bfloat16, gen)
+
+    def layer():
+        for p in parts:
+            p()
+        if att is not None:
+            att()
+    return layer, (lambda: [p() for p in parts])
+
+
 def predictor_rows(Hk, hd, Hq, T, device, variants, formats, log=print, seed=0):
     """Time one layer of each variant in each format. variants: dicts with keys label, ne, rank, steps, att."""
     W = 2 * Hk * hd
@@ -115,32 +138,16 @@ def predictor_rows(Hk, hd, Hq, T, device, variants, formats, log=print, seed=0):
     for v in variants:
         for fmt in formats:
             try:
-                gsz = W // v["steps"]
-                parts = []
-                if v["ne"]:
-                    if v.get("rank"):
-                        parts += [Product(fmt, T, v["ne"], v["rank"], device, gen),
-                                  Product(fmt, T, v["rank"], W, device, gen)]
-                    else:
-                        parts.append(Product(fmt, T, v["ne"], W, device, gen))
-                parts += [Product(fmt, T, g * gsz, gsz, device, gen) for g in range(1, v["steps"])]
-                att = None
-                if v.get("att"):
-                    att = attention_input(T, W, Hk, hd, Hq, device, torch.float32 if fmt == "fp32" else torch.bfloat16, gen)
-
-                def layer():
-                    for p in parts:
-                        p()
-                    if att is not None:
-                        att()
+                layer, products = predictor_layer(Hk, hd, Hq, T, device, v, fmt, gen)
+                att = v.get("att")
                 sec = timer(layer, device)
-                parts_only = timer(lambda: [p() for p in parts], device) if att is not None else sec
+                parts_only = timer(products, device) if att else sec
                 rows.append({"part": "predictor", "variant": v["label"], "format": fmt, "tokens": T,
                              "ms_per_layer": 1e3 * sec, "gvalues_per_s": T * W / sec / 1e9,
                              "gb_per_s": 2 * T * W / sec / 1e9,
-                             "ms_without_attention": 1e3 * parts_only if att is not None else None})
+                             "ms_without_attention": 1e3 * parts_only if att else None})
                 log(f"  predictor {v['label']} [{fmt}]: {1e3 * sec:.2f} ms/layer, {T * W / sec / 1e9:.1f} G values/s")
-                del parts, att
+                del layer, products
             except Exception as exc:                         # e.g. _int_mm unsupported on this device
                 rows.append({"part": "predictor", "variant": v["label"], "format": fmt, "error": repr(exc)})
                 log(f"  predictor {v['label']} [{fmt}]: not measured ({exc!r})")
@@ -179,8 +186,10 @@ def coder_rows(coder_cls, device, data, settings, log=print, max_values=None):
     n = w.numel()
     exact = float(exact_bits(w.to(torch.int32) & 0xFFFF, mu.double(), s.double()).mean())
     rows = []
-    for V, block in settings:
-        coder = coder_cls(device, values_per_stream=V, block=block)
+    for setting in settings:
+        V, block = setting[0], setting[1]
+        warps = setting[2] if len(setting) > 2 else None
+        coder = coder_cls(device, values_per_stream=V, block=block, warps=warps)
         buf, starts, _ = coder.encode(w, mu, s)
         dec = coder.decode(buf, starts, mu, s, n)
         ok = bool(torch.equal(dec, w))
@@ -189,13 +198,47 @@ def coder_rows(coder_cls, device, data, settings, log=print, max_values=None):
         reps = 10 if device.type == "cuda" else 1
         te = timer(lambda: coder.encode(w, mu, s), device, warmup=1 if device.type != "cuda" else 3, reps=reps)
         td = timer(lambda: coder.decode(buf, starts, mu, s, n), device, warmup=1 if device.type != "cuda" else 3, reps=reps)
-        row = {"part": "coder", "values": n, "values_per_stream": V, "block": block, "bit_exact": ok,
+        row = {"part": "coder", "values": n, "values_per_stream": V, "block": block, "warps": coder.warps, "bit_exact": ok,
                "stream_bits_per_value": bits, "symbol_bits_per_value": ideal, "exact_model_bits_per_value": exact,
                "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
                "encode_gvalues_per_s": n / te / 1e9, "decode_gvalues_per_s": n / td / 1e9,
                "encode_gb_per_s": 2 * n / te / 1e9, "decode_gb_per_s": 2 * n / td / 1e9}
         rows.append(row)
-        log(f"  coder V={V} block={block}: exact={ok}, {bits:.4f} bits/value (model {exact:.4f}), "
+        log(f"  coder V={V} block={block} warps={coder.warps}: exact={ok}, {bits:.4f} bits/value (model {exact:.4f}), "
             f"encode {row['encode_gb_per_s']:.1f} GB/s, decode {row['decode_gb_per_s']:.1f} GB/s")
         del buf, starts, dec
     return rows
+
+
+def overlap_row(coder_cls, device, data, setting, layer_fn, log=print):
+    """Decode on one CUDA stream while the predictor runs on another (as a pipelined decoder would, on different
+    token blocks): the predictor runs once per coded layer. Reports each part alone and both together."""
+    w = torch.cat([d[0] for d in data.values()])
+    mu = torch.cat([d[1] for d in data.values()])
+    s = torch.cat([d[2] for d in data.values()])
+    n, layers = w.numel(), len(data)
+    coder = coder_cls(device, values_per_stream=setting[0], block=setting[1],
+                      warps=setting[2] if len(setting) > 2 else None)
+    buf, starts, _ = coder.encode(w, mu, s)
+    s1, s2 = torch.cuda.Stream(device), torch.cuda.Stream(device)
+
+    def predict():
+        for _ in range(layers):
+            layer_fn()
+
+    def both():
+        cur = torch.cuda.current_stream(device)
+        s1.wait_stream(cur)
+        s2.wait_stream(cur)
+        with torch.cuda.stream(s1):
+            predict()
+        with torch.cuda.stream(s2):
+            coder.decode(buf, starts, mu, s, n)
+        cur.wait_stream(s1)
+        cur.wait_stream(s2)
+    tp, td, tb = timer(predict, device), timer(lambda: coder.decode(buf, starts, mu, s, n), device), timer(both, device)
+    row = {"part": "overlap", "values": n, "setting": list(setting), "predictor_ms": 1e3 * tp, "decode_ms": 1e3 * td,
+           "both_ms": 1e3 * tb, "sequential_gvalues_per_s": n / (tp + td) / 1e9, "overlapped_gvalues_per_s": n / tb / 1e9}
+    log(f"  overlap: predictor {1e3 * tp:.2f} ms + decode {1e3 * td:.2f} ms one after the other; together "
+        f"{1e3 * tb:.2f} ms -> {row['overlapped_gvalues_per_s']:.1f} G values/s (sequential {row['sequential_gvalues_per_s']:.1f})")
+    return row
