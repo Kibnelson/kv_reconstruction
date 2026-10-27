@@ -265,7 +265,25 @@ def parser():
     return p
 
 
+def gpu_sharing_note(device):
+    """Free and total memory of the GPU; other processes on it make memory tight and timings meaningless."""
+    try:
+        import torch
+        if torch.device(device).type != "cuda" or not torch.cuda.is_available():
+            return None
+        free, total = torch.cuda.mem_get_info(torch.device(device))
+        note = f"GPU memory free {free / 2 ** 30:.1f} of {total / 2 ** 30:.1f} GB at start"
+        if free < 0.8 * total:
+            note += (" - WARNING: other processes are using this GPU; memory may run out and any timing is "
+                     "not representative (check nvidia-smi)")
+        return note
+    except Exception:  # pragma: no cover - informational only
+        return None
+
+
 def main(argv=None):
+    import os
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     args = parser().parse_args(argv)
     if Path(args.model).is_dir():          # a local checkout has no Hugging Face revision
         args.revision = None
@@ -287,6 +305,11 @@ def main(argv=None):
     env["stages"] = stages
     (out / "environment.json").write_text(json.dumps(env, indent=1))
     log(f"run started: stages {stages}; {env.get('gpu', env['device'])}; commit {env.get('git_commit')}")
+    sharing = gpu_sharing_note(args.device)
+    if sharing:
+        log(sharing)
+        env["gpu_memory_at_start"] = sharing
+        (out / "environment.json").write_text(json.dumps(env, indent=1))
 
     def stop(signum, frame):
         raise SystemExit(f"stopped by signal {signal.Signals(signum).name}")

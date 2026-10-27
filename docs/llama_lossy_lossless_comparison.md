@@ -37,6 +37,10 @@ python -u scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_
     --stages lossy,report 2>&1 | tee -a runs/llama32_3b_compare/console.log
 ```
 
+The run needs about 5 GB of GPU memory while fitting predictors and about 8 GB while scoring lossy KV with the
+model loaded. It can share the GPU with another job if that much is free; `run.log` records the free memory at the
+start and warns when another process holds memory. Timings from a shared GPU are not representative.
+
 `run.log` records each step with host and GPU memory, and on an error the full traceback. If the log simply
 stops, the process was killed from outside. Check for the out-of-memory killer with
 `sudo dmesg | grep -iE "killed process|out of memory" | tail`. `lossy.json` is written after each test

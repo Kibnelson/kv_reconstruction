@@ -131,10 +131,12 @@ class Study:
         return self._f[key]
 
     def forget(self, keep_from):
-        """Drop cached features of layers below keep_from (layer 0 is always kept)."""
-        for cache in (self._f, self._att):
-            for key in [k for k in cache if k[1] < keep_from and k[1] != 0]:
-                del cache[key]
+        """Drop cached features of layers below keep_from (layer 0 is always kept) and attention inputs of layers
+        up to keep_from (the next layer reads the attention of layer keep_from + 1)."""
+        for key in [k for k in self._f if k[1] < keep_from and k[1] != 0]:
+            del self._f[key]
+        for key in [k for k in self._att if k[1] <= keep_from]:
+            del self._att[key]
         for key in [k for k in self._qmap if k < keep_from - 1]:
             del self._qmap[key]
 
@@ -232,8 +234,10 @@ class Study:
         variance of the layer goes next."""
         See, Sec, Scc = S[:ne, :ne], S[:ne, ne:], S[ne:, ne:]
         if ne:
-            reg = 1e-6 * torch.trace(See) / ne
-            Sc = Scc - Sec.T @ torch.linalg.solve(See + reg * torch.eye(ne, dtype=S.dtype, device=S.device), Sec)
+            M = See.clone()                          # See + reg I without a separate identity matrix
+            M.diagonal().add_(1e-6 * torch.trace(See) / ne)
+            Sc = Scc - Sec.T @ torch.linalg.solve(M, Sec)
+            del M
         else:
             Sc = Scc.clone()
         W = self.W
@@ -282,37 +286,59 @@ class Study:
         return start
 
     # ------------------------------------------------------------------ fit
-    def fit(self, layer, cfg, chunk=2048):
-        """Covariance in two passes (mean, then centred products). On CUDA each chunk's product runs in float32
-        (TF32 off) and is accumulated in float64; on CPU everything is float64."""
-        kinds = kinds_at(cfg.kinds, layer)
+    def covariance(self, layer, kinds, chunk=1024):
+        """Mean and covariance of [inputs | current layer] over the calibration documents, one document at a time
+        (two passes: sums, then centred products). On CUDA a document's centred product is accumulated in float32
+        (TF32 off) and added to the float64 total; on CPU everything is float64. Peak memory is the float64
+        matrix plus one float32 matrix and one document's inputs."""
         dev, f64 = self.device, torch.float64
         prod = torch.float32 if dev.type == "cuda" else f64
-        blocks = [(self.extra(d, layer, kinds), self.feats(d, layer)) for d in self.train]
-        n = sum(d.tokens for d in self.train)
-        mu = sum(torch.cat([Xe, Xc], 1).to(f64).sum(0) for Xe, Xc in blocks) / n
-        S = None
-        for Xe, Xc in blocks:
-            for r0 in range(0, Xe.shape[0], chunk):
-                X = (torch.cat([Xe[r0:r0 + chunk], Xc[r0:r0 + chunk]], 1).to(f64) - mu).to(prod)
-                P_ = (X.T @ X).to(f64)
-                S = P_ if S is None else S + P_
-        del blocks
-        S = S / n
-        ne = S.shape[0] - self.W
-        perm = self.pivot_order(S, ne) if cfg.order == "pivot" else torch.arange(self.W, device=dev)
-        idx = torch.cat([torch.arange(ne, device=dev), ne + perm])
-        S, mu = S[idx][:, idx], mu[idx]
+        n, s1 = 0, None
+        for d in self.train:
+            Xe, Xc = self.extra(d, layer, kinds), self.feats(d, layer)
+            part = torch.cat([Xe.to(f64).sum(0), Xc.to(f64).sum(0)])
+            s1 = part if s1 is None else s1 + part
+            n += d.tokens
+            del Xe
+        mu = s1 / n
+        dim = mu.numel()
+        S = torch.zeros(dim, dim, dtype=f64, device=dev)
+        mu_p = mu.to(prod)
+        for d in self.train:
+            Xe, Xc = self.extra(d, layer, kinds), self.feats(d, layer)
+            acc = S if prod == f64 else torch.zeros(dim, dim, dtype=prod, device=dev)
+            for r0 in range(0, d.tokens, chunk):
+                X = torch.cat([Xe[r0:r0 + chunk], Xc[r0:r0 + chunk]], 1).to(prod) - mu_p
+                acc.addmm_(X.T, X)
+            if acc is not S:
+                S.add_(acc)
+            del Xe, acc
+        S /= n
+        return mu, S
+
+    def fit(self, layer, cfg):
+        """Block-causal conditional-mean coefficients: channel j (decode order) is predicted from the inputs and
+        the channels of earlier groups, a_j = L[j, :s] L[:s, :s]^-1 with S = L L^T (ridged). Solved with one
+        triangular solve; no explicit inverse."""
+        kinds = kinds_at(cfg.kinds, layer)
+        dev, f64 = self.device, torch.float64
+        mu, S = self.covariance(layer, kinds)
         dim = S.shape[0]
-        S += self.ridge * torch.trace(S) / dim * torch.eye(dim, dtype=f64, device=dev)
+        ne = dim - self.W
+        perm = self.pivot_order(S, ne) if cfg.order == "pivot" else torch.arange(self.W, device=dev)
+        cur = ne + perm
+        S[ne:, :] = S[cur, :]                       # current-layer block into decode order, in place
+        S[:, ne:] = S[:, cur]
+        mu = torch.cat([mu[:ne], mu[cur]])
+        S.diagonal().add_(self.ridge * float(torch.trace(S)) / dim)
         Lc = torch.linalg.cholesky(S)
-        Linv = torch.linalg.solve_triangular(Lc, torch.eye(dim, dtype=f64, device=dev), upper=False)
+        del S
         starts = self.group_starts(perm, cfg.steps)
-        j = torch.arange(ne, dim, device=dev)
-        mask = torch.arange(dim, device=dev)[None, :] < (ne + starts)[:, None]
-        A = (Lc[j] * mask) @ Linv
-        b = mu[j] - A @ mu
-        del S, Lc, Linv
+        # row j keeps L[j, :s_j]; solving X L = that row gives exact zeros beyond s_j (L is lower triangular)
+        B = Lc[ne:] * (torch.arange(dim, device=dev)[None, :] < (ne + starts)[:, None])
+        A = torch.linalg.solve_triangular(Lc, B, upper=False, left=False)
+        del Lc, B
+        b = mu[ne:] - A @ mu
         return Fit(A.to(torch.float32), b.to(torch.float32), perm, starts, ne, kinds)
 
     def predict(self, F, Xe, cur_perm):
