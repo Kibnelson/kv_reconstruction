@@ -4,7 +4,8 @@
     python scripts/package_llama_compare.py runs/llama32_3b_compare \\
         --destination benchmark_results/llama32_3b_compare_a4500_$(date +%Y%m%d)
 
-Copies summary.md, lossless.json, lossy.json, run_args.json, environment.json, run.log and the capture metadata
+Copies summary.md, lossless.json, lossy.json, frontier.json, gpu_speed.json, run_args.json, environment.json,
+run.log and the capture metadata
 (captures/meta.json -> capture_meta.json). Captured KV (*.npy) stays local. Checks that the JSON reports parse and
 agree with summary.md's method list, and writes manifest.json with each file's size and SHA256. Prints the git
 commands that commit the results to the current branch.
@@ -20,7 +21,7 @@ import sys
 
 FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.json": "lossy.json",
          "run_args.json": "run_args.json", "environment.json": "environment.json", "run.log": "run.log",
-         "console.log": "console.log",
+         "console.log": "console.log", "frontier.json": "frontier.json", "gpu_speed.json": "gpu_speed.json",
          "captures/meta.json": "capture_meta.json"}
 REQUIRED = ("summary.md", "run_args.json", "environment.json", "captures/meta.json")
 
@@ -47,8 +48,14 @@ def check(run):
             if rows["exact KV"]["ppl_change_pct"] != 0.0:
                 raise SystemExit(f"{doc}: exact KV does not reproduce the baseline")
         checks.append(f"lossy: {len(next(iter(res['documents'].values())))} rows x {len(res['documents'])} documents")
+    if (run / "frontier.json").is_file():
+        res = json.loads((run / "frontier.json").read_text())
+        checks.append(f"frontier: {len(res['variants'])} variants, {res['layers']} layers")
+    if (run / "gpu_speed.json").is_file():
+        res = json.loads((run / "gpu_speed.json").read_text())
+        checks.append(f"gpu_speed: {len(res.get('rows', []))} timings on {res.get('gpu')}")
     if not checks:
-        raise SystemExit("no lossless.json or lossy.json in the run")
+        raise SystemExit("no lossless.json, lossy.json, frontier.json or gpu_speed.json in the run")
     return checks
 
 

@@ -15,12 +15,14 @@ Stages (all by default; --stages picks a subset, reusing earlier outputs in the 
              fast) on the two test documents (whole documents and the four 256-token reference chunks)
   lossy      the first --prompt-tokens tokens of each test document coded by every lossy method; the model then
              processes the next --continuation-tokens tokens with that KV; perplexity change vs exact KV
-  report     summary.md and results.json
+  frontier   (optional) bits against compute: ~37 predictor variants (inputs, steps, reduced rank, 8-bit integer
+             formats) fitted from one covariance per layer and scored like the lossless stage -> frontier.json
+  report     summary.md
 
 Document roles (same protocol as the SmolLM2 study): calibration = PEP 484 and six CPython modules, scales =
 dataclasses.py, tests = PEP 8 (text) and argparse.py (code). Costs are computed -log2 P (the reference range
 coder matched computed costs within 0.011 bits per value on SmolLM2); rates of the fixed-rate baselines include
-their scale/offset overhead. GPU timings are not part of this benchmark.
+their scale/offset overhead. GPU timings are not part of these stages.
 """
 from __future__ import annotations
 
@@ -214,6 +216,41 @@ def stage_lossy(args, out):
     return result
 
 
+def stage_frontier(args, out):
+    from kv_compare.frontier import Frontier, default_variants, summarize
+    from kv_compare.predict import Study
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    with_att = all(d.Q is not None for d in study.train)
+    variants = default_variants(with_att=with_att, quick=args.frontier_quick)
+    log(f"frontier: {len(variants)} variants over {study.L} layers ({memory_note(args.device)})")
+    begin = time.time()
+    vs, bits, macs = Frontier(study, variants, log).run()
+    rows = summarize(vs, bits, macs, chunk_spans(study.tests[0].tokens))
+    res = {"layers": study.L, "seconds": time.time() - begin, "with_attention_input": with_att, "variants": rows}
+    (out / "frontier.json").write_text(json.dumps(res, indent=1))
+    log(f"frontier done in {res['seconds']:.0f} s ({memory_note(args.device)})")
+    return res
+
+
+def frontier_lines(out):
+    res = json.loads((out / "frontier.json").read_text())
+    lines = [f"## Bits against compute ({len(res['variants'])} predictor variants, {res['layers']} layers)", "",
+             "Lossless, exact costs like the table above. Multiply-adds per value include the shared projection "
+             "of reduced-rank variants and, for the attention input, the query map and the attention itself. "
+             "Integer formats: int8 x int16 needs 2 and int8 x int8 1 eight-bit tensor-core product per "
+             "multiply-add, and the result is exact on any GPU. P = Pareto point among the floating-point "
+             "variants (no cheaper variant has fewer bits).", "",
+             "| Variant | Multiply-adds per value | 8-bit products per value | Four-chunk average | PEP 8 / argparse.py whole | |",
+             "| --- | --- | --- | --- | --- | --- |"]
+    for r in res["variants"]:
+        prod = f"{r['macs_per_value'] * r['products_per_mac']:,.0f}" if r["products_per_mac"] else "float"
+        w = r["whole"]
+        lines.append(f"| {r['label']} | {r['macs_per_value']:,.0f} | {prod} | {r['chunk_average']:.3f} | "
+                     f"{w.get('test_text', float('nan')):.3f} / {w.get('test_code', float('nan')):.3f} | "
+                     f"{'P' if r['pareto'] else ''} |")
+    return lines + [""]
+
+
 def stage_report(args, out):
     lines = [f"# KV transfer codecs on {args.model}", ""]
     meta = json.loads((out / "captures" / "meta.json").read_text())
@@ -230,6 +267,8 @@ def stage_report(args, out):
             lines.append(f"| {name} | {m['chunk_average']:.3f} | {w.get('test_text', float('nan')):.3f} | "
                          f"{w.get('test_code', float('nan')):.3f} | {m['macs_per_value']:,.0f} |")
         lines.append("")
+    if (out / "frontier.json").is_file():
+        lines += frontier_lines(out)
     if (out / "lossy.json").is_file():
         res = json.loads((out / "lossy.json").read_text())
         docs = list(res["documents"])
@@ -260,8 +299,9 @@ def parser():
     p.add_argument("--kappas", default="0.25,0.5,1,2,4")
     p.add_argument("--prompt-tokens", type=int, default=3072)
     p.add_argument("--continuation-tokens", type=int, default=512)
-    p.add_argument("--max-layers", type=int, default=None, help="lossless stage only: first N layers (smoke tests)")
+    p.add_argument("--max-layers", type=int, default=None, help="lossless and frontier stages: first N layers (smoke tests)")
     p.add_argument("--no-queries", action="store_true", help="skip q_proj capture (drops the attention input)")
+    p.add_argument("--frontier-quick", action="store_true", help="frontier stage: a smaller grid of variants")
     return p
 
 
@@ -322,6 +362,8 @@ def main(argv=None):
             stage_lossless(args, out)
         if "lossy" in stages:
             stage_lossy(args, out)
+        if "frontier" in stages:
+            stage_frontier(args, out)
         if "report" in stages:
             stage_report(args, out)
     except BaseException as exc:

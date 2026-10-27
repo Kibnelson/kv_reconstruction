@@ -96,6 +96,7 @@ class Fit:
     ne: int
     kinds: list
     spread: torch.Tensor = field(default=None)   # per channel (channel order)
+    mu: torch.Tensor = field(default=None)       # calibration mean of the feature row (decode order), if kept
 
 
 class Study:
@@ -286,18 +287,21 @@ class Study:
         return start
 
     # ------------------------------------------------------------------ fit
-    def covariance(self, layer, kinds, chunk=1024):
+    def covariance(self, layer, kinds, chunk=1024, with_amax=False):
         """Mean and covariance of [inputs | current layer] over the calibration documents, one document at a time
         (two passes: sums, then centred products). On CUDA a document's centred product is accumulated in float32
         (TF32 off) and added to the float64 total; on CPU everything is float64. Peak memory is the float64
         matrix plus one float32 matrix and one document's inputs."""
         dev, f64 = self.device, torch.float64
         prod = torch.float32 if dev.type == "cuda" else f64
-        n, s1 = 0, None
+        n, s1, amax = 0, None, None
         for d in self.train:
             Xe, Xc = self.extra(d, layer, kinds), self.feats(d, layer)
             part = torch.cat([Xe.to(f64).sum(0), Xc.to(f64).sum(0)])
             s1 = part if s1 is None else s1 + part
+            if with_amax:
+                m = torch.cat([Xe.abs().amax(0), Xc.abs().amax(0)]).to(f64)
+                amax = m if amax is None else torch.maximum(amax, m)
             n += d.tokens
             del Xe
         mu = s1 / n
@@ -314,18 +318,28 @@ class Study:
                 S.add_(acc)
             del Xe, acc
         S /= n
-        return mu, S
+        return (mu, S, amax) if with_amax else (mu, S)
 
     def fit(self, layer, cfg):
         """Block-causal conditional-mean coefficients: channel j (decode order) is predicted from the inputs and
         the channels of earlier groups, a_j = L[j, :s] L[:s, :s]^-1 with S = L L^T (ridged). Solved with one
         triangular solve; no explicit inverse."""
         kinds = kinds_at(cfg.kinds, layer)
-        dev, f64 = self.device, torch.float64
         mu, S = self.covariance(layer, kinds)
+        box = [S]
+        del S                                        # solve() frees the matrix after factorising it
+        return self.solve(mu, box, kinds, cfg.steps, cfg.order)
+
+    def solve(self, mu, box, kinds, steps, order, perm=None, keep_mu=False):
+        """Coefficients from a mean and covariance of [inputs | current layer (channel order)]. box = [S]: the
+        matrix is taken out of the list, overwritten and freed after the Cholesky factorisation. perm: a
+        precomputed pivoted order (the order depends only on the inputs, not on the number of steps)."""
+        dev, f64 = self.device, torch.float64
+        S = box.pop()
         dim = S.shape[0]
         ne = dim - self.W
-        perm = self.pivot_order(S, ne) if cfg.order == "pivot" else torch.arange(self.W, device=dev)
+        if perm is None:
+            perm = self.pivot_order(S, ne) if order == "pivot" else torch.arange(self.W, device=dev)
         cur = ne + perm
         S[ne:, :] = S[cur, :]                       # current-layer block into decode order, in place
         S[:, ne:] = S[:, cur]
@@ -333,13 +347,13 @@ class Study:
         S.diagonal().add_(self.ridge * float(torch.trace(S)) / dim)
         Lc = torch.linalg.cholesky(S)
         del S
-        starts = self.group_starts(perm, cfg.steps)
+        starts = self.group_starts(perm, steps)
         # row j keeps L[j, :s_j]; solving X L = that row gives exact zeros beyond s_j (L is lower triangular)
         B = Lc[ne:] * (torch.arange(dim, device=dev)[None, :] < (ne + starts)[:, None])
         A = torch.linalg.solve_triangular(Lc, B, upper=False, left=False)
         del Lc, B
         b = mu[ne:] - A @ mu
-        return Fit(A.to(torch.float32), b.to(torch.float32), perm, starts, ne, kinds)
+        return Fit(A.to(torch.float32), b.to(torch.float32), perm, starts, ne, kinds, mu=mu if keep_mu else None)
 
     def predict(self, F, Xe, cur_perm):
         """Prediction for every channel (channel order), post-RoPE, float64. cur_perm: current layer features in

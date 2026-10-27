@@ -124,6 +124,27 @@ class TinyLlamaTests(unittest.TestCase):
             self.assertTrue(np.isfinite(v).all(), name)
             self.assertLess(float(v.mean()), 16.5, name)
 
+    def test_frontier_matches_named_configs(self):
+        """Variants fitted from the shared covariance reproduce the lossless stage's costs; reduced rank and
+        8-bit formats run and cost more bits than (or the same as) the full-precision fit."""
+        from kv_compare.frontier import Frontier, Variant, summarize
+        from kv_compare.predict import CONFIGS
+        same = {"prev": Variant(("P",), 1, "natural", adaptive=False), "block": Variant(("P",), 16, "natural", adaptive=False),
+                "fast": Variant(("L0", "P2", "P", "ATT"), 8)}
+        extra = [Variant(("L0", "P2", "P"), 8, rank=16), Variant(("L0", "P2", "P"), 8, rank=16, coef_bits=8, feat_bits=8),
+                 Variant(("L0", "P2", "P"), 8)]
+        vs, bits, macs = Frontier(self.study, list(same.values()) + extra, log=lambda m: None).run()
+        for name, v in same.items():
+            ref, _ = self.study.lossless(CONFIGS[name])
+            for d in ref:
+                self.assertAlmostEqual(float(bits[v][d].double().mean()), float(ref[d].mean()), places=4, msg=name)
+        mean = {v: float(sum(b.double().mean() for b in bits[v].values())) for v in vs}
+        self.assertGreater(mean[extra[0]], mean[extra[2]])
+        self.assertGreaterEqual(mean[extra[1]] + 1e-3, mean[extra[0]])
+        self.assertLess(macs[extra[0]], macs[extra[2]])
+        rows = summarize(vs, bits, macs, [(0, 160), (160, 320)])
+        self.assertEqual(len(rows), len(vs))
+
     def test_lossy_and_quality(self):
         from kv_compare import baselines
         from kv_compare.core import words_to_float
