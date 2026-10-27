@@ -27,6 +27,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import signal
+import traceback
 from pathlib import Path
 import sys
 import time
@@ -58,6 +60,20 @@ def log(message):
     if LOG_PATH is not None:
         with open(LOG_PATH, "a", encoding="utf-8") as handle:
             handle.write(line + "\n")
+
+
+def memory_note(device=None):
+    """Peak host memory of this process and current GPU memory, for the run log."""
+    import resource
+    note = f"host peak RSS {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2 ** 20:.1f} GB"
+    try:
+        import torch
+        if device is not None and torch.device(device).type == "cuda" and torch.cuda.is_available():
+            note += (f"; GPU allocated {torch.cuda.memory_allocated(device) / 2 ** 30:.1f} GB, "
+                     f"reserved {torch.cuda.memory_reserved(device) / 2 ** 30:.1f} GB")
+    except ImportError:
+        pass
+    return note
 
 
 def environment(args):
@@ -156,11 +172,17 @@ def stage_lossy(args, out):
     fits = {}
     study.lossless(cfg, fits)
     study._f.clear(); study._att.clear()
-    log("fitting AQUA-KV-style predictors")
-    aqua = baselines.aqua_fit(study, study.L)
-    study._f.clear()
+    log(f"fitting AQUA-KV-style predictors ({memory_note(args.device)})")
+    aqua = baselines.aqua_fit(study, study.L, log)
+    study._f.clear(); study._att.clear(); study._qmap.clear()
+    import gc
+    gc.collect()
+    if study.device.type == "cuda":
+        torch.cuda.empty_cache()
     device = torch.device(args.device)
+    log(f"loading {args.model} for the quality check ({memory_note(args.device)})")
     _, model = load_model(args.model, args.revision, device)
+    log(f"model loaded ({memory_note(args.device)})")
     P, M = args.prompt_tokens, args.continuation_tokens
     result = {"prompt_tokens": P, "continuation_tokens": M, "lossy_config": cfg.name, "documents": {}}
     for doc in study.tests:
@@ -168,6 +190,7 @@ def stage_lossy(args, out):
         check = continuation_nll(model, doc.ids, P, M, device, matrices_from_doc(doc, P))
         if check != base:
             raise RuntimeError(f"exact prompt KV did not reproduce the baseline ({check} vs {base})")
+        log(f"{doc.name}: exact-KV perplexity {np.exp(base):.4f}, reproduced by the restored cache")
         exact = torch.stack([words_to_float(doc.words(l, study.device, P)).to(torch.float32).cpu() for l in range(study.L)])
         rows = {"exact KV": {"bits": 16.0, "nll": base, "ppl": float(np.exp(base)), "ppl_change_pct": 0.0, "rel_error": 0.0}}
         methods = [(f"Ours, step {k}", lambda k=k: study.lossy(cfg, fits, doc, P, k)) for k in args.kappas]
@@ -184,8 +207,10 @@ def stage_lossy(args, out):
                            "ppl_change_pct": float(100 * (np.exp(nll - base) - 1)), "rel_error": rel}
             log(f"{doc.name} {label}: {rate:.3f} bits/value, KV error {100 * rel:.2f}%, perplexity {rows[label]['ppl_change_pct']:+.2f}%")
             study._f.clear()
+            del rec
         result["documents"][doc.name] = rows
-    (out / "lossy.json").write_text(json.dumps(result, indent=1))
+        (out / "lossy.json").write_text(json.dumps(result, indent=1))          # partial results survive a crash
+    log(f"lossy stage done ({memory_note(args.device)})")
     return result
 
 
@@ -250,7 +275,8 @@ def main(argv=None):
     out = args.output
     if "capture" in stages:
         if (out / "captures").exists() and any((out / "captures").iterdir()):
-            raise SystemExit(f"{out}/captures is not empty; use a fresh --output or drop the capture stage")
+            raise SystemExit(f"{out}/captures is not empty: the capture stage already ran. Run the remaining stages "
+                             f"with e.g. --stages lossy,report (or lossless,lossy,report), or use a fresh --output")
         out.mkdir(parents=True, exist_ok=True)
     out.mkdir(parents=True, exist_ok=True)
     global LOG_PATH
@@ -261,14 +287,25 @@ def main(argv=None):
     env["stages"] = stages
     (out / "environment.json").write_text(json.dumps(env, indent=1))
     log(f"run started: stages {stages}; {env.get('gpu', env['device'])}; commit {env.get('git_commit')}")
-    if "capture" in stages:
-        stage_capture(args, out)
-    if "lossless" in stages:
-        stage_lossless(args, out)
-    if "lossy" in stages:
-        stage_lossy(args, out)
-    if "report" in stages:
-        stage_report(args, out)
+
+    def stop(signum, frame):
+        raise SystemExit(f"stopped by signal {signal.Signals(signum).name}")
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, stop)
+    try:
+        if "capture" in stages:
+            stage_capture(args, out)
+        if "lossless" in stages:
+            stage_lossless(args, out)
+        if "lossy" in stages:
+            stage_lossy(args, out)
+        if "report" in stages:
+            stage_report(args, out)
+    except BaseException as exc:
+        log("FAILED: " + "".join(traceback.format_exception(exc)).rstrip())
+        log(f"memory at failure: {memory_note(args.device)}")
+        log("finished stages keep their files; rerun only the rest with --stages, e.g. --stages lossy,report")
+        raise
     log(f"run finished in {time.time() - started:.0f} s")
     log(f"share it: python scripts/package_llama_compare.py {out} --destination benchmark_results/<name>")
 

@@ -102,29 +102,35 @@ def fp8_e4m3(x):
     return torch.sign(x) * torch.minimum(torch.round(a / q) * q, torch.full_like(a, 448.0))
 
 
-def _lsq(X, Y, ridge=1e-6):
-    X1 = torch.cat([X, torch.ones(X.shape[0], 1, dtype=X.dtype, device=X.device)], 1)
-    G = X1.T @ X1
+def _lsq_stream(pairs, ridge=1e-6):
+    """Least squares with a bias column from streamed (X, Y) blocks: normal equations in float64."""
+    G = R = None
+    for X, Y in pairs:
+        X1 = torch.cat([X, torch.ones(X.shape[0], 1, dtype=X.dtype, device=X.device)], 1).to(torch.float64)
+        Y = Y.to(torch.float64)
+        G = X1.T @ X1 if G is None else G + X1.T @ X1
+        R = X1.T @ Y if R is None else R + X1.T @ Y
     G += ridge * torch.trace(G) / G.shape[0] * torch.eye(G.shape[0], dtype=G.dtype, device=G.device)
-    return torch.linalg.solve(G, X1.T @ Y)
+    return torch.linalg.solve(G, R)
 
 
 def _apply(Wm, X):
     return torch.cat([X, torch.ones(X.shape[0], 1, dtype=X.dtype, device=X.device)], 1) @ Wm
 
 
-def aqua_fit(study, layers):
-    """AQUA-KV-style predictors per layer, least squares on TRAIN (exact KV, RoPE removed)."""
+def aqua_fit(study, layers, log=None):
+    """AQUA-KV-style predictors per layer, least squares on TRAIN (exact KV, RoPE removed), one document at a
+    time so memory stays small."""
     C = study.C
     out = {}
     for layer in range(1, layers):
-        Xk = torch.cat([study.feats(d, layer - 1)[:, :C] for d in study.train]).to(torch.float64)
-        Yk = torch.cat([study.feats(d, layer)[:, :C] for d in study.train]).to(torch.float64)
-        Xv = torch.cat([torch.cat([study.feats(d, layer - 1)[:, C:], study.feats(d, layer)[:, :C]], 1) for d in study.train]).to(torch.float64)
-        Yv = torch.cat([study.feats(d, layer)[:, C:] for d in study.train]).to(torch.float64)
-        out[layer] = (_lsq(Xk, Yk), _lsq(Xv, Yv))
-        del Xk, Yk, Xv, Yv
+        WK = _lsq_stream((study.feats(d, layer - 1)[:, :C], study.feats(d, layer)[:, :C]) for d in study.train)
+        WV = _lsq_stream((torch.cat([study.feats(d, layer - 1)[:, C:], study.feats(d, layer)[:, :C]], 1),
+                          study.feats(d, layer)[:, C:]) for d in study.train)
+        out[layer] = (WK, WV)
         study.forget(layer - 1)
+        if log:
+            log(f"  AQUA-KV-style: layer {layer} fitted")
     return out
 
 

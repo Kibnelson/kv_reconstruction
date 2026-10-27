@@ -26,6 +26,22 @@ python -m unittest discover -s kv_compare -p 'test_*.py' -v      # CPU, tiny ran
 python scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare
 ```
 
+### If a run stops part-way
+
+Finished stages keep their files. Rerun only the remaining stages in the same `--output`, inside `tmux` so a closed
+terminal or dropped SSH session cannot end the run. Keep a console copy:
+
+```bash
+tmux new -s kvcmp          # reattach later with: tmux attach -t kvcmp
+python -u scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare \
+    --stages lossy,report 2>&1 | tee -a runs/llama32_3b_compare/console.log
+```
+
+`run.log` records each step with host and GPU memory, and on an error the full traceback. If the log simply
+stops, the process was killed from outside. Check for the out-of-memory killer with
+`sudo dmesg | grep -iE "killed process|out of memory" | tail`. `lossy.json` is written after each test
+document, so a partial lossy run still yields results.
+
 ### Commit the results to this branch
 
 Package the small result files into `benchmark_results/` and push them to this branch for review. The captured KV stays local.

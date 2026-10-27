@@ -20,6 +20,7 @@ import sys
 
 FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.json": "lossy.json",
          "run_args.json": "run_args.json", "environment.json": "environment.json", "run.log": "run.log",
+         "console.log": "console.log",
          "captures/meta.json": "capture_meta.json"}
 REQUIRED = ("summary.md", "run_args.json", "environment.json", "captures/meta.json")
 
