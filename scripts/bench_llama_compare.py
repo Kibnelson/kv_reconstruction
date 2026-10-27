@@ -202,11 +202,12 @@ def stage_lossy(args, out):
 
     log(f"fitting our predictor ({cfg.name}) for closed-loop coding")
     fits = {}
+    study.keep_qmaps = True              # the closed loop needs every layer's query map; keep them (~0.7 GB)
     study.lossless(cfg, fits)
     study._f.clear(); study._att.clear()
     log(f"fitting AQUA-KV-style predictors ({memory_note(args.device)})")
     aqua = baselines.aqua_fit(study, study.L, log)
-    study._f.clear(); study._att.clear(); study._qmap.clear()
+    study._f.clear(); study._att.clear()
     gc.collect()
     if study.device.type == "cuda":
         torch.cuda.empty_cache()
@@ -236,12 +237,17 @@ def stage_lossy(args, out):
             nll = continuation_nll(model, doc.ids, P, M, device, matrices_from_values(rec, study.C))
             rows[label] = {"bits": float(rate), "nll": nll, "ppl": float(np.exp(nll)),
                            "ppl_change_pct": float(100 * (np.exp(nll - base) - 1)), "rel_error": rel}
-            log(f"{doc.name} {label}: {rate:.3f} bits/value, KV error {100 * rel:.2f}%, perplexity {rows[label]['ppl_change_pct']:+.2f}%")
+            log(f"{doc.name} {label}: {rate:.3f} bits/value, KV error {100 * rel:.2f}%, perplexity "
+                f"{rows[label]['ppl_change_pct']:+.2f}% ({memory_note(args.device)})")
             study._f.clear()
             del rec
         result["documents"][doc.name] = rows
         (out / "lossy.json").write_text(json.dumps(result, indent=1))          # partial results survive a crash
     log(f"lossy stage done ({memory_note(args.device)})")
+    del model, study, fits, aqua
+    gc.collect()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
     return result
 
 

@@ -155,7 +155,9 @@ class TinyLlamaTests(unittest.TestCase):
         self.study.lossless(cfg, fits)
         doc = self.study.tests[0]
         P, M = 192, 96
+        self.study._f.clear(); self.study._qmap.clear()
         rec, rate = self.study.lossy(cfg, fits, doc, P, 1.0)
+        self.assertEqual(len(self.study._f), 0)      # the closed loop must not accumulate calibration features
         exact = torch.stack([words_to_float(doc.words(l, self.study.device, P)) for l in range(self.study.L)])
         self.assertEqual(tuple(rec.shape), tuple(exact.shape))
         self.assertTrue(0 < rate < 16)

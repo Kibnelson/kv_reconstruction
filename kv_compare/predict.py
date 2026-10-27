@@ -116,6 +116,7 @@ class Study:
         partner = self.rope.pair_partner()
         self.partner = torch.as_tensor(np.concatenate([partner, np.arange(self.C, self.W)]), device=self.device)
         self._f, self._att, self._rep, self._qmap = {}, {}, {}, {}
+        self.keep_qmaps = False      # True: forget() keeps the query maps (closed-loop coding reuses every layer's)
         if self.device.type == "cuda":
             torch.backends.cuda.matmul.allow_tf32 = False
             torch.backends.cudnn.allow_tf32 = False
@@ -124,12 +125,17 @@ class Study:
     def positions(self, n):
         return torch.arange(n, device=self.device)
 
-    def feats(self, doc, layer):
+    def feats(self, doc, layer, cache=True):
+        """De-rotated float32 features of a captured layer. cache=False computes them without keeping them
+        (one layer of one 8,192-token document of an 8B-shaped model is 67 MB)."""
         key = (doc.name, layer)
-        if key not in self._f:
-            x = words_to_float(doc.words(layer, self.device))
-            self._f[key] = self.rope.derotate_row(x, self.positions(x.shape[0])).to(torch.float32)
-        return self._f[key]
+        if key in self._f:
+            return self._f[key]
+        x = words_to_float(doc.words(layer, self.device))
+        f = self.rope.derotate_row(x, self.positions(x.shape[0])).to(torch.float32)
+        if cache:
+            self._f[key] = f
+        return f
 
     def forget(self, keep_from):
         """Drop cached features of layers below keep_from (layer 0 is always kept) and attention inputs of layers
@@ -138,8 +144,9 @@ class Study:
             del self._f[key]
         for key in [k for k in self._att if k[1] <= keep_from]:
             del self._att[key]
-        for key in [k for k in self._qmap if k < keep_from - 1]:
-            del self._qmap[key]
+        if not self.keep_qmaps:
+            for key in [k for k in self._qmap if k < keep_from - 1]:
+                del self._qmap[key]
 
     def rep_index(self, doc):
         if doc.name not in self._rep:
@@ -161,7 +168,8 @@ class Study:
             R = torch.zeros(d1, self.Hq * self.hd, dtype=torch.float64, device=self.device)
             n = 0
             for d in self.train:
-                X = torch.cat([self.feats(d, layer).to(torch.float64), torch.ones(d.tokens, 1, dtype=torch.float64, device=self.device)], 1)
+                X = torch.cat([self.feats(d, layer, cache=False).to(torch.float64),
+                               torch.ones(d.tokens, 1, dtype=torch.float64, device=self.device)], 1)
                 Y = words_to_float(as_words(np.asarray(d.Q[layer]), self.device))
                 G += X.T @ X
                 R += X.T @ Y
