@@ -64,12 +64,15 @@ _interpreter_shim()
 M = 1 << 16
 CLASSES = 10
 RANGE = 24.0
-LUT_BITS = 8                     # coarse slot -> symbol table: 2^8 buckets per class
+LUT_BITS = 10                    # coarse slot -> symbol table: 2^10 buckets per class
+LUT_N = (1 << LUT_BITS) + 1
+REFINE = 2                       # decoder: refinements of the word estimate before its binary search
 
 
 def slice_tables(device):
     """Static stage-1 tables. Returns cum [sum(K_c + 2)] int32 (per class: K_c slices, the escape, then 65536),
-    off [10] int32 (class start in cum), K [10] int32, lut [10, 257] int32 (symbol holding slot b * 256)."""
+    off [10] int32 (class start in cum), K [10] int32, lut [10, 2^LUT_BITS + 1] int32 (symbol holding slot
+    b * 2^(16 - LUT_BITS); the last entry is the escape)."""
     cums, off, Ks, luts = [], [], [], []
     pos = 0
     sig = lambda x: 1.0 / (1.0 + math.exp(-x))
@@ -150,7 +153,7 @@ if triton is not None:
         base = _bd(first)
         width = _bd(last + 1) - base
         R = tl.math.div_rn((65536 - n).to(tl.float32), width)
-        return first, last, n, base, R
+        return first, last, n, base, R, width
 
     @triton.jit
     def _cw(o, first, last, base, R):
@@ -218,7 +221,7 @@ if triton is not None:
             k = tl.where(esc, K, k)
             cum1 = tl.load(cum_ptr + off + k)
             f1 = tl.load(cum_ptr + off + k + 1) - cum1
-            first, last, n, base, R = _slots(lo, hi)
+            first, last, n, base, R, width = _slots(lo, hi)
             o = _ord(w)
             c0 = _cw(o, first, last, base, R)
             c1 = _cw(o + 1, first, last, base, R)
@@ -234,7 +237,8 @@ if triton is not None:
 
     @triton.jit
     def _decode_kernel(buf_ptr, start_ptr, mu_ptr, s_ptr, words_ptr, cum_ptr, off_ptr, K_ptr, lut_ptr,
-                       nvals, S, V, BLOCK: tl.constexpr):
+                       nvals, S, V, BLOCK: tl.constexpr, LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr,
+                       REFINE: tl.constexpr):
         pid = tl.program_id(0)
         lane = pid * BLOCK + tl.arange(0, BLOCK)
         r = tl.arange(0, BLOCK)
@@ -253,9 +257,9 @@ if triton is not None:
             off = tl.load(off_ptr + c)
             # stage 1: coarse table, then binary search for the largest k with cum[k] <= slot
             slot = (x & 0xFFFF).to(tl.int32)
-            b = slot >> 8
-            klo = tl.load(lut_ptr + c * 257 + b)
-            khi = tl.load(lut_ptr + c * 257 + b + 1) + 1
+            b = slot >> LUT_SHIFT
+            klo = tl.load(lut_ptr + c * LUT_W + b)
+            khi = tl.load(lut_ptr + c * LUT_W + b + 1) + 1
             while tl.max(khi - klo, 0) > 1:
                 mid = (klo + khi) // 2
                 go = tl.load(cum_ptr + off + mid) <= slot
@@ -267,27 +271,38 @@ if triton is not None:
             x, rp = _take(x, cum1, f1, valid, buf_ptr, rp)
             esc = k == K
             lo, hi = _bounds(c, tl.where(esc, 0, k), K, mu, s)
-            first, last, n, base, R = _slots(lo, hi)
+            first, last, n, base, R, width = _slots(lo, hi)
             slot2 = (x & 0xFFFF).to(tl.int32)
-            # stage 2: estimate the word from the slot, then a bounded binary search on the cumulative slots
-            u = base + slot2.to(tl.float32) * ((_bd(last + 1) - base) * (1.0 / 65536.0))
+            # stage 2: estimate the word from the slot, refine it for the one-slot-per-word term, then a binary
+            # search on the cumulative slots (which lanes need it, and how far, varies; the loop runs to the
+            # slowest lane of the program, so a good estimate matters)
+            u = base + slot2.to(tl.float32) * (width * (1.0 / 65536.0))
             oe = tl.minimum(tl.maximum(_ord(_bf16_word(u)), first), last)
+            inv_r = tl.math.div_rn(width, (65536 - n).to(tl.float32))
+            for _r in tl.static_range(REFINE):
+                u = base + (slot2 - (oe - first)).to(tl.float32) * inv_r
+                oe = tl.minimum(tl.maximum(_ord(_bf16_word(u)), first), last)
             ce0 = _cw(oe, first, last, base, R)
             ce1 = _cw(oe + 1, first, last, base, R)
             search = valid & (~esc) & (n > 1)
-            olo = tl.where(search & (ce0 > slot2), first, tl.where(search & (ce1 <= slot2), oe + 1, oe))
-            ohi = tl.where(search & (ce0 > slot2), oe, tl.where(search & (ce1 <= slot2), last + 1, oe + 1))
+            below = search & (ce0 > slot2)
+            above = search & (ce1 <= slot2)
+            olo = tl.where(below, first, tl.where(above, oe + 1, oe))
+            ohi = tl.where(below, oe, tl.where(above, last + 1, oe + 1))
+            clo = tl.where(below, 0, tl.where(above, ce1, ce0))              # C(first) = 0
+            chi = tl.where(below, ce0, tl.where(above, 65536, ce1))          # C(last + 1) = 65536
             while tl.max(ohi - olo, 0) > 1:
                 mid = (olo + ohi) // 2
-                go = _cw(mid, first, last, base, R) <= slot2
+                cm = _cw(mid, first, last, base, R)
+                go = cm <= slot2
                 olo = tl.where(go, mid, olo)
+                clo = tl.where(go, cm, clo)
                 ohi = tl.where(go, ohi, mid)
+                chi = tl.where(go, chi, cm)
             o = tl.where(search, olo, first)
-            c0 = _cw(o, first, last, base, R)
-            c1 = _cw(o + 1, first, last, base, R)
             two = valid & (esc | (n > 1))
-            cum2 = tl.where(esc, slot2, c0)
-            f2 = tl.where(esc, 1, c1 - c0)
+            cum2 = tl.where(esc, slot2, clo)
+            f2 = tl.where(esc, 1, chi - clo)
             x, rp = _take(x, cum2, f2, two, buf_ptr, rp)
             w = tl.where(esc, slot2, _word(o))
             tl.store(words_ptr + idx, w.to(tl.int16), mask=valid)
@@ -311,8 +326,9 @@ class SliceCoder:
         return S, programs, cap
 
     def _launch(self, kernel, grid, *args, **kw):
+        warps = max(1, self.BLOCK // 32)         # one thread per lane (Triton's default of 4 warps replicates small blocks)
         try:
-            return kernel[grid](*args, **kw, **self.opts)
+            return kernel[grid](*args, **kw, num_warps=warps, **self.opts)
         except TypeError:                        # launch options unsupported (e.g. interpreter): plain launch
             return kernel[grid](*args, **kw)
 
@@ -331,7 +347,8 @@ class SliceCoder:
         S, P, cap = self.layout(n)
         words = torch.empty(n, dtype=torch.int16, device=self.device)
         self._launch(_decode_kernel, (P,), buf, starts, mu.reshape(-1).contiguous(), s.reshape(-1).contiguous(),
-                     words, self.cum, self.off, self.K, self.lut, n, S, self.V, BLOCK=self.BLOCK)
+                     words, self.cum, self.off, self.K, self.lut, n, S, self.V, BLOCK=self.BLOCK,
+                     LUT_SHIFT=16 - LUT_BITS, LUT_W=LUT_N, REFINE=REFINE)
         return words
 
     def bits(self, starts, n):
