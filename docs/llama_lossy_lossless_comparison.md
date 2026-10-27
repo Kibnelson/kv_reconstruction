@@ -60,14 +60,14 @@ git push
 
 The package holds `summary.md`, `lossless.json`, `lossy.json`, `run_args.json`, `environment.json` (GPU,
 versions, source commit), `run.log` and `capture_meta.json`, plus `manifest.json` with SHA256 hashes. Before
-copying, the packager checks that the reports agree with the summary and that the exact KV reproduced the
-baseline.
+copying, the packager checks that the reports agree with the summary and that every lossy row is measured against
+the exact KV.
 
 | Stage | What it does | Approximate size |
 | --- | --- | --- |
 | `capture` | Prefills 9 documents of 8,192 tokens. Saves BF16 K/V words in cache order, plus q_proj outputs for the six calibration documents (needed for the attention input). | about 8.5 GB of KV and 8.5 GB of queries |
 | `lossless` | Exact per-word costs on the two test documents, for whole documents and the four 256-token reference chunks. | — |
-| `lossy` | Codes the first 3,072 tokens of each test document with every lossy method. The model then processes the next 512 tokens using that KV. Feeding the exact KV back must reproduce the baseline exactly; this is checked on every run. | — |
+| `lossy` | Codes the first 3,072 tokens of each test document with every lossy method. The model then processes the next 512 tokens using that KV. The reference is the captured exact KV restored into the cache; restoring it twice must agree exactly. The model's own prefill of the 3,072-token prompt is reported beside it: on a GPU it can differ slightly (for example +0.05%), because kernels round differently at a different sequence length. | — |
 | `report` | Writes `summary.md`. | — |
 
 Useful options:

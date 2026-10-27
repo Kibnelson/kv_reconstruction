@@ -46,7 +46,7 @@ def check(run):
         res = json.loads((run / "lossy.json").read_text())
         for doc, rows in res["documents"].items():
             if rows["exact KV"]["ppl_change_pct"] != 0.0:
-                raise SystemExit(f"{doc}: exact KV does not reproduce the baseline")
+                raise SystemExit(f"{doc}: lossy rows are not measured against the exact KV")
         checks.append(f"lossy: {len(next(iter(res['documents'].values())))} rows x {len(res['documents'])} documents")
     if (run / "frontier.json").is_file():
         res = json.loads((run / "frontier.json").read_text())

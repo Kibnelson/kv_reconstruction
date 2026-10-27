@@ -2,8 +2,9 @@
 
 The prompt's KV (all layers) is replaced by the KV the receiver holds after transfer; the following tokens are
 processed on the decode side with that cache. Reported: the mean negative log-likelihood of predicting tokens
-P+1 .. P+M-1 from positions P .. P+M-2 (teacher forcing). Exact KV reproduces the baseline to the last digit,
-which is checked on every run.
+P+1 .. P+M-1 from positions P .. P+M-2 (teacher forcing). The reference is the captured exact KV restored the same
+way. On CPU it matches the model's own prompt cache to the last digit; on a GPU the model's own prefill of the
+prompt alone can differ in the last bits (kernels depend on sequence length), so it is reported, not required.
 """
 from __future__ import annotations
 

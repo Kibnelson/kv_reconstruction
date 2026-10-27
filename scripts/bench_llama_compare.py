@@ -14,7 +14,8 @@ Stages (all by default; --stages picks a subset, reusing earlier outputs in the 
   lossless   exact per-word costs: SplitZip-style, ExANS-style and our configurations (prev, block, nohint,
              fast) on the two test documents (whole documents and the four 256-token reference chunks)
   lossy      the first --prompt-tokens tokens of each test document coded by every lossy method; the model then
-             processes the next --continuation-tokens tokens with that KV; perplexity change vs exact KV
+             processes the next --continuation-tokens tokens with that KV; perplexity change vs the captured exact
+             KV (restoring it twice must agree exactly; the model's own prefill of the prompt is reported beside it)
   frontier   (optional) bits against compute: ~37 predictor variants (inputs, steps, reduced rank, 8-bit integer
              formats) fitted from one covariance per layer and scored like the lossless stage -> frontier.json
   report     summary.md
@@ -170,6 +171,35 @@ def stage_lossy(args, out):
     if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
         log(f"{args.lossy_config} needs calibration queries; using fast_noatt")
         cfg = CONFIGS["fast_noatt"]
+    import gc
+    device = torch.device(args.device)
+    P, M = args.prompt_tokens, args.continuation_tokens
+
+    # References first (fails in seconds, before the fits). The reference is the captured exact KV restored into
+    # the cache: what a lossless transfer delivers. The captures come from prefilling the whole 8,192-token
+    # document; on a GPU a prefill of the prompt alone can round differently (kernels depend on the sequence
+    # length), so the model's own prefill is reported beside it and only has to agree closely (a wrong cache
+    # layout would be far off). Restoring the same KV twice must agree exactly.
+    log(f"loading {args.model} for the reference perplexities ({memory_note(args.device)})")
+    _, model = load_model(args.model, args.revision, device)
+    refs = {}
+    for doc in study.tests:
+        own = continuation_nll(model, doc.ids, P, M, device)
+        base = continuation_nll(model, doc.ids, P, M, device, matrices_from_doc(doc, P))
+        again = continuation_nll(model, doc.ids, P, M, device, matrices_from_doc(doc, P))
+        own_pct = float(100 * (np.exp(own - base) - 1))
+        log(f"{doc.name}: perplexity {np.exp(base):.4f} with the captured exact KV; the model's own prefill of the "
+            f"prompt gives {np.exp(own):.4f} ({own_pct:+.3f}%)")
+        if again != base:
+            raise RuntimeError(f"restoring the same KV twice gave different results ({again} vs {base})")
+        if abs(own - base) > 0.01 * abs(own) + 2e-3:
+            raise RuntimeError(f"captured KV is far from the model's own prefill ({base} vs {own}): check the cache layout")
+        refs[doc.name] = (base, own, own_pct)
+    del model
+    gc.collect()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+
     log(f"fitting our predictor ({cfg.name}) for closed-loop coding")
     fits = {}
     study.lossless(cfg, fits)
@@ -177,24 +207,23 @@ def stage_lossy(args, out):
     log(f"fitting AQUA-KV-style predictors ({memory_note(args.device)})")
     aqua = baselines.aqua_fit(study, study.L, log)
     study._f.clear(); study._att.clear(); study._qmap.clear()
-    import gc
     gc.collect()
     if study.device.type == "cuda":
         torch.cuda.empty_cache()
-    device = torch.device(args.device)
     log(f"loading {args.model} for the quality check ({memory_note(args.device)})")
     _, model = load_model(args.model, args.revision, device)
     log(f"model loaded ({memory_note(args.device)})")
-    P, M = args.prompt_tokens, args.continuation_tokens
-    result = {"prompt_tokens": P, "continuation_tokens": M, "lossy_config": cfg.name, "documents": {}}
+    result = {"prompt_tokens": P, "continuation_tokens": M, "lossy_config": cfg.name,
+              "reference": "captured exact KV restored into the cache", "documents": {}}
     for doc in study.tests:
-        base = continuation_nll(model, doc.ids, P, M, device)
+        base, own, own_pct = refs[doc.name]
         check = continuation_nll(model, doc.ids, P, M, device, matrices_from_doc(doc, P))
-        if check != base:
-            raise RuntimeError(f"exact prompt KV did not reproduce the baseline ({check} vs {base})")
-        log(f"{doc.name}: exact-KV perplexity {np.exp(base):.4f}, reproduced by the restored cache")
+        if check != base:                     # every row below is measured with this loaded model
+            log(f"{doc.name}: after reloading the model the exact-KV NLL is {check} (was {base}); using {check}")
+            base = check
         exact = torch.stack([words_to_float(doc.words(l, study.device, P)).to(torch.float32).cpu() for l in range(study.L)])
-        rows = {"exact KV": {"bits": 16.0, "nll": base, "ppl": float(np.exp(base)), "ppl_change_pct": 0.0, "rel_error": 0.0}}
+        rows = {"exact KV": {"bits": 16.0, "nll": base, "ppl": float(np.exp(base)), "ppl_change_pct": 0.0, "rel_error": 0.0,
+                             "model_prefill_nll": own, "model_prefill_ppl_change_pct": own_pct}}
         methods = [(f"Ours, step {k}", lambda k=k: study.lossy(cfg, fits, doc, P, k)) for k in args.kappas]
         methods += [(f"AQUA-KV-style, {b}-bit", lambda b=b: baselines.aqua_style(study, aqua, doc, P, b)) for b in (2, 3, 4)]
         methods += [(f"KIVI-style, {b}-bit", lambda b=b: baselines.kivi_style(study, doc, P, b)) for b in (2, 3, 4)]
@@ -280,7 +309,11 @@ def stage_report(args, out):
             lines.append(f"| {label} | " + " / ".join(f"{x['bits']:.2f}" for x in r) + " | " +
                          " / ".join(f"{100 * x['rel_error']:.2f}%" for x in r) + " | " +
                          " / ".join(f"{x['ppl_change_pct']:+.2f}%" for x in r) + " |")
-        lines += ["", f"Values are {' / '.join(docs)}."]
+        lines += ["", f"Values are {' / '.join(docs)}. Reference: the captured exact KV restored into the cache."]
+        own = [res["documents"][d]["exact KV"].get("model_prefill_ppl_change_pct") for d in docs]
+        if all(x is not None for x in own):
+            lines.append("The model's own prefill of the prompt alone differs from it by " +
+                         " / ".join(f"{x:+.3f}%" for x in own) + " (GPU kernels round differently at another sequence length).")
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
