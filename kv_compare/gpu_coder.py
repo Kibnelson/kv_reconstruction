@@ -165,7 +165,7 @@ if triton is not None:
         e = emit.to(tl.int32)
         cnt = tl.cumsum(e, 0)
         total = tl.sum(e, 0)
-        tl.store(out_ptr + (wp - total + cnt - 1), (x & 0xFFFF).to(tl.uint16), mask=emit)
+        tl.store(out_ptr + (wp - total + cnt - 1), (x & 0xFFFF).to(tl.int16), mask=emit)
         x = tl.where(emit, x >> 16, x)
         x = tl.where(active, ((x // fu) << 16) + (x % fu) + cum.to(tl.uint32), x)
         return x, wp - total
@@ -178,7 +178,7 @@ if triton is not None:
         e = need.to(tl.int32)
         cnt = tl.cumsum(e, 0)
         total = tl.sum(e, 0)
-        w = tl.load(buf_ptr + (rp + cnt - 1), mask=need, other=0).to(tl.uint32)
+        w = (tl.load(buf_ptr + (rp + cnt - 1), mask=need, other=0).to(tl.int32) & 0xFFFF).to(tl.uint32)
         x = tl.where(need, (x << 16) | w, x)
         return x, rp + total
 
@@ -200,7 +200,7 @@ if triton is not None:
             K = tl.load(K_ptr + c)
             off = tl.load(off_ptr + c)
             v = _word_val(w)
-            finite = (v == v) & (tl.abs(v) < float("inf"))
+            finite = ((w >> 7) & 0xFF) != 0xFF                     # exponent field all ones: Inf or NaN
             lo0, _u = _bounds(c, tl.zeros([BLOCK], tl.int32), K, mu, s)
             _l, hiK = _bounds(c, K - 1, K, mu, s)
             esc = (~finite) | (v < lo0) | (v >= hiK)
@@ -228,8 +228,8 @@ if triton is not None:
             x, wp = _put(x, cum2, f2, two, out_ptr, wp)
             x, wp = _put(x, cum1, f1, valid, out_ptr, wp)
         r = tl.arange(0, BLOCK)
-        tl.store(out_ptr + (wp - 2 * BLOCK + 2 * r), (x >> 16).to(tl.uint16))
-        tl.store(out_ptr + (wp - 2 * BLOCK + 2 * r + 1), (x & 0xFFFF).to(tl.uint16))
+        tl.store(out_ptr + (wp - 2 * BLOCK + 2 * r), (x >> 16).to(tl.int16))
+        tl.store(out_ptr + (wp - 2 * BLOCK + 2 * r + 1), (x & 0xFFFF).to(tl.int16))
         tl.store(start_ptr + pid, wp - 2 * BLOCK)
 
     @triton.jit
@@ -239,7 +239,9 @@ if triton is not None:
         lane = pid * BLOCK + tl.arange(0, BLOCK)
         r = tl.arange(0, BLOCK)
         rp = tl.load(start_ptr + pid)
-        x = (tl.load(buf_ptr + (rp + 2 * r)).to(tl.uint32) << 16) | tl.load(buf_ptr + (rp + 2 * r + 1)).to(tl.uint32)
+        hi16 = (tl.load(buf_ptr + (rp + 2 * r)).to(tl.int32) & 0xFFFF).to(tl.uint32)
+        lo16 = (tl.load(buf_ptr + (rp + 2 * r + 1)).to(tl.int32) & 0xFFFF).to(tl.uint32)
+        x = (hi16 << 16) | lo16
         rp = rp + 2 * BLOCK
         for i in range(0, V):
             idx = i * S + lane
@@ -315,11 +317,11 @@ class SliceCoder:
             return kernel[grid](*args, **kw)
 
     def encode(self, words, mu, s):
-        """words: int16/uint16/int32 [n]; mu, s: float32 [n]. Returns (buffer uint16, starts int32, n)."""
+        """words: int16/int32 [n]; mu, s: float32 [n]. Returns (buffer int16 holding 16-bit words, starts int32, n)."""
         n = words.numel()
         S, P, cap = self.layout(n)
         w = words.reshape(-1).to(torch.int32).contiguous()
-        out = torch.zeros(P * cap, dtype=torch.uint16, device=self.device)
+        out = torch.zeros(P * cap, dtype=torch.int16, device=self.device)
         starts = torch.zeros(P, dtype=torch.int32, device=self.device)
         self._launch(_encode_kernel, (P,), w, mu.reshape(-1).contiguous(), s.reshape(-1).contiguous(), out, starts,
                      self.cum, self.off, self.K, n, S, self.V, cap, BLOCK=self.BLOCK)

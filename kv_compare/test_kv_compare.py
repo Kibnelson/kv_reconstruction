@@ -178,6 +178,47 @@ class TinyLlamaTests(unittest.TestCase):
         self.assertTrue(math.isfinite(lossy))
 
 
+CODER_CHECK = r"""
+import os, sys
+os.environ["TRITON_INTERPRET"] = "1"
+sys.path.insert(0, sys.argv[1])
+import torch
+from kv_compare.core import exact_bits, float_to_words
+from kv_compare.gpu_coder import SliceCoder
+torch.manual_seed(0)
+n = 700
+x = torch.randn(n, dtype=torch.float64) * torch.exp(torch.randn(n))
+mu = (x + torch.randn(n, dtype=torch.float64) * 0.05 * x.abs().clamp_min(1e-3)).float()
+s = (0.05 * x.abs().clamp_min(1e-3) * torch.exp(0.3 * torch.randn(n))).float()
+w = float_to_words(x)
+w[:5] = torch.tensor([0x0000, 0x8000, 0x7F80, 0x7FC0, 0xFF80])
+mu[10:20] = 0.0
+s[10:20] = 1e-12
+w = w.to(torch.int16)
+c = SliceCoder("cpu", values_per_stream=16, block=16)
+buf, starts, m = c.encode(w, mu, s)
+dec = c.decode(buf, starts, mu, s, m)
+assert torch.equal(dec, w), "round trip"
+ideal = c.ideal_bits(w, mu, s) / n
+model = float(exact_bits(w.to(torch.int32) & 0xFFFF, mu.double(), s.double()).mean())
+assert abs(ideal - model) < 0.1, (ideal, model)
+print("ok", ideal, model)
+"""
+
+
+class CoderTests(unittest.TestCase):
+    def test_value_slice_coder_round_trip_interpreted(self):
+        """The Triton coder (run by Triton's CPU interpreter) restores every word, including zeros, Inf, NaN and
+        tiny spreads, and its symbol cost stays close to the exact model."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None:
+            self.skipTest("Triton is not installed")
+        r = subprocess.run([sys.executable, "-c", CODER_CHECK, str(ROOT)], capture_output=True, text=True, timeout=900)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertIn("ok", r.stdout)
+
+
 class PackageTests(unittest.TestCase):
     def test_package_copies_small_files_and_refuses_overwrite(self):
         sys.path.insert(0, str(ROOT / "scripts"))

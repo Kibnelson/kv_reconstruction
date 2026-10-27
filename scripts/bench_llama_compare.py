@@ -18,6 +18,9 @@ Stages (all by default; --stages picks a subset, reusing earlier outputs in the 
              KV (restoring it twice must agree exactly; the model's own prefill of the prompt is reported beside it)
   frontier   (optional) bits against compute: ~37 predictor variants (inputs, steps, reduced rank, 8-bit integer
              formats) fitted from one covariance per layer and scored like the lossless stage -> frontier.json
+  gpu_speed  (optional, needs the GPU to itself) measured throughput: the predictor of five frontier variants in
+             fp32, BF16 and exact 8-bit integer formats, and the Triton value-slice coder encoding and decoding
+             real KV (bit-exact round trip) -> gpu_speed.json
   report     summary.md
 
 Document roles (same protocol as the SmolLM2 study): calibration = PEP 484 and six CPython modules, scales =
@@ -28,6 +31,7 @@ their scale/offset overhead. GPU timings are not part of these stages.
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import math
 import signal
@@ -267,6 +271,108 @@ def stage_frontier(args, out):
     return res
 
 
+SPLITZIP_A4500 = ("SplitZip's native codec on the same RTX A4500 (official run, branch experiment/llama32_official_gpu, "
+                  "benchmark_results/llama32_official_a4500_20261022_125030_report_20261022_134517): 12.04 bits per "
+                  "value, encode 137 GB/s, decode 311 GB/s")
+
+
+def stage_gpu_speed(args, out):
+    import gc
+    import torch
+    from kv_compare.gpu_coder import SliceCoder
+    from kv_compare.gpu_speed import coder_inputs, coder_rows, predictor_rows
+    from kv_compare.predict import CONFIGS, Study
+    device = torch.device(args.device)
+    meta = json.loads((out / "captures" / "meta.json").read_text())
+    Hk, hd, Hq = int(meta["kv_heads"]), int(meta["head_dim"]), int(meta["query_heads"])
+    W, Qw = 2 * Hk * hd, Hq * hd
+    note = gpu_sharing_note(args.device)
+    if note and "WARNING" in note:
+        log("gpu_speed: " + note)
+    variants = [
+        {"label": "P, 1 pivot step", "ne": W, "steps": 1},
+        {"label": "P, 16 pivot steps, rank 128", "ne": W, "rank": 128, "steps": 16},
+        {"label": "P, 16 pivot steps", "ne": W, "steps": 16},
+        {"label": "L0+P2+P, 16 pivot steps", "ne": 3 * W, "steps": 16},
+        {"label": "L0+P2+P+ATT, 16 pivot steps", "ne": 3 * W + Qw, "steps": 16, "att": True},
+    ]
+    log(f"gpu_speed: predictor, one layer of {args.speed_tokens} tokens, {len(variants)} variants")
+    rows = predictor_rows(Hk, hd, Hq, args.speed_tokens, device, variants, args.speed_formats, log)
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    cfg = CONFIGS[args.speed_config]
+    if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
+        cfg = CONFIGS["lite"]
+    layers = [l for l in args.speed_layers if l < study.L]
+    log(f"gpu_speed: coder inputs from {cfg.name} on {study.tests[0].name}, layers {layers}")
+    data = coder_inputs(study, cfg, study.tests[0], layers)
+    del study
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    if device.type == "cuda" or os.environ.get("TRITON_INTERPRET") == "1":
+        rows += coder_rows(SliceCoder, device, data, args.speed_settings, log,
+                           max_values=None if device.type == "cuda" else 4096)
+    else:
+        log("gpu_speed: the coder needs a CUDA GPU (or TRITON_INTERPRET=1 for a slow CPU check); skipped")
+    bits = {}
+    if (out / "frontier.json").is_file():
+        for r in json.loads((out / "frontier.json").read_text())["variants"]:
+            bits[r["label"]] = r["chunk_average"]
+    res = {"gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu",
+           "gpu_memory_at_start": note, "coder_config": cfg.name, "coder_layers": layers,
+           "tokens_per_layer": args.speed_tokens, "values_per_layer": args.speed_tokens * W,
+           "bits_per_value": bits, "splitzip_reference": SPLITZIP_A4500, "rows": rows}
+    (out / "gpu_speed.json").write_text(json.dumps(res, indent=1))
+    log(f"gpu_speed done ({memory_note(args.device)})")
+    return res
+
+
+def speed_lines(out):
+    res = json.loads((out / "gpu_speed.json").read_text())
+    pred = [r for r in res["rows"] if r["part"] == "predictor"]
+    coder = [r for r in res["rows"] if r["part"] == "coder"]
+    lines = [f"## GPU speed ({res['gpu']})", "",
+             f"Kernel time only (CUDA-event medians after warm-up), like the published SplitZip and ExANS GB/s; GB/s "
+             f"counts raw BF16 bytes (2 per value). Predictor: one layer of {res['tokens_per_layer']} tokens, random "
+             "data of the real shapes (the inputs product, then one product per group in sequence; the attention "
+             "input adds the query map and the windowed attention, in BF16 for the integer formats). Not included: "
+             "RoPE rotation and the spread arithmetic (element-wise).", "",
+             "| Predictor | Format | ms per layer | G values/s | GB/s |", "| --- | --- | --- | --- | --- |"]
+    for r in pred:
+        if "error" in r:
+            lines.append(f"| {r['variant']} | {r['format']} | not measured | | |")
+        else:
+            lines.append(f"| {r['variant']} | {r['format']} | {r['ms_per_layer']:.2f} | {r['gvalues_per_s']:.1f} | {r['gb_per_s']:.1f} |")
+    if coder:
+        lines += ["", f"Value-slice coder (Triton) on {coder[0]['values']:,} real values ({res['coder_config']} "
+                  f"predictions, layers {res['coder_layers']}); the round trip must be bit-exact.", "",
+                  "| Values per stream x lanes per program | Bit-exact | Stream bits/value | Exact model bits/value | Encode GB/s | Decode GB/s |",
+                  "| --- | --- | --- | --- | --- | --- |"]
+        for r in coder:
+            lines.append(f"| {r['values_per_stream']} x {r['block']} | {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | "
+                         f"{r['exact_model_bits_per_value']:.4f} | {r['encode_gb_per_s']:.1f} | {r['decode_gb_per_s']:.1f} |")
+    ok = [r for r in coder if r["bit_exact"]]
+    if ok and pred:
+        best = max(ok, key=lambda r: r["decode_gvalues_per_s"])
+        lines += ["", "Decode estimate per predictor (fastest exact integer format, else BF16, then the fastest coder; "
+                  "run one after the other, not overlapped). Link it keeps up with = decoded values/s x bits per value.", "",
+                  "| Predictor | Bits per value | Decode G values/s | Decode GB/s | Keeps up with a link of |",
+                  "| --- | --- | --- | --- | --- |"]
+        for v in dict.fromkeys(r["variant"] for r in pred):
+            cand = [r for r in pred if r["variant"] == v and "error" not in r and r["format"] in ("int8x8", "int8x16")]
+            cand = cand or [r for r in pred if r["variant"] == v and "error" not in r and r["format"] == "bf16"]
+            if not cand:
+                continue
+            p_ = max(cand, key=lambda r: r["gvalues_per_s"])
+            g = 1 / (1 / p_["gvalues_per_s"] + 1 / best["decode_gvalues_per_s"])
+            b = res["bits_per_value"].get(v)
+            link = f"{g * b:.0f} Gb/s" if b else "n/a"
+            lines.append(f"| {v} ({p_['format']}) | {'n/a' if b is None else f'{b:.3f}'} | {g:.1f} | {2 * g:.1f} | {link} |")
+    lines += ["", "Reference: " + res["splitzip_reference"] + ".", ""]
+    return lines
+
+
 def frontier_lines(out):
     res = json.loads((out / "frontier.json").read_text())
     lines = [f"## Bits against compute ({len(res['variants'])} predictor variants, {res['layers']} layers)", "",
@@ -304,6 +410,8 @@ def stage_report(args, out):
         lines.append("")
     if (out / "frontier.json").is_file():
         lines += frontier_lines(out)
+    if (out / "gpu_speed.json").is_file():
+        lines += speed_lines(out)
     if (out / "lossy.json").is_file():
         res = json.loads((out / "lossy.json").read_text())
         docs = list(res["documents"])
@@ -341,6 +449,12 @@ def parser():
     p.add_argument("--max-layers", type=int, default=None, help="lossless and frontier stages: first N layers (smoke tests)")
     p.add_argument("--no-queries", action="store_true", help="skip q_proj capture (drops the attention input)")
     p.add_argument("--frontier-quick", action="store_true", help="frontier stage: a smaller grid of variants")
+    p.add_argument("--speed-tokens", type=int, default=8192, help="gpu_speed: tokens per timed layer")
+    p.add_argument("--speed-formats", default="fp32,bf16,int8x16,int8x8")
+    p.add_argument("--speed-config", default="lite", help="gpu_speed: configuration whose predictions feed the coder")
+    p.add_argument("--speed-layers", default="4,12,20,27", help="gpu_speed: test-document layers coded")
+    p.add_argument("--speed-settings", default="1024x64,2048x128,4096x128",
+                   help="gpu_speed: coder settings, values per stream x lanes per program")
     return p
 
 
@@ -368,6 +482,9 @@ def main(argv=None):
         args.revision = None
     args.configs = [c for c in args.configs.split(",") if c]
     args.kappas = [float(k) for k in args.kappas.split(",") if k]
+    args.speed_formats = [f for f in args.speed_formats.split(",") if f]
+    args.speed_layers = [int(l) for l in args.speed_layers.split(",") if l]
+    args.speed_settings = [tuple(int(x) for x in t.split("x")) for t in args.speed_settings.split(",") if t]
     stages = [s for s in args.stages.split(",") if s]
     out = args.output
     if "capture" in stages:
@@ -403,6 +520,8 @@ def main(argv=None):
             stage_lossy(args, out)
         if "frontier" in stages:
             stage_frontier(args, out)
+        if "gpu_speed" in stages:
+            stage_gpu_speed(args, out)
         if "report" in stages:
             stage_report(args, out)
     except BaseException as exc:

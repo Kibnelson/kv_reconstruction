@@ -11,6 +11,8 @@ logistic distribution centred on the prediction. Configurations:
              own layer l-1 KV, window = last 64 tokens + token 0), pivoted channel order, 8 steps, adaptive spread
              (the strong-and-fast version: no waves)
   fast_noatt the fast configuration without the attention input (used when no calibration queries were captured)
+  lite       layer l-1 only, pivoted order, 16 steps, adaptive spread (the speed candidate from the frontier stage)
+  fast16     the fast configuration with 16 steps
 
 Fit: conditional mean of each channel given the inputs and the earlier groups, in closed form from the
 calibration covariance (ridge 1e-3 x average variance). Spread: per-channel mean absolute residual on the scales
@@ -47,10 +49,13 @@ CONFIGS = {
     "nohint": Config("nohint", ("L0", "P2", "R", "P"), 16, "natural", True),
     "fast": Config("fast", ("L0", "P2", "P", "ATT"), 8, "pivot", True),
     "fast_noatt": Config("fast_noatt", ("L0", "P2", "P"), 8, "pivot", True),
+    "lite": Config("lite", ("P",), 16, "pivot", True),
+    "fast16": Config("fast16", ("L0", "P2", "P", "ATT"), 16, "pivot", True),
 }
 LABELS = {"prev": "Our 44% version (layer l-1)", "block": "Our Block (+ earlier groups)",
           "nohint": "Our strongest no-hint", "fast": "Our strong-and-fast",
-          "fast_noatt": "Our strong-and-fast without attention input"}
+          "fast_noatt": "Our strong-and-fast without attention input",
+          "lite": "Our lite (layer l-1, 16 pivoted groups)", "fast16": "Our strong-and-fast, 16 groups"}
 
 
 def kinds_at(kinds, layer):
@@ -465,17 +470,13 @@ class Study:
 
 
 def macs_per_value(cfg_name, Hk, hd, Hq):
-    """Predictor multiply-adds per coded value for a configuration (entropy coder excluded)."""
+    """Predictor multiply-adds per coded value for a configuration (entropy coder excluded): the inputs, the
+    earlier groups (average group start), and for the attention input the query map and the attention."""
     W = 2 * Hk * hd
     Qw = Hq * hd
     cfg = CONFIGS[cfg_name]
     gsz = -(-W // cfg.steps)
     earlier = (cfg.steps - 1) / 2 * gsz
-    if cfg_name == "prev":
-        return W
-    if cfg_name == "block":
-        return W + earlier
-    if cfg_name == "nohint":
-        return 4 * W + 1 + earlier
-    att = Qw + Qw + Hq * 65 * hd * 2 / W if "ATT" in cfg.kinds else 0
-    return 3 * W + earlier + att
+    widths = {"L0": W, "P2": W, "P": W, "R": W + 1, "ATT": Qw}
+    att = Qw + Hq * 65 * hd * 2 / W if "ATT" in cfg.kinds else 0
+    return sum(widths[k] for k in cfg.kinds) + earlier + att

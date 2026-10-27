@@ -68,6 +68,8 @@ the exact KV.
 | `capture` | Prefills 9 documents of 8,192 tokens. Saves BF16 K/V words in cache order, plus q_proj outputs for the six calibration documents (needed for the attention input). | about 8.5 GB of KV and 8.5 GB of queries |
 | `lossless` | Exact per-word costs on the two test documents, for whole documents and the four 256-token reference chunks. | — |
 | `lossy` | Codes the first 3,072 tokens of each test document with every lossy method. The model then processes the next 512 tokens using that KV. The reference is the captured exact KV restored into the cache; restoring it twice must agree exactly. The model's own prefill of the 3,072-token prompt is reported beside it: on a GPU it can differ slightly (for example +0.05%), because kernels round differently at a different sequence length. | — |
+| `frontier` | Optional. About 37 predictor variants fitted from one covariance per layer: input sets, 1–16 steps, reduced-rank inputs and exact 8-bit integer formats. Each gets exact lossless costs and multiply-adds per value (`frontier.json`). | about 30 minutes on an RTX A4500 |
+| `gpu_speed` | Optional; needs the GPU to itself. Times one layer of the predictor for five frontier variants in float32, BF16 and exact 8-bit integer arithmetic. Then encodes and decodes four real test layers with the Triton value-slice coder, checking the round trip bit for bit (`gpu_speed.json`). | a few minutes |
 | `report` | Writes `summary.md`. | — |
 
 Useful options:
@@ -78,7 +80,17 @@ Useful options:
 - `--configs`, `--kappas`, `--prompt-tokens` and `--continuation-tokens` change the sweep.
 - `--max-layers N --stages capture,lossless` gives a quick partial-layer smoke run.
 
-Each stage's elapsed time is logged. GPU codec speed is not measured here; see the speed protocol in the team spec.
+Each stage's elapsed time is logged.
+
+### Speed run (GPU to itself)
+
+```bash
+nvidia-smi                       # nothing else should be running
+python -u scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare \
+    --stages gpu_speed,report 2>&1 | tee -a runs/llama32_3b_compare/console.log
+```
+
+The speed stage reports kernel time only: CUDA-event medians after warm-up, with no host transfers. That matches how SplitZip and ExANS publish GB/s, and GB/s counts raw BF16 bytes. The summary combines the predictor and the coder into a decode rate, shown as decoded values per second and as the link speed that rate keeps up with (values per second x bits per value). It also lists SplitZip's own measurement on the same A4500 for reference. The coder's slice tables are computed once per run, so encoder and decoder share them; for transfers between machines they would ship as constants.
 
 ## Methods
 
