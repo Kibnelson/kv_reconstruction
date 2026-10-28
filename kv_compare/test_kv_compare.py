@@ -195,11 +195,20 @@ w[:5] = torch.tensor([0x0000, 0x8000, 0x7F80, 0x7FC0, 0xFF80])
 mu[10:20] = 0.0
 s[10:20] = 1e-12
 w = w.to(torch.int16)
+import numpy as np
+from kv_compare.gpu_coder import slice_tables, stage1_reference
+t = slice_tables("cpu")
+cum, off, K, slot = t["cum"].numpy().astype(np.int64), t["off"].numpy(), t["K"].numpy(), np.arange(65536)
+for c in range(10):      # the search-free stage 1 finds every slot's symbol
+    assert np.array_equal(stage1_reference(t, c, slot), np.searchsorted(cum[off[c]: off[c] + K[c] + 2], slot, side="right") - 1)
 for mode in ("exact", "uniform"):
     c = SliceCoder("cpu", values_per_stream=16, block=16, mode=mode)
     buf, starts, m = c.encode(w, mu, s)
     dec = c.decode(buf, starts, mu, s, m)
     assert torch.equal(dec, w), ("round trip", mode)
+    c.search = True      # the same streams decode with the earlier stage-1 search
+    assert torch.equal(c.decode(buf, starts, mu, s, m), w), ("round trip with search", mode)
+    c.search = False
     ideal = c.ideal_bits(w, mu, s) / n
     model = float(exact_bits(w.to(torch.int32) & 0xFFFF, mu.double(), s.double()).mean())
     assert abs(ideal - model) < 0.15, (mode, ideal, model)

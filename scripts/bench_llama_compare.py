@@ -280,7 +280,7 @@ def stage_gpu_speed(args, out):
     import gc
     import torch
     from kv_compare.gpu_coder import SliceCoder
-    from kv_compare.gpu_speed import coder_inputs, coder_rows, overlap_row, predictor_layer, predictor_rows
+    from kv_compare.gpu_speed import coder_inputs, coder_rows, fused_rows, overlap_row, predictor_layer, predictor_rows
     from kv_compare.predict import CONFIGS, Study
     device = torch.device(args.device)
     meta = json.loads((out / "captures" / "meta.json").read_text())
@@ -326,7 +326,7 @@ def stage_gpu_speed(args, out):
                 layer_fn, _ = predictor_layer(Hk, hd, Hq, args.speed_tokens, device, v, fmt, gen)
                 try:
                     row = overlap_row(SliceCoder, device, data, (best["values_per_stream"], best["block"], best["warps"]),
-                                      layer_fn, log, mode=best["mode"])
+                                      layer_fn, log, mode=best["mode"], search=best.get("search", False))
                     row.update(predictor=f"{label} ({fmt})", variant=label)
                     rows.append(row)
                 except Exception as exc:
@@ -334,6 +334,14 @@ def stage_gpu_speed(args, out):
                 del layer_fn
     else:
         log("gpu_speed: the coder needs a CUDA GPU (or TRITON_INTERPRET=1 for a slow CPU check); skipped")
+    if device.type == "cuda" and args.fused_configs:
+        del data
+        gc.collect()
+        torch.cuda.empty_cache()
+        study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+        log(f"gpu_speed: fused one-step codec, whole {study.tests[0].name} ({study.L} layers), configs {args.fused_configs}")
+        rows += fused_rows(study, device, args.fused_configs, log, modes=args.fused_modes)
+        del study
     bits = {}
     if (out / "frontier.json").is_file():
         for r in json.loads((out / "frontier.json").read_text())["variants"]:
@@ -369,10 +377,12 @@ def speed_lines(out):
     if coder:
         lines += ["", f"Value-slice coder (Triton) on {coder[0]['values']:,} real values ({res['coder_config']} "
                   f"predictions, layers {res['coder_layers']}); the round trip must be bit-exact.", "",
-                  "| Mode | Values per stream x lanes per program (warps) | Bit-exact | Stream bits/value | Exact model bits/value | Encode GB/s | Decode GB/s |",
-                  "| --- | --- | --- | --- | --- | --- | --- |"]
+                  "Stage 1: how the decoder finds the slice symbol (direct: a table and one comparison; search: a "
+                  "coarse table and a binary search); the streams are the same.", "",
+                  "| Mode | Stage 1 | Values per stream x lanes per program (warps) | Bit-exact | Stream bits/value | Exact model bits/value | Encode GB/s | Decode GB/s |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- |"]
         for r in coder:
-            lines.append(f"| {r.get('mode', 'exact')} | {r['values_per_stream']} x {r['block']} ({r.get('warps', max(1, r['block'] // 32))}) | {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | "
+            lines.append(f"| {r.get('mode', 'exact')} | {'search' if r.get('search', True) else 'direct'} | {r['values_per_stream']} x {r['block']} ({r.get('warps', max(1, r['block'] // 32))}) | {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | "
                          f"{r['exact_model_bits_per_value']:.4f} | {r['encode_gb_per_s']:.1f} | {r['decode_gb_per_s']:.1f} |")
     ok = [r for r in coder if r["bit_exact"]]
     if ok and pred:
@@ -401,6 +411,26 @@ def speed_lines(out):
                   f"{r['decode_ms']:.2f} ms one after the other, {r['both_ms']:.2f} ms together, so "
                   f"{r['overlapped_gvalues_per_s']:.1f} G values/s ({2 * r['overlapped_gvalues_per_s']:.1f} GB/s)"
                   + (f", keeping up with a {r['overlapped_gvalues_per_s'] * b:.0f} Gb/s link." if b else ".")]
+    fused = [r for r in res["rows"] if r["part"] == "fused"]
+    if fused:
+        f0 = next((r for r in fused if "error" not in r), fused[0])
+        lines += ["", f"Whole-document decode, fused one-step codec (Triton, measured): {f0['doc']}, {f0['layers']} layers x "
+                  f"{f0['tokens']} tokens = {f0['values'] / 1e6:.0f}M values, encoded and decoded layer by layer as a receiver "
+                  "must: one kernel predicts each layer from the decoded previous layer (int8 tensor-core product, RoPE, "
+                  "spread), decodes it and makes the next layer's features. Times are the kernels end to end (CUDA "
+                  "events); the decode must be bit-exact. Bits are the stream's own (states included); the predictor's "
+                  "exact-model bits show the cost of its int8 coefficients and features.", "",
+                  "| Tokens per program x rows (warps) | Mode | Stage 1 | Bit-exact | Stream bits/value | Predictor exact-model bits/value | Encoder forward + encode ms | Decode ms | Decode G values/s | Decode GB/s | Keeps up with a link of |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+        for r in fused:
+            head = f"| {r['tokens_per_program']} x {r['rows']} ({r['warps']}) | {r['mode']} | {'search' if r['search'] else 'direct'} |"
+            if "error" in r:
+                lines.append(head + " not measured | | | | | | | |")
+                continue
+            g = r["decode_gvalues_per_s"]
+            lines.append(head + f" {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | {r['exact_model_bits_per_value']:.4f} | "
+                         f"{r['model_ms']:.1f} + {r['encode_ms']:.1f} | {r['decode_ms']:.1f} | {g:.1f} | {2 * g:.1f} | "
+                         f"{g * r['stream_bits_per_value']:.0f} Gb/s |")
     lines += ["", "Reference: " + res["splitzip_reference"] + ".", ""]
     return lines
 
@@ -469,6 +499,22 @@ def mix_lines(out, res):
             counts = ", ".join(f"{c} {opts[i][0].replace('P, ', '')}" for i, c in enumerate(best[1]) if c)
             lines.append(f"| {R} Gb/s | {ms(16 / R)} | {ms(t_sz)} | {ms(single[0])} ({single[1].replace('P, ', '')}) | "
                          f"{ms(best[0])} ({counts}) | {t_sz / best[0]:.2f}x |")
+    fused = [r for r in res["rows"] if r["part"] == "fused" and r.get("bit_exact")]
+    if fused:
+        f = max(fused, key=lambda r: r["decode_gvalues_per_s"])
+        n = f["values"]
+        sz = (float(np.mean(ll["methods"]["SplitZip-style"]["per_layer"][f["doc"]]))
+              if f["doc"] in ll["methods"]["SplitZip-style"]["per_layer"] else sz_bits)
+        lines += ["", f"Our codec alone, measured end to end (fused one-step codec, whole {f['doc']}: {n / 1e6:.0f}M values, "
+                  f"{f['stream_bits_per_value']:.3f} bits/value, decoded layer by layer at {f['decode_gvalues_per_s']:.1f} G "
+                  f"values/s; {f['tokens_per_program']} x {f['rows']} ({f['warps']}), {f['mode']}). SplitZip: "
+                  f"{sz:.3f} bits/value on the same document, its measured A4500 decode speed. Ideal link as above.", "",
+                  "| Link | Raw BF16 | SplitZip | Ours (fused, measured) | Ours vs SplitZip |", "| --- | --- | --- | --- | --- |"]
+        for R in (10, 25, 50, 100, 200, 400, 700):
+            t_o = max(f["stream_bits_per_value"] / R, 1 / f["decode_gvalues_per_s"])
+            t_sz = max(sz / R, 1 / Ts)
+            ms = lambda t: f"{t * n / 1e6:.0f} ms"
+            lines.append(f"| {R} Gb/s | {ms(16 / R)} | {ms(t_sz)} | {ms(t_o)} | {t_sz / t_o:.2f}x |")
     return lines + ([""] if lines else [])
 
 
@@ -559,6 +605,11 @@ def parser():
     p.add_argument("--speed-settings", default="1024x128x1,1024x256x1,768x128x1,768x256x1,512x128x1",
                    help="gpu_speed: coder settings, values per stream x lanes per program [x warps per program; "
                         "default one thread per lane, fewer warps interleave several lanes per thread]")
+    p.add_argument("--fused-configs", default="32x8x8,64x8x8,32x4x4,16x4x4,64x16x16",
+                   help="gpu_speed: fused one-step codec on the whole test document, tokens per program x rows x "
+                        "warps (empty: skip)")
+    p.add_argument("--fused-modes", default="uniform,exact",
+                   help="gpu_speed: fused codec modes (every config in the first; the fastest also in the others)")
     return p
 
 
@@ -592,6 +643,10 @@ def main(argv=None):
     args.speed_settings = [tuple(int(x) for x in t.split("x")) for t in args.speed_settings.split(",") if t]
     if any(len(t) not in (2, 3) for t in args.speed_settings):
         raise SystemExit("--speed-settings takes VxB or VxBxW items (values per stream x lanes x warps)")
+    args.fused_configs = [tuple(int(x) for x in t.split("x")) for t in args.fused_configs.split(",") if t]
+    if any(len(t) != 3 for t in args.fused_configs):
+        raise SystemExit("--fused-configs takes TBxRxW items (tokens per program x rows x warps)")
+    args.fused_modes = [m for m in args.fused_modes.split(",") if m]
     stages = [s for s in args.stages.split(",") if s]
     out = args.output
     if "capture" in stages:

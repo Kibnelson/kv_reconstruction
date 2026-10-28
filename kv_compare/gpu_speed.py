@@ -237,26 +237,32 @@ def coder_rows(coder_cls, device, data, settings, log=print, max_values=None, mo
         warps = setting[2] if len(setting) > 2 else None
         coder = coder_cls(device, values_per_stream=V, block=block, warps=warps, mode=mode)
         buf, starts, _ = coder.encode(w, mu, s)
-        dec = coder.decode(buf, starts, mu, s, n)
-        ok = bool(torch.equal(dec, w))
         bits = coder.bits(starts, n) / n
         ideal = coder.ideal_bits(w, mu, s) / n
         reps = 10 if device.type == "cuda" else 1
-        te = timer(lambda: coder.encode(w, mu, s), device, warmup=1 if device.type != "cuda" else 3, reps=reps)
-        td = timer(lambda: coder.decode(buf, starts, mu, s, n), device, warmup=1 if device.type != "cuda" else 3, reps=reps)
-        row = {"part": "coder", "mode": mode, "values": n, "values_per_stream": V, "block": block, "warps": coder.warps, "bit_exact": ok,
-               "stream_bits_per_value": bits, "symbol_bits_per_value": ideal, "exact_model_bits_per_value": exact,
-               "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
-               "encode_gvalues_per_s": n / te / 1e9, "decode_gvalues_per_s": n / td / 1e9,
-               "encode_gb_per_s": 2 * n / te / 1e9, "decode_gb_per_s": 2 * n / td / 1e9}
-        rows.append(row)
-        log(f"  coder [{mode}] V={V} block={block} warps={coder.warps}: exact={ok}, {bits:.4f} bits/value (model {exact:.4f}), "
-            f"encode {row['encode_gb_per_s']:.1f} GB/s, decode {row['decode_gb_per_s']:.1f} GB/s")
-        del buf, starts, dec
+        warm = 1 if device.type != "cuda" else 3
+        te = timer(lambda: coder.encode(w, mu, s), device, warmup=warm, reps=reps)
+        for search in (False, True):             # the same streams, decoded with and without the stage-1 search
+            coder.search = search
+            dec = coder.decode(buf, starts, mu, s, n)
+            ok = bool(torch.equal(dec, w))
+            td = timer(lambda: coder.decode(buf, starts, mu, s, n), device, warmup=warm, reps=reps)
+            row = {"part": "coder", "mode": mode, "search": search, "values": n, "values_per_stream": V, "block": block,
+                   "warps": coder.warps, "bit_exact": ok,
+                   "stream_bits_per_value": bits, "symbol_bits_per_value": ideal, "exact_model_bits_per_value": exact,
+                   "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
+                   "encode_gvalues_per_s": n / te / 1e9, "decode_gvalues_per_s": n / td / 1e9,
+                   "encode_gb_per_s": 2 * n / te / 1e9, "decode_gb_per_s": 2 * n / td / 1e9}
+            rows.append(row)
+            log(f"  coder [{mode}{', stage-1 search' if search else ''}] V={V} block={block} warps={coder.warps}: "
+                f"exact={ok}, {bits:.4f} bits/value (model {exact:.4f}), encode {row['encode_gb_per_s']:.1f} GB/s, "
+                f"decode {row['decode_gb_per_s']:.1f} GB/s")
+            del dec
+        del buf, starts
     return rows
 
 
-def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exact"):
+def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exact", search=False):
     """Decode on one CUDA stream while the predictor runs on another (as a pipelined decoder would, on different
     token blocks): the predictor runs once per coded layer. Reports each part alone and both together."""
     w = torch.cat([d[0] for d in data.values()])
@@ -265,6 +271,7 @@ def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exa
     n, layers = w.numel(), len(data)
     coder = coder_cls(device, values_per_stream=setting[0], block=setting[1],
                       warps=setting[2] if len(setting) > 2 else None, mode=mode)
+    coder.search = search
     buf, starts, _ = coder.encode(w, mu, s)
     s1, s2 = torch.cuda.Stream(device), torch.cuda.Stream(device)
 
@@ -283,8 +290,82 @@ def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exa
         cur.wait_stream(s1)
         cur.wait_stream(s2)
     tp, td, tb = timer(predict, device), timer(lambda: coder.decode(buf, starts, mu, s, n), device), timer(both, device)
-    row = {"part": "overlap", "mode": mode, "values": n, "setting": list(setting), "predictor_ms": 1e3 * tp, "decode_ms": 1e3 * td,
+    row = {"part": "overlap", "mode": mode, "search": search, "values": n, "setting": list(setting), "predictor_ms": 1e3 * tp, "decode_ms": 1e3 * td,
            "both_ms": 1e3 * tb, "sequential_gvalues_per_s": n / (tp + td) / 1e9, "overlapped_gvalues_per_s": n / tb / 1e9}
     log(f"  overlap: predictor {1e3 * tp:.2f} ms + decode {1e3 * td:.2f} ms one after the other; together "
         f"{1e3 * tb:.2f} ms -> {row['overlapped_gvalues_per_s']:.1f} G values/s (sequential {row['sequential_gvalues_per_s']:.1f})")
     return row
+
+
+# ---------------------------------------------------------------------------------------------- fused codec
+def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64):
+    """The fused one-step codec on a whole test document (every layer, decoded layer by layer as a receiver
+    must): bit-exact check, coded bits, the predictor's exact-model bits, and the time of the encoder's forward
+    pass, the encoder and the decoder. configs: (tokens per program, rows, warps); every config runs in the first
+    mode with the search-free stage 1; the fastest also with the stage-1 search and in the other modes."""
+    import gc
+    from .fused import FusedOneStep, prepare, reference_mu
+    consts = prepare(study, log)
+    doc = study.tests[0]
+    L, W = study.L, study.W
+    T = doc.tokens - doc.tokens % 128
+    words = torch.empty(L, T, W, dtype=torch.int16, device=device)
+    for l in range(L):
+        w = doc.words(l, device, rows=T)
+        words[l] = (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
+    n = L * T * W
+    rows, model_bits = [], None
+
+    def run(TB, R, nw, mode, search):
+        nonlocal model_bits
+        tag = f"{TB} tokens x {R} rows, {nw} warps, {mode}{', stage-1 search' if search else ''}"
+        row = {"part": "fused", "tokens_per_program": TB, "rows": R, "warps": nw, "mode": mode, "search": search,
+               "values": n, "layers": L, "tokens": T, "doc": doc.name}
+        try:
+            codec = FusedOneStep(consts, study.C, study.hd, tokens_per_program=TB, rows=R, kchunk=kchunk, warps=nw,
+                                 mode=mode, search=search)
+            xall, prior = codec.model(words)
+            buf, starts = codec.encode(words, xall, prior)
+            P = T // TB
+            scratch = (torch.zeros(2, T, W, dtype=torch.int8, device=device),) + codec._scratch(P)
+            dec = codec.decode(buf, starts, T, scratch=scratch)
+            ok = bool(torch.equal(dec, words))
+            bits = codec.bits(starts, T) / n
+            if model_bits is None:               # the predictor's exact-model cost (same for every config)
+                tot, pos = 0.0, torch.arange(T, device=device)
+                for l in range(L):
+                    x = words_to_float(words[l].to(torch.int32) & 0xFFFF)
+                    m = reference_mu(consts, l, xall[l - 1].float() if l else None, pos, study.C, study.hd)
+                    mult = ((prior[l] * 64.0 + 16.0) * 0.0125).clamp(0.25, 4.0)
+                    sp = consts["sp"][l][None, :] * mult[:, None]
+                    tot += float(exact_bits(words[l].to(torch.int32) & 0xFFFF, m.double(), sp.double()).sum())
+                    del x, m, sp
+                model_bits = tot / n
+            tm = timer(lambda: codec.model(words), device, warmup=1, reps=3)
+            te = timer(lambda: codec.encode(words, xall, prior, out=buf), device, warmup=1, reps=3)
+            td = timer(lambda: codec.decode(buf, starts, T, out=dec, scratch=scratch), device, warmup=2, reps=5)
+            row.update(bit_exact=ok, stream_bits_per_value=bits, exact_model_bits_per_value=model_bits,
+                       model_ms=1e3 * tm, encode_ms=1e3 * te, decode_ms=1e3 * td,
+                       encode_gvalues_per_s=n / (tm + te) / 1e9, decode_gvalues_per_s=n / td / 1e9)
+            log(f"  fused [{tag}]: exact={ok}, {bits:.4f} bits/value (model {model_bits:.4f}); forward {1e3 * tm:.1f} ms "
+                f"+ encode {1e3 * te:.1f} ms, decode {1e3 * td:.1f} ms -> {n / td / 1e9:.1f} G values/s")
+            del codec, xall, prior, buf, starts, dec, scratch
+        except Exception as exc:                 # e.g. out of registers / shared memory for a config
+            import traceback; traceback.print_exc()
+            row["error"] = repr(exc)[:240]
+            log(f"  fused [{tag}]: not measured ({row['error']})")
+        gc.collect()
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+        rows.append(row)
+        return row
+
+    for TB, R, nw in configs:
+        run(TB, R, nw, modes[0], False)
+    ok = [r for r in rows if r.get("bit_exact")]
+    if ok:
+        best = max(ok, key=lambda r: r["decode_gvalues_per_s"])
+        run(best["tokens_per_program"], best["rows"], best["warps"], modes[0], True)
+        for mode in modes[1:]:
+            run(best["tokens_per_program"], best["rows"], best["warps"], mode, False)
+    del words
+    return rows
