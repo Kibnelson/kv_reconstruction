@@ -355,7 +355,7 @@ def stage_gpu_speed(args, out):
         study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
         log(f"gpu_speed: fused one-step codec, whole {study.tests[0].name} ({study.L} layers), configs {args.fused_configs}")
         rows += fused_rows(study, device, args.fused_configs, log, modes=args.fused_modes,
-                           layer_configs=args.layer_configs)
+                           layer_configs=args.layer_configs, ranks=args.layer_ranks)
         del study
     bits = {}
     if (out / "frontier.json").is_file():
@@ -680,24 +680,35 @@ def mix_lines(out, res):
                          f"{ms(best[0])} ({counts}) | {t_sz / best[0]:.2f}x |")
     fused = [r for r in res["rows"] if r["part"] in ("fused", "layerwise") and r.get("bit_exact")]
     if fused:
-        f = max(fused, key=lambda r: r["decode_gvalues_per_s"])
-        impl = ("fused one-step codec" if f["part"] == "fused" else "per-layer one-step codec")
-        shape = (f"{f['tokens_per_program']} x {f['rows']} ({f['warps']})" if f["part"] == "fused"
-                 else f"{f['tokens_per_program']} tokens per program, {f['chunks']} chunk(s)")
-        n = f["values"]
-        sz = (float(np.mean(ll["methods"]["SplitZip-style"]["per_layer"][f["doc"]]))
-              if f["doc"] in ll["methods"]["SplitZip-style"]["per_layer"] else sz_bits)
-        lines += ["", f"Our codec alone, measured end to end ({impl}, whole {f['doc']}: {n / 1e6:.0f}M values, "
-                  f"{f['stream_bits_per_value']:.3f} bits/value, decoded layer by layer at {f['decode_gvalues_per_s']:.1f} G "
-                  f"values/s; {shape}, {f['mode']}). SplitZip: {sz:.3f} bits/value on the same document, its measured "
-                  "A4500 decode speed. Ideal link as above; the bands are typical deployments (see the doc).", "",
-                  "| Link | Typical setting | Raw BF16 | SplitZip | Ours (measured) | Ours vs SplitZip |",
-                  "| --- | --- | --- | --- | --- | --- |"]
+        def name(r):
+            if r["part"] == "fused":
+                return f"fused {r['tokens_per_program']}x{r['rows']}, {r['mode']}"
+            v = r.get("variant") or ""
+            kind = "reduced rank" if "reduced-rank" in v else "dense"
+            return f"per layer, {kind} product, {r['mode']}"
+        best = {}                                    # per kind, the fastest measured row
+        for r in fused:
+            k = name(r)
+            if k not in best or r["decode_gvalues_per_s"] > best[k]["decode_gvalues_per_s"]:
+                best[k] = r
+        cands = list(best.values())
+        f0 = cands[0]
+        n = f0["values"]
+        sz = (float(np.mean(ll["methods"]["SplitZip-style"]["per_layer"][f0["doc"]]))
+              if f0["doc"] in ll["methods"]["SplitZip-style"]["per_layer"] else sz_bits)
+        lines += ["", f"Our codec alone, measured end to end (whole {f0['doc']}: {n / 1e6:.0f}M values, decoded layer by "
+                  "layer, bit-exact). For each link the mode with the shortest transfer among: " +
+                  "; ".join(f"{name(r)} ({r['stream_bits_per_value']:.3f} bits/value, {r['decode_gvalues_per_s']:.1f} G "
+                            "values/s)" for r in cands) +
+                  f". SplitZip: {sz:.3f} bits/value on the same document, its measured A4500 decode speed. Ideal link "
+                  "as above; the bands are typical deployments (see the doc).", "",
+                  "| Link | Typical setting | Raw BF16 | SplitZip | Ours (measured) | Mode | Ours vs SplitZip |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
         for R, band in LINK_BANDS:
-            t_o = max(f["stream_bits_per_value"] / R, 1 / f["decode_gvalues_per_s"])
+            t_o, pick = min(((max(r["stream_bits_per_value"] / R, 1 / r["decode_gvalues_per_s"]), name(r)) for r in cands))
             t_sz = max(sz / R, 1 / Ts)
             ms = lambda t: f"{t * n / 1e6:.0f} ms"
-            lines.append(f"| {R} Gb/s | {band} | {ms(16 / R)} | {ms(t_sz)} | {ms(t_o)} | {t_sz / t_o:.2f}x |")
+            lines.append(f"| {R} Gb/s | {band} | {ms(16 / R)} | {ms(t_sz)} | {ms(t_o)} | {pick} | {t_sz / t_o:.2f}x |")
     return lines + ([""] if lines else [])
 
 
@@ -811,6 +822,8 @@ def parser():
     p.add_argument("--pool-fused", default="32x4x4", help="pool: fused codec shape (TBxRxW)")
     p.add_argument("--pool-layer", default="128x2", help="pool: per-layer codec shape (TBxC)")
     p.add_argument("--pool-tokens", default="2048,8192", help="pool: prefix lengths for the recompute baseline")
+    p.add_argument("--layer-ranks", default="512",
+                   help="gpu_speed: reduced-rank products to try in the per-layer codec (the fast-link mode)")
     p.add_argument("--fused-modes", default="uniform,exact",
                    help="gpu_speed: fused codec modes (every config in the first; the fastest also in the others)")
     return p
@@ -852,6 +865,7 @@ def main(argv=None):
         raise SystemExit("--fused-configs takes TBxRxW items (tokens per program x rows x warps)")
     args.fused_modes = [m for m in args.fused_modes.split(",") if m]
     args.layer_configs = [tuple(int(x) for x in t.split("x")) for t in args.layer_configs.split(",") if t]
+    args.layer_ranks = [int(r) for r in args.layer_ranks.split(",") if r]
     args.pool_fused = tuple(int(x) for x in args.pool_fused.split("x"))
     args.pool_layer = tuple(int(x) for x in args.pool_layer.split("x"))
     args.pool_tokens = [int(t) for t in args.pool_tokens.split(",") if t]

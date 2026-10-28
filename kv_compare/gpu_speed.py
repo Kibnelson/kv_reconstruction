@@ -299,7 +299,7 @@ def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exa
 
 
 # ---------------------------------------------------------------------------------------------- fused codec
-def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64, layer_configs=()):
+def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64, layer_configs=(), ranks=()):
     """The one-step codec on a whole test document (every layer, decoded layer by layer as a receiver must), in
     two implementations: fused (one kernel per direction, configs: tokens per program, rows, warps) and per layer
     (cuBLAS int8 product, then one coding kernel; layer_configs: tokens per program, token chunks on separate CUDA
@@ -371,30 +371,31 @@ def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64,
         for mode in modes[1:]:
             run(best["tokens_per_program"], best["rows"], best["warps"], mode, False)
     if layer_configs:
-        rows += layerwise_rows(consts, study, words, layer_configs, device, log, modes, model_bits)
+        rows += layerwise_rows(consts, study, words, layer_configs, device, log, modes, model_bits, ranks)
     del words
     return rows
 
 
-def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uniform",), model_bits=None):
+def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uniform",), model_bits=None, ranks=()):
     """The per-layer one-step codec (kv_compare.layerwise) on the same document: configs (tokens per program,
     chunks)."""
     import gc
     from .fused import FusedOneStep
-    from .layerwise import LayerwiseOneStep
+    from .layerwise import LayerwiseOneStep, prepare_rank
     L, T, W = words.shape
     n = L * T * W
     xall, prior = FusedOneStep(consts, study.C, study.hd, tokens_per_program=32, rows=4, warps=4).model(words)
     rows = []
 
     def run(TB, chunks, mode, search, features="inline", lean=False, split=False, parts=False, product="cublas",
-            tiles=(128, 128, 64, 4), graph=False):
+            tiles=(128, 128, 64, 4), graph=False, rank=None):
         variant = ", ".join(x for x in ("features in a separate pass" if features == "pass" else "",
                                         "lean registers" if lean else "",
                                         "products on high-priority streams" if split else "",
                                         f"Triton product {tiles[0]}x{tiles[1]}x{tiles[2]} ({tiles[3]} warps)"
                                         if product == "triton" else "",
-                                        "CUDA graph" if graph else "") if x)
+                                        "CUDA graph" if graph else "",
+                                        f"reduced-rank product (rank {rank['rank']})" if rank else "") if x)
         tag = f"per layer, {TB} tokens per program, {chunks} chunk{'s' if chunks > 1 else ''}, {mode}" + \
               (", stage-1 search" if search else "") + (f", {variant}" if variant else "")
         row = {"part": "layerwise", "tokens_per_program": TB, "chunks": chunks, "mode": mode, "search": search,
@@ -402,13 +403,17 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
         try:
             codec = LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=TB, mode=mode, search=search,
                                      chunks=chunks, features=features, lean=lean, split_streams=split,
-                                     product=product, gemm_tiles=tiles)
-            buf, starts = codec.encode(words, xall, prior)
+                                     product=product, gemm_tiles=tiles, rank=rank)
+            xa, pr = (xall, prior)
+            if rank is not None:                     # the rank predictor's own forward pass (its priors differ)
+                xa, pr = codec.model(words)
+                row["model_ms"] = 1e3 * timer(lambda: codec.model(words), device, warmup=1, reps=3)
+            buf, starts = codec.encode(words, xa, pr)
             bufs = codec.buffers(T)
             dec = codec.decode(buf, starts, T, bufs=bufs)
             ok = bool(torch.equal(dec, words))
             bits = codec.bits(starts, T) / n
-            te = timer(lambda: codec.encode(words, xall, prior, out=buf), device, warmup=1, reps=3)
+            te = timer(lambda: codec.encode(words, xa, pr, out=buf), device, warmup=1, reps=3)
             if graph:                                # the whole decode captured once, then replayed
                 g = torch.cuda.CUDAGraph()
                 side = torch.cuda.Stream(device)
@@ -431,7 +436,7 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
             log(f"  [{tag}]: exact={ok}, {bits:.4f} bits/value; encode {1e3 * te:.1f} ms (after the forward pass), "
                 f"decode {1e3 * td:.1f} ms -> {n / td / 1e9:.1f} G values/s")
             if parts:                                # where the decode time goes
-                accs = codec.products(xall)
+                accs = codec.products(xa)
                 tc = timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs, accs=accs), device, warmup=2, reps=5)
                 tp = timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs, products_only=True), device,
                            warmup=2, reps=5)
@@ -464,5 +469,14 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
             run(TB, c2, modes[0], True, graph=True)
         for mode in modes[1:]:
             run(TB, ch, mode, True)
+        for r in ranks:                              # the fast-link mode: a reduced-rank product
+            try:
+                rc = prepare_rank(study, consts, r, log)
+            except Exception as exc:
+                log(f"  reduced rank {r}: not prepared ({exc!r})")
+                continue
+            run(TB, ch, modes[0], True, rank=rc, parts=True)
+            run(TB, ch, modes[0], True, rank=rc, graph=True)
+            del rc
     del xall, prior
     return rows

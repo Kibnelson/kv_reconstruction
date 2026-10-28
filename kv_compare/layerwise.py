@@ -225,19 +225,158 @@ if triton is not None:
             tl.store(pos_ptr + seg, wp)
 
 
+    @triton.jit
+    def _requant_kernel(z_ptr, q_ptr, m1_ptr, m0_ptr, NV, R, BLOCK: tl.constexpr):
+        """Reduced-rank product: the int32 intermediate requantized to 8 bits, q = clamp(floor(z * m1 + m0))."""
+        idx = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        m = idx < NV
+        j = idx % R
+        z = tl.load(z_ptr + idx, mask=m, other=0).to(tl.float32)
+        q = tl.floor(z * tl.load(m1_ptr + j) + tl.load(m0_ptr + j))
+        q = tl.minimum(tl.maximum(q, -127.0), 127.0)
+        tl.store(q_ptr + idx, q.to(tl.int8), mask=m)
+
+    @triton.jit
+    def _lsurp_kernel(words_ptr, acc_ptr, sa_ptr, b_ptr, inv_ptr, cos_ptr, sin_ptr, ssum_ptr, T, W, G, HG,
+                      TB: tl.constexpr, H2: tl.constexpr):
+        """Encoder's forward pass: one layer's surprise sums per head and token from the exact words, with the
+        decoder's per-lane prediction arithmetic (so the priors agree bit for bit)."""
+        pid = tl.program_id(0)
+        g = pid % G
+        t0 = (pid // G) * TB
+        HD: tl.constexpr = 2 * H2
+        cc = tl.arange(0, HD)
+        key = g < HG
+        low = cc < H2
+        own = g * HD + cc
+        part = tl.where(low, own + H2, own - H2)
+        hh = tl.where(low, cc, cc - H2)
+        sao = tl.load(sa_ptr + own)
+        bo = tl.load(b_ptr + own)
+        sap = tl.load(sa_ptr + part)
+        bp = tl.load(b_ptr + part)
+        invl = tl.load(inv_ptr + own)
+        for i in range(0, TB):
+            t = t0 + i
+            cs = tl.load(cos_ptr + t * H2 + hh)
+            sn = tl.load(sin_ptr + t * H2 + hh)
+            mu = _lane_mu(acc_ptr + t * W, own, part, sao, bo, sap, bp, cs, sn, low, key)
+            v = gc._word_val(tl.load(words_ptr + t * W + own).to(tl.int32) & 0xFFFF)
+            tl.store(ssum_ptr + g * T + t, tl.sum(fu._sq(v, mu, invl), 0))
+
+    @triton.jit
+    def _lprior_kernel(ssum_ptr, prior_ptr, T, G, PRIOR_SCALE, BLOCK: tl.constexpr):
+        """Next layer's prior per token: the decoder's sum over heads, times the fixed-point scale."""
+        t = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        m = t < T
+        sacc = tl.zeros([BLOCK], dtype=tl.int32)
+        for gg in range(0, G):
+            sacc += tl.load(ssum_ptr + gg * T + t, mask=m, other=0)
+        tl.store(prior_ptr + t, sacc.to(tl.float32) * PRIOR_SCALE, mask=m)
+
+
+def _requant_ref(z, m1, m0):
+    """PyTorch mirror of _requant_kernel (calibration statistics only)."""
+    q = torch.floor(z.to(torch.float32) * m1[None, :] + m0[None, :])
+    return torch.clamp(q, -127, 127)
+
+
+def _mu_from_acc(acc, sa, b, cos, sin, C, hd):
+    """Prediction from int32 products (scale, bias, RoPE for keys), as reference_mu in fused."""
+    n = acc.shape[0]
+    mud = acc.to(torch.float32) * sa[None, :] + b[None, :]
+    h2 = hd // 2
+    k = mud[:, :C].reshape(n, -1, hd)
+    a, bb = k[..., :h2], k[..., h2:]
+    cs, sn = cos[:n][:, None, :], sin[:n][:, None, :]
+    rot = torch.cat([a * cs - bb * sn, bb * cs + a * sn], -1).reshape(n, C)
+    return torch.cat([rot, mud[:, C:]], 1)
+
+
+def prepare_rank(study, consts, rank, log=print):
+    """Constants of the reduced-rank one-step predictor (a faster product for fast links): per layer the dense
+    one-step regression A, reduced to rank r (A ~ U U^T A, U the top r directions of the prediction's covariance),
+    as two 8-bit products: z = Bq x_q (int32, r values), requantized to 8 bits per component (centred: z_q = clamp(
+    floor(z * m1 + m0))), then acc = Uq z_q (int32) with per-channel scale sa and bias b (the calibration mean of
+    the prediction matches the layer's mean). Features, RoPE tables and layer 0 are the dense constants'."""
+    from .core import LN2X2, words_to_float
+    L, W, hd, dev = study.L, study.W, study.hd, study.device
+    f32, f64 = torch.float32, torch.float64
+    r = int(rank)
+    isx, sx = consts["isx"], consts["sx"]
+    Bq = torch.zeros(L, r, W, dtype=torch.int8, device=dev)
+    Uq = torch.zeros(L, W, r, dtype=torch.int8, device=dev)
+    m1 = torch.ones(L, r, dtype=f32, device=dev)
+    m0 = torch.zeros(L, r, dtype=f32, device=dev)
+    sa = consts["sa"].clone()
+    b = consts["b"].clone()
+
+    def xq_of(d, l):
+        f = study.feats(d, l, cache=False)
+        return torch.clamp(torch.floor(f * isx[l][None, :] + 0.5), -127, 127).to(f64)
+
+    for l in range(1, L):
+        mu, S = study.covariance(l, ["P"])
+        S.diagonal().add_(study.ridge * float(torch.trace(S)) / S.shape[0])
+        Sxx, Syx = S[:W, :W], S[W:, :W]
+        A = torch.linalg.solve(Sxx, Syx.T).T
+        my = mu[W:]
+        _, U = torch.linalg.eigh(A @ Sxx @ A.T)
+        U = U[:, -r:]
+        B = U.T @ A
+        del S, Sxx, Syx, A
+        Bf = B * sx[l - 1].to(f64)[None, :]
+        sb = (Bf.abs().amax(1) / 127).clamp_min(1e-30)
+        bq = torch.clamp(torch.round(Bf / sb[:, None]), -127, 127)
+        zs = [(xq_of(d, l - 1) @ bq.T) for d in study.train]        # exact int32 values (in float64)
+        n = sum(z.shape[0] for z in zs)
+        cz = sum((z * sb[None, :]).sum(0) for z in zs) / n
+        az = torch.stack([(z * sb[None, :] - cz).abs().amax(0) for z in zs]).amax(0)
+        sz = (az / 127).clamp_min(1e-30)
+        m1[l] = (sb / sz).to(f32)
+        m0[l] = (-cz / sz + 0.5).to(f32)
+        Uf = U * sz[None, :]
+        su = (Uf.abs().amax(1) / 127).clamp_min(1e-30)
+        uq = torch.clamp(torch.round(Uf / su[:, None]), -127, 127)
+        macc = sum((_requant_ref(z, m1[l], m0[l]).to(f64) @ uq.T).sum(0) for z in zs)
+        b[l] = (my - su * (macc / n)).to(f32)
+        sa[l] = su.to(f32)
+        Bq[l], Uq[l] = bq.to(torch.int8), uq.to(torch.int8)
+        del zs
+        study.forget(l - 1)
+    rc = {"Bq": Bq, "Uq": Uq, "m1": m1, "m0": m0, "sa": sa, "b": b, "rank": r}
+    sp = consts["sp"].clone()
+    cos, sin = consts["cos"], consts["sin"]
+    for l in range(1, L):
+        x = words_to_float(study.tables.words(l, dev))
+        z = xq_of(study.tables, l - 1) @ rc["Bq"][l].to(f64).T
+        acc = (_requant_ref(z, m1[l], m0[l]).to(f64) @ rc["Uq"][l].to(f64).T)
+        m = _mu_from_acc(acc, sa[l], b[l], cos, sin, study.C, hd)
+        sp[l] = ((x - m.double()).abs().mean(0) / LN2X2 + 1e-12).to(f32)
+    rc["sp"] = sp
+    rc["inv"] = (fu.QS / (LN2X2 * sp.double())).to(f32)
+    log(f"  reduced-rank one-step predictor (rank {r}) prepared for {L} layers")
+    return rc
+
+
 class LayerwiseOneStep:
     """Encode / decode a document's KV (all layers) with cuBLAS products and one coding kernel per layer."""
 
     def __init__(self, consts, C, hd, tokens_per_program=128, mode="uniform", search=True, chunks=1, fuse=False,
-                 features="inline", lean=False, split_streams=False, product="cublas", gemm_tiles=(128, 128, 64, 4)):
+                 features="inline", lean=False, split_streams=False, product="cublas", gemm_tiles=(128, 128, 64, 4),
+                 rank=None):
         """features: "inline" (the coding kernel makes the next layer's features) or "pass" (a separate kernel);
         lean: reload per-channel constants every token (fewer registers); split_streams: per chunk, the products on
-        a high-priority CUDA stream and the coding on another, so pending products are scheduled first."""
+        a high-priority CUDA stream and the coding on another, so pending products are scheduled first; rank: the
+        constants of prepare_rank (the reduced-rank product, for fast links) instead of the dense product."""
         if triton is None:
             raise RuntimeError("Triton is required")
         if mode not in ("exact", "uniform"):
             raise ValueError("mode is 'exact' or 'uniform'")
-        self.k = consts
+        self.k = dict(consts)
+        self.rank = rank
+        if rank is not None:                         # the coding kernels read sa, b, sp, inv: the rank predictor's
+            self.k.update(sa=rank["sa"], b=rank["b"], sp=rank["sp"], inv=rank["inv"])
         self.L, self.W = consts["Aq"].shape[0], consts["Aq"].shape[1]
         self.C, self.hd, self.TB = C, hd, int(tokens_per_program)
         self.mode, self.search, self.chunks = mode, bool(search), int(chunks)
@@ -268,8 +407,29 @@ class LayerwiseOneStep:
         return (T // self.TB) * self.G, self.hd * (2 * self.L * self.TB + 2) + 8
 
     def model(self, words):
-        """Features and priors of the exact words (the fused forward pass: the same arithmetic)."""
-        return fu.FusedOneStep(self.k, self.C, self.hd, tokens_per_program=32, rows=4, warps=4).model(words)
+        """Features and priors of the exact words. Dense product: the fused forward pass (the same arithmetic);
+        reduced rank: the features pass, then per layer the products and the decoder's surprise sums."""
+        if self.rank is None:
+            return fu.FusedOneStep(self.k, self.C, self.hd, tokens_per_program=32, rows=4, warps=4).model(words)
+        L, T, W = words.shape
+        dev, k = self.device, self.k
+        xall = torch.zeros(L, T, W, dtype=torch.int8, device=dev)
+        prior = torch.ones(L, T, dtype=torch.float32, device=dev)
+        for l in range(L - 1):
+            self._launch(_lfeat_kernel, (triton.cdiv(T * W, 1024),), words[l], xall[l], k["isx"][l], k["cos"],
+                         k["sin"], 0, T * W, W, self.C, HD=self.hd, BLOCK=1024, warps=4)
+        acc = torch.zeros(T, W, dtype=torch.int32, device=dev)
+        ssum = torch.zeros(self.G, T, dtype=torch.int32, device=dev)
+        for l in range(L - 1):
+            if l == 0:
+                acc.zero_()
+            else:
+                self._product(xall[l - 1], l, acc)
+            self._launch(_lsurp_kernel, ((T // self.TB) * self.G,), words[l], acc, k["sa"][l], k["b"][l], k["inv"][l],
+                         k["cos"], k["sin"], ssum, T, W, self.G, self.HG, TB=self.TB, H2=self.hd // 2)
+            self._launch(_lprior_kernel, (triton.cdiv(T, 256),), ssum, prior[l + 1], T, self.G, self.prior_scale,
+                         BLOCK=256, warps=4)
+        return xall, prior
 
     def encode(self, words, xall=None, prior=None, out=None):
         L, T, W = words.shape
@@ -288,7 +448,7 @@ class LayerwiseOneStep:
             if layer == 0:
                 acc.zero_()
             else:
-                int_mm(xall[layer - 1], k["Aq"][layer], out=acc)
+                self._product(xall[layer - 1], layer, acc)
             self._launch(_lenc_kernel, (S,), words[layer], prior[layer], state, pos, out, starts, acc,
                          k["sa"][layer], k["b"][layer], k["sp"][layer], k["cos"], k["sin"], smult, t["cumf"], t["ko"],
                          T, W, self.G, self.HG, FLUSH=layer == 0, TB=self.TB, H2=self.hd // 2,
@@ -338,7 +498,7 @@ class LayerwiseOneStep:
                         if layer == 0:
                             acc.zero_()
                         else:
-                            self._product(bufs["xbuf"][(layer + 1) % 2][rows], k["Aq"][layer], acc)
+                            self._product(bufs["xbuf"][(layer + 1) % 2][rows], layer, acc)
                     if gstreams:
                         streams[c].wait_stream(gstreams[c])
                 if products_only:
@@ -363,7 +523,16 @@ class LayerwiseOneStep:
             cur.wait_stream(s)
         return words
 
-    def _product(self, x, A, out):
+    def _product(self, x, layer, out):
+        """The layer's int32 products from 8-bit features x [n, W] into out [n, W]."""
+        if self.rank is not None:                    # two 8-bit products with an 8-bit intermediate
+            rc = self.rank
+            z = int_mm(x, rc["Bq"][layer])
+            zq = torch.empty(z.shape, dtype=torch.int8, device=z.device)
+            self._launch(_requant_kernel, (triton.cdiv(z.numel(), 1024),), z, zq, rc["m1"][layer], rc["m0"][layer],
+                         z.numel(), z.shape[1], BLOCK=1024, warps=4)
+            return int_mm(zq, rc["Uq"][layer], out=out)
+        A = self.k["Aq"][layer]
         if self.product == "cublas" or not x.is_cuda:
             return int_mm(x, A, out=out)
         BM, BN, BK, nw = self.gemm_tiles
@@ -379,7 +548,8 @@ class LayerwiseOneStep:
         """The exact int32 products of every layer from features xall (for timing the coding alone)."""
         out = [None]
         for layer in range(1, self.L):
-            out.append(int_mm(xall[layer - 1], self.k["Aq"][layer]))
+            out.append(self._product(xall[layer - 1], layer, torch.empty(xall.shape[1], self.W, dtype=torch.int32,
+                                                                       device=xall.device)))
         out[0] = torch.zeros_like(out[1])
         return out
 
