@@ -2,9 +2,14 @@
 
 The objective is exact reconstruction with fewer transferred/stored bytes and
 total latency at or below the strongest suitable baseline. The latest V64/B32
-graph path saves 43.19% and decodes a 56 MiB request in 96.236 ms. Its modeled
-1 Gb/s fetch narrowly beats ExANS and remains about 9 ms behind SplitZip.
+finish-fused graph path saves 43.19% and decodes a 56 MiB request in 88.224 ms.
+Its modeled 1 Gb/s fetch beats ExANS and remains about 1.02 ms behind SplitZip.
 At higher link rates, saved transmission time shrinks substantially.
+
+The [finish-fusion findings](lite_finish_findings.md) explain the completed
+paired GPU result and the next controlled allocation-fill experiment. Retimed
+SplitZip is slightly faster in that run, so the budgets below use its latest
+0.512 ms decode rather than the previous run's 0.555 ms.
 
 ## What the target requires
 
@@ -14,16 +19,16 @@ match SplitZip is approximately:
 
 | Effective link | Required decode ms | Current decode ms |
 |---:|---:|---:|
-| 1 Gb/s | 87.246 | 96.236 |
-| 5 Gb/s | 17.893 | 96.236 |
-| 25 Gb/s | 4.022 | 96.236 |
-| 100 Gb/s | 1.422 | 96.236 |
-| 400 Gb/s | 0.771 | 96.236 |
+| 1 Gb/s | 87.204 | 88.224 |
+| 5 Gb/s | 17.851 | 88.224 |
+| 25 Gb/s | 3.980 | 88.224 |
+| 100 Gb/s | 1.379 | 88.224 |
+| 400 Gb/s | 0.729 | 88.224 |
 
 At 400 Gb/s, the current Lite packet takes 0.667 ms to transmit. SplitZip's
-complete modeled fetch takes 1.439 ms, leaving Lite 0.771 ms to decode. Matching
-raw BF16 transfer+decode instead permits 0.856 ms. These are calculated targets,
-not measured network results. They imply roughly 125x and 112x further decoder
+complete modeled fetch takes 1.396 ms, leaving Lite 0.729 ms to decode. Matching
+raw BF16 transfer+decode instead permits 0.857 ms. These are calculated targets,
+not measured network results. They imply roughly 121x and 103x further decoder
 improvement, respectively; the next fusion alone is not a 400 Gb/s solution.
 
 A separate steady-throughput target is approximately 88 GB/s of reconstructed
@@ -39,7 +44,8 @@ compressed arrivals. The A4500 remains useful for compute experiments and
 modeled link sweeps; actual 400 Gb/s validation requires a suitable end-to-end
 hardware path. This inference concerns PCIe ingress, not the card's much faster
 local GPU memory or an assumed NVLink path. Actual negotiated links and transfer
-rates have not been measured here.
+rates have not been measured here. The finish run records negotiated PCIe Gen4
+x16 metadata; that is not a bandwidth measurement.
 
 Primary interface references:
 
@@ -50,14 +56,15 @@ Primary interface references:
 
 | Arm | Change | What it targets | Status |
 |---|---|---|---|
-| A | Fuse BF16 conversion, inverse RoPE, feature writes and recovered-word writes | Repeated kernels, temporary buffers and memory traffic | Implemented; software checks pass; GPU run pending |
+| A | Fuse BF16 conversion, inverse RoPE, feature writes and recovered-word writes | Repeated kernels, temporary buffers and memory traffic | GPU completed: decode 96.206 to 88.224 ms, identical packets |
+| A2 | Remove protective allocation fills after a full-write audit | Empty-buffer initialization and graph nodes | Implemented experiment; GPU result pending |
 | B | Use an exact integer-symbol/table decoder | Dynamic floating-point interval inversion and symbol searches | Proposed; first measure held-out rate/escapes |
 | C | Fit smaller predictors and a few dependency waves | Dense products and 448 sequential groups | Proposed; new calibration and packet sizes required |
 | D | Transmit small prefill hints as parallel prediction context | Replace expensive reconstruction dependencies with cheap shared context | Proposed; new hooked captures and full side-information accounting required |
 | E | Batch independent packets and pipeline input/decode | Occupancy and steady throughput | Proposed; measure latency/queueing too |
 | F | Direct staging, safe GPU validation and owned output slots | Endpoint costs that become large at sub-millisecond budgets | Proposed; retain validation and ownership guarantees |
 
-### A: implement the next controlled fusion
+### A: completed controlled fusion
 
 `FinishEngine` keeps the existing predictor, probability model, entropy kernel,
 channel order, fixed state and packet representation. One GPU kernel converts
@@ -70,7 +77,7 @@ Its division, sum reduction and update order remain intact. Calibration and
 nonunit attention scaling use the inherited path. A syntax-tree comparison
 locks the execution-loop change to this conversion/write region.
 
-The GPU experiment compares the current V64/B32 graph with the new finish graph
+The completed GPU experiment compares the previous V64/B32 graph with the finish graph
 using identical packet bytes. A sender check must reproduce those bytes exactly
 outside timing. Fresh receiver processes only decode fixed state plus packets.
 Paired calls alternate arms and different-length packets. Both fitted engines
@@ -80,6 +87,14 @@ Reports include retimed raw BF16, official SplitZip and official ExANS; targets
 against both raw and SplitZip through 400 Gb/s; separate phase diagnostics; and
 optional eager kernel profiles. The latter show kernel-count/cost changes, not
 captured-graph latency. The 400 Gb/s rows expose the remaining gap honestly.
+
+Before changing the format, A2 isolates the allocation-fill policy described in
+the [write audit](lite_allocation_audit.md). Other same-format candidates are
+caching immutable group spreads and replacing the coarse stage-1 lookup/search
+with a full inverse CDF of the exact same frequencies. That lookup changes
+memory footprint and execution, not packet probabilities; actual GPU gains
+remain unmeasured. Neither execution tuning nor table lookup alone establishes
+a new research contribution.
 
 ### B: an exact table-friendly conditional codec
 
