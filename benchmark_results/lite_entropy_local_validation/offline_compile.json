@@ -1,0 +1,74 @@
+{
+  "status": "passed",
+  "gpu_measured": false,
+  "scope": "offline NVIDIA SM86 compilation only; no GPU execution or timing",
+  "triton_version": "3.6.0",
+  "source": "kv_compare/lite_entropy.py",
+  "source_sha256": "aae9f0bc6547ba0cd84e75e012bbc0999b4f0b6191419b859bb927d4abcb16da",
+  "kernel": "_decode_full_kernel",
+  "target": {
+    "backend": "cuda",
+    "arch": 86,
+    "warp_size": 32
+  },
+  "signature": {
+    "buf_ptr": "*i16",
+    "start_ptr": "*i64",
+    "mu_ptr": "*fp32",
+    "s_ptr": "*fp32",
+    "words_ptr": "*i16",
+    "cum_ptr": "*i32",
+    "off_ptr": "*i32",
+    "K_ptr": "*i32",
+    "lut_ptr": "*u16",
+    "nvals": "i32",
+    "S": "i32",
+    "V": "i32"
+  },
+  "options": {
+    "num_warps": 1,
+    "enable_fp_fusion": false
+  },
+  "procedure": "triton.compile(ASTSource(_decode_full_kernel, signature, constexprs=constants), target=GPUTarget('cuda', 86, 32), options=options)",
+  "compiles": [
+    {
+      "refine": 0,
+      "constexprs": {
+        "BLOCK": 32,
+        "LUT_SHIFT": 6,
+        "LUT_W": 65536,
+        "REFINE": 0
+      },
+      "ptx_bytes": 62558,
+      "ptx_sha256": "3445193d3e0ab20710ac4f18c974d7a17fe0a39048944f59e6b3b90cdc8eb827",
+      "shared_bytes": 0,
+      "num_warps": 1
+    },
+    {
+      "refine": 1,
+      "constexprs": {
+        "BLOCK": 32,
+        "LUT_SHIFT": 6,
+        "LUT_W": 65536,
+        "REFINE": 1
+      },
+      "ptx_bytes": 64901,
+      "ptx_sha256": "d8a63dbb4dddea69a0ca7a7c3629f8624aa9a1d3511139a403f71a26d0d8a521",
+      "shared_bytes": 0,
+      "num_warps": 1
+    },
+    {
+      "refine": 2,
+      "constexprs": {
+        "BLOCK": 32,
+        "LUT_SHIFT": 6,
+        "LUT_W": 65536,
+        "REFINE": 2
+      },
+      "ptx_bytes": 66160,
+      "ptx_sha256": "0a54205a4ce6ed82f64f6273a2122e4556575c95535e8f629ae10bbd56c8fcb6",
+      "shared_bytes": 0,
+      "num_warps": 1
+    }
+  ]
+}

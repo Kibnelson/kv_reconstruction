@@ -1,0 +1,41 @@
+{
+  "status": "software_checked",
+  "gpu_measured": false,
+  "parent_commit": "46810dc060ea835e57284d97b59080b179ec5aff",
+  "tests": {
+    "run": 13,
+    "passed": 10,
+    "skipped_actual_cuda": 3
+  },
+  "software": {
+    "torch": "2.14.1+cpu",
+    "triton": "3.6.0",
+    "numpy": "2.3.5"
+  },
+  "syntax_checks": [
+    "python -m py_compile for new Python files",
+    "bash -n scripts/run_lite_entropy_a4500.sh",
+    "git diff --cached --check"
+  ],
+  "inherited_files_checked": 47,
+  "changed_inherited_files": [],
+  "code_sha256": {
+    "scripts/bench_lite_entropy.py": "54c410962de747eb87abfa87689ccf9195817d0f2b2592fb341f2e106de4ae10",
+    "scripts/package_lite_entropy.py": "68963d6d9bcce2d15c885c050ecf9391209f29ff09d1c2264c3de5e38a9f7c3a",
+    "scripts/run_lite_entropy_a4500.sh": "d6fa1131ef8033f296eabf29d3e49d0f2b99f3daf6040f5d65ebf142b862ddfe",
+    "kv_compare/lite_entropy.py": "aae9f0bc6547ba0cd84e75e012bbc0999b4f0b6191419b859bb927d4abcb16da",
+    "tests/test_lite_entropy.py": "029f5b1e48f06f1ebb4d890221ffef760c08cda4f2d958086bbc6d51a17deb06",
+    "tests/test_lite_entropy_runner.py": "3cfd33834826ff845783ae5ecfac526ccf8915840e36ab9673658f440f7f07f6"
+  },
+  "offline_compilation": {
+    "target": "NVIDIA SM86",
+    "refinements": [
+      0,
+      1,
+      2
+    ],
+    "passed": true,
+    "gpu_measured": false
+  },
+  "scope": "CPU protocol, exhaustive inverse-CDF interval checks, Triton-interpreter exactness and offline compilation only; no GPU execution, latency or network measurement; actual CUDA gates remain required"
+}

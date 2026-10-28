@@ -2,14 +2,15 @@
 
 The objective is exact reconstruction with fewer transferred/stored bytes and
 total latency at or below the strongest suitable baseline. The latest V64/B32
-finish-fused graph path saves 43.19% and decodes a 56 MiB request in 88.224 ms.
-Its modeled 1 Gb/s fetch beats ExANS and remains about 1.02 ms behind SplitZip.
+finish-fused, fill-disabled graph saves 43.19% and decodes a 56 MiB request in
+83.243 ms. Its modeled 1 Gb/s fetch beats SplitZip by about 3.98 ms and also
+beats ExANS.
 At higher link rates, saved transmission time shrinks substantially.
 
-The [finish-fusion findings](lite_finish_findings.md) explain the completed
-paired GPU result and the next controlled allocation-fill experiment. Retimed
-SplitZip is slightly faster in that run, so the budgets below use its latest
-0.512 ms decode rather than the previous run's 0.555 ms.
+The [entropy experiment notes](lite_entropy_experiment.md) explain the completed
+allocation GPU result and the next exact lookup test. The budgets below use
+that run's retimed SplitZip decode of 0.532 ms. The earlier
+[finish-fusion findings](lite_finish_findings.md) retain the preceding result.
 
 ## What the target requires
 
@@ -19,16 +20,16 @@ match SplitZip is approximately:
 
 | Effective link | Required decode ms | Current decode ms |
 |---:|---:|---:|
-| 1 Gb/s | 87.204 | 88.224 |
-| 5 Gb/s | 17.851 | 88.224 |
-| 25 Gb/s | 3.980 | 88.224 |
-| 100 Gb/s | 1.379 | 88.224 |
-| 400 Gb/s | 0.729 | 88.224 |
+| 1 Gb/s | 87.223 | 83.243 |
+| 5 Gb/s | 17.870 | 83.243 |
+| 25 Gb/s | 3.999 | 83.243 |
+| 100 Gb/s | 1.399 | 83.243 |
+| 400 Gb/s | 0.748 | 83.243 |
 
 At 400 Gb/s, the current Lite packet takes 0.667 ms to transmit. SplitZip's
-complete modeled fetch takes 1.396 ms, leaving Lite 0.729 ms to decode. Matching
-raw BF16 transfer+decode instead permits 0.857 ms. These are calculated targets,
-not measured network results. They imply roughly 121x and 103x further decoder
+complete modeled fetch takes 1.416 ms, leaving Lite 0.748 ms to decode. Matching
+raw BF16 transfer+decode instead permits 0.839 ms. These are calculated targets,
+not measured network results. They imply roughly 111x and 99x further decoder
 improvement, respectively; the next fusion alone is not a 400 Gb/s solution.
 
 A separate steady-throughput target is approximately 88 GB/s of reconstructed
@@ -57,7 +58,8 @@ Primary interface references:
 | Arm | Change | What it targets | Status |
 |---|---|---|---|
 | A | Fuse BF16 conversion, inverse RoPE, feature writes and recovered-word writes | Repeated kernels, temporary buffers and memory traffic | GPU completed: decode 96.206 to 88.224 ms, identical packets |
-| A2 | Remove protective allocation fills after a full-write audit | Empty-buffer initialization and graph nodes | Implemented experiment; GPU result pending |
+| A2 | Remove protective allocation fills after a full-write audit | Empty-buffer initialization and graph nodes | GPU completed: decode 88.162 to 83.243 ms, identical packets |
+| A3 | Full exact stage-1 lookup and initial-refinement sweep | Symbol search overhead with unchanged probabilities | Implemented; software checks pass; GPU result pending |
 | B | Use an exact integer-symbol/table decoder | Dynamic floating-point interval inversion and symbol searches | Proposed; first measure held-out rate/escapes |
 | C | Fit smaller predictors and a few dependency waves | Dense products and 448 sequential groups | Proposed; new calibration and packet sizes required |
 | D | Transmit small prefill hints as parallel prediction context | Replace expensive reconstruction dependencies with cheap shared context | Proposed; new hooked captures and full side-information accounting required |
@@ -88,13 +90,13 @@ against both raw and SplitZip through 400 Gb/s; separate phase diagnostics; and
 optional eager kernel profiles. The latter show kernel-count/cost changes, not
 captured-graph latency. The 400 Gb/s rows expose the remaining gap honestly.
 
-Before changing the format, A2 isolates the allocation-fill policy described in
-the [write audit](lite_allocation_audit.md). Other same-format candidates are
-caching immutable group spreads and replacing the coarse stage-1 lookup/search
-with a full inverse CDF of the exact same frequencies. That lookup changes
-memory footprint and execution, not packet probabilities; actual GPU gains
-remain unmeasured. Neither execution tuning nor table lookup alone establishes
-a new research contribution.
+Before changing the format, A2 isolated the allocation-fill policy described in
+the [write audit](lite_allocation_audit.md). A3 now replaces the coarse stage-1
+lookup/search with a full inverse CDF of the exact same frequencies and sweeps
+initial word-guess refinements. It changes memory footprint and execution, not
+packet probabilities; GPU gains remain unmeasured. Caching immutable group
+spreads is another same-format candidate. Neither execution tuning nor table
+lookup alone establishes a new research contribution.
 
 ### B: an exact table-friendly conditional codec
 
@@ -190,15 +192,16 @@ cd ~/kv_reconstruction
 git fetch origin
 git switch experiment/llama_causal_packet_compare
 git pull --ff-only origin experiment/llama_causal_packet_compare
-bash scripts/run_lite_finish_a4500.sh --profile
+bash scripts/run_lite_entropy_a4500.sh
 ```
 
-The default parent is `runs/lite_graph_a4500_20261028_092354_3260980`. Only arm A
+The default parent is `runs/lite_allocation_a4500_20261028_103751_647646`. Arm A3
 is implemented in this command. It reuses fits, captures and native libraries;
 no refitting or model downloads occur. Separate profiles follow ordinary timings.
-Resume with `bash scripts/run_lite_finish_a4500.sh --resume RUN_DIR --profile`.
+Resume with `bash scripts/run_lite_entropy_a4500.sh --resume RUN_DIR`.
 The small report is published automatically; full traces remain local.
 
-The numerical targets are reproducible from
-`benchmark_results/lite_high_link_study_20261028/targets.json` and the cited
-published graph report. They are derived analysis, not new GPU measurements.
+The current numerical targets are reproducible from the allocation GPU report
+linked in the entropy experiment notes. Earlier graph-based targets remain in
+`benchmark_results/lite_high_link_study_20261028/targets.json`. Network targets
+are derived analysis, not measured network performance.
