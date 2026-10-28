@@ -169,6 +169,38 @@ Notes:
 - One deviation remains, in AQUA-KV's calibration data: it is fitted on this study's calibration documents (the same ones our codec uses), not on the 256 x 8192 RedPajama tokens of the authors' README.
 - Earlier runs used stand-ins: "AQUA-KV-style" (a scalar min-max quantizer instead of HIGGS, no BF16 prefix; before commit c96f7be its predictors were fitted on exact KV and its 2- and 3-bit rows diverged on Llama-3.2-3B) and "KIVI-style" (128-token / 64-channel groups, no BF16 recent tokens). Rerun only the baselines with `--stages lossy,report --lossy-methods aqua,kivi`; the other rows of `lossy.json` are kept and the stand-in rows are dropped.
 
+## Results with the authors' baselines (`474524c`, run at commit `1da98b5`)
+
+All on test_text / test_code, RTX A4500. Baselines follow their authors' code (see Methods).
+
+**Lossless, one document (470M values) over an ideal link** (decoding overlapped with arrival; measured decode speeds):
+
+| Link | SplitZip (12.02 bits, 311 GB/s) | ExANS official (10.86 bits, 54 GB/s) | Ours (best measured mode) | Ours vs SplitZip | Ours vs ExANS |
+| --- | --- | --- | --- | --- | --- |
+| 1-50 Gb/s | | | | 1.34x | 1.21x |
+| 100 Gb/s | 56 ms | 51 ms | 42 ms | 1.33x | 1.20x |
+| 200 Gb/s | 28 ms | 26 ms | 23 ms | 1.24x | 1.12x |
+| 400 Gb/s | 14 ms | 18 ms | 23 ms | 0.62x | 0.77x |
+| 800 Gb/s | 7 ms | 18 ms | 23 ms | 0.31x | 0.77x |
+
+The official ExANS codes 10.86-10.87 bits per value here (its re-implementation estimated 10.72) and decodes at 54 GB/s, encodes at 5 GB/s. Per-layer hybrid with SplitZip's format (estimate from measured parts): 1.11x SplitZip at 400 Gb/s and 1.04x at 800 Gb/s. Our prediction inside SplitZip's fixed-length format (bits only): 10.18 bits (dense product) and 10.51 bits (rank 256) against SplitZip's 12.02; our entropy-coded stream is 9.0-9.4.
+
+**Lossy** (first 3,072 tokens; perplexity change of the next 512 tokens):
+
+| Method | Bits per value | Perplexity change |
+| --- | --- | --- |
+| AQUA-KV 2-bit | 2.11 | +1.46% / -0.35% |
+| AQUA-KV 3-bit | 3.07 | +0.06% / -0.23% |
+| AQUA-KV 4-bit | 4.03 | -0.08% / -0.10% |
+| KIVI 2-bit | 3.27 | +20.79% / +3.46% |
+| KIVI 4-bit | 5.23 | +0.28% / +0.23% |
+| Ours (`fast` predictor, computed cost), step 1 | 3.31 / 3.04 | +1.26% / +0.28% |
+| Ours (`fast`), step 2 | 2.56 / 2.38 | +3.81% / +0.59% |
+| Ours, GPU codec (one-step, measured stream), step 0.5 | 4.14 / 3.91 | +0.93% / -0.21% |
+| Ours, GPU codec, step 1 | 3.20 / 2.99 | +6.77% / +1.16% |
+
+With HIGGS and its closed-loop fit, AQUA-KV reaches at 2.1 bits the quality our codec needs about 3.2 bits for, and at 3.1 bits better quality than ours at 4 bits: about one bit per value better. It does this with more KV error (5.3% at 3 bits against our 3.8% at 2.6 bits), so mean squared error is not what decides quality here. Two differences are likely: AQUA-KV keeps the first 4 tokens (the attention sinks, which receive much of every query's attention) in BF16, and HIGGS scales each token's error with that token's residual, while our step is the same for every token. Our GPU codec at step 4 (+776% perplexity) points the same way. KIVI is behind both. The GPU codec decodes at 17 G values/s (dense) and 25 G values/s (rank 256).
+
 ## Reference: SmolLM2-135M (same protocol, NumPy implementation)
 
 Lossless, bits per value, averaged over the four reference chunks (all 30 layers):

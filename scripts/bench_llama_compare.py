@@ -894,7 +894,7 @@ def splitzip_mix_lines(out, res):
     z = np.array(sz_layers[doc], dtype=float)
     L = len(z)
     nl = rows[0]["values"] / L
-    t_z = nl / Ts + t_feat
+    t_z = nl / Ts                                    # a SplitZip layer; a features pass only before one of ours
 
     def kind(r):
         return f"{'rank ' + str(r['rank']) if r.get('rank') else 'dense'}, {r['mode']}"
@@ -909,7 +909,8 @@ def splitzip_mix_lines(out, res):
             mine = np.zeros(L, bool)
             mine[order[:n]] = True
             bits = float(np.where(mine, b, z).sum()) * nl
-            dec = n * t_m + (L - n) * t_z
+            ours_after_sz = int(sum(1 for l in range(1, L) if mine[l] and not mine[l - 1]))
+            dec = n * t_m + (L - n) * t_z + ours_after_sz * t_feat
             out_.append((max(bits / (R * 1e9), dec), n, bits / (nl * L), dec))
         return min(out_)
 
