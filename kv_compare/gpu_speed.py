@@ -412,7 +412,9 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
             if rank is not None:                     # the rank predictor's own forward pass (its priors differ)
                 xa, pr = codec.model(words)
                 row["model_ms"] = 1e3 * timer(lambda: codec.model(words), device, warmup=1, reps=3)
-            buf, starts = codec.encode(words, xa, pr)
+            lw = torch.zeros(L, dtype=torch.int64, device=words.device)
+            buf, starts = codec.encode(words, xa, pr, layer_words=lw)
+            row["layer_bits_per_value"] = [16 * int(v) / (T * W) for v in lw.tolist()]   # states, alignment: layer 0
             bufs = codec.buffers(T)
             dec = codec.decode(buf, starts, T, bufs=bufs)
             ok = bool(torch.equal(dec, words))
@@ -458,6 +460,20 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
 
     for TB, chunks in configs:
         run(TB, chunks, modes[0], True)
+    try:                                             # a separate features pass (what a layer coded otherwise costs)
+        from .layerwise import _lfeat_kernel
+        import triton
+        lc = LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=configs[0][0])
+        xo = torch.empty(T, W, dtype=torch.int8, device=device)
+        k = lc.k
+        tf = timer(lambda: lc._launch(_lfeat_kernel, (triton.cdiv(T * W, 1024),), words[1], xo, k["isx"][1], k["cos"],
+                                      k["sin"], 0, T * W, W, study.C, HD=study.hd, BLOCK=1024, warps=4),
+                   device, warmup=2, reps=10)
+        rows.append({"part": "feature_pass", "ms_per_layer": 1e3 * tf, "tokens": T, "values_per_layer": T * W})
+        log(f"  features pass alone: {1e3 * tf:.3f} ms per layer")
+        del lc, xo
+    except Exception as exc:
+        log(f"  features pass: not measured ({exc!r})")
     ok = [r for r in rows if r.get("bit_exact")]
     if ok:
         best = max(ok, key=lambda r: r["decode_gvalues_per_s"])

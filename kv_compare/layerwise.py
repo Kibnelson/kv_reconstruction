@@ -471,7 +471,9 @@ class LayerwiseOneStep:
                          BLOCK=256, warps=4)
         return xall, prior
 
-    def encode(self, words, xall=None, prior=None, out=None):
+    def encode(self, words, xall=None, prior=None, out=None, layer_words=None):
+        """layer_words: an int64 tensor [L] to receive the 16-bit words each layer adds to the streams (layer 0
+        also gets the final states; starts and alignment are left out, see bits)."""
         L, T, W = words.shape
         S, cap = self.layout(T)
         if xall is None:
@@ -489,10 +491,15 @@ class LayerwiseOneStep:
                 acc.zero_()
             else:
                 self._product(xall[layer - 1], layer, acc)
+            before = pos.sum(dtype=torch.int64) if layer_words is not None and layer > 0 else None
             self._launch(_lenc_kernel, (S,), words[layer], prior[layer], state, pos, out, starts, acc,
                          k["sa"][layer], k["b"][layer], k["sp"][layer], k["cos"], k["sin"], smult, t["cumf"], t["ko"],
                          T, W, self.G, self.HG, FLUSH=layer == 0, TB=self.TB, H2=self.hd // 2,
                          UNIFORM=self.mode == "uniform")
+            if before is not None:
+                layer_words[layer] = before - pos.sum(dtype=torch.int64)
+        if layer_words is not None:                  # layer 0: the rest of the streams (its words, states, alignment)
+            layer_words[0] = (self.bits(starts, T) - 32 * S) // 16 - layer_words[1:].sum()
         return out, starts
 
     def buffers(self, T):

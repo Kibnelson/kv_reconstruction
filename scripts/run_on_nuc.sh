@@ -46,6 +46,27 @@ RUN=${RUN:-$HOME/kv_reconstruction/runs/llama32_3b_compare}
 STAGES=${STAGES:-gpu_speed,report}
 echo "running on branch $cur, commit $(git log --oneline -1); stages $STAGES; output $RUN"
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader
+
+# CHECKS=1: compare our AQUA-KV and KIVI re-implementations with the authors' own functions first (the report
+# includes the results). AQUA-KV runs in the environment the earlier official run built (torch 2.5.1 with
+# fast-hadamard-transform); KIVI's functions need only torch and Triton (this environment).
+if [ "${CHECKS:-0}" = 1 ]; then
+    OFF=$HOME/kv_reconstruction/runs/_llama_official
+    AQUA_PY=$OFF/envs/aqua/bin/python
+    AQUA_SRC=$OFF/sources/aqua
+    KIVI_SRC=$OFF/sources/kivi
+    if [ ! -d "$KIVI_SRC/.git" ]; then
+        git clone -q https://github.com/jy-yuan/KIVI.git "$KIVI_SRC" && git -C "$KIVI_SRC" checkout -q 876b4d2
+    fi
+    if [ -x "$AQUA_PY" ] && [ -d "$AQUA_SRC" ]; then
+        "$AQUA_PY" scripts/check_baselines_official.py aqua --source "$AQUA_SRC" --output "$RUN/check_aqua.json" \
+            2>&1 | tail -n 40 | tee -a "$RUN/console.log" || echo "AQUA-KV check failed (see above)"
+    else
+        echo "AQUA-KV check skipped: no $AQUA_PY or $AQUA_SRC"
+    fi
+    python scripts/check_baselines_official.py kivi --source "$KIVI_SRC" --output "$RUN/check_kivi.json" \
+        2>&1 | tail -n 30 | tee -a "$RUN/console.log" || echo "KIVI check failed (see above)"
+fi
 python -u scripts/bench_llama_compare.py --device cuda --output "$RUN" --stages "$STAGES" ${EXTRA:-} 2>&1 \
     | tee -a "$RUN/console.log"
 

@@ -2,10 +2,11 @@
 
 `scripts/bench_llama_compare.py` captures Llama-3.2-3B KV once and runs every method on the same words:
 
-- **Lossless:** our predictive codec against SplitZip-style and ExANS-style exponent coding, in bits per value.
-- **Lossy:** our codec run closed loop with a quantized residual, against AQUA-KV-style, KIVI-style and FP8-cast
-  baselines. Each method is scored by bits per value and by how much worse the model continues the text
-  when it reads that method's KV.
+- **Lossless:** our predictive codec against SplitZip and ExANS (the authors' codecs, plus re-implemented
+  "-style" versions of both for exact bit costs), in bits per value and in measured speed.
+- **Lossy:** our codec run closed loop with a quantized residual, against AQUA-KV and KIVI (following the
+  authors' code, see Methods) and an FP8 cast. Each method is scored by bits per value and by how much worse the
+  model continues the text when it reads that method's KV.
 
 The implementation is in `kv_compare/`. The protocol and document roles match the SmolLM2-135M study, whose
 results are reproduced at the end for reference.
@@ -71,6 +72,8 @@ the exact KV.
 | `frontier` | Optional. About 37 predictor variants fitted from one covariance per layer: input sets, 1–16 steps, reduced-rank inputs and exact 8-bit integer formats. Each gets exact lossless costs and multiply-adds per value (`frontier.json`). | about 30 minutes on an RTX A4500 |
 | `gpu_speed` | Optional; needs the GPU to itself. Times one layer of the predictor for the frontier variants in float32, BF16 and exact 8-bit integer arithmetic. Then encodes and decodes four real test layers with the Triton value-slice coder, checking the round trip bit for bit, with both stage-1 decoders. Finally it encodes and decodes the whole first test document (every layer, layer by layer) with the fused one-step codec in several kernel shapes (`gpu_speed.json`). | 10–20 minutes (mostly Triton compiling the fused kernels) |
 | `pool` | Optional; needs the GPU to itself. GPU-resident KV pool: how long it takes to bring back a cached 8,192-token prefix by recomputing it (the model's prefill), by copying raw KV from CPU memory, or by decoding our compressed KV; what adding a prefix costs; how many tokens fit (`pool.json`). | 10–15 minutes |
+| `format` | Optional. Bits of our one-step prediction inside SplitZip's kind of format: fixed-length codes (no entropy coder), with the code book of each value chosen by the prediction, for the dense and the rank-256 product (`format.json`, `kv_compare/szformat.py`). | a few minutes |
+| `exans` | Optional; needs nvcc, CMake and the nvCOMP SDK (all used by the earlier official run). Builds the official ExANS codec from the authors' source with one compile fix and runs it on both test documents: measured stream size, bit-exact round trip, encode and decode speed (`exans.json`). | about 5 minutes |
 | `report` | Writes `summary.md`. | — |
 
 Useful options:
@@ -153,14 +156,17 @@ python -u scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_
 | Ours, `nohint` | yes | Adds layer 0, layer l−2, the token's earlier occurrence and the adaptive spread | computed −log2 P |
 | Ours, `fast` | yes | Layers 0, l−2, l−1 and the recomputed attention of layer l−1 (queries predicted from the token's own KV, window of the last 64 tokens plus token 0); pivoted channel order; 8 steps; adaptive spread | computed −log2 P |
 | Ours, step k | no | The `fast` predictor run closed loop on the receiver's reconstructed KV. The residual is quantized with step k × the channel's typical error and entropy-coded. Each value's error is at most half a step plus BF16 rounding. | computed −log2 P |
-| AQUA-KV-style, b-bit | no | Closed loop: keys from the previous layer's keys, values from the previous layer's values plus current keys (RoPE removed). b-bit min-max residual per token and 64 channels; layer 0 direct at 4 bits | b + 0.5 |
-| KIVI-style, b-bit | no | Keys per channel over 128-token blocks, values per token over 64 channels | b + 0.375 |
+| ExANS, official codec | yes | The authors' CUDA codec (openlake de6c38b, built with one compile fix): blocks of 499,712 values; exponent bytes with a per-128-value phase shift, coded by nvCOMP's batched ANS; sign and mantissa byte raw; header and phase bitmap | measured stream size |
+| AQUA-KV, b-bit | no | The authors' algorithm (goodevening13/aquakv e744183): keys predicted from the previous layer's reconstructed keys, values from the current reconstructed keys plus the previous layer's reconstructed values (RoPE removed), BF16 linear maps fitted layer by layer on the calibration documents' own closed-loop reconstructions (float32, pseudo-inverse, 1e-3 damping); residual quantized with HIGGS (Hadamard transform over 1024 channels, per-token L2 scale, 2-D EDEN grid with 16 / 64 / 256 points); layer 0 HIGGS 4-bit; the first 4 tokens in BF16 | b (4 in layer 0) + one 16-bit scale per 1024 values; 16 for the 4 prefix tokens |
+| KIVI, b-bit | no | The authors' code (jy-yuan/KIVI 876b4d2) with the paper's settings: keys per channel over 32-token groups, values per token over 32-channel groups, asymmetric min-max with BF16 scale and minimum; the most recent 128 tokens (values; keys beyond whole 128-token blocks) stay BF16 | b + 1 per quantized value; 16 for the BF16 tokens |
 | FP8 cast | no | e4m3, no scale | 8 |
 
 Notes:
 
 - The reference range coder matched computed costs within 0.011 bits per value in every SmolLM2 test.
-- AQUA-KV quantizes its residual with HIGGS, a vector quantizer. That is more accurate than our scalar stand-in at the same bits, so the AQUA-KV-style rows understate the real method. In particular, the 2-bit stand-in can diverge.
+- Baselines follow the authors' papers and code, so none is weaker than published. AQUA-KV and KIVI are re-implemented on our captured KV from the authors' code (their caches need older Transformers versions) and checked against the authors' own functions with `scripts/check_baselines_official.py`: KIVI's quantizer agrees exactly; AQUA-KV's HIGGS quantizer gives the same values for 99.94-99.99% of entries (the rest are near-ties after a differently ordered Hadamard sum) and the same error, and its regression the same weights within one BF16 step. ExANS and SplitZip run the authors' own codecs.
+- One deviation remains, in AQUA-KV's calibration data: it is fitted on this study's calibration documents (the same ones our codec uses), not on the 256 x 8192 RedPajama tokens of the authors' README.
+- Earlier runs used stand-ins: "AQUA-KV-style" (a scalar min-max quantizer instead of HIGGS, no BF16 prefix; before commit c96f7be its predictors were fitted on exact KV and its 2- and 3-bit rows diverged on Llama-3.2-3B) and "KIVI-style" (128-token / 64-channel groups, no BF16 recent tokens). Rerun only the baselines with `--stages lossy,report --lossy-methods aqua,kivi`; the other rows of `lossy.json` are kept and the stand-in rows are dropped.
 
 ## Reference: SmolLM2-135M (same protocol, NumPy implementation)
 

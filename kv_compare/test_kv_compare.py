@@ -145,6 +145,25 @@ class TinyLlamaTests(unittest.TestCase):
         rows = summarize(vs, bits, macs, [(0, 160), (160, 320)])
         self.assertEqual(len(rows), len(vs))
 
+    def test_higgs_and_hadamard(self):
+        """Our Walsh-Hadamard transform is the Sylvester matrix product; HIGGS error falls with the grid size and
+        an all-zero row stays zero."""
+        from scipy.linalg import hadamard as sylvester
+        from kv_compare import baselines
+        g = torch.Generator().manual_seed(0)
+        x = torch.randn(7, 64, generator=g, dtype=torch.float64)
+        H = torch.as_tensor(sylvester(64), dtype=torch.float64)
+        self.assertTrue(torch.allclose(baselines.hadamard(x), x @ H, atol=1e-10))
+        r = torch.randn(300, 1024, generator=g, dtype=torch.float64)
+        r[5] = 0
+        errs = []
+        for n in (16, 64, 256):
+            y = baselines.higgs_qdq(r, n)
+            self.assertTrue(bool((y[5] == 0).all()))
+            errs.append(float((y - r).norm() / r.norm()))
+        self.assertTrue(errs[0] > errs[1] > errs[2] > 0)
+        self.assertLess(errs[0], 0.4)
+
     def test_lossy_and_quality(self):
         from kv_compare import baselines
         from kv_compare.core import words_to_float
@@ -167,10 +186,37 @@ class TinyLlamaTests(unittest.TestCase):
         bound = 0.5 * spread + (exact.abs() + 0.5 * spread) * 2.0 ** -8 + 1e-12
         self.assertTrue(bool(((rec.double() - exact).abs() <= bound * 1.0001).all()))
         aqua = baselines.aqua_fit(self.study, self.study.L)
-        for out, r in (baselines.aqua_style(self.study, aqua, doc, P, 3), baselines.kivi_style(self.study, doc, P, 3),
-                       baselines.fp8_cast(self.study, doc, P)):
-            self.assertEqual(tuple(out.shape), tuple(exact.shape))
-            self.assertTrue(torch.isfinite(out).all())
+        aqua3 = baselines.aqua_fit(self.study, self.study.L, bits=3)     # fitted on its own 3-bit reconstructions
+        a2 = baselines.aqua_official_fit(self.study, self.study.L, 2)
+        a4 = baselines.aqua_official_fit(self.study, self.study.L, 4)
+        outs = {}
+        for name, (out, r) in (("aqua-style", baselines.aqua_style(self.study, aqua, doc, P, 3)),
+                               ("aqua-style-closed", baselines.aqua_style(self.study, aqua3, doc, P, 3)),
+                               ("aqua 2", baselines.aqua_official(self.study, a2, doc, P, 2)),
+                               ("aqua 4", baselines.aqua_official(self.study, a4, doc, P, 4)),
+                               ("kivi-style", baselines.kivi_style(self.study, doc, P, 3)),
+                               ("kivi 2", baselines.kivi_official(self.study, doc, P, 2)),
+                               ("kivi 4", baselines.kivi_official(self.study, doc, P, 4)),
+                               ("fp8", baselines.fp8_cast(self.study, doc, P))):
+            self.assertEqual(tuple(out.shape), tuple(exact.shape), name)
+            self.assertTrue(torch.isfinite(out).all(), name)
+            outs[name] = (out, r)
+        err = lambda name: float((outs[name][0].double() - exact).norm() / exact.norm())
+        self.assertLess(err("aqua 4"), err("aqua 2"))
+        self.assertLess(err("kivi 4"), err("kivi 2"))
+        # AQUA-KV keeps the first tokens exact; KIVI keeps the last 128 values tokens (and keys beyond whole 128s)
+        p = baselines.AQUA_PREFIX
+        self.assertTrue(torch.equal(outs["aqua 2"][0][:, :p].double(), exact[:, :p]))
+        C = self.study.C
+        self.assertTrue(torch.equal(outs["kivi 2"][0][:, -128:, C:].double(), exact[:, -128:, C:]))
+        nk = P - P % 128
+        self.assertTrue(torch.equal(outs["kivi 2"][0][:, nk:, :C].double(), exact[:, nk:, :C]))
+        # rates: KIVI b + 1 per quantized value (two BF16 numbers per 32), 16 elsewhere
+        nv = P - 128
+        kivi2 = ((nk * C * 3 + (P - nk) * C * 16) + (nv * C * 3 + (P - nv) * C * 16)) / (P * 2 * C)
+        self.assertAlmostEqual(outs["kivi 2"][1], kivi2)
+        self.assertGreater(outs["aqua 2"][1], 2.0)
+        self.assertLess(outs["aqua 2"][1], outs["aqua 4"][1])
         base = continuation_nll(self.model, doc.ids, P, M, self.device)
         same = continuation_nll(self.model, doc.ids, P, M, self.device, matrices_from_doc(doc, P))
         self.assertEqual(base, same)
@@ -333,6 +379,43 @@ for mode, chunks, search, rank, rq in (("uniform", 1, True, None, "kernel"), ("e
     assert torch.equal(dec, words), ("round trip", mode, chunks, int((dec != words).sum()))
     print("ok", mode, chunks, rq, codec.bits(starts, T) / (L * T * W))
 """
+
+
+LOSSY_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
+from kv_compare import lossy_gpu as lg, layerwise
+xs = torch.stack([words_to_float(w32[l]) for l in range(L)])
+rc = layerwise.prepare_rank(study, consts, 32, log=lambda m: None)
+for kappa, chunks, rank in ((1.0, 2, None), (0.25, 1, rc)):
+    codec = lg.LossyLayerwise(consts, study.C, study.hd, kappa, tokens_per_program=16, chunks=chunks, rank=rank,
+                              requant="epilogue" if rank else "kernel", rank_tiles=(16, 16, 32, 4))
+    rec, xall, prior = codec.quantize(words)
+    buf, starts, _ = codec.encode(words, rec, xall, prior)
+    dec = codec.decode(buf, starts, T)
+    assert torch.equal(dec, rec), ("round trip", kappa, int((dec != rec).sum()))
+    r32 = rec.to(torch.int32) & 0xFFFF
+    xr = torch.stack([words_to_float(r32[l]) for l in range(L)])
+    step = (kappa * codec.k["sp"]).double()[:, None, :]
+    bound = 0.5 * step + (xs.abs() + 0.5 * step) * 2.0 ** -8 + 1e-30
+    fin = torch.isfinite(xs)
+    ok = ((xr - xs).abs() <= bound * 1.0001) | (r32 == w32)
+    assert bool(ok[fin].all()), ("error bound", kappa, int((~ok[fin]).sum()))
+    assert torch.equal(r32[1, 3, 2:5], w32[1, 3, 2:5]), "Inf and NaN travel exactly"
+    print("ok", kappa, chunks, rank is not None, codec.bits(starts, T) / (L * T * W))
+"""
+
+
+class LossyGpuTests(unittest.TestCase):
+    def test_lossy_gpu_codec_round_trip_interpreted(self):
+        """The closed-loop lossy per-layer codec decodes exactly the encoder's reconstruction, within half a step
+        plus BF16 rounding of the input, with Inf and NaN kept exact; dense and reduced-rank products."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None or torch is None:
+            self.skipTest("Triton and PyTorch are required")
+        r = subprocess.run([sys.executable, "-c", LOSSY_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=2400)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertEqual(r.stdout.count("ok"), 2, r.stdout)
 
 
 class PackageTests(unittest.TestCase):
