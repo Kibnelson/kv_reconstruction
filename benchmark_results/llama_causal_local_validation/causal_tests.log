@@ -1,0 +1,82 @@
+test_all_bf16_patterns_preserved_by_charged_raw_fallback (tests.test_llama_causal.CausalTests.test_all_bf16_patterns_preserved_by_charged_raw_fallback) ... ok
+test_complete_codec_quality_and_package_on_tiny_original_bf16_llama (tests.test_llama_causal.CausalTests.test_complete_codec_quality_and_package_on_tiny_original_bf16_llama) ... [21:17:12] load fixed receiver state: block32
+[21:17:12] causal encode/decode: block32_k0_test_text
+[21:17:16] causal encode/decode: block32_k0_test_code
+[21:17:19] causal encode/decode: block32_k0.5_test_text
+[21:17:21] causal encode/decode: block32_k0.5_test_code
+[21:17:23] causal encode/decode: block32_k1_test_text
+[21:17:25] causal encode/decode: block32_k1_test_code
+[21:17:27] load fixed receiver state: lite
+[21:17:27] causal encode/decode: lite_k0_test_text
+[21:17:40] causal encode/decode: lite_k0_test_code
+[21:17:52] causal encode/decode: lite_k0.5_test_text
+[21:17:56] causal encode/decode: lite_k0.5_test_code
+[21:18:00] causal encode/decode: lite_k1_test_text
+[21:18:04] causal encode/decode: lite_k1_test_code
+[21:18:19] load fixed receiver state: block32
+[21:18:19] reuse measured packet: block32_k0_test_text
+[21:18:19] reuse measured packet: block32_k0_test_code
+[21:18:19] reuse measured packet: block32_k0.5_test_text
+[21:18:19] reuse measured packet: block32_k0.5_test_code
+[21:18:19] reuse measured packet: block32_k1_test_text
+[21:18:19] reuse measured packet: block32_k1_test_code
+[21:18:19] load fixed receiver state: lite
+[21:18:19] reuse measured packet: lite_k0_test_text
+[21:18:19] reuse measured packet: lite_k0_test_code
+[21:18:19] reuse measured packet: lite_k0.5_test_text
+[21:18:19] reuse measured packet: lite_k0.5_test_code
+[21:18:19] reuse measured packet: lite_k1_test_text
+[21:18:19] reuse measured packet: lite_k1_test_code
+[21:18:34] load the cached original BF16 model for continuation quality
+[21:18:34] quality block32_k0_test_text: +0.000%
+[21:18:34] quality block32_k0.5_test_text: -0.032%
+[21:18:34] quality block32_k1_test_text: +0.028%
+[21:18:34] quality lite_k0_test_text: +0.000%
+[21:18:34] quality lite_k0.5_test_text: +0.010%
+[21:18:34] quality lite_k1_test_text: -0.008%
+[21:18:34] quality block32_k0_test_code: +0.000%
+[21:18:34] quality block32_k0.5_test_code: -0.070%
+[21:18:34] quality block32_k1_test_code: +0.035%
+[21:18:34] quality lite_k0_test_code: +0.000%
+[21:18:34] quality lite_k0.5_test_code: -0.009%
+[21:18:34] quality lite_k1_test_code: -0.050%
+ok
+test_fit_cache_reuse_and_runtime_widths_are_tamper_checked (tests.test_llama_causal.CausalTests.test_fit_cache_reuse_and_runtime_widths_are_tamper_checked) ... ok
+test_receiver_rebuilds_context_for_lossless_and_lossy_nonzero_position (tests.test_llama_causal.CausalTests.test_receiver_rebuilds_context_for_lossless_and_lossy_nonzero_position) ... ok
+test_residual_tail_escape_and_compact_directory_roundtrip (tests.test_llama_causal.CausalTests.test_residual_tail_escape_and_compact_directory_roundtrip) ... ok
+test_separate_receiver_process_has_only_packet_and_fixed_state (tests.test_llama_causal.CausalTests.test_separate_receiver_process_has_only_packet_and_fixed_state) ... ok
+test_wire_corruption_state_mismatch_and_invalid_offsets_stop_before_kernel (tests.test_llama_causal.CausalTests.test_wire_corruption_state_mismatch_and_invalid_offsets_stop_before_kernel) ... ok
+test_all_residual_tables_cover_the_same_integer_precision (tests.test_llama_causal.TableTests.test_all_residual_tables_cover_the_same_integer_precision) ... ok
+test_no_cuda_refuses_benchmark_and_preserves_existing_report (tests.test_llama_causal.TableTests.test_no_cuda_refuses_benchmark_and_preserves_existing_report) ... /tmp/tmpb22a6f_w/report/summary.md
+[21:18:45] Existing run preserved; startup validation failed: Actual CUDA required
+[21:18:45] Traceback (most recent call last):
+  File "/workspace/scratch/cf461553fac4/kv_causal_compare/scripts/bench_llama_causal.py", line 342, in main
+    torch, device = device_check(args.device, args.software_check)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1139, in __call__
+    return self._mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1143, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1198, in _execute_mock_call
+    raise effect
+  File "/workspace/scratch/cf461553fac4/kv_causal_compare/scripts/bench_llama_causal.py", line 342, in main
+    torch, device = device_check(args.device, args.software_check)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1139, in __call__
+    return self._mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1143, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1198, in _execute_mock_call
+    raise effect
+RuntimeError: Actual CUDA required
+
+ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 98.436s
+
+OK

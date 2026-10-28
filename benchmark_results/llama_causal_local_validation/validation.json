@@ -1,0 +1,73 @@
+{
+  "format": "llama_causal_local_validation_v1",
+  "gpu_measured": false,
+  "scope": "CPU Torch and Triton interpreter correctness, tiny random BF16 Llama integration, and offline sm_86 compilation. No Llama-3.2-3B GPU rates or speed claims.",
+  "software": {
+    "torch": "2.5.1+cpu",
+    "triton": "3.5.0",
+    "transformers": "4.57.6",
+    "numpy": "1.26.4"
+  },
+  "tests": {
+    "causal_suite_passed": 9,
+    "existing_team_suite_passed": 8,
+    "startup_subset_passed": 3,
+    "startup_subset_overlap_with_causal_suite": 2,
+    "unique_tests_passed": 18,
+    "failed": 0
+  },
+  "verified": {
+    "lossless_original_words": true,
+    "lossy_intended_words": true,
+    "lossy_error_bound": true,
+    "both_fp32_and_bf16": true,
+    "nonzero_position": true,
+    "independent_receiver_process": true,
+    "all_65536_bf16_patterns_via_charged_raw_fallback": true,
+    "wire_corruption_rejected": true,
+    "state_and_spread_tampering_rejected": true,
+    "complete_packet_accounting": true,
+    "resumed_packets_do_not_repeat_timing": true,
+    "real_tiny_bf16_llama_continuation_quality": true,
+    "package_excludes_kv_packets_weights": true,
+    "missing_model_shards_fail_before_fitting": true,
+    "actual_no_cuda_guard": true,
+    "python_compile": true,
+    "bash_syntax": true,
+    "git_diff_check": true,
+    "standalone_source_check": true,
+    "cpu_only_discovery_skips_optional_triton_tests": true
+  },
+  "offline_gpu_compilation": {
+    "target": "cuda sm_86",
+    "num_warps": 1,
+    "executed_on_gpu": false,
+    "kernels": [
+      "_res_encode",
+      "_res_decode",
+      "_compact",
+      "_encode_kernel",
+      "_decode_kernel"
+    ]
+  },
+  "files_sha256": {
+    "kv_compare/causal_entropy.py": "b886f320d0eed587a08de0d0b97f94f881f8d9c06b2522b8dab2f39c59aa8722",
+    "kv_compare/causal_packet.py": "d5e441509be82fb8bbb294fc15616820d0d3db04467d4a18a9043a0f3a7c626e",
+    "kv_compare/causal_study.py": "323054aa25192ce604139d726190b48dba2217d1281960e2113542264c3263ca",
+    "kv_compare/gpu_coder.py": "62e31357c438aefdbe5f6687afdb4d43945ed7612348a72bbc9615f3732400c7",
+    "scripts/bench_llama_causal.py": "de2f2f38fb6fbb7958fccf08c43477ba812d9860e365421a6bf88e80e232c792",
+    "scripts/package_llama_causal.py": "ee1e6ae032de9761ee0f41f4cce663059c17c0abad5d0609bd88a13cacb7380b",
+    "scripts/run_llama_causal_a4500.sh": "010b676d59607d3a3b3bc7c4ffb41d051fe87ef00b378001f3df947385da5b3f",
+    "tests/test_llama_causal.py": "063ef1b5ca146e48c4c8a556742c6a0b19615ec9412887af8ab5349040b62b5c",
+    "docs/llama_causal_packet_comparison.md": "767ca804dc5b70204eb97aaf47a179e020eee1fafcaaf8df9b468a756df54cd7"
+  },
+  "pending": "Actual RTX A4500 full-model run on frozen captures. BF16 cross-GPU portability, P1 attention, network and SSD serving are unmeasured.",
+  "commands": [
+    "TRITON_INTERPRET=1 python -m unittest tests.test_llama_causal -v",
+    "TRITON_INTERPRET=1 python -m unittest tests.test_llama_causal.TableTests -v",
+    "python -m unittest kv_compare.test_kv_compare -v",
+    "python -m unittest discover -s tests -p test_llama_causal.py -v",
+    "python scripts/build_standalone.py --check",
+    "bash -n scripts/run_llama_causal_a4500.sh"
+  ]
+}

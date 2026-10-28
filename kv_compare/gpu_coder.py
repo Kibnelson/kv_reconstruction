@@ -50,11 +50,15 @@ def _interpreter_shim():
         return
     original = ti._patch_lang_tensor
 
-    def patched(tensor, scope):
-        original(tensor, scope)
+    def patched(tensor, scope=None):
+        if scope is None:
+            original(tensor)
+        else:
+            original(tensor, scope)
         scalar = lambda d: np.asarray(d).reshape(-1)[0].item()
-        scope.set_attr(tensor, "__index__", lambda self: int(scalar(self.handle.data)))
-        scope.set_attr(tensor, "__bool__", lambda self: bool(scalar(self.handle.data)) if np.asarray(self.handle.data).size == 1 else True)
+        set_attr = setattr if scope is None else scope.set_attr
+        set_attr(tensor, "__index__", lambda self: int(scalar(self.handle.data)))
+        set_attr(tensor, "__bool__", lambda self: bool(scalar(self.handle.data)) if np.asarray(self.handle.data).size == 1 else True)
     ti._patch_lang_tensor = patched
     ti._kv_compare_shim = True
 
@@ -334,13 +338,17 @@ class SliceCoder:
         except TypeError:                        # launch options unsupported (e.g. interpreter): plain launch
             return kernel[grid](*args, **kw)
 
-    def encode(self, words, mu, s):
+    def encode(self, words, mu, s, *, out=None, starts=None):
         """words: int16/int32 [n]; mu, s: float32 [n]. Returns (buffer int16 holding 16-bit words, starts int32, n)."""
         n = words.numel()
         S, P, cap = self.layout(n)
         w = words.reshape(-1).to(torch.int32).contiguous()
-        out = torch.zeros(P * cap, dtype=torch.int16, device=self.device)
-        starts = torch.zeros(P, dtype=torch.int32, device=self.device)
+        if out is None:
+            out = torch.zeros(P * cap, dtype=torch.int16, device=self.device)
+        if starts is None:
+            starts = torch.zeros(P, dtype=torch.int32, device=self.device)
+        if out.numel() != P * cap or out.dtype != torch.int16 or starts.numel() != P:
+            raise ValueError("wrong encoder workspace geometry")
         self._launch(_encode_kernel, (P,), w, mu.reshape(-1).contiguous(), s.reshape(-1).contiguous(), out, starts,
                      self.cum, self.off, self.K, n, S, self.V, cap, BLOCK=self.BLOCK)
         return out, starts, n
