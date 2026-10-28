@@ -317,19 +317,21 @@ def stage_gpu_speed(args, out):
                            max_values=None if device.type == "cuda" else 4096, modes=args.speed_modes)
         rows += crows
         ok = [r for r in crows if r["bit_exact"]]
+        fmt = "int8x8" if "int8x8" in args.speed_formats else args.speed_formats[0]
         for best in ([max([r for r in ok if r["mode"] == m], key=lambda r: r["decode_gvalues_per_s"])
                       for m in args.speed_modes if any(r["mode"] == m for r in ok)] if device.type == "cuda" else []):
-            lite = next(v for v in variants if v["label"] == "P, 16 pivot steps")
-            gen = torch.Generator(device=device).manual_seed(1)
-            fmt = "int8x8" if "int8x8" in args.speed_formats else args.speed_formats[0]
-            layer_fn, _ = predictor_layer(Hk, hd, Hq, args.speed_tokens, device, lite, fmt, gen)
-            try:
-                row = overlap_row(SliceCoder, device, data, (best["values_per_stream"], best["block"], best["warps"]),
-                                  layer_fn, log, mode=best["mode"])
-                row.update(predictor=f"{lite['label']} ({fmt})")
-                rows.append(row)
-            except Exception as exc:
-                log(f"  overlap: not measured ({exc!r})")
+            for label in ("P, 1 pivot step", "P, 8 pivot steps", "P, 16 pivot steps"):
+                v = next(x for x in variants if x["label"] == label)
+                gen = torch.Generator(device=device).manual_seed(1)
+                layer_fn, _ = predictor_layer(Hk, hd, Hq, args.speed_tokens, device, v, fmt, gen)
+                try:
+                    row = overlap_row(SliceCoder, device, data, (best["values_per_stream"], best["block"], best["warps"]),
+                                      layer_fn, log, mode=best["mode"])
+                    row.update(predictor=f"{label} ({fmt})", variant=label)
+                    rows.append(row)
+                except Exception as exc:
+                    log(f"  overlap {label}: not measured ({exc!r})")
+                del layer_fn
     else:
         log("gpu_speed: the coder needs a CUDA GPU (or TRITON_INTERPRET=1 for a slow CPU check); skipped")
     bits = {}
@@ -404,73 +406,69 @@ def speed_lines(out):
 
 
 def mix_lines(out, res):
-    """Transfer time of one document's KV over links of several speeds: raw BF16, SplitZip, ours, and a per-layer
-    mix of SplitZip-style coding with two of our predictors (the one-step and the 16-group lite version). Each
-    layer takes one option; the mix minimises max(time on the wire, decode time), decode times adding up (both of
-    ours share the GPU's cores). Computed from the measured codec speeds and bits with an ideal link (decoding
-    overlapped with arrival); no network was measured."""
+    """Transfer time of one document's KV over links of several speeds: raw BF16 and SplitZip as references, and
+    our codec alone (no SplitZip coding anywhere): its best single predictor for that link, and a per-layer
+    choice among our predictors (one step, 8 groups, 16 groups) that minimises max(time on the wire, decode
+    time). Speeds are the measured overlapped (predictor and coder on separate CUDA streams) decode rates, bits the
+    frontier costs plus the coder's measured stream overhead. Ideal link: time = bits / link speed, decoding
+    overlapped with arrival; no network was measured."""
     if not ((out / "lossless.json").is_file() and (out / "frontier.json").is_file()):
         return []
     ll = json.loads((out / "lossless.json").read_text())
     fr = {r["label"]: r for r in json.loads((out / "frontier.json").read_text())["variants"]}
     meta = json.loads((out / "captures" / "meta.json").read_text())
     docs = [d for d in TESTS if d in ll["methods"]["SplitZip-style"]["per_layer"]]
-    if not docs or "P, 16 pivot steps" not in fr:
+    if not docs:
         return []
     per_layer = lambda label: np.mean([fr[label]["per_layer"][d] for d in docs], 0)
-    sz = np.mean([ll["methods"]["SplitZip-style"]["per_layer"][d] for d in docs], 0)
+    sz_bits = float(np.mean([ll["methods"]["SplitZip-style"]["per_layer"][d] for d in docs]))
     Ts = 311.0 / 2                                                     # SplitZip native decode on the A4500
-    pred = {r["variant"]: max(r["gvalues_per_s"], r.get("gvalues_per_s_graph") or 0)
-            for r in res["rows"] if r["part"] == "predictor" and r.get("format") == "int8x8" and "error" not in r}
-    L = len(sz)
-    n = int(meta["tokens"]) * 2 * int(meta["kv_heads"]) * int(meta["head_dim"]) * L
     lines = []
-    for over in [r for r in res["rows"] if r["part"] == "overlap"]:
-        mode = over.get("mode", "exact")
+    for mode in dict.fromkeys(r.get("mode", "exact") for r in res["rows"] if r["part"] == "overlap"):
         crow = [r for r in res["rows"] if r["part"] == "coder" and r.get("mode", "exact") == mode and r["bit_exact"]]
         if not crow:
             continue
         cbest = max(crow, key=lambda r: r["decode_gvalues_per_s"])
         extra = cbest["stream_bits_per_value"] - cbest["exact_model_bits_per_value"]
-        opts = [("SplitZip", sz, Ts), ("lite", per_layer("P, 16 pivot steps") + extra, over["overlapped_gvalues_per_s"])]
-        if "P, 1 pivot step" in fr and "P, 1 pivot step" in pred:
-            t1 = 1 / (1 / pred["P, 1 pivot step"] + 1 / cbest["decode_gvalues_per_s"])     # not overlapped
-            opts.insert(1, ("one-step", per_layer("P, 1 pivot step") + extra, t1))
-        B = np.stack([o[1] for o in opts])                            # [options, layers] bits per value
-        C = np.array([1 / o[2] for o in opts])                        # ns per value
-        lines += ["", f"Transfer time of one document's KV ({n / 1e6:.0f}M values), {mode} coder, computed from the "
-                  "measured speeds and an ideal link (decoding overlapped with arrival; no network measured). "
-                  "Options per layer: " + "; ".join(f"{o[0]} ({float(np.mean(o[1])):.2f} bits/value, {o[2]:.1f} G values/s)"
-                                                    for o in opts) + ".", "",
-                  "| Link | Raw BF16 | SplitZip | Ours (lite) | Mixed | Layers per option | Mixed vs SplitZip |",
-                  "| --- | --- | --- | --- | --- | --- | --- |"]
-        # every layer holds the same number of values, so decode time depends only on how many layers take each
-        # option; for each count combination the fewest bits come from an exact DP over the layers
+        opts = []
+        for r in res["rows"]:
+            v = r.get("variant") or r.get("predictor", "").split(" (")[0]
+            if r["part"] == "overlap" and r.get("mode", "exact") == mode and v in fr:
+                opts.append((v, per_layer(v) + extra, r["overlapped_gvalues_per_s"]))
+        if not opts:
+            continue
+        L = len(opts[0][1])
+        n = int(meta["tokens"]) * 2 * int(meta["kv_heads"]) * int(meta["head_dim"]) * L
+        B = np.stack([o[1] for o in opts])
+        C = np.array([1 / o[2] for o in opts])
         K = len(opts)
-        combos = {}                                                  # counts of options 1..K-1 -> (bits, choice)
-        dp = {tuple([0] * (K - 1)): (0.0, [])}
+        dp = {tuple([0] * K): 0.0}                                   # option counts -> fewest total bits
         for l in range(L):
             nxt = {}
-            for cnt, (bits, ch) in dp.items():
+            for cnt, bits in dp.items():
                 for o in range(K):
                     c2 = list(cnt)
-                    if o:
-                        c2[o - 1] += 1
+                    c2[o] += 1
                     c2 = tuple(c2)
                     val = bits + B[o, l]
-                    if c2 not in nxt or val < nxt[c2][0]:
-                        nxt[c2] = (val, ch + [o])
+                    if val < nxt.get(c2, float("inf")):
+                        nxt[c2] = val
             dp = nxt
+        lines += ["", f"Our codec alone ({mode} coder; no SplitZip coding anywhere): transfer time of one document's KV "
+                  f"({n / 1e6:.0f}M values), from measured overlapped decode speeds and an ideal link (decoding "
+                  "overlapped with arrival; no network measured). Our predictors: " +
+                  "; ".join(f"{o[0]} ({float(np.mean(o[1])):.2f} bits/value, {o[2]:.1f} G values/s)" for o in opts) +
+                  ". SplitZip and raw BF16 are references only.", "",
+                  "| Link | Raw BF16 | SplitZip | Ours, best single predictor | Ours, per-layer choice (layers) | Ours vs SplitZip |",
+                  "| --- | --- | --- | --- | --- | --- |"]
         for R in (10, 25, 50, 100, 200, 400, 700):
-            best = None
-            for cnt, (bits, ch) in dp.items():
-                ch = np.array(ch)
-                t = max(bits / L / R, C[ch].mean())
-                best = (t, ch) if best is None or t < best[0] else best
-            t_sz, t_ours = max(sz.mean() / R, 1 / Ts), max(opts[-1][1].mean() / R, 1 / opts[-1][2])
-            counts = ", ".join(f"{int((best[1] == i).sum())} {o[0]}" for i, o in enumerate(opts) if (best[1] == i).any())
+            single = min(((max(float(np.mean(o[1])) / R, 1 / o[2]), o[0]) for o in opts))
+            best = min(((max(bits / L / R, float(np.dot(cnt, C)) / L), cnt) for cnt, bits in dp.items()))
+            t_sz = max(sz_bits / R, 1 / Ts)
             ms = lambda t: f"{t * n / 1e6:.0f} ms"
-            lines.append(f"| {R} Gb/s | {ms(16 / R)} | {ms(t_sz)} | {ms(t_ours)} | {ms(best[0])} | {counts} | {t_sz / best[0]:.2f}x |")
+            counts = ", ".join(f"{c} {opts[i][0].replace('P, ', '')}" for i, c in enumerate(best[1]) if c)
+            lines.append(f"| {R} Gb/s | {ms(16 / R)} | {ms(t_sz)} | {ms(single[0])} ({single[1].replace('P, ', '')}) | "
+                         f"{ms(best[0])} ({counts}) | {t_sz / best[0]:.2f}x |")
     return lines + ([""] if lines else [])
 
 
@@ -558,7 +556,7 @@ def parser():
     p.add_argument("--speed-modes", default="exact,uniform",
                    help="gpu_speed: coder modes; uniform gives every word of a slice an equal share (faster, a few "
                         "hundredths of a bit more)")
-    p.add_argument("--speed-settings", default="1024x32,1024x64x1,1024x128x1,1024x64,2048x64x1",
+    p.add_argument("--speed-settings", default="1024x64x1,1024x128x1,1024x256x2,512x128x1,2048x128x1",
                    help="gpu_speed: coder settings, values per stream x lanes per program [x warps per program; "
                         "default one thread per lane, fewer warps interleave several lanes per thread]")
     return p

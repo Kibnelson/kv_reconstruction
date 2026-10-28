@@ -3,20 +3,24 @@
 The word's value v is coded against Logistic(mu, s) in two symbols, with 16-bit rANS on many interleaved streams:
 
   1. Slice. With the width class c = clamp(floor(log2(|mu| + 2s)) - floor(log2 s) - 3, 0, 9), slices of width
-     d = 2^(c-3) spreads cover t = (v - mu)/s on [-24, 24): slice k is [mu + t0*s, mu + t1*s) with
-     t0 = -24 + k*d, t1 = min(t0 + d, 24). The slice symbol uses one static table per class (logistic mass of the
-     slice, every symbol at least 1/65536); an escape symbol (value outside the range, Inf or NaN) is followed by
-     the raw 16-bit word.
-  2. Word in the slice. The words of the slice, first..last in ordered index, share 65,536 slots: word o gets
-     C(o) = floor((BD(o) - BD(first)) * R) + (o - first), R = (65536 - n) / (BD(last + 1) - BD(first)), so its
-     share follows its rounding interval [BD(o), BD(o + 1)) and every word has at least one slot. A slice with
-     one word needs no second symbol. The decoder estimates the word from the slot, then corrects it with a
-     bounded binary search.
+     d = 2^(c-3) spreads cover t = (v - mu)/s on [-24, 24): slice k has bounds lo = mu + t0*s, hi = mu + t1*s
+     with t0 = -24 + k*d, t1 = min(t0 + d, 24), and holds the words whose ordered index o satisfies
+     first(lo) <= o < first(hi), where first(x) is the ordered index of x rounded up to BF16 (bit operations).
+     The slice symbol uses one static table per class (logistic mass of the slice, every symbol at least
+     1/65536); an escape symbol (outside the range, Inf or NaN) is followed by the raw 16-bit word.
+  2. Word in the slice, n = first(hi) - first(lo) words, j = o - first(lo):
+       mode "uniform": equal shares, q = floor(65536 / n) slots each, the last word also takes the remainder;
+                       decoded as j = min(slot // q, n - 1)
+       mode "exact":   shares follow the words' rounding intervals [BD(o), BD(o + 1)), every word at least one
+                       slot: C(o) = floor((BD(o) - BD(first)) * R) + (o - first), R = (65536 - n) / width;
+                       decoded from an estimate refined twice, then a bounded binary search
+     A slice with one word needs no second symbol.
 
-Encoder and decoder run the same float32 operations (add, multiply, correctly rounded division; the kernels are
-compiled without fused multiply-add) and integer operations, so they agree bit for bit on one GPU type. Shipping
-the slice tables as constants (they are computed once here, in float64) and keeping the float32 lines unfused
-makes the stream portable across GPUs; that portability is not tested here.
+Encoder and decoder run the same integer and float32 operations (add, multiply, correctly rounded division; the
+kernels are compiled without fused multiply-add), so they agree bit for bit on one GPU type. Quotients computed
+with approximate float division are corrected to the exact integer result. Shipping the slice tables as
+constants (computed once here, in float64) makes the stream portable across GPUs; that portability is not
+tested here.
 
 Streams: lane j of a Triton program codes values j, j + S, j + 2S, ... (S lanes in all), so loads are coalesced.
 A program's lanes share one output segment: at each symbol the lanes that emit or read a 16-bit word take
@@ -66,15 +70,17 @@ CLASSES = 10
 RANGE = 24.0
 LUT_BITS = 10                    # coarse slot -> symbol table: 2^10 buckets per class
 LUT_N = (1 << LUT_BITS) + 1
-REFINE = 2                       # decoder: refinements of the word estimate before its binary search
+REFINE = 2                       # exact mode: refinements of the word estimate before its binary search
 
 
 def slice_tables(device):
-    """Static stage-1 tables. Returns cum [sum(K_c + 2)] int32 (per class: K_c slices, the escape, then 65536),
-    off [10] int32 (class start in cum), K [10] int32, lut [10, 2^LUT_BITS + 1] int32 (symbol holding slot
-    b * 2^(16 - LUT_BITS); the last entry is the escape)."""
-    cums, off, Ks, luts = [], [], [], []
-    pos = 0
+    """Static stage-1 tables.
+    cum [sum(K_c + 2)] int32: per class, cumulative counts of the K_c slices, the escape, then 65536 (mirror);
+    off [10], K [10] int32 (mirror); and the packed tables the kernels read:
+    cumf: per class, for symbols 0..K: (cum << 16) | frequency;  ko [10]: (start in cumf << 10) | K;
+    lut [10, 2^LUT_BITS + 1]: (first symbol that can hold bucket b's slots) | (number of candidates << 16)."""
+    cums, off, Ks, cumfs, kos, luts = [], [], [], [], [], []
+    pos = posf = 0
     sig = lambda x: 1.0 / (1.0 + math.exp(-x))
     for c in range(CLASSES):
         d = 2.0 ** (c - 3)
@@ -84,15 +90,20 @@ def slice_tables(device):
         f = [1 + math.floor(p * (M - K - 1)) for p in P] + [1]
         f[int(np.argmax(P))] += M - sum(f)
         cum = np.concatenate([[0], np.cumsum(f)]).astype(np.int64)
-        assert cum[-1] == M and min(f) >= 1
-        lut = [int(np.searchsorted(cum, b << (16 - LUT_BITS), side="right") - 1) for b in range(1 << LUT_BITS)]
-        luts.append(lut + [K])
+        assert cum[-1] == M and min(f) >= 1 and max(f) < M and K < 1024
+        sym = [int(np.searchsorted(cum, b << (16 - LUT_BITS), side="right") - 1) for b in range(1 << LUT_BITS)] + [K]
+        luts.append([sym[b] | ((sym[b + 1] + 1 - sym[b]) << 16) for b in range(1 << LUT_BITS)] + [K | (1 << 16)])
+        cumfs.append([(int(cum[k]) << 16) | int(cum[k + 1] - cum[k]) for k in range(K + 1)])
+        kos.append((posf << 10) | K)
         cums.append(cum)
         off.append(pos)
         Ks.append(K)
         pos += len(cum)
-    as_t = lambda a: torch.as_tensor(np.asarray(a, dtype=np.int32), device=device)
-    return as_t(np.concatenate(cums)), as_t(off), as_t(Ks), as_t(np.asarray(luts))
+        posf += K + 1
+    as_t = lambda a: torch.as_tensor(np.asarray(a, dtype=np.int64).astype(np.int32), device=device)
+    return {"cum": as_t(np.concatenate(cums)), "off": as_t(off), "K": as_t(Ks),
+            "cumf": as_t(np.concatenate([np.asarray(x, dtype=np.int64) for x in cumfs])), "ko": as_t(kos),
+            "lut": as_t(np.asarray(luts, dtype=np.int64))}
 
 
 if triton is not None:
@@ -118,11 +129,12 @@ if triton is not None:
 
     @triton.jit
     def _first_ge(x):
-        """Smallest ordered index whose value is >= x (x finite)."""
-        o = _ord(_bf16_word(x))
-        o = tl.where(_word_val(_word(o)) < x, o + 1, o)
-        o = tl.where(_word_val(_word(o - 1)) >= x, o - 1, o)
-        return o
+        """Ordered index of x rounded up to BF16 (finite x): truncate the bit pattern, plus one step for a positive
+        value with nonzero low bits (truncating a negative value already moves it up). For x = +0 this is +0."""
+        b = x.to(tl.uint32, bitcast=True)
+        w = (b >> 16).to(tl.int32)
+        up = ((b >> 31) == 0) & ((b & 0xFFFF) != 0)
+        return _ord(tl.where(up, w + 1, w))
 
     @triton.jit
     def _bd(o):
@@ -137,23 +149,19 @@ if triton is not None:
         return tl.minimum(tl.maximum(ea - es - 3, 0), 9)
 
     @triton.jit
-    def _bounds(c, k, K, mu, s):
+    def _bounds(c, k, mu, s):
         d = ((c + 124) << 23).to(tl.float32, bitcast=True)          # 2^(c-3)
         t0 = k.to(tl.float32) * d - 24.0
         t1 = tl.minimum(t0 + d, 24.0)
-        lo = mu + t0 * s
-        hi = mu + t1 * s
-        return lo, hi
+        return mu + t0 * s, mu + t1 * s
 
     @triton.jit
-    def _slots(lo, hi):
-        first = _first_ge(lo)
-        last = _first_ge(hi) - 1
-        n = last - first + 1
+    def _shares(first, last, n):
+        """Exact mode: base edge and slot scale of a slice."""
         base = _bd(first)
         width = _bd(last + 1) - base
         R = tl.math.div_rn((65536 - n).to(tl.float32), width)
-        return first, last, n, base, R, width
+        return base, R, width
 
     @triton.jit
     def _cw(o, first, last, base, R):
@@ -161,17 +169,21 @@ if triton is not None:
         return tl.where(o > last, 65536, c)
 
     @triton.jit
-    def _first_last(lo, hi):
-        first = _first_ge(lo)
-        last = _first_ge(hi) - 1
-        return first, last, last - first + 1
+    def _q_of(n):
+        """Uniform mode: q = floor(65536 / n) (n >= 2), from an approximate float quotient corrected exactly."""
+        nn = tl.maximum(n, 2)
+        q = tl.floor(65536.0 / nn.to(tl.float32)).to(tl.int32)
+        q = tl.where(q * nn > 65536, q - 1, q)
+        q = tl.where((q + 1) * nn <= 65536, q + 1, q)
+        return q
 
     @triton.jit
-    def _cu(j, n):
-        """Equal-share cumulative count: ceil(j * 65536 / n), unsigned 32-bit (j <= n <= 65535)."""
-        ju = j.to(tl.uint32)
-        nu = tl.maximum(n, 1).to(tl.uint32)
-        return ((ju << 16) + nu - 1) // nu
+    def _j_of(slot, q, n):
+        """Uniform mode: j = min(slot // q, n - 1), exactly."""
+        j = tl.floor(slot.to(tl.float32) / q.to(tl.float32)).to(tl.int32)
+        j = tl.where(j * q > slot, j - 1, j)
+        j = tl.where((j + 1) * q <= slot, j + 1, j)
+        return tl.minimum(j, n - 1)
 
     @triton.jit
     def _put(x, cum, f, active, out_ptr, wp):
@@ -199,7 +211,7 @@ if triton is not None:
         return x, rp + total
 
     @triton.jit
-    def _encode_kernel(words_ptr, mu_ptr, s_ptr, out_ptr, start_ptr, cum_ptr, off_ptr, K_ptr,
+    def _encode_kernel(words_ptr, mu_ptr, s_ptr, out_ptr, start_ptr, cumf_ptr, ko_ptr,
                        nvals, S, V, CAP, BLOCK: tl.constexpr, UNIFORM: tl.constexpr):
         pid = tl.program_id(0)
         lane = pid * BLOCK + tl.arange(0, BLOCK)
@@ -213,39 +225,47 @@ if triton is not None:
             mu = tl.load(mu_ptr + idx, mask=valid, other=0.0)
             s = tl.load(s_ptr + idx, mask=valid, other=1.0)
             c = _width_class(mu, s)
-            K = tl.load(K_ptr + c)
-            off = tl.load(off_ptr + c)
+            kop = tl.load(ko_ptr + c)
+            K = kop & 1023
+            offf = kop >> 10
+            o = _ord(w)
+            lo0, _u = _bounds(c, tl.zeros([BLOCK], tl.int32), mu, s)
+            _l, hiK = _bounds(c, K - 1, mu, s)
+            esc = (((w >> 7) & 0xFF) == 0xFF) | (o < _first_ge(lo0)) | (o >= _first_ge(hiK))
+            # slice: estimate from the value, then move until first(lo) <= o < first(hi) (exactly the decoder's sets)
             v = _word_val(w)
-            finite = ((w >> 7) & 0xFF) != 0xFF                     # exponent field all ones: Inf or NaN
-            lo0, _u = _bounds(c, tl.zeros([BLOCK], tl.int32), K, mu, s)
-            _l, hiK = _bounds(c, K - 1, K, mu, s)
-            esc = (~finite) | (v < lo0) | (v >= hiK)
-            # slice: estimate, then move until lo <= v < hi (the decoder sees exactly these bounds)
             d_inv = ((130 - c) << 23).to(tl.float32, bitcast=True)            # 2^(3-c)
             t = tl.math.div_rn(v - mu, s)
             k = tl.floor((t + 24.0) * d_inv)
             k = tl.where(esc, 0.0, tl.minimum(tl.maximum(k, 0.0), (K - 1).to(tl.float32))).to(tl.int32)
-            lo, hi = _bounds(c, k, K, mu, s)
-            move = (~esc) & ((v < lo) | (v >= hi))
+            lo, hi = _bounds(c, k, mu, s)
+            first = _first_ge(lo)
+            nxt = _first_ge(hi)
+            move = (~esc) & ((o < first) | (o >= nxt))
             while tl.max(move.to(tl.int32), 0) > 0:
-                k = tl.where(move & (v < lo), k - 1, tl.where(move & (v >= hi), k + 1, k))
-                lo, hi = _bounds(c, k, K, mu, s)
-                move = (~esc) & ((v < lo) | (v >= hi))
+                k = tl.where(move & (o < first), k - 1, tl.where(move & (o >= nxt), k + 1, k))
+                lo, hi = _bounds(c, k, mu, s)
+                first = _first_ge(lo)
+                nxt = _first_ge(hi)
+                move = (~esc) & ((o < first) | (o >= nxt))
             k = tl.where(esc, K, k)
-            cum1 = tl.load(cum_ptr + off + k)
-            f1 = tl.load(cum_ptr + off + k + 1) - cum1
-            o = _ord(w)
-            if UNIFORM:                      # every word of the slice gets an equal share of the 65,536 slots
-                first, last, n = _first_last(lo, hi)
-                c0 = _cu(o - first, n).to(tl.int32)
-                c1 = _cu(o - first + 1, n).to(tl.int32)
+            p = tl.load(cumf_ptr + offf + k)
+            cum1 = (p >> 16) & 0xFFFF                                # packed int32: shift is arithmetic
+            f1 = p & 0xFFFF
+            last = nxt - 1
+            n = nxt - first
+            j = o - first
+            if UNIFORM:                      # equal shares; the last word also takes the remainder
+                q = _q_of(n)
+                c0 = j * q
+                f0 = tl.where(j == n - 1, 65536 - (n - 1) * q, q)
             else:                            # shares follow the words' rounding intervals
-                first, last, n, base, R, width = _slots(lo, hi)
+                base, R, width = _shares(first, last, n)
                 c0 = _cw(o, first, last, base, R)
-                c1 = _cw(o + 1, first, last, base, R)
+                f0 = _cw(o + 1, first, last, base, R) - c0
             two = valid & (esc | (n > 1))
             cum2 = tl.where(esc, w, c0)
-            f2 = tl.where(esc, 1, c1 - c0)
+            f2 = tl.where(esc, 1, f0)
             x, wp = _put(x, cum2, f2, two, out_ptr, wp)
             x, wp = _put(x, cum1, f1, valid, out_ptr, wp)
         r = tl.arange(0, BLOCK)
@@ -254,7 +274,7 @@ if triton is not None:
         tl.store(start_ptr + pid, wp - 2 * BLOCK)
 
     @triton.jit
-    def _decode_kernel(buf_ptr, start_ptr, mu_ptr, s_ptr, words_ptr, cum_ptr, off_ptr, K_ptr, lut_ptr,
+    def _decode_kernel(buf_ptr, start_ptr, mu_ptr, s_ptr, words_ptr, cumf_ptr, ko_ptr, lut_ptr,
                        nvals, S, V, BLOCK: tl.constexpr, LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr,
                        REFINE: tl.constexpr, UNIFORM: tl.constexpr):
         pid = tl.program_id(0)
@@ -271,40 +291,38 @@ if triton is not None:
             mu = tl.load(mu_ptr + idx, mask=valid, other=0.0)
             s = tl.load(s_ptr + idx, mask=valid, other=1.0)
             c = _width_class(mu, s)
-            K = tl.load(K_ptr + c)
-            off = tl.load(off_ptr + c)
+            kop = tl.load(ko_ptr + c)
+            K = kop & 1023
+            offf = kop >> 10
             # stage 1: coarse table, then binary search for the largest k with cum[k] <= slot
             slot = (x & 0xFFFF).to(tl.int32)
-            b = slot >> LUT_SHIFT
-            klo = tl.load(lut_ptr + c * LUT_W + b)
-            khi = tl.load(lut_ptr + c * LUT_W + b + 1) + 1
+            lp = tl.load(lut_ptr + c * LUT_W + (slot >> LUT_SHIFT))
+            klo = lp & 0xFFFF
+            khi = klo + (lp >> 16)
             while tl.max(khi - klo, 0) > 1:
                 mid = (klo + khi) // 2
-                go = tl.load(cum_ptr + off + mid) <= slot
+                go = ((tl.load(cumf_ptr + offf + mid) >> 16) & 0xFFFF) <= slot
                 klo = tl.where(go, mid, klo)
                 khi = tl.where(go, khi, mid)
             k = klo
-            cum1 = tl.load(cum_ptr + off + k)
-            f1 = tl.load(cum_ptr + off + k + 1) - cum1
-            x, rp = _take(x, cum1, f1, valid, buf_ptr, rp)
+            p = tl.load(cumf_ptr + offf + k)
+            x, rp = _take(x, (p >> 16) & 0xFFFF, p & 0xFFFF, valid, buf_ptr, rp)
             esc = k == K
-            lo, hi = _bounds(c, tl.where(esc, 0, k), K, mu, s)
+            lo, hi = _bounds(c, tl.where(esc, 0, k), mu, s)
+            first = _first_ge(lo)
+            last = _first_ge(hi) - 1
+            n = last - first + 1
+            slot2 = (x & 0xFFFF).to(tl.int32)
             if UNIFORM:
-                first, last, n = _first_last(lo, hi)
-                slot2 = (x & 0xFFFF).to(tl.int32)
-                j = ((slot2.to(tl.uint32) * tl.maximum(n, 1).to(tl.uint32)) >> 16).to(tl.int32)   # exact inverse
+                q = _q_of(n)
+                j = _j_of(slot2, q, n)
                 o = tl.where(valid & (~esc) & (n > 1), first + j, first)
-                two = valid & (esc | (n > 1))
-                cu0 = _cu(o - first, n).to(tl.int32)
-                cu1 = _cu(o - first + 1, n).to(tl.int32)
-                cum2 = tl.where(esc, slot2, cu0)
-                f2 = tl.where(esc, 1, cu1 - cu0)
+                cum2 = tl.where(esc, slot2, j * q)
+                f2 = tl.where(esc, 1, tl.where(j == n - 1, 65536 - (n - 1) * q, q))
             else:
-                first, last, n, base, R, width = _slots(lo, hi)
-                slot2 = (x & 0xFFFF).to(tl.int32)
-                # stage 2: estimate the word from the slot, refine it for the one-slot-per-word term, then a binary
-                # search on the cumulative slots (which lanes need it, and how far, varies; the loop runs to the
-                # slowest lane of the program, so a good estimate matters)
+                base, R, width = _shares(first, last, n)
+                # estimate the word from the slot, refine it for the one-slot-per-word term, then a binary search on
+                # the cumulative slots (the loop runs to the slowest lane of the program, so a good estimate matters)
                 u = base + slot2.to(tl.float32) * (width * (1.0 / 65536.0))
                 oe = tl.minimum(tl.maximum(_ord(_bf16_word(u)), first), last)
                 inv_r = tl.math.div_rn(width, (65536 - n).to(tl.float32))
@@ -329,9 +347,9 @@ if triton is not None:
                     ohi = tl.where(go, ohi, mid)
                     chi = tl.where(go, chi, cm)
                 o = tl.where(search, olo, first)
-                two = valid & (esc | (n > 1))
                 cum2 = tl.where(esc, slot2, clo)
                 f2 = tl.where(esc, 1, chi - clo)
+            two = valid & (esc | (n > 1))
             x, rp = _take(x, cum2, f2, two, buf_ptr, rp)
             w = tl.where(esc, slot2, _word(o))
             tl.store(words_ptr + idx, w.to(tl.int16), mask=valid)
@@ -351,7 +369,7 @@ class SliceCoder:
         if mode not in ("exact", "uniform"):
             raise ValueError("mode is 'exact' (word shares follow rounding intervals) or 'uniform' (equal shares)")
         self.mode = mode
-        self.cum, self.off, self.K, self.lut = slice_tables(self.device)
+        self.tables = slice_tables(self.device)
         self.opts = {} if fuse else {"enable_fp_fusion": False}
 
     def layout(self, n):
@@ -366,22 +384,26 @@ class SliceCoder:
         except TypeError:                        # launch options unsupported (e.g. interpreter): plain launch
             return kernel[grid](*args, **kw)
 
-    def encode(self, words, mu, s):
-        """words: int16/int32 [n]; mu, s: float32 [n]. Returns (buffer int16 holding 16-bit words, starts int32, n)."""
+    def encode(self, words, mu, s, out=None):
+        """words: int16/int32 [n]; mu, s: float32 [n]. Returns (buffer int16 holding 16-bit words, starts int32, n).
+        out: an int16 buffer of at least programs x capacity words to reuse (its old contents do not matter)."""
         n = words.numel()
         S, P, cap = self.layout(n)
         w = words.reshape(-1).to(torch.int32).contiguous()
-        out = torch.zeros(P * cap, dtype=torch.int16, device=self.device)
-        starts = torch.zeros(P, dtype=torch.int32, device=self.device)
+        if out is None:
+            out = torch.empty(P * cap, dtype=torch.int16, device=self.device)
+        starts = torch.empty(P, dtype=torch.int32, device=self.device)
+        t = self.tables
         self._launch(_encode_kernel, (P,), w, mu.reshape(-1).contiguous(), s.reshape(-1).contiguous(), out, starts,
-                     self.cum, self.off, self.K, n, S, self.V, cap, BLOCK=self.BLOCK, UNIFORM=self.mode == "uniform")
+                     t["cumf"], t["ko"], n, S, self.V, cap, BLOCK=self.BLOCK, UNIFORM=self.mode == "uniform")
         return out, starts, n
 
-    def decode(self, buf, starts, mu, s, n):
+    def decode(self, buf, starts, mu, s, n, out=None):
         S, P, cap = self.layout(n)
-        words = torch.empty(n, dtype=torch.int16, device=self.device)
+        words = torch.empty(n, dtype=torch.int16, device=self.device) if out is None else out
+        t = self.tables
         self._launch(_decode_kernel, (P,), buf, starts, mu.reshape(-1).contiguous(), s.reshape(-1).contiguous(),
-                     words, self.cum, self.off, self.K, self.lut, n, S, self.V, BLOCK=self.BLOCK,
+                     words, t["cumf"], t["ko"], t["lut"], n, S, self.V, BLOCK=self.BLOCK,
                      LUT_SHIFT=16 - LUT_BITS, LUT_W=LUT_N, REFINE=REFINE, UNIFORM=self.mode == "uniform")
         return words
 
@@ -395,7 +417,8 @@ class SliceCoder:
     def ideal_bits(self, words, mu, s):
         """Sum of -log2(f / 65536) over the coder's symbols (no stream overhead), computed in PyTorch with the
         same float32 operations: the size the rANS stream should reach up to its state and rounding overhead."""
-        return float(symbol_costs(words, mu, s, self.cum, self.off, self.K, self.mode).sum())
+        t = self.tables
+        return float(symbol_costs(words, mu, s, t["cum"], t["off"], t["K"], self.mode).sum())
 
 
 # ---------------------------------------------------------------------------------------------- reference model
@@ -423,10 +446,10 @@ def _bf16_word_t(x):
 
 
 def _first_ge_t(x):
-    o = _ord_t(_bf16_word_t(x))
-    o = torch.where(_word_val_t(_word_t(o)) < x, o + 1, o)
-    o = torch.where(_word_val_t(_word_t(o - 1)) >= x, o - 1, o)
-    return o
+    b = x.contiguous().view(torch.int32).to(torch.int64) & 0xFFFFFFFF
+    w = b >> 16
+    up = ((b >> 31) == 0) & ((b & 0xFFFF) != 0)
+    return _ord_t(torch.where(up, w + 1, w))
 
 
 def _bd_t(o):
@@ -443,8 +466,9 @@ def symbol_costs(words, mu, s, cum, off, K, mode="exact"):
     c = (ea - es - 3).clamp(0, 9).to(torch.int64)
     Kc = K.to(torch.int64)[c]
     offc = off.to(torch.int64)[c]
-    d = 2.0 ** (c.to(torch.float32) - 3)
+    d = ((c + 124) << 23).to(torch.int32).view(torch.float32)
     v = _word_val_t(w)
+    o = _ord_t(w)
 
     def bounds(k):
         t0 = k.to(torch.float32) * d - 24.0
@@ -452,32 +476,34 @@ def symbol_costs(words, mu, s, cum, off, K, mode="exact"):
         return mu + t0 * s, mu + t1 * s
     lo0, _ = bounds(torch.zeros_like(Kc))
     _, hiK = bounds(Kc - 1)
-    esc = ~torch.isfinite(v) | (v < lo0) | (v >= hiK)
-    k = torch.floor(((v - mu) / s + 24.0) * (2.0 ** (3 - c.to(torch.float32))))
+    esc = (((w >> 7) & 0xFF) == 0xFF) | (o < _first_ge_t(lo0)) | (o >= _first_ge_t(hiK))
+    k = torch.floor(((v - mu) / s + 24.0) * ((130 - c) << 23).to(torch.int32).view(torch.float32))
     k = torch.where(esc, torch.zeros_like(k), torch.minimum(k.clamp_min(0), (Kc - 1).to(torch.float32))).to(torch.int64)
     lo, hi = bounds(k)
+    first, nxt = _first_ge_t(lo), _first_ge_t(hi)
     for _ in range(64):
-        move = ~esc & ((v < lo) | (v >= hi))
+        move = ~esc & ((o < first) | (o >= nxt))
         if not bool(move.any()):
             break
-        k = torch.where(move & (v < lo), k - 1, torch.where(move & (v >= hi), k + 1, k))
+        k = torch.where(move & (o < first), k - 1, torch.where(move & (o >= nxt), k + 1, k))
         lo, hi = bounds(k)
+        first, nxt = _first_ge_t(lo), _first_ge_t(hi)
     cumt = cum.to(torch.int64)
     ks = torch.where(esc, Kc, k)
     f1 = cumt[offc + ks + 1] - cumt[offc + ks]
-    first, last = _first_ge_t(lo), _first_ge_t(hi) - 1
-    n = last - first + 1
-    base = _bd_t(first)
-    R = (65536 - n).to(torch.float32) / (_bd_t(last + 1) - base)
-    o = _ord_t(w)
-
-    def cw(q):
-        cc = torch.floor((_bd_t(q) - base) * R).to(torch.int64) + (q - first)
-        return torch.where(q > last, torch.full_like(cc, 65536), cc)
+    last = nxt - 1
+    n = nxt - first
+    j = o - first
     if mode == "uniform":
-        cu = lambda j: torch.div((j << 16) + n.clamp_min(1) - 1, n.clamp_min(1), rounding_mode="floor")
-        share = cu(o - first + 1) - cu(o - first)
+        q = torch.div(65536, n.clamp_min(2), rounding_mode="floor")
+        share = torch.where(j == n - 1, 65536 - (n - 1) * q, q)
     else:
+        base = _bd_t(first)
+        R = (65536 - n).to(torch.float32) / (_bd_t(last + 1) - base)
+
+        def cw(qq):
+            cc = torch.floor((_bd_t(qq) - base) * R).to(torch.int64) + (qq - first)
+            return torch.where(qq > last, torch.full_like(cc, 65536), cc)
         share = cw(o + 1) - cw(o)
     f2 = torch.where(esc, torch.ones_like(n), torch.where(n > 1, share, torch.full_like(n, 65536)))
     return 16 - torch.log2(f1.double()) + 16 - torch.log2(f2.double())
