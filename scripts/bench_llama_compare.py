@@ -684,7 +684,7 @@ def mix_lines(out, res):
             if r["part"] == "fused":
                 return f"fused {r['tokens_per_program']}x{r['rows']}, {r['mode']}"
             v = r.get("variant") or ""
-            kind = "reduced rank" if "reduced-rank" in v else "dense"
+            kind = (f"rank {r['rank']}" if r.get("rank") else "reduced rank") if "reduced-rank" in v else "dense"
             return f"per layer, {kind} product, {r['mode']}"
         best = {}                                    # per kind, the fastest measured row
         for r in fused:
@@ -816,14 +816,15 @@ def parser():
     p.add_argument("--fused-configs", default="32x8x8,64x8x8,32x4x4,16x4x4,64x16x16",
                    help="gpu_speed: fused one-step codec on the whole test document, tokens per program x rows x "
                         "warps (empty: skip)")
-    p.add_argument("--layer-configs", default="128x1,128x2,128x4,64x2,256x2",
+    p.add_argument("--layer-configs", default="128x1,128x2,128x4,64x2,256x2,32x2",
                    help="gpu_speed: per-layer one-step codec (cuBLAS product + one coding kernel per layer), tokens "
                         "per program x token chunks decoded on separate CUDA streams (empty: skip)")
     p.add_argument("--pool-fused", default="32x4x4", help="pool: fused codec shape (TBxRxW)")
     p.add_argument("--pool-layer", default="128x2", help="pool: per-layer codec shape (TBxC)")
     p.add_argument("--pool-tokens", default="2048,8192", help="pool: prefix lengths for the recompute baseline")
-    p.add_argument("--layer-ranks", default="512",
-                   help="gpu_speed: reduced-rank products to try in the per-layer codec (the fast-link mode)")
+    p.add_argument("--layer-ranks", default="512,384,256",
+                   help="gpu_speed: reduced-rank products to try in the per-layer codec (the fast-link mode): each "
+                        "with its requantization in a kernel and in the first product's epilogue (3 tile shapes)")
     p.add_argument("--fused-modes", default="uniform,exact",
                    help="gpu_speed: fused codec modes (every config in the first; the fastest also in the others)")
     return p

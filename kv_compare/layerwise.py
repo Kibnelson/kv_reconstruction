@@ -39,6 +39,40 @@ def int_mm(x, A, out=None):
 if triton is not None:
 
     @triton.jit
+    def _imm_tile(x_ptr, a_ptr, M, N, K, BM: tl.constexpr, BN: tl.constexpr, BK: tl.constexpr, GROUP: tl.constexpr):
+        """This program's [BM, BN] int32 tile of X [M, K] times A [N, K] transposed, with its row and column
+        indices (grouped order: consecutive programs share A tiles in L2)."""
+        pid = tl.program_id(0)
+        nm = tl.cdiv(M, BM)
+        nn = tl.cdiv(N, BN)
+        gw = GROUP * nn
+        gid = pid // gw
+        fm = gid * GROUP
+        gs = tl.minimum(nm - fm, GROUP)
+        pm = fm + (pid % gw) % gs
+        pn = (pid % gw) // gs
+        rm = pm * BM + tl.arange(0, BM)
+        rn = pn * BN + tl.arange(0, BN)
+        rk = tl.arange(0, BK)
+        acc = tl.zeros([BM, BN], dtype=tl.int32)
+        for k0 in range(0, K, BK):
+            xt = tl.load(x_ptr + rm[:, None] * K + (k0 + rk)[None, :])
+            at = tl.load(a_ptr + rn[:, None] * K + (k0 + rk)[None, :])
+            acc = tl.dot(xt, tl.trans(at), acc, out_dtype=tl.int32)
+        return acc, rm, rn
+
+    @triton.jit
+    def _igemm_rq_kernel(x_ptr, a_ptr, q_ptr, m1_ptr, m0_ptr, M, N, K, BM: tl.constexpr, BN: tl.constexpr,
+                         BK: tl.constexpr, GROUP: tl.constexpr):
+        """Reduced-rank product, first half, with the requantization in the epilogue: q [M, N] int8 =
+        clamp(floor(z * m1 + m0)) of z = X [M, K] times A [N, K] transposed. The same values as int_mm followed by
+        _requant_kernel (same float32 operations, no fused multiply-add), but z never goes through memory."""
+        acc, rm, rn = _imm_tile(x_ptr, a_ptr, M, N, K, BM, BN, BK, GROUP)
+        q = tl.floor(acc.to(tl.float32) * tl.load(m1_ptr + rn)[None, :] + tl.load(m0_ptr + rn)[None, :])
+        q = tl.minimum(tl.maximum(q, -127.0), 127.0)
+        tl.store(q_ptr + rm[:, None] * N + rn[None, :], q.to(tl.int8))
+
+    @triton.jit
     def _igemm_kernel(x_ptr, a_ptr, c_ptr, M, N, K, BM: tl.constexpr, BN: tl.constexpr, BK: tl.constexpr,
                       GROUP: tl.constexpr):
         """Exact int8 product C [M, N] int32 = X [M, K] times A [N, K] transposed (a small-footprint kernel that
@@ -364,11 +398,14 @@ class LayerwiseOneStep:
 
     def __init__(self, consts, C, hd, tokens_per_program=128, mode="uniform", search=True, chunks=1, fuse=False,
                  features="inline", lean=False, split_streams=False, product="cublas", gemm_tiles=(128, 128, 64, 4),
-                 rank=None):
+                 rank=None, requant="kernel", rank_tiles=(64, 128, 64, 4)):
         """features: "inline" (the coding kernel makes the next layer's features) or "pass" (a separate kernel);
         lean: reload per-channel constants every token (fewer registers); split_streams: per chunk, the products on
         a high-priority CUDA stream and the coding on another, so pending products are scheduled first; rank: the
-        constants of prepare_rank (the reduced-rank product, for fast links) instead of the dense product."""
+        constants of prepare_rank (the reduced-rank product, for fast links) instead of the dense product;
+        requant (reduced rank): "kernel" (cuBLAS first product, int32 intermediate, a requantization kernel) or
+        "epilogue" (a Triton first product, tiles rank_tiles = (BM, BN, BK, warps), that requantizes in its
+        epilogue: the same 8-bit intermediate, bit for bit); the second product follows `product`."""
         if triton is None:
             raise RuntimeError("Triton is required")
         if mode not in ("exact", "uniform"):
@@ -386,6 +423,9 @@ class LayerwiseOneStep:
         if product not in ("cublas", "triton"):
             raise ValueError("product is 'cublas' or 'triton'")
         self.product, self.gemm_tiles = product, tuple(int(v) for v in gemm_tiles)
+        if requant not in ("kernel", "epilogue"):
+            raise ValueError("requant is 'kernel' or 'epilogue'")
+        self.requant, self.rank_tiles = requant, tuple(int(v) for v in rank_tiles)
         self.device = consts["Aq"].device
         self.tables = gc.slice_tables(self.device)
         self.opts = {} if fuse else {"enable_fp_fusion": False}
@@ -466,6 +506,8 @@ class LayerwiseOneStep:
                 "pos": torch.empty(S, dtype=torch.int32, device=dev),
                 "smult": torch.empty(S * self.TB, dtype=torch.float32, device=dev),
                 "acc": [torch.zeros(Tc, self.W, dtype=torch.int32, device=dev) for _ in range(self.chunks)],
+                "scratch": ([self._scratch(Tc) for _ in range(self.chunks)] if self.rank is not None
+                            else [None] * self.chunks),
                 "streams": ([torch.cuda.Stream(dev) for _ in range(self.chunks)]
                             if dev.type == "cuda" and (self.chunks > 1 or self.split) else None),
                 "gemm_streams": ([torch.cuda.Stream(dev, priority=-1) for _ in range(self.chunks)]
@@ -498,7 +540,7 @@ class LayerwiseOneStep:
                         if layer == 0:
                             acc.zero_()
                         else:
-                            self._product(bufs["xbuf"][(layer + 1) % 2][rows], layer, acc)
+                            self._product(bufs["xbuf"][(layer + 1) % 2][rows], layer, acc, bufs["scratch"][c])
                     if gstreams:
                         streams[c].wait_stream(gstreams[c])
                 if products_only:
@@ -523,16 +565,35 @@ class LayerwiseOneStep:
             cur.wait_stream(s)
         return words
 
-    def _product(self, x, layer, out):
+    def _scratch(self, n):
+        """Working memory of the reduced-rank product for n tokens: the int32 and 8-bit intermediates."""
+        r = self.rank["rank"]
+        return {"z": torch.empty(n, r, dtype=torch.int32, device=self.device) if self.requant == "kernel" else None,
+                "zq": torch.empty(n, r, dtype=torch.int8, device=self.device)}
+
+    def _product(self, x, layer, out, scratch=None):
         """The layer's int32 products from 8-bit features x [n, W] into out [n, W]."""
         if self.rank is not None:                    # two 8-bit products with an 8-bit intermediate
             rc = self.rank
-            z = int_mm(x, rc["Bq"][layer])
-            zq = torch.empty(z.shape, dtype=torch.int8, device=z.device)
-            self._launch(_requant_kernel, (triton.cdiv(z.numel(), 1024),), z, zq, rc["m1"][layer], rc["m0"][layer],
-                         z.numel(), z.shape[1], BLOCK=1024, warps=4)
-            return int_mm(zq, rc["Uq"][layer], out=out)
-        A = self.k["Aq"][layer]
+            n, r = x.shape[0], rc["rank"]
+            s = self._scratch(n) if scratch is None else scratch
+            zq = s["zq"]
+            BM, BN, BK, nw = self.rank_tiles
+            if self.requant == "epilogue":
+                if n % BM or r % BN or self.W % BK:
+                    raise ValueError(f"epilogue tiles {BM}x{BN}x{BK} do not divide {n} x {r} x {self.W}")
+                self._launch(_igemm_rq_kernel, ((n // BM) * (r // BN),), x, rc["Bq"][layer], zq, rc["m1"][layer],
+                             rc["m0"][layer], n, r, self.W, BM=BM, BN=BN, BK=BK, GROUP=8, warps=nw, num_stages=3)
+            else:
+                z = s["z"] if s["z"] is not None else torch.empty(n, r, dtype=torch.int32, device=x.device)
+                int_mm(x, rc["Bq"][layer], out=z)
+                self._launch(_requant_kernel, (triton.cdiv(z.numel(), 1024),), z, zq, rc["m1"][layer],
+                             rc["m0"][layer], z.numel(), r, BLOCK=1024, warps=4)
+            return self._dense(zq, rc["Uq"][layer], out)
+        return self._dense(x, self.k["Aq"][layer], out)
+
+    def _dense(self, x, A, out):
+        """out [n, N] int32 = x [n, K] int8 times A [N, K] int8 transposed: cuBLAS, or the Triton kernel."""
         if self.product == "cublas" or not x.is_cuda:
             return int_mm(x, A, out=out)
         BM, BN, BK, nw = self.gemm_tiles

@@ -243,7 +243,8 @@ class CoderTests(unittest.TestCase):
     def test_layerwise_codec_round_trip_interpreted(self):
         """The per-layer one-step codec (int8 product, then one coding kernel per layer; streams kept open across
         layers) restores the same KV bit for bit, with one and two token chunks, both modes, both stage-1 decoders
-        and the reduced-rank product (fast-link mode)."""
+        and the reduced-rank product (fast-link mode), its requantization in a separate kernel or in the first
+        product's epilogue."""
         import importlib.util
         import subprocess
         if importlib.util.find_spec("triton") is None or torch is None:
@@ -251,7 +252,7 @@ class CoderTests(unittest.TestCase):
         r = subprocess.run([sys.executable, "-c", LAYERWISE_CHECK, str(ROOT)], capture_output=True, text=True,
                            timeout=1800)
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
-        self.assertEqual(r.stdout.count("ok"), 3, r.stdout)
+        self.assertEqual(r.stdout.count("ok"), 4, r.stdout)
 
 
 FUSED_CHECK = r"""
@@ -309,9 +310,19 @@ LAYERWISE_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
 from kv_compare import layerwise
 xall, prior = fused.FusedOneStep(consts, study.C, study.hd, tokens_per_program=16, rows=4, kchunk=32, warps=4).model(words)
 rc = layerwise.prepare_rank(study, consts, 32, log=lambda m: None)
-for mode, chunks, search, rank in (("uniform", 1, True, None), ("exact", 2, False, None), ("uniform", 2, True, rc)):
+tiles = (16, 16, 32, 4)
+ck = layerwise.LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=16, rank=rc, requant="kernel")
+ce = layerwise.LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=16, rank=rc, requant="epilogue",
+                                rank_tiles=tiles)
+for l in range(1, L):          # requantized in the product's epilogue: the same 8-bit intermediate and products
+    sk, se = ck._scratch(T), ce._scratch(T)
+    ak = ck._product(xall[l - 1], l, torch.empty(T, W, dtype=torch.int32), sk)
+    ae = ce._product(xall[l - 1], l, torch.empty(T, W, dtype=torch.int32), se)
+    assert se["z"] is None and torch.equal(sk["zq"], se["zq"]) and torch.equal(ak, ae), ("epilogue", l)
+for mode, chunks, search, rank, rq in (("uniform", 1, True, None, "kernel"), ("exact", 2, False, None, "kernel"),
+                                       ("uniform", 2, True, rc, "kernel"), ("uniform", 2, True, rc, "epilogue")):
     codec = layerwise.LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=16, mode=mode, search=search,
-                                       chunks=chunks, rank=rank)
+                                       chunks=chunks, rank=rank, requant=rq, rank_tiles=tiles)
     if rank is not None:       # its own forward pass: the same features, priors from the reduced-rank predictor
         xr, pr = codec.model(words)
         assert torch.equal(xr[:L - 1], xall[:L - 1]), "features"
@@ -320,7 +331,7 @@ for mode, chunks, search, rank in (("uniform", 1, True, None), ("exact", 2, Fals
         buf, starts = codec.encode(words, xall, prior)
     dec = codec.decode(buf, starts, T)
     assert torch.equal(dec, words), ("round trip", mode, chunks, int((dec != words).sum()))
-    print("ok", mode, chunks, codec.bits(starts, T) / (L * T * W))
+    print("ok", mode, chunks, rq, codec.bits(starts, T) / (L * T * W))
 """
 
 

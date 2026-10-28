@@ -388,22 +388,26 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
     rows = []
 
     def run(TB, chunks, mode, search, features="inline", lean=False, split=False, parts=False, product="cublas",
-            tiles=(128, 128, 64, 4), graph=False, rank=None):
+            tiles=(128, 128, 64, 4), graph=False, rank=None, requant="kernel", rank_tiles=(64, 128, 64, 4)):
+        rq = (f", requantized in a Triton product epilogue {rank_tiles[0]}x{rank_tiles[1]}x{rank_tiles[2]} "
+              f"({rank_tiles[3]} warps)" if requant == "epilogue" else "")
         variant = ", ".join(x for x in ("features in a separate pass" if features == "pass" else "",
                                         "lean registers" if lean else "",
                                         "products on high-priority streams" if split else "",
                                         f"Triton product {tiles[0]}x{tiles[1]}x{tiles[2]} ({tiles[3]} warps)"
                                         if product == "triton" else "",
                                         "CUDA graph" if graph else "",
-                                        f"reduced-rank product (rank {rank['rank']})" if rank else "") if x)
+                                        f"reduced-rank product (rank {rank['rank']}{rq})" if rank else "") if x)
         tag = f"per layer, {TB} tokens per program, {chunks} chunk{'s' if chunks > 1 else ''}, {mode}" + \
               (", stage-1 search" if search else "") + (f", {variant}" if variant else "")
         row = {"part": "layerwise", "tokens_per_program": TB, "chunks": chunks, "mode": mode, "search": search,
-               "variant": variant, "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name}
+               "variant": variant, "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name,
+               "rank": rank["rank"] if rank else None, "requant": requant if rank else None}
         try:
             codec = LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=TB, mode=mode, search=search,
                                      chunks=chunks, features=features, lean=lean, split_streams=split,
-                                     product=product, gemm_tiles=tiles, rank=rank)
+                                     product=product, gemm_tiles=tiles, rank=rank, requant=requant,
+                                     rank_tiles=rank_tiles)
             xa, pr = (xall, prior)
             if rank is not None:                     # the rank predictor's own forward pass (its priors differ)
                 xa, pr = codec.model(words)
@@ -475,8 +479,18 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
             except Exception as exc:
                 log(f"  reduced rank {r}: not prepared ({exc!r})")
                 continue
-            run(TB, ch, modes[0], True, rank=rc, parts=True)
-            run(TB, ch, modes[0], True, rank=rc, graph=True)
+            first = len(rows)
+            run(TB, ch, modes[0], True, rank=rc, parts=True)             # cuBLAS, then a requantization kernel
+            for rt in ((64, 128, 64, 4), (128, 128, 64, 4), (64, 64, 64, 4)):
+                run(TB, ch, modes[0], True, rank=rc, requant="epilogue", rank_tiles=rt, parts=rt == (64, 128, 64, 4))
+            done = [x for x in rows[first:] if x.get("bit_exact")]
+            if done:                                 # the fastest of these with 1 and 4 chunks, and as a graph
+                b = max(done, key=lambda x: x["decode_gvalues_per_s"])
+                rt = next((t for t in ((64, 128, 64, 4), (128, 128, 64, 4), (64, 64, 64, 4))
+                           if b["variant"].endswith(f"{t[0]}x{t[1]}x{t[2]} ({t[3]} warps))")), (64, 128, 64, 4))
+                for c2 in (1, 4):
+                    run(TB, c2, modes[0], True, rank=rc, requant=b["requant"], rank_tiles=rt, parts=c2 == 1)
+                run(TB, ch, modes[0], True, rank=rc, requant=b["requant"], rank_tiles=rt, graph=True)
             del rc
     del xall, prior
     return rows
