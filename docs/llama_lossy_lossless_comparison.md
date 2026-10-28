@@ -105,6 +105,17 @@ The next run (`6792614`) showed neither helps: a CUDA graph gave the same 32.5 m
 
 The first fast-link run (`28ef51d`) decoded bit-exact in 30.0 ms (15.7 G values/s) at 9.21 bits per value (+0.196, as the probe said). At 200 Gb/s that is 0.94x of SplitZip's 28.2 ms, up from 0.87x; slower links are unchanged (1.33-1.34x, dense or exact modes). The products took 11.4 ms instead of the expected 7.5 ms (half of 15.0), and running them with the coding cost 3.1 ms more than one after the other (11.4 + 15.6 = 27.0 ms against 30.1 ms). Part of the 11.4 ms is the int32 intermediate (16 MB written, read back and requantized by an extra kernel in each layer), so the speed stage now also runs the first product as a Triton kernel that requantizes in its epilogue (`requant="epilogue"`, bit for bit the same 8-bit intermediate, three tile shapes), and tries ranks 512, 384 and 256 with 1, 2 and 4 chunks. The coding alone (15.6 ms) is the floor of this design and already slower than SplitZip's 14.1 ms at 400 Gb/s, so 400 Gb/s needs a faster coder, not a cheaper product.
 
+That run (`c96f7be`, commit `f29e3d0`) won 200 Gb/s. Requantizing in the epilogue took the rank-512 products from 11.5 to 8.9 ms (64x128x64 tiles) and 128x128x64 tiles did better still. All decodes bit-exact, 32 tokens per program (now the fastest dense shape too: 31.2 ms), 2 chunks:
+
+| Product | Bits per value | Products alone | Decode, kernel requantization | Decode, epilogue (128x128x64) | 200 Gb/s vs SplitZip |
+| --- | --- | --- | --- | --- | --- |
+| dense | 9.025 | 14.6 ms | 31.2 ms | - | 0.90x |
+| rank 512 | 9.221 (+0.20) | 11.5 → 8.9 ms | 28.2 ms | 25.5 ms | 1.11x |
+| rank 384 | 9.296 (+0.27) | 9.6 → 7.3 ms | 26.5 ms | 24.5 ms | 1.15x |
+| rank 256 | 9.405 (+0.38) | 7.6 → 5.5 ms | 24.5 ms | 22.9 ms | 1.23x |
+
+(products alone: kernel requantization → epilogue with 64x128x64 tiles; the decode columns are the best of plain and CUDA-graph runs.) Rank 256 decodes at 20.5 G values/s, 22.9 ms for the document, while its 9.405 bits take 22.1 ms on a 200 Gb/s wire: decode and link are now balanced there, so a smaller rank would only add bits. The measured transfer table is 1.34x SplitZip up to 50 Gb/s, 1.33x at 100 Gb/s and 1.23x at 200 Gb/s (rank 256); 0.62x at 400 Gb/s, where the coding alone (15.6-15.7 ms) is the limit.
+
 Stage 1 of the decoder (finding the slice symbol) has two versions over the same streams. The direct version, now the default, uses a table for the rare tail slots and one comparison elsewhere. The search version, used before, does a binary search that waits for the slowest of a program's lanes. Both are timed.
 
 A cheaper predictor for fusing was ruled out: predicting each KV head only from its own head in the previous layer costs +0.59 bits per value on SmolLM2-135M (+0.38 for keys from keys and values from values), so the fused codec keeps the full one-step product.
