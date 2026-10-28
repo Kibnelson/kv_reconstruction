@@ -132,6 +132,20 @@ if triton is not None:
         return k, sym, j, esc
 
     @triton.jit
+    def _token_step(step0, istep0, mult, KAPPA, TOKSTEP: tl.constexpr):
+        """The step, its reciprocal and the table class for one token: kappa x spread (class from kappa / the
+        multiplier) or, with TOKSTEP, kappa x spread x multiplier (then the class is kappa's for every token)."""
+        if TOKSTEP:
+            step = step0 * mult
+            istep = tl.math.div_rn(tl.full(step0.shape, 1.0, tl.float32), step)
+            c = _lclass(KAPPA + mult * 0.0)
+        else:
+            step = step0
+            istep = istep0
+            c = _lclass(tl.math.div_rn(KAPPA + mult * 0.0, mult))
+        return step, istep, c
+
+    @triton.jit
     def _recon(mu, k, step):
         return gc._bf16_word(mu + k.to(tl.float32) * step)
 
@@ -152,7 +166,8 @@ if triton is not None:
     @triton.jit
     def _lyq_kernel(words_ptr, out_ptr, acc_ptr, xout_ptr, sa_ptr, b_ptr, sp_ptr, inv_ptr, isx_ptr, cos_ptr, sin_ptr,
                     ssum_in_ptr, ssum_out_ptr, smult_ptr, lut_ptr, KAPPA, T, W, G, HG, PRIOR_SCALE,
-                    FIRST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr, LUT_W: tl.constexpr):
+                    FIRST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr, LUT_W: tl.constexpr,
+                    PREFIX: tl.constexpr, TOKSTEP: tl.constexpr):
         """Encoder's forward pass for one layer of one token block x head: quantize, reconstruct, surprise sums and
         the next layer's features from the reconstruction."""
         pid = tl.program_id(0)
@@ -174,20 +189,21 @@ if triton is not None:
         spl = tl.load(sp_ptr + own)
         invl = tl.load(inv_ptr + own)
         isxl = tl.load(isx_ptr + own)
-        step = spl * KAPPA
-        istep = tl.math.div_rn(tl.full([HD], 1.0, tl.float32), step)
+        step0 = spl * KAPPA
+        istep0 = tl.math.div_rn(tl.full([HD], 1.0, tl.float32), step0)
         for i in range(0, TB):
             t = t0 + i
             cs = tl.load(cos_ptr + t * H2 + hh)
             sn = tl.load(sin_ptr + t * H2 + hh)
             mu = lw._lane_mu(acc_ptr + t * W, own, part, sao, bo, sap, bp, cs, sn, low, key)
             mult = tl.load(smult + i)
-            c = _lclass(tl.math.div_rn(KAPPA + mult * 0.0, mult))
+            step, istep, c = _token_step(step0, istep0, mult, KAPPA, TOKSTEP)
             gp = tl.load(lut_ptr + c * LUT_W + LUT_N + 1)
             Gs = gp & 0xFFFF
             lm = gp >> 16
             w = tl.load(words_ptr + t * W + own).to(tl.int32) & 0xFFFF
             k, sym, j, esc = _lattice(gc._word_val(w), mu, istep, w, Gs, lm)
+            esc = esc | (t < PREFIX)
             wq = tl.where(esc, w, _recon(mu, k, step))
             tl.store(out_ptr + t * W + own, wq.to(tl.int16))
             v = gc._word_val(wq)
@@ -199,7 +215,8 @@ if triton is not None:
     @triton.jit
     def _lyenc_kernel(words_ptr, prior_ptr, state_ptr, pos_ptr, out_ptr, start_ptr, acc_ptr, sa_ptr, b_ptr, sp_ptr,
                       cos_ptr, sin_ptr, smult_ptr, cumf_ptr, lut_ptr, KAPPA, T, W, G, HG,
-                      FLUSH: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr, LUT_W: tl.constexpr):
+                      FLUSH: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr, LUT_W: tl.constexpr,
+                      PREFIX: tl.constexpr, TOKSTEP: tl.constexpr):
         """Encode one layer of one token block x head, tokens in reverse (layers are launched last first)."""
         pid = tl.program_id(0)
         g = pid % G
@@ -225,8 +242,8 @@ if triton is not None:
         sap = tl.load(sa_ptr + part)
         bp = tl.load(b_ptr + part)
         spl = tl.load(sp_ptr + own)
-        step = spl * KAPPA
-        istep = tl.math.div_rn(tl.full([HD], 1.0, tl.float32), step)
+        step0 = spl * KAPPA
+        istep0 = tl.math.div_rn(tl.full([HD], 1.0, tl.float32), step0)
         for ii in range(0, TB):
             i = TB - 1 - ii
             t = t0 + i
@@ -234,7 +251,7 @@ if triton is not None:
             sn = tl.load(sin_ptr + t * H2 + hh)
             mu = lw._lane_mu(acc_ptr + t * W, own, part, sao, bo, sap, bp, cs, sn, low, key)
             mult = tl.load(smult + i)
-            c = _lclass(tl.math.div_rn(KAPPA + mult * 0.0, mult))
+            step, istep, c = _token_step(step0, istep0, mult, KAPPA, TOKSTEP)
             row = lut_ptr + c * LUT_W
             kop = tl.load(row + LUT_N)
             gp = tl.load(row + LUT_N + 1)
@@ -243,6 +260,8 @@ if triton is not None:
             lm = gp >> 16
             w = tl.load(words_ptr + t * W + own).to(tl.int32) & 0xFFFF
             k, sym, j, esc = _lattice(gc._word_val(w), mu, istep, w, Gs, lm)
+            forced = t < PREFIX                          # the first tokens: their exact word, no symbol
+            esc = esc | forced
             p = tl.load(cumf_ptr + offf + sym)
             cum1 = (p >> 16) & 0xFFFF
             f1 = p & 0xFFFF
@@ -251,7 +270,7 @@ if triton is not None:
             f2 = tl.where(esc, 1, 1 << sh)
             two = valid & (esc | (lm > 0))
             x, wp = gc._put(x, cum2, f2, two, out_ptr, wp, 0)
-            x, wp = gc._put(x, cum1, f1, valid, out_ptr, wp, 0)
+            x, wp = gc._put(x, cum1, f1, valid & (~forced), out_ptr, wp, 0)
         if FLUSH:
             base = tl.multiple_of(((wp - 2 * HD) // 8) * 8, 8)
             tl.store(out_ptr.to(tl.pointer_type(tl.int32)) + base // 2 + cc, x.to(tl.int32, bitcast=True))
@@ -265,7 +284,7 @@ if triton is not None:
                       inv_ptr, isx_ptr, cos_ptr, sin_ptr, ssum_in_ptr, ssum_out_ptr, smult_ptr, cumf_ptr, lut_ptr,
                       KAPPA, t_base, T, W, G, HG, PRIOR_SCALE,
                       FIRST: tl.constexpr, LAST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr,
-                      LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr):
+                      LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr, PREFIX: tl.constexpr, TOKSTEP: tl.constexpr):
         """Decode one layer of one token block x head: symbol (coarse table + binary search), the cell inside it,
         the reconstruction, surprise sums and the next layer's features."""
         pid = tl.program_id(0)
@@ -297,14 +316,14 @@ if triton is not None:
         spl = tl.load(sp_ptr + own)
         invl = tl.load(inv_ptr + own)
         isxl = tl.load(isx_ptr + own)
-        step = spl * KAPPA
+        step0 = spl * KAPPA
         for i in range(0, TB):
             t = t0 + i
             cs = tl.load(cos_ptr + t * H2 + hh)
             sn = tl.load(sin_ptr + t * H2 + hh)
             mu = lw._lane_mu(acc_ptr + (t - t_base) * W, own, part, sao, bo, sap, bp, cs, sn, low, key)
             mult = tl.load(smult + i)
-            c = _lclass(tl.math.div_rn(KAPPA + mult * 0.0, mult))
+            step, _is, c = _token_step(step0, step0, mult, KAPPA, TOKSTEP)
             row = lut_ptr + c * LUT_W
             kop = tl.load(row + LUT_N)
             gp = tl.load(row + LUT_N + 1)
@@ -321,10 +340,11 @@ if triton is not None:
                 go = ((tl.load(cumf_ptr + offf + mid) >> 16) & 0xFFFF) <= slot
                 klo = tl.where(go, mid, klo)
                 khi = tl.where(go, khi, mid)
+            forced = t < PREFIX
             sym = klo
             p = tl.load(cumf_ptr + offf + sym)
-            x, rp = gc._take(x, (p >> 16) & 0xFFFF, p & 0xFFFF, valid, buf_ptr, rp, 0)
-            esc = sym == K
+            x, rp = gc._take(x, (p >> 16) & 0xFFFF, p & 0xFFFF, valid & (~forced), buf_ptr, rp, 0)
+            esc = (sym == K) | forced
             slot2 = (x & 0xFFFF).to(tl.int32)
             sh = 16 - lm
             j = slot2 >> sh
@@ -350,10 +370,13 @@ class LossyLayerwise(lw.LayerwiseOneStep):
     """Closed-loop lossy coding of a document's KV (all layers) with the per-layer one-step predictor."""
 
     def __init__(self, consts, C, hd, kappa, tokens_per_program=64, chunks=2, rank=None, requant="kernel",
-                 rank_tiles=(64, 128, 64, 4), product="cublas", fuse=False):
+                 rank_tiles=(64, 128, 64, 4), product="cublas", fuse=False, prefix=0, token_step=False):
+        """prefix: the first tokens travel exact (the attention sinks); token_step: step = kappa x spread x the
+        token's adaptive multiplier (a coarser step where the model expects a larger error)."""
         super().__init__(consts, C, hd, tokens_per_program=tokens_per_program, mode="uniform", search=True,
                          chunks=chunks, fuse=fuse, product=product, rank=rank, requant=requant, rank_tiles=rank_tiles)
         self.kappa = float(kappa)
+        self.prefix, self.token_step = int(prefix), bool(token_step)
         self.lt = lattice_tables(self.device)
 
     def quantize(self, words):
@@ -379,7 +402,7 @@ class LossyLayerwise(lw.LayerwiseOneStep):
                          k["sa"][layer], k["b"][layer], k["sp"][layer], k["inv"][layer], k["isx"][layer], k["cos"],
                          k["sin"], ssum[(layer + 1) % 2], ssum[layer % 2], smult, self.lt["lut"], self.kappa,
                          T, W, self.G, self.HG, self.prior_scale, FIRST=layer == 0, TB=self.TB, H2=self.hd // 2,
-                         LUT_W=LUT_W)
+                         LUT_W=LUT_W, PREFIX=self.prefix, TOKSTEP=self.token_step)
         return rec, xall, prior
 
     def encode(self, words, rec=None, xall=None, prior=None, out=None, layer_words=None):
@@ -405,7 +428,7 @@ class LossyLayerwise(lw.LayerwiseOneStep):
             self._launch(_lyenc_kernel, (S,), words[layer], prior[layer], state, pos, out, starts, acc,
                          k["sa"][layer], k["b"][layer], k["sp"][layer], k["cos"], k["sin"], smult, self.lt["cumf"],
                          self.lt["lut"], self.kappa, T, W, self.G, self.HG, FLUSH=layer == 0, TB=self.TB,
-                         H2=self.hd // 2, LUT_W=LUT_W)
+                         H2=self.hd // 2, LUT_W=LUT_W, PREFIX=self.prefix, TOKSTEP=self.token_step)
             if before is not None:
                 layer_words[layer] = before - pos.sum(dtype=torch.int64)
         if layer_words is not None:
@@ -439,7 +462,8 @@ class LossyLayerwise(lw.LayerwiseOneStep):
                                  bufs["ssum"][layer % 2], bufs["smult"][c * P * self.TB:], self.lt["cumf"],
                                  self.lt["lut"], self.kappa, c * Tc, T, W, self.G, self.HG, self.prior_scale,
                                  FIRST=layer == 0, LAST=layer == L - 1, TB=self.TB, H2=self.hd // 2,
-                                 LUT_SHIFT=16 - LUT_BITS, LUT_W=LUT_W)
+                                 LUT_SHIFT=16 - LUT_BITS, LUT_W=LUT_W, PREFIX=self.prefix,
+                                 TOKSTEP=self.token_step)
         for s in streams or []:
             cur.wait_stream(s)
         return words

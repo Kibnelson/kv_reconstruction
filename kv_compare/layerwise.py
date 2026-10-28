@@ -140,10 +140,11 @@ if triton is not None:
                      tail_ptr, t_base, T, W, G, HG, PRIOR_SCALE,
                      FIRST: tl.constexpr, LAST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr,
                      LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr, REFINE: tl.constexpr, UNIFORM: tl.constexpr,
-                     SEARCH: tl.constexpr, FEAT: tl.constexpr, LEAN: tl.constexpr):
+                     SEARCH: tl.constexpr, FEAT: tl.constexpr, LEAN: tl.constexpr, ONES: tl.constexpr):
         """Decode one layer of one token block x head (pointers are the layer's: out_ptr, sa_ptr, ...).
         FEAT: make the next layer's features here (else a separate pass does); LEAN: reload the per-channel
-        constants every token instead of keeping them in registers."""
+        constants every token instead of keeping them in registers; FIRST: the stream states come from the stream
+        (the first layer this codec decodes); ONES: prior 1 (no previous layer of ours to take surprise from)."""
         pid = tl.program_id(0)
         g = pid % G
         blk = pid // G
@@ -168,7 +169,7 @@ if triton is not None:
         # spread multipliers of the block's tokens, from the previous layer's surprise sums (all heads)
         rb = tl.arange(0, TB)
         smult = smult_ptr + pid * TB
-        if FIRST:
+        if ONES:
             tl.store(smult + rb, fu._mult(tl.full([TB], 1.0, tl.float32)))
         else:
             sacc = tl.zeros([TB], dtype=tl.int32)
@@ -562,7 +563,7 @@ class LayerwiseOneStep:
                                  FIRST=layer == 0, LAST=layer == L - 1, TB=self.TB, H2=self.hd // 2,
                                  LUT_SHIFT=16 - gc.LUT_BITS, LUT_W=gc.LUT_W, REFINE=gc.REFINE,
                                  UNIFORM=self.mode == "uniform", SEARCH=self.search,
-                                 FEAT=self.features == "inline", LEAN=self.lean)
+                                 FEAT=self.features == "inline", LEAN=self.lean, ONES=layer == 0)
                     if self.features == "pass" and layer < L - 1:
                         nv = Tc * W
                         self._launch(_lfeat_kernel, (triton.cdiv(nv, 1024),), words[layer], bufs["xbuf"][layer % 2],

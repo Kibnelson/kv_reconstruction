@@ -300,7 +300,7 @@ def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exa
 
 # ---------------------------------------------------------------------------------------------- fused codec
 def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64, layer_configs=(), ranks=(),
-               lossy_kappas=()):
+               lossy_kappas=(), splitzip_source=None, mix_counts=()):
     """The one-step codec on a whole test document (every layer, decoded layer by layer as a receiver must), in
     two implementations: fused (one kernel per direction, configs: tokens per program, rows, warps) and per layer
     (cuBLAS int8 product, then one coding kernel; layer_configs: tokens per program, token chunks on separate CUDA
@@ -373,6 +373,12 @@ def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64,
             run(best["tokens_per_program"], best["rows"], best["warps"], mode, False)
     if layer_configs:
         rows += layerwise_rows(consts, study, words, layer_configs, device, log, modes, model_bits, ranks)
+        if splitzip_source is not None and mix_counts:
+            try:
+                rows += mixed_rows(consts, study, words, device, log, splitzip_source, rows, mix_counts)
+            except Exception as exc:
+                log(f"  mix with SplitZip: not measured ({exc!r})")
+                rows.append({"part": "mixed_error", "error": repr(exc)[:400]})
     if lossy_kappas:
         rows += lossy_rows(consts, study, words, device, log, lossy_kappas)
     del words
@@ -434,6 +440,83 @@ def lossy_rows(consts, study, words, device, log=print, kappas=(0.5, 1.0, 2.0), 
     return rows
 
 
+def mixed_rows(consts, study, words, device, log, splitzip_source, layer_rows, counts=(0, 4, 8, 12, 16, 20, 24, 28)):
+    """Our per-layer codec mixed with the authors' SplitZip codec (kv_compare.mixed), measured: for the fastest
+    dense and reduced-rank modes, the layers where ours saves the most coded by ours (counts of them), the rest by
+    SplitZip; one real stream each, decoded bit-exact and timed. Also SplitZip alone on the whole document."""
+    import gc
+    from .layerwise import prepare_rank
+    from .mixed import MixedOneStep, load_splitzip, mix_orders
+    L, T, W = words.shape
+    n = L * T * W
+    sz, commit = load_splitzip(splitzip_source, device, log)
+    cal = torch.stack([study.train[0].words(l, device) for l in range(L)])
+    cal16 = (cal - 65536 * (cal >= 32768).to(torch.int32)).to(torch.int16)
+    cover = sz.calibrate(cal16.view(torch.bfloat16))
+    del cal, cal16
+    rows = []
+    enc_all = sz.encode(words.view(torch.bfloat16))
+    dec_all = sz.decode(enc_all)
+    ok = bool(torch.equal(dec_all.view(torch.int16), words.reshape(-1)))
+    te = timer(lambda: sz.encode(words.view(torch.bfloat16)), device, warmup=3, reps=10)
+    td = timer(lambda: sz.decode(enc_all), device, warmup=3, reps=10)
+    sz_bits = 8 * enc_all.compressed_bytes / n
+    rows.append({"part": "splitzip_official", "commit": commit, "bit_exact": ok, "calibration": study.train[0].name,
+                 "coverage": cover, "stream_bits_per_value": sz_bits, "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
+                 "decode_gvalues_per_s": n / td / 1e9, "decode_gbps": 2 * n / td / 1e9, "values": n,
+                 "doc": study.tests[0].name})
+    log(f"  SplitZip (official {commit[:7]}, calibrated on {study.train[0].name}): exact={ok}, {sz_bits:.4f} bits/value; "
+        f"encode {1e3 * te:.1f} ms, decode {1e3 * td:.1f} ms ({2 * n / td / 1e9:.0f} GB/s)")
+    del enc_all, dec_all
+    sz_layer = [8 * sz.encode(words[l].view(torch.bfloat16)).compressed_bytes / (T * W) for l in range(L)]
+    cands = {}
+    for r in layer_rows:                             # the fastest dense (cuBLAS) and reduced-rank modes with layer bits
+        if r.get("part") != "layerwise" or not r.get("bit_exact") or not r.get("layer_bits_per_value"):
+            continue
+        if r.get("mode") != "uniform" or r.get("product", "cublas") != "cublas":
+            continue
+        key = r.get("rank")
+        if key not in cands or r["decode_gvalues_per_s"] > cands[key]["decode_gvalues_per_s"]:
+            cands[key] = r
+    for key, base in sorted(cands.items(), key=lambda kv: (kv[0] is not None, kv[0] or 0)):
+        rc = prepare_rank(study, consts, key, log) if key else None
+        tiles = tuple(base["rank_tiles"]) if base.get("rank_tiles") else (64, 128, 64, 4)
+        kw = dict(tokens_per_program=base["tokens_per_program"], chunks=base["chunks"], rank=rc,
+                  requant=base.get("requant") or "kernel", rank_tiles=tiles)
+        label = f"rank {key}" if key else "dense"
+        order = mix_orders(base["layer_bits_per_value"], sz_layer)
+        probe = MixedOneStep(consts, study.C, study.hd, [True] * L, sz, **kw)
+        xall, prior = probe.model(words)
+        bufs = probe.buffers(T)
+        for m in counts:
+            mask = [False] * L
+            for l in order[:min(m, L)]:
+                mask[l] = True
+            row = {"part": "mixed", "mode": label, "ours_layers": int(sum(mask)), "ours_mask": mask,
+                   "tokens_per_program": base["tokens_per_program"], "chunks": base["chunks"], "values": n,
+                   "doc": study.tests[0].name}
+            try:
+                codec = MixedOneStep(consts, study.C, study.hd, mask, sz, **kw)
+                enc = codec.encode(words, xall, prior)
+                dec = codec.decode_mixed(enc, T, bufs=bufs)
+                ok = bool(torch.equal(dec, words))
+                td = timer(lambda: codec.decode_mixed(enc, T, out=dec, bufs=bufs), device, warmup=2, reps=5)
+                bits = codec.total_bits(enc, T) / n
+                row.update(bit_exact=ok, stream_bits_per_value=bits, decode_ms=1e3 * td,
+                           decode_gvalues_per_s=n / td / 1e9)
+                log(f"  [mix {label}, {row['ours_layers']} of {L} layers ours]: exact={ok}, {bits:.4f} bits/value, "
+                    f"decode {1e3 * td:.1f} ms -> {n / td / 1e9:.1f} G values/s")
+                del codec, enc
+            except Exception as exc:
+                row["error"] = repr(exc)[:240]
+                log(f"  [mix {label}, {m} layers ours]: not measured ({row['error']})")
+            gc.collect()
+            rows.append(row)
+        del probe, xall, prior, bufs, rc
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+    return rows
+
+
 def _wf(w):
     return (w.to(torch.int32) << 16).view(torch.float32).to(torch.float64)
 
@@ -464,7 +547,9 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
               (", stage-1 search" if search else "") + (f", {variant}" if variant else "")
         row = {"part": "layerwise", "tokens_per_program": TB, "chunks": chunks, "mode": mode, "search": search,
                "variant": variant, "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name,
-               "rank": rank["rank"] if rank else None, "requant": requant if rank else None}
+               "rank": rank["rank"] if rank else None, "requant": requant if rank else None,
+               "rank_tiles": list(rank_tiles) if rank and requant == "epilogue" else None, "product": product,
+               "gemm_tiles": list(tiles) if product == "triton" else None}
         try:
             codec = LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=TB, mode=mode, search=search,
                                      chunks=chunks, features=features, lean=lean, split_streams=split,

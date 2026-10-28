@@ -232,14 +232,19 @@ def stage_lossy(args, out):
         log("preparing the GPU lossy codec's one-step predictor")
         gconsts = _fused.prepare(study, log=log)
 
-    def gpu_lossy(doc, kappa):
+    VARIANTS = {"base": ("", 0, False), "sinks": (", sinks", None, False), "token": (", token step", 0, True),
+                "both": (", sinks + token step", None, True)}
+    variants = [VARIANTS[v] for v in args.lossy_variants]
+
+    def gpu_lossy(doc, kappa, prefix=0, token_step=False):
         """Our closed-loop lossy codec on the GPU (kv_compare.lossy_gpu): a real stream, decoded bit for bit as
         the encoder reconstructed it; its bits are the stream's."""
         from kv_compare.lossy_gpu import LossyLayerwise
         w = torch.stack([doc.words(l, device, P) for l in range(study.L)])
         w16 = (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
         TB, ch = (64, 2) if P % 128 == 0 else (16, 1)
-        codec = LossyLayerwise(gconsts, study.C, study.hd, kappa, tokens_per_program=TB, chunks=ch)
+        codec = LossyLayerwise(gconsts, study.C, study.hd, kappa, tokens_per_program=TB, chunks=ch, prefix=prefix,
+                               token_step=token_step)
         rec, xall, prior = codec.quantize(w16)
         buf, starts, _ = codec.encode(w16, rec, xall, prior)
         dec = codec.decode(buf, starts, P)
@@ -284,7 +289,9 @@ def stage_lossy(args, out):
                              "model_prefill_nll": own, "model_prefill_ppl_change_pct": own_pct}}
         methods = []
         if "ours" in chosen:
-            methods += [(f"Ours, step {k}", lambda k=k: study.lossy(cfg, fits, doc, P, k)) for k in args.kappas]
+            methods += [(f"Ours, step {k}{tag}", lambda k=k, pf=pf, ts=ts: study.lossy(
+                cfg, fits, doc, P, k, prefix=args.sink_tokens if pf is None else pf, token_step=ts))
+                for tag, pf, ts in variants for k in args.kappas]
         if "aqua" in chosen:
             methods += [(f"AQUA-KV, {b}-bit", lambda b=b: baselines.aqua_official(study, aqua[b], doc, P, b)) for b in (2, 3, 4)]
         if "kivi" in chosen:
@@ -292,8 +299,9 @@ def stage_lossy(args, out):
         if "fp8" in chosen:
             methods += [("FP8 cast", lambda: baselines.fp8_cast(study, doc, P))]
         if "gpu" in chosen:
-            methods += [(f"Ours, GPU codec (one-step, measured stream), step {k}", lambda k=k: gpu_lossy(doc, k))
-                        for k in args.kappas]
+            methods += [(f"Ours, GPU codec (one-step, measured stream), step {k}{tag}", lambda k=k, pf=pf, ts=ts:
+                         gpu_lossy(doc, k, prefix=args.sink_tokens if pf is None else pf, token_step=ts))
+                        for tag, pf, ts in variants for k in args.kappas]
         if previous and doc.name in previous["documents"]:          # keep the rows of methods not rerun
             old = previous["documents"][doc.name]
             stale = tuple(p for m, p in (("aqua", "AQUA-KV-style"), ("kivi", "KIVI-style")) if m in chosen)
@@ -502,7 +510,8 @@ def stage_gpu_speed(args, out):
         study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
         log(f"gpu_speed: fused one-step codec, whole {study.tests[0].name} ({study.L} layers), configs {args.fused_configs}")
         rows += fused_rows(study, device, args.fused_configs, log, modes=args.fused_modes,
-                           layer_configs=args.layer_configs, ranks=args.layer_ranks, lossy_kappas=args.lossy_speed_kappas)
+                           layer_configs=args.layer_configs, ranks=args.layer_ranks, lossy_kappas=args.lossy_speed_kappas,
+                           splitzip_source=args.splitzip_source or (out / "splitzip"), mix_counts=args.mix_counts)
         del study
     bits = {}
     if (out / "frontier.json").is_file():
@@ -518,10 +527,12 @@ def stage_gpu_speed(args, out):
 
 
 def stage_pool(args, out):
+    """GPU-resident KV pool, measured parts: the model's prefill (what a pool miss costs), host-to-GPU copies (pinned
+    and pageable) and the GPU memory left after the model. Every method's decode and encode times come from the
+    other stages (gpu_speed, exans, the authors'-code timings), its bits and quality from the lossy stage."""
     import gc
     import torch
     from kv_compare.capture import load_model
-    from kv_compare.gpu_speed import fused_rows
     from kv_compare.pool import copy_seconds, prefill_seconds
     from kv_compare.predict import Study
     device = torch.device(args.device)
@@ -533,120 +544,129 @@ def stage_pool(args, out):
         log("pool: " + note)
     study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
     doc = study.tests[0]
-    L, W = study.L, study.W
-    log(f"pool: our codec on the whole {doc.name} (fused {args.pool_fused}, per layer {args.pool_layer})")
-    rows = fused_rows(study, device, [args.pool_fused], log, modes=("uniform", "exact"), layer_configs=[args.pool_layer])
+    L, W, T = study.L, study.W, doc.tokens
     ids = [int(v) for v in doc.ids[: doc.tokens]]
     del study
     gc.collect()
-    torch.cuda.empty_cache()
     log("pool: loading the model for the recompute baseline")
     _tok, model = load_model(args.model, args.revision, device)
     torch.cuda.empty_cache()
     free, total = torch.cuda.mem_get_info(device)
     prefill = {}
-    for T in args.pool_tokens:
-        if T <= len(ids):
-            prefill[T] = prefill_seconds(model, ids[:T], device)
-            log(f"  prefill of {T} tokens: {1e3 * prefill[T]:.1f} ms")
+    for t in args.pool_tokens:
+        if t <= len(ids):
+            prefill[t] = prefill_seconds(model, ids[:t], device)
+            log(f"  prefill of {t} tokens: {1e3 * prefill[t]:.1f} ms")
     del model
     gc.collect()
     torch.cuda.empty_cache()
-    T = max(r["tokens"] for r in rows if "tokens" in r)
     n = L * T * W
-    ok = [r for r in rows if r.get("bit_exact")]
-    formats = {"raw BF16": 16.0}
-    if (out / "lossless.json").is_file():
-        sz = json.loads((out / "lossless.json").read_text())["methods"]["SplitZip-style"]["per_layer"]
-        if doc.name in sz:
-            formats["SplitZip"] = float(np.mean(sz[doc.name]))
-    for r in ok:
-        formats[f"ours lossless ({r['mode']})"] = min(formats.get(f"ours lossless ({r['mode']})", 99.0), r["stream_bits_per_value"])
-    copies = {}
-    for name, bits in formats.items():
-        copies[name] = copy_seconds(bits * n / 8, device)
-        log(f"  copy of {name} ({bits * n / 8 / 2 ** 20:.0f} MiB): host to GPU {1e3 * copies[name]['h2d_pinned']:.1f} ms "
-            f"pinned, {1e3 * copies[name]['h2d_pageable']:.1f} ms pageable")
-    lossy = {}
-    if (out / "lossy.json").is_file():
-        lres = json.loads((out / "lossy.json").read_text())
-        if doc.name in lres["documents"]:
-            for label, v in lres["documents"][doc.name].items():
-                if label.startswith("Ours, step"):
-                    lossy[label] = {"bits": v["bits"], "rel_error": v["rel_error"], "ppl_change_pct": v["ppl_change_pct"]}
+    copies = {"raw BF16": copy_seconds(2 * n, device)}
+    c = copies["raw BF16"]
+    log(f"  copy of the raw KV ({2 * n / 2 ** 20:.0f} MiB): host to GPU {1e3 * c['h2d_pinned']:.1f} ms pinned, "
+        f"{1e3 * c['h2d_pageable']:.1f} ms pageable")
     res = {"gpu": torch.cuda.get_device_name(device), "gpu_memory_at_start": note, "doc": doc.name, "tokens": T,
            "layers": L, "values": n, "free_after_model_bytes": free, "total_bytes": total,
-           "prefill_seconds": {str(k): v for k, v in prefill.items()}, "copies": copies, "formats_bits": formats,
-           "lossy": lossy, "codec_rows": rows}
+           "prefill_seconds": {str(k): v for k, v in prefill.items()}, "copies": copies, "version": 2}
     (out / "pool.json").write_text(json.dumps(res, indent=1))
     log(f"pool done ({memory_note(args.device)})")
     return res
 
 
 def pool_lines(out):
+    """Every method as a GPU-resident KV pool for one cached prefix: memory held, prefixes that fit, time to bring
+    it back from GPU or CPU memory, the cost of adding it, and (lossy methods) quality."""
     res = json.loads((out / "pool.json").read_text())
     T, n, L = res["tokens"], res["values"], res["layers"]
     raw = 2 * n
-    mb = lambda bits: bits * n / 8 / 2 ** 20
-    pre = res["prefill_seconds"].get(str(T))
-    rows = [r for r in res["codec_rows"] if r.get("bit_exact")]
-    lines = [f"## GPU-resident KV pool ({res['gpu']}, measured)", "",
-             f"A pool keeps finished requests' KV so that a later request with the same prefix skips its prefill. "
-             f"Bringing back one cached prefix of {T} tokens ({res['doc']}, {L} layers, {raw / 2 ** 20:.0f} MiB of "
-             "raw BF16 KV). Times are CUDA-event medians; our decode is bit-exact. Copies are host to GPU over "
-             "this machine's PCIe link.", "",
-             "| Way to bring the prefix back | Time | Kept in | Memory held |", "| --- | --- | --- | --- |"]
-    if pre:
-        lines.append(f"| Recompute: the model's prefill | {1e3 * pre:.0f} ms | nothing | 0 |")
-    lines.append(f"| Raw KV kept in GPU memory | 0 ms | GPU | {raw / 2 ** 20:.0f} MiB |")
-    c = res["copies"]["raw BF16"]
-    lines.append(f"| Raw KV in CPU memory, copied back (pinned / pageable) | {1e3 * c['h2d_pinned']:.0f} / "
-                 f"{1e3 * c['h2d_pageable']:.0f} ms | CPU | {raw / 2 ** 20:.0f} MiB |")
-    best = {}
-    for r in rows:                                   # the fastest decode per implementation and mode
-        k = (r["part"], r["mode"])
-        if k not in best or r["decode_ms"] < best[k]["decode_ms"]:
-            best[k] = r
-    for r in sorted(best.values(), key=lambda r: r["decode_ms"]):
-        impl = "fused" if r["part"] == "fused" else "per layer"
-        key = f"ours lossless ({r['mode']})"
-        cp = res["copies"].get(key, {}).get("h2d_pinned")
-        lines.append(f"| Ours ({impl}, {r['mode']}{', search' if r['search'] else ''}) kept in GPU memory, decoded | "
-                     f"{r['decode_ms']:.0f} ms | GPU | {mb(r['stream_bits_per_value']):.0f} MiB |")
-        if cp is not None:
-            lines.append(f"| Ours ({impl}, {r['mode']}) in CPU memory: copy, then decode | {1e3 * cp:.0f} + "
-                         f"{r['decode_ms']:.0f} ms | CPU | {mb(r['stream_bits_per_value']):.0f} MiB |")
-    if "SplitZip" in res["copies"]:
-        b = res["formats_bits"]["SplitZip"]
-        lines.append(f"| SplitZip kept in GPU memory, decoded (its published A4500 speed, not run here) | "
-                     f"{1e3 * raw / 311e9:.0f} ms | GPU | {mb(b):.0f} MiB |")
-    if pre and rows:
-        fwd = next((r["model_ms"] for r in rows if r["part"] == "fused"), None)
-        lines += ["", "Adding the prefix to the pool (ours): the encoder's forward pass (features and spreads of the "
-                  "exact KV, the same for both implementations) plus the encode, against the prefill that produced "
-                  "the KV.", "", "| Codec | Forward + encode ms | Share of the prefill |", "| --- | --- | --- |"]
-        for r in rows:
-            f = r.get("model_ms", fwd)
-            if f is None:
-                continue
-            e = f + r["encode_ms"]
-            lines.append(f"| {('fused' if r['part'] == 'fused' else 'per layer')}, {r['mode']}"
-                         f"{', search' if r['search'] else ''} | {f:.0f} + {r['encode_ms']:.0f} | {100 * e / (1e3 * pre):.0f}% |")
     free = res["free_after_model_bytes"]
-    lines += ["", f"Capacity: KV bytes per token = {L} layers x {n // (L * T)} values x bits / 8. Pool = the "
-              f"{free / 2 ** 30:.1f} GiB free after loading the model (no room left for activations, so an upper "
-              "bound).", "", "| Format | Bits per value | KiB per token | Tokens per GiB | Tokens in the free memory | vs raw |",
-              "| --- | --- | --- | --- | --- | --- |"]
-    per_tok = n // T
-    fmts = dict(res["formats_bits"])
-    for label, v in res["lossy"].items():
-        fmts[f"{label} (lossy: {100 * v['rel_error']:.1f}% KV error, perplexity {v['ppl_change_pct']:+.2f}%; "
-             "GPU decoder not built yet)"] = v["bits"]
-    for name, bits in fmts.items():
-        bpt = per_tok * bits / 8
-        lines.append(f"| {name} | {bits:.2f} | {bpt / 1024:.1f} | {2 ** 30 / bpt:,.0f} | {free / bpt:,.0f} | "
-                     f"{16 / bits:.2f}x |")
+    pre = res["prefill_seconds"].get(str(T))
+    rate_h2d = raw / res["copies"]["raw BF16"]["h2d_pinned"]           # bytes per second, pinned
+    mib = lambda bits: bits * n / 8 / 2 ** 20
+    gs = json.loads((out / "gpu_speed.json").read_text())["rows"] if (out / "gpu_speed.json").is_file() else []
+    gs += res.get("codec_rows", [])
+    lres = json.loads((out / "lossy.json").read_text()) if (out / "lossy.json").is_file() else None
+    docs = list(lres["documents"]) if lres else []
+    entries = []                                     # (method, quality, bits, decode s or None, encode s or None)
+
+    def quality(label):
+        if not lres:
+            return None
+        rs = [lres["documents"][d].get(label) for d in docs]
+        if any(r is None for r in rs):
+            return None
+        return float(np.mean([r["bits"] for r in rs])), " / ".join(f"{r['ppl_change_pct']:+.2f}%" for r in rs)
+
+    szr = next((r for r in gs if r["part"] == "splitzip_official" and r.get("bit_exact")), None)
+    if szr:
+        entries.append(("SplitZip (authors' codec)", "lossless", szr["stream_bits_per_value"], szr["decode_ms"] / 1e3,
+                        szr["encode_ms"] / 1e3))
+    elif (out / "lossless.json").is_file():
+        b = float(np.mean(json.loads((out / "lossless.json").read_text())["methods"]["SplitZip-style"]["per_layer"][res["doc"]]))
+        entries.append(("SplitZip (official A4500 speed, earlier run)", "lossless", b, raw / 311e9, raw / 137e9))
+    if (out / "exans.json").is_file():
+        ex = json.loads((out / "exans.json").read_text())["documents"].get(res["doc"])
+        if ex:
+            entries.append(("ExANS (authors' codec)", "lossless", ex["bits_per_value"], ex["decode_ms_wall"] / 1e3,
+                            ex["encode_ms_wall"] / 1e3))
+    best = {}
+    for r in gs:                                     # ours lossless: the fewest bits and the fastest decode
+        if r["part"] in ("fused", "layerwise") and r.get("bit_exact"):
+            for key, better in (("fewest bits", lambda a, b: a["stream_bits_per_value"] < b["stream_bits_per_value"]),
+                                ("fastest decode", lambda a, b: a["decode_ms"] < b["decode_ms"])):
+                if key not in best or better(r, best[key]):
+                    best[key] = r
+    for key, r in best.items():
+        enc = (r.get("model_ms") or 35.0) / 1e3 + r["encode_ms"] / 1e3
+        kind = "fused" if r["part"] == "fused" else f"per layer{', rank ' + str(r['rank']) if r.get('rank') else ''}"
+        entries.append((f"Ours lossless, {key} ({kind}, {r['mode']})", "lossless", r["stream_bits_per_value"],
+                        r["decode_ms"] / 1e3, enc))
+    lspeed = {}
+    for r in gs:
+        if r["part"] == "lossy_layerwise" and r.get("bit_exact") and r.get("rank") is None:
+            lspeed[float(r["kappa"])] = (r["decode_ms"] / 1e3, (r["quantize_ms"] + r["encode_ms"]) / 1e3)
+    if lres:
+        for label in lres["documents"][docs[0]]:
+            if label == "exact KV":
+                continue
+            q = quality(label)
+            if q is None:
+                continue
+            dec = enc = None
+            if label.startswith("Ours, GPU codec"):
+                k = float(label.split("step ", 1)[1].split(",")[0])
+                dec, enc = lspeed.get(k, (None, None))
+            for name, path in (("AQUA-KV", "time_aqua.json"), ("KIVI", "time_kivi.json")):
+                if label.startswith(name + ",") and (out / path).is_file():
+                    tb = json.loads((out / path).read_text())["bits"].get(label.split(", ")[1].split("-")[0])
+                    if tb:
+                        dec, enc = tb["decode_ms"] / 1e3, tb["encode_ms"] / 1e3
+            entries.append((label, q[1], q[0], dec, enc))
+    ms = lambda sec: "not timed" if sec is None else f"{1e3 * sec:,.0f} ms"
+    lines = [f"## GPU-resident KV pool ({res['gpu']})", "",
+             f"A pool keeps finished requests' KV so that a later request with the same prefix skips its prefill. One "
+             f"cached prefix of {T} tokens ({res['doc']}, {L} layers; {raw / 2 ** 20:.0f} MiB as raw BF16). Recomputing "
+             f"it (the model's prefill, what a miss costs) takes {ms(pre)}. From GPU memory a method pays its decode; "
+             f"from CPU memory, the host-to-GPU copy of its bytes ({rate_h2d / 1e9:.1f} GB/s pinned, measured with the "
+             "raw KV) and then the decode. Adding a prefix costs its encode. Prefixes that fit: the "
+             f"{free / 2 ** 30:.1f} GiB left after the model's weights (no room kept for activations, so an upper "
+             "bound). Decode and encode times are measured on this GPU: ours and SplitZip in gpu_speed, ExANS in its "
+             "stage, AQUA-KV and KIVI with the authors' own code (scripts/time_baseline_decoders.py); our lossy "
+             "variants (sinks, token step) decode at the base variant's speed. Lossy quality = perplexity change "
+             f"({' / '.join(docs)}).", "",
+             "| Method | Lossless / perplexity change | Bits per value | MiB per prefix | Prefixes in free GPU memory | "
+             "Back from GPU memory | Back from CPU memory | Adding it |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- |",
+             f"| Recompute (the model's prefill) | lossless | - | 0 | - | {ms(pre)} | {ms(pre)} | 0 |",
+             f"| Raw BF16 | lossless | 16.00 | {mib(16):.0f} | {free / (raw):,.1f} | 0 ms | "
+             f"{ms(res['copies']['raw BF16']['h2d_pinned'])} | 0 |"]
+    for name, qual, bits, dec, enc in entries:
+        nbytes = bits * n / 8
+        cpu = None if dec is None else nbytes / rate_h2d + dec
+        lines.append(f"| {name} | {qual} | {bits:.2f} | {mib(bits):.0f} | {free / nbytes:,.1f} | {ms(dec)} | "
+                     f"{ms(cpu)} | {ms(enc)} |")
     return lines + [""]
+
 
 
 def speed_lines(out):
@@ -825,47 +845,101 @@ def mix_lines(out, res):
             counts = ", ".join(f"{c} {opts[i][0].replace('P, ', '')}" for i, c in enumerate(best[1]) if c)
             lines.append(f"| {R} Gb/s | {ms(16 / R)} | {ms(t_sz)} | {ms(single[0])} ({single[1].replace('P, ', '')}) | "
                          f"{ms(best[0])} ({counts}) | {t_sz / best[0]:.2f}x |")
-    fused = [r for r in res["rows"] if r["part"] in ("fused", "layerwise") and r.get("bit_exact")]
-    if fused:
-        def name(r):
-            if r["part"] == "fused":
-                return f"fused {r['tokens_per_program']}x{r['rows']}, {r['mode']}"
-            v = r.get("variant") or ""
-            kind = (f"rank {r['rank']}" if r.get("rank") else "reduced rank") if "reduced-rank" in v else "dense"
-            return f"per layer, {kind} product, {r['mode']}"
-        best = {}                                    # per kind, the fastest measured row
-        for r in fused:
-            k = name(r)
-            if k not in best or r["decode_gvalues_per_s"] > best[k]["decode_gvalues_per_s"]:
-                best[k] = r
-        cands = list(best.values())
-        f0 = cands[0]
-        n = f0["values"]
+    lines += measured_transfer_lines(out, res, ll, sz_bits)
+    return lines + ([""] if lines else [])
+
+
+def measured_transfer_lines(out, res, ll, sz_bits):
+    """Two versions of the measured transfer comparison, each with time and bytes for every link: (1) our codec
+    alone; (2) our codec mixed with SplitZip per layer (the measured mixes). SplitZip: the authors' codec as
+    measured in this run when available, else its earlier official A4500 run."""
+    rows = res["rows"]
+    whole = [r for r in rows if r["part"] in ("fused", "layerwise") and r.get("bit_exact")]
+    if not whole:
+        return []
+
+    def name(r):
+        if r["part"] == "fused":
+            return f"fused {r['tokens_per_program']}x{r['rows']}, {r['mode']}"
+        v = r.get("variant") or ""
+        kind = (f"rank {r['rank']}" if r.get("rank") else "reduced rank") if "reduced-rank" in v else "dense"
+        return f"per layer, {kind} product, {r['mode']}"
+
+    best = {}
+    for r in whole:
+        k = name(r)
+        if k not in best or r["decode_gvalues_per_s"] > best[k]["decode_gvalues_per_s"]:
+            best[k] = r
+    cands = list(best.values())
+    f0 = cands[0]
+    n = f0["values"]
+    szr = next((r for r in rows if r["part"] == "splitzip_official" and r.get("bit_exact")), None)
+    if szr:
+        sz, sz_rate, sz_src = szr["stream_bits_per_value"], szr["decode_gvalues_per_s"], \
+            f"the authors' codec ({szr['commit'][:7]}) run here: {szr['stream_bits_per_value']:.3f} bits/value, " \
+            f"{szr['decode_gbps']:.0f} GB/s decode"
+    else:
         sz = (float(np.mean(ll["methods"]["SplitZip-style"]["per_layer"][f0["doc"]]))
               if f0["doc"] in ll["methods"]["SplitZip-style"]["per_layer"] else sz_bits)
-        lines += ["", f"Our codec alone, measured end to end (whole {f0['doc']}: {n / 1e6:.0f}M values, decoded layer by "
-                  "layer, bit-exact). For each link the mode with the shortest transfer among: " +
-                  "; ".join(f"{name(r)} ({r['stream_bits_per_value']:.3f} bits/value, {r['decode_gvalues_per_s']:.1f} G "
-                            "values/s)" for r in cands) +
-                  f". SplitZip: {sz:.3f} bits/value on the same document, its measured A4500 decode speed. Ideal link "
-                  "as above; the bands are typical deployments (see the doc).", "",
-                  "| Link | Typical setting | Raw BF16 | SplitZip | ExANS | Ours (measured) | Mode | Ours vs SplitZip | Ours vs ExANS |",
-                  "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
-        exr = None
-        if (out / "exans.json").is_file():
-            exd = json.loads((out / "exans.json").read_text())["documents"]
-            exr = exd.get(f0["doc"])
-        for R, band in LINK_BANDS:
-            t_o, pick = min(((max(r["stream_bits_per_value"] / R, 1 / r["decode_gvalues_per_s"]), name(r)) for r in cands))
-            t_sz = max(sz / R, 1 / Ts)
-            ms = lambda t: f"{t * n / 1e6:.0f} ms"
-            if exr:
-                t_ex = max(exr["bits_per_value"] / R, 2 / exr["decode_gbps_wall"])
-                ex_cells = f"{ms(t_ex)} | {ms(t_o)} | {pick} | {t_sz / t_o:.2f}x | {t_ex / t_o:.2f}x"
-            else:
-                ex_cells = f"not run | {ms(t_o)} | {pick} | {t_sz / t_o:.2f}x | -"
-            lines.append(f"| {R} Gb/s | {band} | {ms(16 / R)} | {ms(t_sz)} | {ex_cells} |")
-    return lines + ([""] if lines else [])
+        sz_rate, sz_src = 311.0 / 2, f"{sz:.3f} bits/value (SplitZip-style cost), 311 GB/s (official A4500 run)"
+    exr = None
+    if (out / "exans.json").is_file():
+        exr = json.loads((out / "exans.json").read_text())["documents"].get(f0["doc"])
+    mib = lambda bits: bits * n / 8 / 2 ** 20
+    t = lambda bits, rate, R: max(bits / R, 1 / rate) * n / 1e9          # seconds
+    ms = lambda sec: f"{1e3 * sec:.0f} ms"
+
+    def ours_best(R, pool):
+        return min(((t(r["stream_bits_per_value"], r["decode_gvalues_per_s"], R), r) for r in pool),
+                   key=lambda x: x[0])
+
+    lines = ["", f"### Measured transfer, version 1: our codec alone ({f0['doc']}: {n / 1e6:.0f}M values)", "",
+             "Each cell: time to move the document over an ideal link (decoding overlapped with arrival: the longer of "
+             "the time on the wire and the decode) and the bytes sent. Our row is the measured mode with the shortest "
+             "time for that link, among: " + "; ".join(
+                 f"{name(r)} ({r['stream_bits_per_value']:.3f} bits/value, {r['decode_gvalues_per_s']:.1f} G values/s)"
+                 for r in cands) + f". SplitZip: {sz_src}." +
+             (f" ExANS: the authors' codec run here, {exr['bits_per_value']:.3f} bits/value, "
+              f"{exr['decode_gbps_wall']:.0f} GB/s decode." if exr else ""), "",
+             "| Link | Typical setting | SplitZip | ExANS | Ours | Mode | Ours: time vs SplitZip | Ours: bytes vs SplitZip | Ours: time vs ExANS |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for R, band in LINK_BANDS:
+        to, r = ours_best(R, cands)
+        tsz = t(sz, sz_rate, R)
+        ob = r["stream_bits_per_value"]
+        exc = f"{ms(t(exr['bits_per_value'], exr['decode_gbps_wall'] / 2, R))}, {mib(exr['bits_per_value']):.0f} MiB" if exr else "not run"
+        exv = f"{t(exr['bits_per_value'], exr['decode_gbps_wall'] / 2, R) / to:.2f}x" if exr else "-"
+        lines.append(f"| {R} Gb/s | {band} | {ms(tsz)}, {mib(sz):.0f} MiB | {exc} | {ms(to)}, {mib(ob):.0f} MiB | "
+                     f"{name(r)} | {tsz / to:.2f}x | {100 * (1 - ob / sz):.0f}% fewer | {exv} |")
+    worst = [R for R, _ in LINK_BANDS if ours_best(R, cands)[0] > t(sz, sz_rate, R)]
+    if worst:
+        R = worst[0]
+        to, r = ours_best(R, cands)
+        lines += ["", f"Where our codec alone is slower (from {R} Gb/s), it is our decode that sets the time, not the "
+                  f"link: at {R} Gb/s it takes {ms(to)} against SplitZip's {ms(t(sz, sz_rate, R))}, but the link is busy "
+                  f"for only {ms(r['stream_bits_per_value'] * n / (R * 1e9))} and carries "
+                  f"{100 * (1 - r['stream_bits_per_value'] / sz):.0f}% fewer bytes ({mib(r['stream_bits_per_value']):.0f} "
+                  f"against {mib(sz):.0f} MiB): a shared or metered link carries more of everything else."]
+    mixed = [r for r in rows if r["part"] == "mixed" and r.get("bit_exact")]
+    if mixed:
+        lines += ["", f"### Measured transfer, version 2: our codec + SplitZip per layer", "",
+                  "The layers where ours saves the most are coded by ours, the rest by the authors' SplitZip codec; "
+                  "every mix is a real stream, decoded bit-exact and timed. Measured mixes: " + ", ".join(
+                      f"{r['mode']} {r['ours_layers']}/{len(r['ours_mask'])} ({r['stream_bits_per_value']:.2f} bits, "
+                      f"{r['decode_ms']:.1f} ms)" for r in sorted(mixed, key=lambda r: (r["mode"], r["ours_layers"]))) +
+                  ". With 0 layers of ours the mix is SplitZip itself, so the best mix is never slower than SplitZip.",
+                  "", "| Link | SplitZip | Ours alone | Ours + SplitZip mix | Layers ours (mode) | Mix: time vs SplitZip | Mix: bytes vs SplitZip |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
+        for R, _band in LINK_BANDS:
+            tsz = t(sz, sz_rate, R)
+            to, r1 = ours_best(R, cands)
+            tm, rm = ours_best(R, mixed + cands)
+            lay = f"{rm['ours_layers']} of {len(rm['ours_mask'])} ({rm['mode']})" if rm["part"] == "mixed" else \
+                f"all ({name(rm)})"
+            lines.append(f"| {R} Gb/s | {ms(tsz)}, {mib(sz):.0f} MiB | {ms(to)}, {mib(r1['stream_bits_per_value']):.0f} MiB | "
+                         f"{ms(tm)}, {mib(rm['stream_bits_per_value']):.0f} MiB | {lay} | {tsz / tm:.2f}x | "
+                         f"{100 * (1 - rm['stream_bits_per_value'] / sz):.0f}% fewer |")
+    return lines
 
 
 def splitzip_mix_lines(out, res):
@@ -956,12 +1030,14 @@ def lossy_link_lines(out):
     ms = lambda t: f"{1e3 * t:,.0f}"
     lines = ["", f"## Lossless and lossy side by side ({whole[0]['doc']}: {n / 1e6:.0f}M values per link)", "",
              "Time to move one document's KV over an ideal link, decoding overlapped with arrival: max(bits / link, "
-             "decode time) with the decode measured on this GPU; a * marks a method whose decode was not measured "
-             "(its time on the wire only, so a lower bound). Bits and quality of the lossy rows from the lossy stage "
+             "decode time) with the decode measured on this GPU (AQUA-KV and KIVI with the authors' code); a * marks "
+             "a method whose decode was not measured (its time on the wire only, so a lower bound). MiB = bytes sent "
+             "for the document. Bits and quality of the lossy rows from the lossy stage "
              f"(first {lres['prompt_tokens']} tokens of each test document; quality = perplexity change of the next "
              f"{lres['continuation_tokens']} tokens, {' / '.join(docs)}).", "",
-             "| Method | Bits per value | Perplexity change | " + " | ".join(f"{R} Gb/s (ms)" for R in links) + " |",
-             "| --- | --- | --- | " + " | ".join("---" for _ in links) + " |"]
+             "| Method | Bits per value | MiB | Perplexity change | " + " | ".join(f"{R} Gb/s (ms)" for R in links) + " |",
+             "| --- | --- | --- | --- | " + " | ".join("---" for _ in links) + " |"]
+    mibs = lambda bits: f"{bits * n / 8 / 2 ** 20:.0f}"
 
     def times(bits, rate):
         cells = []
@@ -977,13 +1053,16 @@ def lossy_link_lines(out):
         ll = json.loads((out / "lossless.json").read_text())["methods"].get("SplitZip-style")
         if ll and whole[0]["doc"] in ll.get("per_layer", {}):
             sz = float(np.mean(ll["per_layer"][whole[0]["doc"]]))
-    lines.append(f"| SplitZip (lossless) | {sz:.2f} | 0 | " + " | ".join(times(sz, 311.0 / 2)) + " |")
+    szr = next((r for r in rows if r["part"] == "splitzip_official" and r.get("bit_exact")), None)
+    sz_rate = szr["decode_gvalues_per_s"] if szr else 311.0 / 2
+    sz = szr["stream_bits_per_value"] if szr else sz
+    lines.append(f"| SplitZip (lossless) | {sz:.2f} | {mibs(sz)} | 0 | " + " | ".join(times(sz, sz_rate)) + " |")
     best = []
     for R in links:                                  # ours lossless: the best measured mode for each link
         best.append(min(max(r["stream_bits_per_value"] * n / (R * 1e9), n / (r["decode_gvalues_per_s"] * 1e9))
                         for r in whole))
     lo, hi = min(r["stream_bits_per_value"] for r in whole), max(r["stream_bits_per_value"] for r in whole)
-    lines.append(f"| Ours, lossless (best measured mode per link) | {lo:.2f}-{hi:.2f} | 0 | " +
+    lines.append(f"| Ours, lossless (best measured mode per link) | {lo:.2f}-{hi:.2f} | {mibs(lo)}-{mibs(hi)} | 0 | " +
                  " | ".join(ms(t) for t in best) + " |")
     for label in lres["documents"][docs[0]]:
         if label == "exact KV":
@@ -992,9 +1071,14 @@ def lossy_link_lines(out):
         bits = float(np.mean([x["bits"] for x in rs]))
         ppl = " / ".join(f"{x['ppl_change_pct']:+.2f}%" for x in rs)
         rate = None
+        for name, path in (("AQUA-KV", "time_aqua.json"), ("KIVI", "time_kivi.json")):
+            if label.startswith(name + ",") and (out / path).is_file():
+                tb = json.loads((out / path).read_text())["bits"].get(label.split(", ")[1].split("-")[0])
+                if tb:
+                    rate = tb["decode_gvalues_per_s"]
         if label.startswith("Ours, GPU codec"):
-            rate = lossy_speed.get(float(label.rsplit("step ", 1)[1]))
-        lines.append(f"| {label} | {bits:.2f} | {ppl} | " + " | ".join(times(bits, rate)) + " |")
+            rate = lossy_speed.get(float(label.split("step ", 1)[1].split(",")[0]))
+        lines.append(f"| {label} | {bits:.2f} | {mibs(bits)} | {ppl} | " + " | ".join(times(bits, rate)) + " |")
     return lines + [""]
 
 
@@ -1052,7 +1136,9 @@ def stage_report(args, out):
     if (out / "gpu_speed.json").is_file():
         lines += speed_lines(out)
         lines += mix_lines(out, json.loads((out / "gpu_speed.json").read_text()))
-        lines += splitzip_mix_lines(out, json.loads((out / "gpu_speed.json").read_text()))
+        _g = json.loads((out / "gpu_speed.json").read_text())
+        if not any(r["part"] == "mixed" for r in _g["rows"]):
+            lines += splitzip_mix_lines(out, _g)
     if (out / "pool.json").is_file():
         lines += pool_lines(out)
     if (out / "format.json").is_file():
@@ -1128,6 +1214,10 @@ def parser():
     p.add_argument("--continuation-tokens", type=int, default=512)
     p.add_argument("--max-layers", type=int, default=None, help="lossless and frontier stages: first N layers (smoke tests)")
     p.add_argument("--no-queries", action="store_true", help="skip q_proj capture (drops the attention input)")
+    p.add_argument("--lossy-variants", default="base,sinks,token,both",
+                   help="lossy stage, ours and gpu: base; sinks (the first --sink-tokens tokens exact); token (the "
+                        "step follows the token's adaptive spread); both")
+    p.add_argument("--sink-tokens", type=int, default=4, help="lossy variants: tokens kept exact (AQUA-KV's 4)")
     p.add_argument("--lossy-methods", default="ours,aqua,kivi,fp8,gpu",
                    help="lossy stage: methods to (re)run; a subset is merged into the existing lossy.json")
     p.add_argument("--frontier-quick", action="store_true", help="frontier stage: a smaller grid of variants")
@@ -1156,6 +1246,11 @@ def parser():
     p.add_argument("--cuda-home", type=Path, default=None,
                    help="exans: CUDA toolkit with nvcc (default: $CUDA_HOME, the earlier official run's toolkit, "
                         "or the nvcc on PATH)")
+    p.add_argument("--splitzip-source", type=Path,
+                   default=Path.home() / "kv_reconstruction/runs/_llama_official/sources/splitzip",
+                   help="gpu_speed: a checkout of the authors' SplitZip (cloned into the run folder if missing)")
+    p.add_argument("--mix-counts", default="0,2,4,6,8,10,12,14,16,20,24,28",
+                   help="gpu_speed: numbers of layers coded by ours in the measured SplitZip mixes (empty: skip)")
     p.add_argument("--lossy-speed-kappas", default="0.25,0.5,1,2,4",
                    help="gpu_speed: steps of the GPU lossy codec timed on the whole test document (empty: skip)")
     p.add_argument("--format-ranks", default="256",
@@ -1194,6 +1289,9 @@ def main(argv=None):
     args.configs = [c for c in args.configs.split(",") if c]
     args.kappas = [float(k) for k in args.kappas.split(",") if k]
     args.lossy_methods = [m for m in args.lossy_methods.split(",") if m]
+    args.lossy_variants = [v for v in args.lossy_variants.split(",") if v]
+    if not set(args.lossy_variants) <= {"base", "sinks", "token", "both"}:
+        raise SystemExit("--lossy-variants takes a comma list of base, sinks, token, both")
     if not set(args.lossy_methods) <= {"ours", "aqua", "kivi", "fp8", "gpu"}:
         raise SystemExit("--lossy-methods takes a comma list of ours, aqua, kivi, fp8, gpu")
     args.speed_formats = [f for f in args.speed_formats.split(",") if f]
@@ -1210,6 +1308,9 @@ def main(argv=None):
     args.layer_ranks = [int(r) for r in args.layer_ranks.split(",") if r]
     args.format_ranks = [int(r) for r in args.format_ranks.split(",") if r]
     args.lossy_speed_kappas = [float(k) for k in args.lossy_speed_kappas.split(",") if k]
+    args.mix_counts = [int(c) for c in args.mix_counts.split(",") if c]
+    if args.splitzip_source is not None and not (args.splitzip_source / "codec_gpu.py").is_file():
+        args.splitzip_source = None
     if args.cuda_home is None:
         import shutil as _sh
         cand = [os.environ.get("CUDA_HOME"), str(Path.home() / "kv_reconstruction/runs/_matched_baselines/cuda12_8/toolkit")]

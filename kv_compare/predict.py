@@ -422,11 +422,13 @@ class Study:
                    None if F.spread is None else F.spread.to(device))
 
     # ------------------------------------------------------------------ closed-loop lossy coding
-    def lossy(self, cfg, fits, doc, rows, kappa):
+    def lossy(self, cfg, fits, doc, rows, kappa, prefix=0, token_step=False):
         """Code the first `rows` tokens of doc closed loop: every prediction uses the receiver's reconstructed KV.
         Residuals are quantized with step kappa * spread (per channel), entropy-coded against the adaptive
         logistic model, and reconstructed to BF16. Returns (reconstructed values [L, rows, W] float32 on CPU,
-        bits per value)."""
+        bits per value). prefix: the first tokens travel exact (16 bits per value; the attention sinks);
+        token_step: the step follows the model's spread (kappa x spread x the adaptive multiplier), so a token the
+        model expects to be hard gets a coarser step, as a per-token scale does."""
         if "R" in cfg.kinds:
             raise ValueError("closed-loop coding uses configurations without the earlier-occurrence input")
         rec, frec = {}, {}
@@ -452,10 +454,16 @@ class Study:
                 m = self.rope.rotate_row(md, pos_all)[:, ch]
                 mult = ((64 * prior[:, None] + qsum[:, None] + 16) / (64 + st + 16)).clamp(0.25, 4.0)
                 se = s[ch][None, :] * mult
-                step = kappa * s[ch][None, :]
+                step = kappa * (se if token_step else s[ch][None, :])
                 k = torch.round((x[:, ch] - m) / step)
                 xh = to_bf16(m + k * step)
-                total += float(bin_bits(k, step, se).sum())
+                if prefix:
+                    p = min(prefix, rows)
+                    xh[:p] = x[:p, ch]
+                    total += float(bin_bits(k[p:], step[p:] if step.shape[0] > 1 else step, se[p:]).sum())
+                    total += 16.0 * p * len(ch)
+                else:
+                    total += float(bin_bits(k, step, se).sum())
                 q = (xh - m).abs() / (LN2X2 * s[ch][None, :])
                 qsum += q.sum(1)
                 xrec[:, ch] = xh

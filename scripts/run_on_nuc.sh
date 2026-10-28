@@ -47,8 +47,8 @@ STAGES=${STAGES:-gpu_speed,report}
 echo "running on branch $cur, commit $(git log --oneline -1); stages $STAGES; output $RUN"
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader
 
-# CHECKS=1: compare our AQUA-KV and KIVI re-implementations with the authors' own functions first (the report
-# includes the results). AQUA-KV runs in the environment the earlier official run built (torch 2.5.1 with
+# CHECKS=1: compare our AQUA-KV and KIVI re-implementations with the authors' own functions, and time their
+# decoders with the authors' code, first (the report includes the results). AQUA-KV runs in the environment the earlier official run built (torch 2.5.1 with
 # fast-hadamard-transform); KIVI's functions need only torch and Triton (this environment).
 if [ "${CHECKS:-0}" = 1 ]; then
     OFF=$HOME/kv_reconstruction/runs/_llama_official
@@ -66,6 +66,13 @@ if [ "${CHECKS:-0}" = 1 ]; then
     fi
     python scripts/check_baselines_official.py kivi --source "$KIVI_SRC" --output "$RUN/check_kivi.json" \
         2>&1 | tail -n 30 | tee -a "$RUN/console.log" || echo "KIVI check failed (see above)"
+    # decode / encode time of one document with the authors' code (for the transfer and pool tables)
+    if [ -x "$AQUA_PY" ] && [ -d "$AQUA_SRC" ]; then
+        "$AQUA_PY" scripts/time_baseline_decoders.py aqua --source "$AQUA_SRC" --output "$RUN/time_aqua.json" \
+            2>&1 | tail -n 10 | tee -a "$RUN/console.log" || echo "AQUA-KV timing failed (see above)"
+    fi
+    python scripts/time_baseline_decoders.py kivi --source "$KIVI_SRC" --output "$RUN/time_kivi.json" \
+        2>&1 | tail -n 10 | tee -a "$RUN/console.log" || echo "KIVI timing failed (see above)"
 fi
 python -u scripts/bench_llama_compare.py --device cuda --output "$RUN" --stages "$STAGES" ${EXTRA:-} 2>&1 \
     | tee -a "$RUN/console.log"

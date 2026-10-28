@@ -201,6 +201,12 @@ The official ExANS codes 10.86-10.87 bits per value here (its re-implementation 
 
 With HIGGS and its closed-loop fit, AQUA-KV reaches at 2.1 bits the quality our codec needs about 3.2 bits for, and at 3.1 bits better quality than ours at 4 bits: about one bit per value better. It does this with more KV error (5.3% at 3 bits against our 3.8% at 2.6 bits), so mean squared error is not what decides quality here. Two differences are likely: AQUA-KV keeps the first 4 tokens (the attention sinks, which receive much of every query's attention) in BF16, and HIGGS scales each token's error with that token's residual, while our step is the same for every token. Our GPU codec at step 4 (+776% perplexity) points the same way. KIVI is behind both. The GPU codec decodes at 17 G values/s (dense) and 25 G values/s (rank 256).
 
+## Next run: both uses (T and P), the SplitZip mix and two lossy fixes
+
+- **Transfer (T), two versions.** Version 1 is our codec alone; version 2 mixes it with the authors' SplitZip codec per layer (`kv_compare/mixed.py`): the layers where ours saves the most are coded by ours, the rest by SplitZip, for 0-28 layers of ours, each mix a real stream decoded bit-exact and timed. With 0 layers of ours the mix is SplitZip, so the best mix per link is never slower than SplitZip. Every cell gives the time and the bytes sent, so a link where we are slower also shows how many fewer bytes we send and how long the link is actually busy.
+- **Pool (P), every method.** Memory per cached 8K prefix, prefixes that fit, time back from GPU or CPU memory, the cost of adding it, and quality. AQUA-KV's and KIVI's decode and encode times come from the authors' own code (`scripts/time_baseline_decoders.py`; AQUA-KV's HIGGS kernel in its own environment, the codes kept on the GPU), SplitZip and ExANS from their official codecs.
+- **Lossy fixes**, in our CPU coder (strong `fast` predictor) and our GPU codec, each also combined: `sinks` (the first 4 tokens exact, as AQUA-KV keeps them) and `token step` (the step follows the token's adaptive spread, like a per-token scale). `--lossy-variants`, `--sink-tokens`.
+
 ## Reference: SmolLM2-135M (same protocol, NumPy implementation)
 
 Lossless, bits per value, averaged over the four reference chunks (all 30 layers):

@@ -175,6 +175,11 @@ class TinyLlamaTests(unittest.TestCase):
         doc = self.study.tests[0]
         P, M = 192, 96
         self.study._f.clear(); self.study._qmap.clear()
+        rs, rate_s = self.study.lossy(cfg, fits, doc, P, 1.0, prefix=4, token_step=True)
+        ex4 = torch.stack([words_to_float(doc.words(l, self.study.device, 4)) for l in range(self.study.L)])
+        self.assertTrue(torch.equal(rs[:, :4].double(), ex4.float().double()))
+        self.assertTrue(0 < rate_s < 16)
+        self.study._f.clear(); self.study._qmap.clear()
         rec, rate = self.study.lossy(cfg, fits, doc, P, 1.0)
         self.assertEqual(len(self.study._f), 0)      # the closed loop must not accumulate calibration features
         exact = torch.stack([words_to_float(doc.words(l, self.study.device, P)) for l in range(self.study.L)])
@@ -385,23 +390,53 @@ LOSSY_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
 from kv_compare import lossy_gpu as lg, layerwise
 xs = torch.stack([words_to_float(w32[l]) for l in range(L)])
 rc = layerwise.prepare_rank(study, consts, 32, log=lambda m: None)
-for kappa, chunks, rank in ((1.0, 2, None), (0.25, 1, rc)):
+for kappa, chunks, rank, prefix, tstep in ((1.0, 2, None, 0, False), (0.25, 1, rc, 0, False), (2.0, 2, None, 4, True)):
     codec = lg.LossyLayerwise(consts, study.C, study.hd, kappa, tokens_per_program=16, chunks=chunks, rank=rank,
-                              requant="epilogue" if rank else "kernel", rank_tiles=(16, 16, 32, 4))
+                              requant="epilogue" if rank else "kernel", rank_tiles=(16, 16, 32, 4), prefix=prefix,
+                              token_step=tstep)
     rec, xall, prior = codec.quantize(words)
     buf, starts, _ = codec.encode(words, rec, xall, prior)
     dec = codec.decode(buf, starts, T)
     assert torch.equal(dec, rec), ("round trip", kappa, int((dec != rec).sum()))
     r32 = rec.to(torch.int32) & 0xFFFF
     xr = torch.stack([words_to_float(r32[l]) for l in range(L)])
-    step = (kappa * codec.k["sp"]).double()[:, None, :]
+    step = (kappa * codec.k["sp"]).double()[:, None, :] * (4.0 if tstep else 1.0)    # the multiplier is <= 4
     bound = 0.5 * step + (xs.abs() + 0.5 * step) * 2.0 ** -8 + 1e-30
     fin = torch.isfinite(xs)
     ok = ((xr - xs).abs() <= bound * 1.0001) | (r32 == w32)
     assert bool(ok[fin].all()), ("error bound", kappa, int((~ok[fin]).sum()))
     assert torch.equal(r32[1, 3, 2:5], w32[1, 3, 2:5]), "Inf and NaN travel exactly"
-    print("ok", kappa, chunks, rank is not None, codec.bits(starts, T) / (L * T * W))
+    assert torch.equal(r32[:, :prefix], w32[:, :prefix]), "the first tokens travel exactly"
+    print("ok", kappa, chunks, rank is not None, prefix, tstep, codec.bits(starts, T) / (L * T * W))
 """
+
+
+MIXED_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
+from kv_compare import mixed
+xall, prior = fused.FusedOneStep(consts, study.C, study.hd, tokens_per_program=16, rows=4, kchunk=32, warps=4).model(words)
+sz = mixed.TorchSplitZipStyle("cpu")
+sz.calibrate(words.view(torch.bfloat16))
+for ours in ([True, False, True], [False, True, True], [False, False, False], [True, True, True], [True, True, False]):
+    codec = mixed.MixedOneStep(consts, study.C, study.hd, ours, sz, tokens_per_program=16, chunks=2)
+    enc = codec.encode(words, xall, prior)
+    dec = codec.decode_mixed(enc, T)
+    assert torch.equal(dec, words), ("round trip", ours, int((dec != words).sum()))
+    print("ok", ours, codec.total_bits(enc, T) / (L * T * W))
+"""
+
+
+class MixedTests(unittest.TestCase):
+    def test_mixed_codec_round_trip_interpreted(self):
+        """Our per-layer codec mixed with a SplitZip-style codec per layer restores the KV bit for bit for any mix
+        (our layers after a SplitZip layer start from its features and prior 1)."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None or torch is None:
+            self.skipTest("Triton and PyTorch are required")
+        r = subprocess.run([sys.executable, "-c", MIXED_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=2400)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertEqual(r.stdout.count("ok"), 5, r.stdout)
 
 
 class LossyGpuTests(unittest.TestCase):
@@ -415,7 +450,7 @@ class LossyGpuTests(unittest.TestCase):
         r = subprocess.run([sys.executable, "-c", LOSSY_CHECK, str(ROOT)], capture_output=True, text=True,
                            timeout=2400)
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
-        self.assertEqual(r.stdout.count("ok"), 2, r.stdout)
+        self.assertEqual(r.stdout.count("ok"), 3, r.stdout)
 
 
 class PackageTests(unittest.TestCase):

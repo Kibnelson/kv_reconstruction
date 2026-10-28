@@ -25,6 +25,7 @@ FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.js
          "pool.json": "pool.json", "cheap_products.json": "cheap_products.json", "format.json": "format.json",
          "check_aqua.json": "check_aqua.json", "check_kivi.json": "check_kivi.json", "exans.json": "exans.json",
          "exans/build_fix.diff": "exans_build_fix.diff", "exans/official_test.log": "exans_official_test.log",
+         "time_aqua.json": "time_aqua.json", "time_kivi.json": "time_kivi.json",
          "captures/meta.json": "capture_meta.json"}
 REQUIRED = ("summary.md", "run_args.json", "environment.json", "captures/meta.json")
 
