@@ -383,7 +383,7 @@ def speed_lines(out):
                   "| Predictor | Bits per value | Decode G values/s | Decode GB/s | Keeps up with a link of |",
                   "| --- | --- | --- | --- | --- |"]
         for v in dict.fromkeys(r["variant"] for r in pred):
-            cand = [r for r in pred if r["variant"] == v and "error" not in r and r["format"] in ("int8x8", "int8x16")]
+            cand = [r for r in pred if r["variant"] == v and "error" not in r and r["format"] in ("int8x8", "int8x16")]   # dense only
             cand = cand or [r for r in pred if r["variant"] == v and "error" not in r and r["format"] == "bf16"]
             if not cand:
                 continue
@@ -550,13 +550,13 @@ def parser():
     p.add_argument("--no-queries", action="store_true", help="skip q_proj capture (drops the attention input)")
     p.add_argument("--frontier-quick", action="store_true", help="frontier stage: a smaller grid of variants")
     p.add_argument("--speed-tokens", type=int, default=8192, help="gpu_speed: tokens per timed layer")
-    p.add_argument("--speed-formats", default="fp32,bf16,int8x16,int8x8")
+    p.add_argument("--speed-formats", default="fp32,bf16,int8x16,int8x8,int8x8s")
     p.add_argument("--speed-config", default="lite", help="gpu_speed: configuration whose predictions feed the coder")
     p.add_argument("--speed-layers", default="4,12,20,27", help="gpu_speed: test-document layers coded")
     p.add_argument("--speed-modes", default="exact,uniform",
                    help="gpu_speed: coder modes; uniform gives every word of a slice an equal share (faster, a few "
                         "hundredths of a bit more)")
-    p.add_argument("--speed-settings", default="1024x64x1,1024x128x1,1024x256x2,512x128x1,2048x128x1",
+    p.add_argument("--speed-settings", default="1024x128x1,1024x256x1,768x128x1,768x256x1,512x128x1",
                    help="gpu_speed: coder settings, values per stream x lanes per program [x warps per program; "
                         "default one thread per lane, fewer warps interleave several lanes per thread]")
     return p

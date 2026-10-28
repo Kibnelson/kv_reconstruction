@@ -9,6 +9,8 @@ groups decoded before it, in sequence; plus, for the attention input, the query 
   int8x16    exact integers on the 8-bit tensor cores: 8-bit coefficients x 16-bit features as two 8-bit halves
              (two torch._int_mm products per multiply-add, combined in 64-bit integers)
   int8x8     8-bit coefficients x 8-bit features (one product)
+  int8x8s    as int8x8 with the inputs product 2:4 sparse (two of every four coefficients zero; Ampere's sparse
+             tensor cores via cuSPARSELt or CUTLASS). Speed only: the bit cost of the sparsity is not measured here
 Random data of the real shapes is used: the cost of a dense product does not depend on the values.
 
 Entropy coder. The Triton value-slice coder (gpu_coder.py) encodes and decodes the real words of the test
@@ -64,6 +66,23 @@ class Product:
         elif fmt == "bf16":
             self.B = torch.randn(K, N, device=device, generator=gen).to(torch.bfloat16)
             self.X = torch.randn(T, K, device=device, generator=gen).to(torch.bfloat16)
+        elif fmt == "int8x8s":                              # 2:4 sparse coefficients (Ampere sparse tensor cores)
+            rnd = lambda *shape: torch.randint(-127, 128, shape, device=device, generator=gen, dtype=torch.int8)
+            W = rnd(N, K)
+            keep = torch.rand(N, K // 4, 4, device=device, generator=gen).argsort(-1)[..., :2]
+            mask = torch.zeros(N, K // 4, 4, dtype=torch.bool, device=device).scatter_(-1, keep, True).reshape(N, K)
+            W = torch.where(mask, W, torch.zeros_like(W))
+            self.Xt = rnd(K, T)                             # [K, T]: the product is W @ Xt = (X W^T)^T
+            self.kind = None
+            try:                                            # cuSPARSELt first, then CUTLASS
+                self.packed = torch._cslt_compress(W)
+                torch._cslt_sparse_mm(self.packed, self.Xt, out_dtype=torch.int32)
+                self.kind = "cusparselt"
+            except Exception:
+                from torch.sparse._semi_structured_conversions import sparse_semi_structured_from_dense_cutlass
+                self.packed, self.meta = sparse_semi_structured_from_dense_cutlass(W)
+                torch._sparse_semi_structured_mm(self.packed, self.meta, self.Xt, out_dtype=torch.int32)
+                self.kind = "cutlass"
         else:
             rnd = lambda *shape: torch.randint(-127, 128, shape, device=device, generator=gen, dtype=torch.int8)
             self.Bt = rnd(N, K)                              # [N, K] row-major = [K, N] column-major for _int_mm
@@ -74,6 +93,10 @@ class Product:
     def __call__(self):
         if self.fmt in ("fp32", "bf16"):
             return self.X @ self.B
+        if self.fmt == "int8x8s":
+            if self.kind == "cusparselt":
+                return torch._cslt_sparse_mm(self.packed, self.Xt, out_dtype=torch.int32)
+            return torch._sparse_semi_structured_mm(self.packed, self.meta, self.Xt, out_dtype=torch.int32)
         y = torch._int_mm(self.hi, self.Bt.t())
         if self.lo is None:
             return y
@@ -112,12 +135,13 @@ def predictor_layer(Hk, hd, Hq, T, device, v, fmt, gen):
     W = 2 * Hk * hd
     gsz = W // v["steps"]
     parts = []
+    dense = "int8x8" if fmt == "int8x8s" else fmt                  # 2:4 sparsity only for the inputs product
     if v["ne"]:
         if v.get("rank"):
-            parts += [Product(fmt, T, v["ne"], v["rank"], device, gen), Product(fmt, T, v["rank"], W, device, gen)]
+            parts += [Product(dense, T, v["ne"], v["rank"], device, gen), Product(dense, T, v["rank"], W, device, gen)]
         else:
             parts.append(Product(fmt, T, v["ne"], W, device, gen))
-    parts += [Product(fmt, T, g * gsz, gsz, device, gen) for g in range(1, v["steps"])]
+    parts += [Product(dense, T, g * gsz, gsz, device, gen) for g in range(1, v["steps"])]
     att = None
     if v.get("att"):
         att = attention_input(T, W, Hk, hd, Hq, device, torch.float32 if fmt == "fp32" else torch.bfloat16, gen)
@@ -137,6 +161,8 @@ def predictor_rows(Hk, hd, Hq, T, device, variants, formats, log=print, seed=0):
     rows = []
     for v in variants:
         for fmt in formats:
+            if fmt == "int8x8s" and (v.get("rank") or v.get("att") or not v["ne"]):
+                continue                                     # sparse timing only for a plain inputs product
             try:
                 layer, products = predictor_layer(Hk, hd, Hq, T, device, v, fmt, gen)
                 att = v.get("att")
@@ -157,7 +183,7 @@ def predictor_rows(Hk, hd, Hq, T, device, variants, formats, log=print, seed=0):
                         graph_sec = timer(graph.replay, device)
                         del graph
                     except Exception as exc:                 # capture unsupported: report the plain timing only
-                        log(f"  predictor {v['label']} [{fmt}]: CUDA graph not measured ({exc!r})")
+                        log(f"  predictor {v['label']} [{fmt}]: CUDA graph not measured ({repr(exc)[:240]})")
                 rows.append({"part": "predictor", "variant": v["label"], "format": fmt, "tokens": T,
                              "ms_per_layer": 1e3 * sec, "gvalues_per_s": T * W / sec / 1e9,
                              "gb_per_s": 2 * T * W / sec / 1e9,
@@ -168,8 +194,9 @@ def predictor_rows(Hk, hd, Hq, T, device, variants, formats, log=print, seed=0):
                     + (f"; as a CUDA graph {1e3 * graph_sec:.2f} ms, {T * W / graph_sec / 1e9:.1f} G values/s" if graph_sec else ""))
                 del layer, products
             except Exception as exc:                         # e.g. _int_mm unsupported on this device
-                rows.append({"part": "predictor", "variant": v["label"], "format": fmt, "error": repr(exc)})
-                log(f"  predictor {v['label']} [{fmt}]: not measured ({exc!r})")
+                msg = repr(exc)[:240]
+                rows.append({"part": "predictor", "variant": v["label"], "format": fmt, "error": msg})
+                log(f"  predictor {v['label']} [{fmt}]: not measured ({msg})")
     return rows
 
 
