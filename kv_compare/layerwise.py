@@ -48,13 +48,44 @@ if triton is not None:
         return tl.where(key, rot, ao)
 
     @triton.jit
+    def _feature(v, vp, cs, sn, low, key, isx):
+        """Next-layer 8-bit feature from a decoded value and its RoPE partner (the fused tile's arithmetic)."""
+        d = tl.where(key, tl.where(low, v * cs + vp * sn, v * cs - vp * sn), v)
+        q = tl.floor(d * isx + 0.5)
+        q = tl.where(q == q, q, 0.0)
+        q = tl.minimum(tl.maximum(q, -127.0), 127.0)
+        return q.to(tl.int8)
+
+    @triton.jit
+    def _lfeat_kernel(words_ptr, xout_ptr, isx_ptr, cos_ptr, sin_ptr, t_base, NV, W, C, HD: tl.constexpr,
+                      BLOCK: tl.constexpr):
+        """Features of a chunk of one decoded layer (a separate pass), element-wise over token x channel."""
+        idx = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        m = idx < NV
+        idx = tl.where(m, idx, 0)
+        t = t_base + idx // W
+        c = idx % W
+        cc = c % HD
+        H2: tl.constexpr = HD // 2
+        low = cc < H2
+        part = tl.where(low, c + H2, c - H2)
+        hh = tl.where(low, cc, cc - H2)
+        v = gc._word_val(tl.load(words_ptr + t * W + c).to(tl.int32) & 0xFFFF)
+        vp = gc._word_val(tl.load(words_ptr + t * W + part).to(tl.int32) & 0xFFFF)
+        cs = tl.load(cos_ptr + t * H2 + hh)
+        sn = tl.load(sin_ptr + t * H2 + hh)
+        tl.store(xout_ptr + t * W + c, _feature(v, vp, cs, sn, low, c < C, tl.load(isx_ptr + c)), mask=m)
+
+    @triton.jit
     def _ldec_kernel(buf_ptr, start_ptr, state_ptr, pos_ptr, out_ptr, acc_ptr, xout_ptr, sa_ptr, b_ptr, sp_ptr,
                      inv_ptr, isx_ptr, cos_ptr, sin_ptr, ssum_in_ptr, ssum_out_ptr, smult_ptr, cumf_ptr, lut_ptr,
                      tail_ptr, t_base, T, W, G, HG, PRIOR_SCALE,
                      FIRST: tl.constexpr, LAST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr,
                      LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr, REFINE: tl.constexpr, UNIFORM: tl.constexpr,
-                     SEARCH: tl.constexpr):
-        """Decode one layer of one token block x head (pointers are the layer's: out_ptr, sa_ptr, ...)."""
+                     SEARCH: tl.constexpr, FEAT: tl.constexpr, LEAN: tl.constexpr):
+        """Decode one layer of one token block x head (pointers are the layer's: out_ptr, sa_ptr, ...).
+        FEAT: make the next layer's features here (else a separate pass does); LEAN: reload the per-channel
+        constants every token instead of keeping them in registers."""
         pid = tl.program_id(0)
         g = pid % G
         blk = pid // G
@@ -87,15 +118,24 @@ if triton is not None:
                 sacc += tl.load(ssum_in_ptr + gg * T + t0 + rb)
             tl.store(smult + rb, fu._mult(sacc.to(tl.float32) * PRIOR_SCALE))
         tl.debug_barrier()
-        sao = tl.load(sa_ptr + own)
-        bo = tl.load(b_ptr + own)
-        sap = tl.load(sa_ptr + part)
-        bp = tl.load(b_ptr + part)
-        spl = tl.load(sp_ptr + own)
-        invl = tl.load(inv_ptr + own)
-        isxl = tl.load(isx_ptr + own)
+        if not LEAN:
+            sao = tl.load(sa_ptr + own)
+            bo = tl.load(b_ptr + own)
+            sap = tl.load(sa_ptr + part)
+            bp = tl.load(b_ptr + part)
+            spl = tl.load(sp_ptr + own)
+            invl = tl.load(inv_ptr + own)
+            isxl = tl.load(isx_ptr + own)
         for i in range(0, TB):
             t = t0 + i
+            if LEAN:
+                sao = tl.load(sa_ptr + own)
+                bo = tl.load(b_ptr + own)
+                sap = tl.load(sa_ptr + part)
+                bp = tl.load(b_ptr + part)
+                spl = tl.load(sp_ptr + own)
+                invl = tl.load(inv_ptr + own)
+                isxl = tl.load(isx_ptr + own)
             cs = tl.load(cos_ptr + t * H2 + hh)
             sn = tl.load(sin_ptr + t * H2 + hh)
             mu = _lane_mu(acc_ptr + (t - t_base) * W, own, part, sao, bo, sap, bp, cs, sn, low, key)
@@ -105,13 +145,10 @@ if triton is not None:
             tl.store(out_ptr + t * W + own, w.to(tl.int16))
             v = gc._word_val(w)
             tl.store(ssum_out_ptr + g * T + t, tl.sum(fu._sq(v, mu, invl), 0))
-            tl.debug_barrier()                       # the partner lane's word, for the de-rotated features
-            vp = gc._word_val(tl.load(out_ptr + t * W + part).to(tl.int32) & 0xFFFF)
-            d = tl.where(key, tl.where(low, v * cs + vp * sn, v * cs - vp * sn), v)
-            q = tl.floor(d * isxl + 0.5)
-            q = tl.where(q == q, q, 0.0)
-            q = tl.minimum(tl.maximum(q, -127.0), 127.0)
-            tl.store(xout_ptr + t * W + own, q.to(tl.int8))
+            if FEAT:
+                tl.debug_barrier()                   # the partner lane's word, for the de-rotated features
+                vp = gc._word_val(tl.load(out_ptr + t * W + part).to(tl.int32) & 0xFFFF)
+                tl.store(xout_ptr + t * W + own, _feature(v, vp, cs, sn, low, key, isxl))
         if not LAST:
             tl.store(state_ptr + seg * HD + cc, x.to(tl.int32, bitcast=True))
             tl.store(pos_ptr + seg, rp)
@@ -167,7 +204,11 @@ if triton is not None:
 class LayerwiseOneStep:
     """Encode / decode a document's KV (all layers) with cuBLAS products and one coding kernel per layer."""
 
-    def __init__(self, consts, C, hd, tokens_per_program=128, mode="uniform", search=True, chunks=1, fuse=False):
+    def __init__(self, consts, C, hd, tokens_per_program=128, mode="uniform", search=True, chunks=1, fuse=False,
+                 features="inline", lean=False, split_streams=False):
+        """features: "inline" (the coding kernel makes the next layer's features) or "pass" (a separate kernel);
+        lean: reload per-channel constants every token (fewer registers); split_streams: per chunk, the products on
+        a high-priority CUDA stream and the coding on another, so pending products are scheduled first."""
         if triton is None:
             raise RuntimeError("Triton is required")
         if mode not in ("exact", "uniform"):
@@ -176,15 +217,18 @@ class LayerwiseOneStep:
         self.L, self.W = consts["Aq"].shape[0], consts["Aq"].shape[1]
         self.C, self.hd, self.TB = C, hd, int(tokens_per_program)
         self.mode, self.search, self.chunks = mode, bool(search), int(chunks)
+        if features not in ("inline", "pass"):
+            raise ValueError("features is 'inline' or 'pass'")
+        self.features, self.lean, self.split = features, bool(lean), bool(split_streams)
         self.device = consts["Aq"].device
         self.tables = gc.slice_tables(self.device)
         self.opts = {} if fuse else {"enable_fp_fusion": False}
         self.G, self.HG = self.W // hd, C // hd
         self.prior_scale = 1.0 / (self.W * fu.QS)
 
-    def _launch(self, kernel, grid, *args, **kw):
+    def _launch(self, kernel, grid, *args, warps=1, **kw):
         try:
-            return kernel[grid](*args, **kw, num_warps=1, **self.opts)
+            return kernel[grid](*args, **kw, num_warps=warps, **self.opts)
         except TypeError:                            # interpreter: no launch options
             return kernel[grid](*args, **kw)
 
@@ -236,9 +280,13 @@ class LayerwiseOneStep:
                 "smult": torch.empty(S * self.TB, dtype=torch.float32, device=dev),
                 "acc": [torch.zeros(Tc, self.W, dtype=torch.int32, device=dev) for _ in range(self.chunks)],
                 "streams": ([torch.cuda.Stream(dev) for _ in range(self.chunks)]
-                            if dev.type == "cuda" and self.chunks > 1 else None)}
+                            if dev.type == "cuda" and (self.chunks > 1 or self.split) else None),
+                "gemm_streams": ([torch.cuda.Stream(dev, priority=-1) for _ in range(self.chunks)]
+                                 if dev.type == "cuda" and self.split else None)}
 
-    def decode(self, buf, starts, T, out=None, bufs=None):
+    def decode(self, buf, starts, T, out=None, bufs=None, accs=None, products_only=False):
+        """accs: precomputed int32 products per layer (list of [T, W]; layer 0 ignored) - times the coding
+        alone; products_only: run only the products (on features already in bufs["xbuf"]) - times them alone."""
         L, W = self.L, self.W
         S, _ = self.layout(T)
         words = torch.empty(L, T, W, dtype=torch.int16, device=self.device) if out is None else out
@@ -247,20 +295,29 @@ class LayerwiseOneStep:
         Tc = T // self.chunks
         P = (Tc // self.TB) * self.G                  # programs per chunk and layer
         cur = torch.cuda.current_stream(self.device) if self.device.type == "cuda" else None
-        streams = bufs["streams"]
-        if streams:
-            for s in streams:
-                s.wait_stream(cur)
+        streams, gstreams = bufs["streams"], bufs.get("gemm_streams")
+        for s in (streams or []) + (gstreams or []):
+            s.wait_stream(cur)
         for layer in range(L):                       # issued layer by layer, so the chunks' streams interleave
             for c in range(self.chunks):
                 rows = slice(c * Tc, (c + 1) * Tc)
+                acc = bufs["acc"][c] if accs is None else accs[layer][rows]
+                if accs is None:
+                    gctx = torch.cuda.stream(gstreams[c]) if gstreams else (
+                        torch.cuda.stream(streams[c]) if streams else _null())
+                    with gctx:
+                        if gstreams:
+                            gstreams[c].wait_stream(streams[c])      # features of the previous layer, acc free
+                        if layer == 0:
+                            acc.zero_()
+                        else:
+                            int_mm(bufs["xbuf"][(layer + 1) % 2][rows], k["Aq"][layer], out=acc)
+                    if gstreams:
+                        streams[c].wait_stream(gstreams[c])
+                if products_only:
+                    continue
                 ctx = torch.cuda.stream(streams[c]) if streams else _null()
                 with ctx:
-                    acc = bufs["acc"][c]
-                    if layer == 0:
-                        acc.zero_()
-                    else:
-                        int_mm(bufs["xbuf"][(layer + 1) % 2][rows], k["Aq"][layer], out=acc)
                     self._launch(_ldec_kernel, (P,), buf, starts, bufs["state"], bufs["pos"], words[layer], acc,
                                  bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer], k["sp"][layer],
                                  k["inv"][layer], k["isx"][layer], k["cos"], k["sin"], bufs["ssum"][(layer + 1) % 2],
@@ -268,11 +325,24 @@ class LayerwiseOneStep:
                                  t["tail"], c * Tc, T, W, self.G, self.HG, self.prior_scale,
                                  FIRST=layer == 0, LAST=layer == L - 1, TB=self.TB, H2=self.hd // 2,
                                  LUT_SHIFT=16 - gc.LUT_BITS, LUT_W=gc.LUT_W, REFINE=gc.REFINE,
-                                 UNIFORM=self.mode == "uniform", SEARCH=self.search)
-        if streams:
-            for s in streams:
-                cur.wait_stream(s)
+                                 UNIFORM=self.mode == "uniform", SEARCH=self.search,
+                                 FEAT=self.features == "inline", LEAN=self.lean)
+                    if self.features == "pass" and layer < L - 1:
+                        nv = Tc * W
+                        self._launch(_lfeat_kernel, (triton.cdiv(nv, 1024),), words[layer], bufs["xbuf"][layer % 2],
+                                     k["isx"][layer], k["cos"], k["sin"], c * Tc, nv, W, self.C, HD=self.hd, BLOCK=1024,
+                                     warps=4)
+        for s in (streams or []) + (gstreams or []):
+            cur.wait_stream(s)
         return words
+
+    def products(self, xall):
+        """The exact int32 products of every layer from features xall (for timing the coding alone)."""
+        out = [None]
+        for layer in range(1, self.L):
+            out.append(int_mm(xall[layer - 1], self.k["Aq"][layer]))
+        out[0] = torch.zeros_like(out[1])
+        return out
 
     def bits(self, starts, T):
         """Coded size: every segment's used words (data, states, alignment) plus a 32-bit start per segment."""

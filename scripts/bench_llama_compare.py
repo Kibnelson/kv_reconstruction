@@ -587,16 +587,23 @@ def speed_lines(out):
                   "Chunks: the tokens are split into that many parts, each decoded on its own CUDA stream, so one "
                   "part's product runs while another part decodes. Encode time excludes the encoder's forward pass "
                   "(as in the fused table).", "",
-                  "| Tokens per program | Chunks | Mode | Stage 1 | Bit-exact | Stream bits/value | Encode ms | Decode ms | Decode G values/s | Decode GB/s | Keeps up with a link of |",
-                  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+                  "| Tokens per program | Chunks | Mode | Stage 1 | Variant | Bit-exact | Stream bits/value | Encode ms | Decode ms | Decode G values/s | Decode GB/s | Keeps up with a link of |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
         for r in lw:
-            head = f"| {r['tokens_per_program']} | {r['chunks']} | {r['mode']} | {'search' if r['search'] else 'direct'} |"
+            head = (f"| {r['tokens_per_program']} | {r['chunks']} | {r['mode']} | {'search' if r['search'] else 'direct'} | "
+                    f"{r.get('variant') or '-'} |")
             if "error" in r:
                 lines.append(head + " not measured | | | | | | |")
                 continue
             g = r["decode_gvalues_per_s"]
             lines.append(head + f" {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | {r['encode_ms']:.1f} | "
                          f"{r['decode_ms']:.1f} | {g:.1f} | {2 * g:.1f} | {g * r['stream_bits_per_value']:.0f} Gb/s |")
+        for r in lw:
+            if "coding_only_ms" in r:
+                lines += ["", f"Where the decode time goes ({r['tokens_per_program']} tokens per program, {r['chunks']} "
+                          f"chunk(s)): the 27 products alone {r['products_only_ms']:.1f} ms, the 28 coding kernels alone "
+                          f"(products precomputed) {r['coding_only_ms']:.1f} ms, both as decoded {r['decode_ms']:.1f} ms; "
+                          f"overlap hides {r['products_only_ms'] + r['coding_only_ms'] - r['decode_ms']:.1f} ms."]
     lines += ["", "Reference: " + res["splitzip_reference"] + ".", ""]
     return lines
 
@@ -735,6 +742,18 @@ def stage_report(args, out):
         lines += mix_lines(out, json.loads((out / "gpu_speed.json").read_text()))
     if (out / "pool.json").is_file():
         lines += pool_lines(out)
+    if (out / "cheap_products.json").is_file():
+        cp = json.loads((out / "cheap_products.json").read_text())
+        lines += ["## Cheaper one-step products (scripts/probe_cheap_products.py)", "",
+                  f"Lossless bits with a cheaper product in the one-step predictor (layers 1-{cp['layers'] - 1}; layer 0 "
+                  "is predicted by its mean in every variant). Halving the product is for fast links, where decode "
+                  "speed matters more than bits.", "",
+                  "| Product | Multiply-adds per token | Bits per value (text / code) | vs dense int8 |",
+                  "| --- | --- | --- | --- |"]
+        for name, v in cp["variants"].items():
+            lines.append(f"| {name} | {v['macs_per_token']:,} | {v['bits']['test_text']:.3f} / {v['bits']['test_code']:.3f} | "
+                         f"{v['delta']:+.3f} |")
+        lines.append("")
     if (out / "lossy.json").is_file():
         res = json.loads((out / "lossy.json").read_text())
         docs = list(res["documents"])

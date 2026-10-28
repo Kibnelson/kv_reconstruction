@@ -72,7 +72,8 @@ class Product:
             keep = torch.rand(N, K // 4, 4, device=device, generator=gen).argsort(-1)[..., :2]
             mask = torch.zeros(N, K // 4, 4, dtype=torch.bool, device=device).scatter_(-1, keep, True).reshape(N, K)
             W = torch.where(mask, W, torch.zeros_like(W))
-            self.Xt = rnd(K, T)                             # [K, T]: the product is W @ Xt = (X W^T)^T
+            self.Xt = rnd(T, K).t()                         # [K, T] column-major (the sparse kernels need it):
+                                                            # the product is W @ Xt = (X W^T)^T
             self.kind = None
             try:                                            # cuSPARSELt first, then CUTLASS
                 self.packed = torch._cslt_compress(W)
@@ -386,14 +387,17 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
     xall, prior = FusedOneStep(consts, study.C, study.hd, tokens_per_program=32, rows=4, warps=4).model(words)
     rows = []
 
-    def run(TB, chunks, mode, search):
+    def run(TB, chunks, mode, search, features="inline", lean=False, split=False, parts=False):
+        variant = ", ".join(x for x in ("features in a separate pass" if features == "pass" else "",
+                                        "lean registers" if lean else "",
+                                        "products on high-priority streams" if split else "") if x)
         tag = f"per layer, {TB} tokens per program, {chunks} chunk{'s' if chunks > 1 else ''}, {mode}" + \
-              (", stage-1 search" if search else "")
+              (", stage-1 search" if search else "") + (f", {variant}" if variant else "")
         row = {"part": "layerwise", "tokens_per_program": TB, "chunks": chunks, "mode": mode, "search": search,
-               "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name}
+               "variant": variant, "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name}
         try:
             codec = LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=TB, mode=mode, search=search,
-                                     chunks=chunks)
+                                     chunks=chunks, features=features, lean=lean, split_streams=split)
             buf, starts = codec.encode(words, xall, prior)
             bufs = codec.buffers(T)
             dec = codec.decode(buf, starts, T, bufs=bufs)
@@ -405,6 +409,15 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
                        encode_ms=1e3 * te, decode_ms=1e3 * td, decode_gvalues_per_s=n / td / 1e9)
             log(f"  [{tag}]: exact={ok}, {bits:.4f} bits/value; encode {1e3 * te:.1f} ms (after the forward pass), "
                 f"decode {1e3 * td:.1f} ms -> {n / td / 1e9:.1f} G values/s")
+            if parts:                                # where the decode time goes
+                accs = codec.products(xall)
+                tc = timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs, accs=accs), device, warmup=2, reps=5)
+                tp = timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs, products_only=True), device,
+                           warmup=2, reps=5)
+                row.update(coding_only_ms=1e3 * tc, products_only_ms=1e3 * tp)
+                log(f"    parts: products alone {1e3 * tp:.1f} ms, coding alone {1e3 * tc:.1f} ms, together "
+                    f"{1e3 * td:.1f} ms (overlap hides {1e3 * (tp + tc - td):.1f} ms)")
+                del accs
             del codec, buf, starts, dec, bufs
         except Exception as exc:
             row["error"] = repr(exc)[:240]
@@ -418,8 +431,14 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
     ok = [r for r in rows if r.get("bit_exact")]
     if ok:
         best = max(ok, key=lambda r: r["decode_gvalues_per_s"])
-        run(best["tokens_per_program"], best["chunks"], modes[0], False)
+        TB, ch = best["tokens_per_program"], best["chunks"]
+        run(TB, ch, modes[0], True, parts=True)              # the same again, timed in parts
+        run(TB, ch, modes[0], False)
+        run(TB, ch, modes[0], True, features="pass")
+        run(TB, ch, modes[0], True, lean=True)
+        run(TB, ch, modes[0], True, split=True)
+        run(TB, ch, modes[0], True, features="pass", lean=True, split=True)
         for mode in modes[1:]:
-            run(best["tokens_per_program"], best["chunks"], mode, True)
+            run(TB, ch, mode, True)
     del xall, prior
     return rows
