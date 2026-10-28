@@ -1,0 +1,66 @@
+{
+  "status": "passed",
+  "gpu_measured": false,
+  "scope": "offline NVIDIA SM86 compilation only; no GPU execution or timing",
+  "triton_version": "3.6.0",
+  "kernel": "_ldec_kernel",
+  "target": {
+    "backend": "cuda",
+    "arch": 86,
+    "warp_size": 32
+  },
+  "signature": {
+    "buf_ptr": "*i16",
+    "start_ptr": "*i32",
+    "state_ptr": "*i32",
+    "pos_ptr": "*i32",
+    "out_ptr": "*i16",
+    "acc_ptr": "*i32",
+    "xout_ptr": "*i8",
+    "sa_ptr": "*fp32",
+    "b_ptr": "*fp32",
+    "sp_ptr": "*fp32",
+    "inv_ptr": "*fp32",
+    "isx_ptr": "*fp32",
+    "cos_ptr": "*fp32",
+    "sin_ptr": "*fp32",
+    "ssum_in_ptr": "*i32",
+    "ssum_out_ptr": "*i32",
+    "smult_ptr": "*fp32",
+    "cumf_ptr": "*i32",
+    "lut_ptr": "*i32",
+    "tail_ptr": "*i32",
+    "t_base": "i32",
+    "T": "i32",
+    "W": "i32",
+    "G": "i32",
+    "HG": "i32",
+    "PRIOR_SCALE": "fp32"
+  },
+  "constexprs": {
+    "FIRST": false,
+    "LAST": false,
+    "TB": 32,
+    "H2": 64,
+    "LUT_SHIFT": 6,
+    "LUT_W": 1028,
+    "REFINE": 2,
+    "UNIFORM": true,
+    "SEARCH": false,
+    "FEAT": true,
+    "LEAN": false,
+    "ONES": false
+  },
+  "options": {
+    "num_warps": 1,
+    "enable_fp_fusion": false
+  },
+  "sources": {
+    "kv_compare/team_lookup.py": "c3fdc1f0a3ad194fc25b712033082850b08ca011f7114b7af39d61fb11cac40e",
+    "kv_compare/team_onestep/layerwise.py": "b21b808673f7e956fa9caefd1ff14443fdf7722c81e349b67e07ee45639a5f61",
+    "kv_compare/team_onestep/gpu_coder.py": "82255724519067fc9165e8371fd186ea518cdd44f3fdc34c60efe86808795db2"
+  },
+  "ptx_bytes": 103455,
+  "ptx_sha256": "e61c1ecb7898b537575e0baf1686d6e28f799db0709ba25b6cf68499728a860f",
+  "shared_bytes": 0
+}
