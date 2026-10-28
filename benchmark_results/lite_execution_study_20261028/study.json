@@ -1,0 +1,344 @@
+{
+  "new_gpu_measurements": false,
+  "scope": "derived study of published GPU evidence; no new performance measurements",
+  "source_commit": "1843ee85f63cb5309e949c9d22cf39e88ec0e96f",
+  "sources": [
+    {
+      "path": "benchmark_results/lite_baselines_a4500_20261028_070735_342774_report_20261028_071217/results.json",
+      "sha256": "8c11023d0ab419c111577d3f1161799025b131013c053943939b902f2318657c"
+    },
+    {
+      "path": "benchmark_results/lite_fast_a4500_20261028_060544_3215314_report_20261028_060828/results.json",
+      "sha256": "5b5c606bcac572b2651f74ae432fa0780474b68cd9276eada7623a006d650a9d"
+    }
+  ],
+  "input": {
+    "meta_sha256": "de33b22243969fe8d37be0dbc90f835bda263ba8091aee717c4e0ad53b5c9d2a",
+    "model": "unsloth/Llama-3.2-3B",
+    "revision": "d4446454d87d51aa42e1fb174f25acc5f8762331",
+    "protocol": "team_PEP_CPython",
+    "documents": {
+      "train0": {
+        "words_sha256": "d7e7c7f9168c0fe7bc65a04a99faaaf8f103d1b0eb41e0acf94b81594749ed80",
+        "tokens": 8192,
+        "token_ids_sha256": "4d27c17692ef1338619438ffe8eef244348a2933a1f831f02ff87aaebc9b4448"
+      },
+      "train1": {
+        "words_sha256": "6bec8d35943a18ef841bd084ea113401fe2ad0db5c7d5ec91c7f32d7a66ef40a",
+        "tokens": 8192,
+        "token_ids_sha256": "64cd415a06403ef04d74cc5da6a30000e43ee88a5b3fbc227c6cb1458ce04bc1"
+      },
+      "train2": {
+        "words_sha256": "7502a1cdf4e282ba4058df15fc507909bb2b741959d664a8ed4ad45dfe317210",
+        "tokens": 8192,
+        "token_ids_sha256": "57de2c3d6441ea5cb3e6225081bd53a5153492177de04e83b20624826d4aca62"
+      },
+      "train3": {
+        "words_sha256": "a807616a12d3ff5b3ae07f575803899773a7d445552d2c8ea2bfa07b0fb9917a",
+        "tokens": 8192,
+        "token_ids_sha256": "7d515141c9e596608099d22a222e6906ff82f58bf661985be5cc3c335f046d54"
+      },
+      "tables": {
+        "words_sha256": "95cb73a219785c65209da7b48582919a113ff17317c016037e235e4d4bc5a3ce",
+        "tokens": 8192,
+        "token_ids_sha256": "72527e4c13e51b291be02ff025333a593ab7d955d0c89ee4239ed4589c6698ff"
+      },
+      "test_text": {
+        "words_sha256": "2bc64c4e3b7f538f7e99dcc8e9ae3ca85a94bdbd927213e08f3e664d23079948",
+        "tokens": 8192,
+        "token_ids_sha256": "a51522b27abad981f9dd26fa86721f19ce58f95f8c44ef84c3b9850cd1ff45ed"
+      },
+      "test_code": {
+        "words_sha256": "8265a27b90ab5f9d69d50464d6b42b62f0bc16c5a3a0cbc1581cb2d627d99807",
+        "tokens": 8192,
+        "token_ids_sha256": "b17d2b7acdd4212f460ae7b13fed16b7a07fb8c9948ef7f9368ce139ad4058eb"
+      }
+    }
+  },
+  "hardware": {
+    "name": "NVIDIA RTX A4500",
+    "multiprocessors": 56
+  },
+  "lossless_methods": [
+    {
+      "method": "raw_bf16",
+      "kappa": 0.0,
+      "mode": "lossless",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 58720573,
+      "complete_bpv": 16.00008637564523,
+      "saved_percent": -0.0005398477826767945,
+      "original_exact": true,
+      "encode_ms": 0.42407726868987083,
+      "decode_ms": 0.35052280873060226,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6280255317687988,
+          "ppl": 5.093807222295391,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.179115056991577,
+          "ppl": 8.838481244703246,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {
+        "raw_bf16": {
+          "packet_bytes_ratio": 1.0,
+          "encode_time_ratio": 1.0,
+          "decode_time_ratio": 1.0
+        },
+        "splitzip_official_framed": {
+          "packet_bytes_ratio": 1.328600459100287,
+          "encode_time_ratio": 0.4877270139581016,
+          "decode_time_ratio": 0.6704771371769384
+        },
+        "exans_official_fixed_framed": {
+          "packet_bytes_ratio": 1.2924456343397517,
+          "encode_time_ratio": 0.027995917700703546,
+          "decode_time_ratio": 0.09582828407433477
+        }
+      }
+    },
+    {
+      "method": "splitzip_official_framed",
+      "kappa": 0.0,
+      "mode": "lossless",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 44197315,
+      "complete_bpv": 12.042812619890487,
+      "saved_percent": 24.73242112568446,
+      "original_exact": true,
+      "encode_ms": 0.8694971911609173,
+      "decode_ms": 0.5227960646152496,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6280255317687988,
+          "ppl": 5.093807222295391,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.179115056991577,
+          "ppl": 8.838481244703246,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {
+        "raw_bf16": {
+          "packet_bytes_ratio": 0.7526717254615346,
+          "encode_time_ratio": 2.05032727608134,
+          "decode_time_ratio": 1.491475166790215
+        },
+        "splitzip_official_framed": {
+          "packet_bytes_ratio": 1.0,
+          "encode_time_ratio": 1.0,
+          "decode_time_ratio": 1.0
+        },
+        "exans_official_fixed_framed": {
+          "packet_bytes_ratio": 0.9727872856637285,
+          "encode_time_ratio": 0.057400793680680864,
+          "decode_time_ratio": 0.14292550597298856
+        }
+      }
+    },
+    {
+      "method": "exans_official_fixed_framed",
+      "kappa": 0.0,
+      "mode": "lossless",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 45433689,
+      "complete_bpv": 12.379697799682617,
+      "saved_percent": 22.626888751983643,
+      "original_exact": true,
+      "encode_ms": 15.147825237363577,
+      "decode_ms": 3.6578220315277576,
+      "quality": [],
+      "vs_baseline": {
+        "raw_bf16": {
+          "packet_bytes_ratio": 0.7737269355324581,
+          "encode_time_ratio": 35.71949348796913,
+          "decode_time_ratio": 10.43533242465546
+        },
+        "splitzip_official_framed": {
+          "packet_bytes_ratio": 1.0279739617666819,
+          "encode_time_ratio": 17.42136189898304,
+          "decode_time_ratio": 6.996651809572671
+        },
+        "exans_official_fixed_framed": {
+          "packet_bytes_ratio": 1.0,
+          "encode_time_ratio": 1.0,
+          "decode_time_ratio": 1.0
+        }
+      }
+    },
+    {
+      "method": "lite_b8",
+      "kappa": 0.0,
+      "mode": "lossless",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 32785667,
+      "complete_bpv": 8.933385304042272,
+      "saved_percent": 44.16634184973581,
+      "original_exact": true,
+      "encode_ms": 227.93860081583261,
+      "decode_ms": 254.77031199261546,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6280255317687988,
+          "ppl": 5.093807222295391,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.179115056991577,
+          "ppl": 8.838481244703246,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {
+        "raw_bf16": {
+          "packet_bytes_ratio": 0.5583335673512586,
+          "encode_time_ratio": 537.4930882761483,
+          "decode_time_ratio": 726.8294834086579
+        },
+        "splitzip_official_framed": {
+          "packet_bytes_ratio": 0.7418022339139833,
+          "encode_time_ratio": 262.1498989680441,
+          "decode_time_ratio": 487.32255125163
+        },
+        "exans_official_fixed_framed": {
+          "packet_bytes_ratio": 0.721615781628474,
+          "encode_time_ratio": 15.047612264076033,
+          "decode_time_ratio": 69.65082220968686
+        }
+      }
+    }
+  ],
+  "calculated_precompressed_fetch_targets": [
+    {
+      "effective_gbps": 1,
+      "transfer_time_advantage_ms": 91.293184,
+      "decode_budget_ms": 91.81598006461525,
+      "required_decode_reduction_factor": 2.774792708342508
+    },
+    {
+      "effective_gbps": 2.5,
+      "transfer_time_advantage_ms": 36.5172736,
+      "decode_budget_ms": 37.04006966461525,
+      "required_decode_reduction_factor": 6.878235227402936
+    },
+    {
+      "effective_gbps": 5,
+      "transfer_time_advantage_ms": 18.2586368,
+      "decode_budget_ms": 18.78143286461525,
+      "required_decode_reduction_factor": 13.565009327515682
+    },
+    {
+      "effective_gbps": 10,
+      "transfer_time_advantage_ms": 9.1293184,
+      "decode_budget_ms": 9.65211446461525,
+      "required_decode_reduction_factor": 26.395284984094005
+    }
+  ],
+  "measured_network": false,
+  "previous_b64_profile": {
+    "profiled_wall_ms": 531.5427295863628,
+    "operators": [
+      {
+        "name": "cudaMemcpyAsync",
+        "calls": 28,
+        "self_cpu_ms": 0.5648289999999104,
+        "cpu_total_ms": 0.5648289999999104,
+        "self_device_ms": 0.0,
+        "device_total_ms": 0.0
+      },
+      {
+        "name": "cudaStreamSynchronize",
+        "calls": 1,
+        "self_cpu_ms": 0.002552999999999997,
+        "cpu_total_ms": 0.002552999999999997,
+        "self_device_ms": 0.0,
+        "device_total_ms": 0.0
+      },
+      {
+        "name": "cudaLaunchKernel",
+        "calls": 44256,
+        "self_cpu_ms": 106.43995599999465,
+        "cpu_total_ms": 106.43995599999465,
+        "self_device_ms": 0.0,
+        "device_total_ms": 0.0
+      },
+      {
+        "name": "aten::matmul",
+        "calls": 447,
+        "self_cpu_ms": 0.6531550000001748,
+        "cpu_total_ms": 26.35413100000005,
+        "self_device_ms": 0.0,
+        "device_total_ms": 7.111650000000246
+      },
+      {
+        "name": "aten::mm",
+        "calls": 447,
+        "self_cpu_ms": 23.102932999999148,
+        "cpu_total_ms": 25.700975999999876,
+        "self_device_ms": 7.111650000000246,
+        "device_total_ms": 7.111650000000246
+      }
+    ],
+    "selected_device_rows": [
+      {
+        "name": "_decode_kernel",
+        "calls": 448,
+        "self_cpu_ms": 0.0,
+        "cpu_total_ms": 0.0,
+        "self_device_ms": 134.6526879999996,
+        "device_total_ms": 134.6526879999996
+      },
+      {
+        "name": "aten::_index_put_impl_",
+        "calls": 924,
+        "self_cpu_ms": 20.388018999998003,
+        "cpu_total_ms": 131.4124109999989,
+        "self_device_ms": 48.41416799999949,
+        "device_total_ms": 75.47211599999704
+      },
+      {
+        "name": "aten::mm",
+        "calls": 447,
+        "self_cpu_ms": 23.102932999999148,
+        "cpu_total_ms": 25.700975999999876,
+        "self_device_ms": 7.111650000000246,
+        "device_total_ms": 7.111650000000246
+      }
+    ]
+  },
+  "interpretation": "Prior B64 profile is instrumented and overlaps inclusive operator/kernel totals. It does not apportion the later B8 wall time. New B8 profiles are required."
+}
