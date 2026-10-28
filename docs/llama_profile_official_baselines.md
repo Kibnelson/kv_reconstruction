@@ -38,6 +38,12 @@ results/recipe under `resume_history/`, and preserves profiling, toolchain,
 AQUA setup and BF16 PPL. It does not rerun those stages. Model, inputs, modes,
 source pins and official evaluation settings must still match.
 
+The subsequent path/tokenizer repair also migrates the known 27dfbf6 partial
+run and preserves its completed ExANS native build/GPU smoke checkpoint. Hashing
+normalizes JSON string paths before file access. Regression coverage runs the
+full sender/receiver wrapper with real framing and a CPU native-transport fixture,
+in addition to the actual native GPU test performed on the A4500.
+
 ExANS standalone executables now receive the CUDA/nvCOMP runtime library paths,
 including `libcudart.so.12`. These loader-path additions apply only to ExANS
 children; they do not change AQUA's runtime used by the saved BF16 reference.
@@ -133,12 +139,26 @@ bytes). This authenticates that particular backup, **not equivalence or row orde
 against the removed original**. The report explicitly labels backup calibration.
 
 The sampler follows the released `get_red_pajama` rule, including seed 0,
-tokenizer type/BOS/EOS settings, long-document rejection and random window
+BOS/EOS assignments, long-document rejection and random window
 selection. Tests compare its tokens with the released function on identical
 records. The resulting 256 × 8,192 token batches are passed via the author's
 supported local pretokenized-file input; training, holdout, quantizers and full
 WikiText evaluation are unchanged. Row selections, text/token hashes and the
 token-file checksum are retained; raw text/tokens are not published.
+
+The pinned checkpoint declares generic `PreTrainedTokenizer` and supplies
+`tokenizer.json`. With Transformers 4.46.3, forcing `use_fast=False` attempts an
+unimplemented slow vocabulary and then reports a secondary protobuf error.
+Backup preparation selects the checkpoint's fast backend, as the successful
+official perplexity entry point does. Tokenizer config/JSON hashes and the
+backend choice are recorded. This compatibility selection is outside the
+unchanged author training code. An integration test uses the actual pinned
+checkpoint assets and AQUA's pinned Transformers/tokenizers versions; it
+reproduces the failed slow load, verifies fast/default-PPL token identity, and
+matches the released sampler's output on the same records.
+
+This repair reuses the already downloaded shards and Arrow cache; it does not
+restart the completed download or the BF16 PPL evaluation.
 
 Selecting the backup is a documented calibration provenance variation. It must
 not be described as exact reproduction of the original calibration data. If

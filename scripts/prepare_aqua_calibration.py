@@ -15,6 +15,22 @@ sys.path.insert(0,str(ROOT))
 from scripts.package_llama_causal import sha
 
 
+def tokenizer_plan(model_path):
+    """The pinned Llama-3 checkpoint provides a fast-only tokenizer JSON.
+
+    Its generic PreTrainedTokenizer config has no implemented slow vocabulary.
+    Use the checkpoint backend used by the author's successful PPL entry point.
+    """
+    path=Path(model_path)/'tokenizer_config.json'
+    config=json.loads(path.read_text()) if path.exists() else {}
+    generic=config.get('tokenizer_class') in ('PreTrainedTokenizer','PreTrainedTokenizerFast')
+    if generic and not (Path(model_path)/'tokenizer.json').is_file():
+        raise ValueError('fast-only checkpoint is missing tokenizer.json')
+    return dict(use_fast=generic,reason='checkpoint_fast_backend_as_official_ppl' if generic else 'author_default_slow',
+        tokenizer_config_sha256=sha(path) if path.exists() else None,
+        tokenizer_json_sha256=sha(Path(model_path)/'tokenizer.json') if generic else None)
+
+
 def sample_records(data,tokenizer,*,nsamples=256,seqlen=8192,seed=0):
     """Released get_red_pajama's sampling rule, with an explicit data source."""
     import torch
@@ -43,13 +59,18 @@ def prepare(source,model_path,output,receipt,cache,manifest_path):
     from huggingface_hub import hf_hub_download
     from transformers import AutoTokenizer
     manifest=json.loads(manifest_path.read_text())
+    plan=tokenizer_plan(model_path)
     recipe=dict(manifest_sha256=sha(manifest_path),sampler_source_sha256=sha(source/'aquakv/datautils.py'),
-        model_snapshot=str(model_path),seed=0,nsamples=256,seqlen=8192)
+        model_snapshot=str(model_path),seed=0,nsamples=256,seqlen=8192,tokenizer=plan)
     if receipt.exists() and output.exists():
         old=json.loads(receipt.read_text())
         if old['recipe']==recipe and sha(output)==old['token_file_sha256']:
             return old
         raise ValueError('existing calibration tokens/provenance changed; preserve them and choose a new output')
+    # Validate the checkpoint backend before any dataset download/preparation.
+    tokenizer=AutoTokenizer.from_pretrained(model_path,use_fast=plan['use_fast'],trust_remote_code=None,local_files_only=True)
+    if plan['use_fast'] and not tokenizer.is_fast:
+        raise ValueError('the checkpoint fast tokenizer backend did not load')
     paths=[]
     for e in manifest['files']:
         path=Path(hf_hub_download(repo_id=manifest['repo'],repo_type='dataset',revision=manifest['revision'],
@@ -60,7 +81,6 @@ def prepare(source,model_path,output,receipt,cache,manifest_path):
     data=load_dataset('parquet',data_files={'train':paths},split='train',cache_dir=str(cache/'arrow'))
     if len(data)!=manifest['rows'] or not {'text','meta'}<=set(data.column_names):
         raise ValueError('backup is missing expected rows/columns; no subset fallback')
-    tokenizer=AutoTokenizer.from_pretrained(model_path,use_fast=False,trust_remote_code=None,local_files_only=True)
     batches,selections=sample_records(data,tokenizer)
     output.parent.mkdir(parents=True,exist_ok=True)
     temporary=output.with_suffix('.part'); torch.save(batches,temporary); temporary.replace(output)

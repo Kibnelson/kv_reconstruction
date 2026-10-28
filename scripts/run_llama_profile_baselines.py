@@ -24,7 +24,7 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG",":4096:8")
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from scripts.bench_llama_baselines import call, device_check, verified_inputs, log
-from scripts.package_llama_causal import sha
+from scripts.package_llama_causal import sha as hash_file
 from kv_compare.profile_recovery import recover_partial,runtime_environment
 
 PINS={"aqua":("goodevening13/aquakv","e744183f2f3a4a90381f20a6975456871fd1ae29"),
@@ -35,6 +35,11 @@ FILES=["scripts/run_llama_profile_baselines.py","scripts/run_llama_profile_a4500
        "scripts/bench_llama_baselines.py","kv_compare/framed_baselines.py","scripts/package_llama_causal.py",
        "kv_compare/profile_recovery.py","scripts/prepare_aqua_calibration.py",
        "benchmark_fixtures/aqua_redpajama_backup_manifest.json"]
+
+
+def sha(path):
+    """JSON requests contain string paths; normalize at the hashing boundary."""
+    return hash_file(Path(path))
 
 
 def write(path,data):
@@ -76,7 +81,7 @@ def receive(request,torch,device):
                 raise AssertionError("official ExANS receiver differs from original BF16 words")
             np.save(e["decoded"],words.cpu().numpy().astype("<u2"),allow_pickle=False)
             checks.append(dict(id=e["id"],verified=True,word_sha256=word_sha(words),decoded_file_sha256=sha(e["decoded"])))
-        write(q["output"],dict(gpu_measured=True,no_source_kv_or_predictions=True,checks=checks,
+        write(q["output"],dict(gpu_measured=device.type=="cuda",no_source_kv_or_predictions=True,checks=checks,
             inputs="wire and pinned native decoder library only; expected digest is an assertion"))
     finally:
         codec.close()
@@ -277,7 +282,7 @@ class Suite:
         from kv_compare.official_exans import Exans,RAW
         from scripts.bench_llama_causal import timed
         source=self.cache/"sources/exans"; build=json.loads((self.out/"exans_build.json").read_text())
-        blocks=max(math.ceil(e["values"]*2/RAW) for e in self.inputs)
+        blocks=max(2,max(math.ceil(e["values"]*2/RAW) for e in self.inputs))
         codec=Exans(source,build["library"],self.device,blocks)
         directory=self.out/"exans"; directory.mkdir(exist_ok=True)
         rows=[]; entries=[]; validations=[]
@@ -336,7 +341,7 @@ class Suite:
         for v in validations:
             v.update(status="verified",decoded_file_sha256=checks[v["id"]]["decoded_file_sha256"])
         write(self.out/"exans_validation.json",validations)
-        write(self.out/"exans.json",dict(rows=rows,gpu_measured=True,official_commit=PINS["exans"][1],
+        write(self.out/"exans.json",dict(rows=rows,gpu_measured=self.device.type=="cuda",official_commit=PINS["exans"][1],
             scope="official ExANS native codec plus local complete fixed-record transport harness; not original vLLM evaluation"))
         return dict(artifacts=self.artifacts(self.out/"exans.json",self.out/"exans_receiver.json",self.out/"exans_validation.json",
             *[self.out/r[k] for r in rows+validations for k in ("packet","decoded")]))

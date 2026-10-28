@@ -19,6 +19,23 @@ LEGACY_CODE={
 }
 
 
+RECOVERY_CODE_V1={
+    "scripts/run_llama_profile_baselines.py": "ae34a763aef1abd81082004d73f45bb88bdfc86f21ef2c677f2b1fa7f2d857f0",
+    "scripts/run_llama_profile_a4500.sh": "effb4022391f2158fab1b6ca300bdd4d528835220a224ec2fee96b43571cfda9",
+    "scripts/package_llama_profile.py": "9c5c186100659d7d12f8e6ab7f8f265b4126b1a94ce795aed975f5c2124c90c0",
+    "scripts/setup_qwen_cuda_toolchain.py": "c6f383bdf3026e1af6261d878762ca3cb6415a020c33606bff96b0fc7e5c9f39",
+    "kv_compare/causal_profile.py": "8ab17bff0ce1bed20098b6746e5638f964326d4c1c6f3480c871ce2606dbf2f9",
+    "kv_compare/official_exans.py": "df2134b5709b26cf631bf281b1a05225d9256277a3e4c62f915e6985b4869185",
+    "native/exans_build_compat.h": "a1c9a5b2c6621b6f929a481250067e4618f8dd3d46084fa1be1a783dc2a70182",
+    "scripts/bench_llama_baselines.py": "bd3cbde7a9ec8dbaf296377fbcf0369761911f117cae6663fb63f04b7a740924",
+    "kv_compare/framed_baselines.py": "7719b5cb246791be1e4d73921b95515d2207b6b0fdc6a1292bdf1ce243467c27",
+    "scripts/package_llama_causal.py": "ee1e6ae032de9761ee0f41f4cce663059c17c0abad5d0609bd88a13cacb7380b",
+    "kv_compare/profile_recovery.py": "fb7acf7cbe087f628194281371d72a92fb73fc721faaf77237d63c02d1ea89f3",
+    "scripts/prepare_aqua_calibration.py": "a3f32784b1d6c4be67f20d32265bfe4c9d9598bfd9ad1196c2236cc711b52e16",
+    "benchmark_fixtures/aqua_redpajama_backup_manifest.json": "4caecc08c02a2ce96590eba1c8751e5eef4806f81d10c107670373309a462d5e"
+}
+
+
 def digest(path):
     h=hashlib.sha256()
     with Path(path).open('rb') as f:
@@ -42,18 +59,20 @@ def runtime_environment(env,home,extra=()):
 
 
 def recover_partial(old,recipe,out):
-    """Only the known initial release may migrate; all completed evidence is kept.
+    """Only known runner releases may migrate; all completed evidence is kept.
 
-    Source changes are runner/loader/report repairs, never a measured core change.
+    Changes repair runner/loader/calibration preparation, never the measured core.
     Backup calibration is explicit and allowed only before training has completed.
     """
     out=Path(out).resolve(); before=old['recipe']
     legacy=before.get('code')==LEGACY_CODE
+    recovery_v1=before.get('code')==RECOVERY_CODE_V1
     source_choice_only=(before.get('code')==recipe.get('code') and
         before.get('aqua_calibration','original')=='original' and recipe.get('aqua_calibration')=='backup')
-    if old['identity']!=identity(before) or not (legacy or source_choice_only):
+    if old['identity']!=identity(before) or not (legacy or recovery_v1 or source_choice_only):
         raise ValueError('resume identity changed outside the supported repair; existing run preserved')
     allowed={'profile','toolchain','aqua_setup','aqua_raw'}
+    if recovery_v1: allowed.add('exans_build')
     if source_choice_only: allowed.update({'exans_build','exans'})
     completed={name for name,s in old['stages'].items() if s.get('status')=='completed'}
     if not completed<=allowed or old.get('status') not in ('partial','failed','running'):
@@ -78,6 +97,6 @@ def recover_partial(old,recipe,out):
     result.setdefault('resume_history',[]).append(dict(previous_identity=old['identity'],
         previous_recipe=before,archived_result=str(archive.relative_to(out)),archived_sha256=digest(archive),
         preserved_completed_stages=sorted(completed),
-        reason='runtime-library discovery and explicit calibration-source recovery; completed artifacts unchanged'))
+        reason='checkpoint-preserving runtime/calibration compatibility repair; completed artifacts unchanged'))
     result.update(recipe=recipe,identity=identity(recipe),status='running')
     return result
