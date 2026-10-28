@@ -93,7 +93,7 @@ def memory_note(device=None):
 
 
 STAGES = ("capture", "evalcap", "lossless", "lossy", "frontier", "gpu_speed", "pool", "format", "szcodec", "exans",
-          "report")
+          "aquappl", "szprotocol", "report")
 BRANCH = "llama32-3b-lossy-lossless-compare"
 
 
@@ -161,6 +161,212 @@ def stage_evalcap(args, out):
     (out / "captures" / "eval_meta.json").write_text(json.dumps({"text": str(args.eval_text), "tokens": args.eval_tokens,
                                                                   "captures": reports}, indent=1))
     return reports
+
+
+AQUA_PAPER = {                     # AQUA-KV paper, Table 1, Llama 3.2 3B (bits per value, WikiText-2 perplexity)
+    "exact": (16.0, 6.98), "aqua2": (2.16, 7.03), "kivi2g128": (2.25, 9.33), "higgs2": (2.02, 7.47)}
+
+
+def aqua_method(name, study, fits, consts):
+    """A method of the AQUA-KV-protocol stage by name: exact, higgs<b>, aqua<b>, kivi<b>g<group>,
+    ours<step>[t] (t: per-token step)."""
+    from kv_compare import streaming as sm
+    if name == "exact":
+        return None
+    if name.startswith("higgs"):
+        return sm.HiggsNoPredictor(study, int(name[5:]))
+    if name.startswith("aqua"):
+        b = int(name[4:])
+        if b not in fits:
+            from kv_compare import baselines
+            log(f"aquappl: fitting AQUA-KV {b}-bit predictors as {baselines.AQUA_SOURCE} does")
+            fits[b] = baselines.aqua_official_fit(study, study.L, b, log)
+        return sm.AquaKV(study, fits[b], b)
+    if name.startswith("kivi"):
+        b, g = name[4:].split("g")
+        return sm.Kivi(int(b), int(g))
+    if name.startswith("ours"):
+        tok = name.endswith("t")
+        return sm.OursGpu(consts, study.C, study.hd, float(name[4:].rstrip("t")), token_step=tok)
+    raise SystemExit(f"unknown --aqua-methods entry {name!r}")
+
+
+def stage_aquappl(args, out):
+    """AQUA-KV's WikiText-2 perplexity protocol (kv_compare.streaming) for every method: 8,192-token windows of
+    the whole test split, 32 tokens per forward pass, the first 4 tokens and the recent buffer in BF16, the rest
+    compressed in blocks of >= 128 tokens. Results in aqua_protocol.json (kept per method; rerun one with
+    --aqua-rerun)."""
+    import gc
+    import torch
+    from kv_compare import fused
+    from kv_compare import streaming as sm
+    from kv_compare.capture import load_model
+    from kv_compare.predict import Study
+    if args.eval_text is None or not Path(args.eval_text).is_file():
+        raise SystemExit("aquappl needs --eval-text (the WikiText-2 raw test split joined with blank lines)")
+    device = torch.device(args.device)
+    path = out / "aqua_protocol.json"
+    res = json.loads(path.read_text()) if path.is_file() else {"methods": {}}
+    tokenizer, model = load_model(args.model, args.revision, device)
+    windows = sm.window_ids(tokenizer, Path(args.eval_text).read_text(encoding="utf-8"), args.aqua_seqlen)
+    if args.aqua_windows:
+        windows = windows[:args.aqua_windows]
+    res.update(protocol=f"aquakv evaluate_perplexity.py: seqlen {args.aqua_seqlen}, chunk 32, prefix 4, recent buffer 128",
+               windows=len(windows), text=str(args.eval_text), source="goodevening13/aquakv@e744183")
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    consts = fused.prepare(study, log=log) if any(m.startswith("ours") for m in args.aqua_methods) else None
+    fits = {}
+    log(f"aquappl: {len(windows)} windows of {args.aqua_seqlen} tokens; methods {args.aqua_methods}")
+    for name in args.aqua_methods:
+        if name in res["methods"] and name not in args.aqua_rerun:
+            log(f"aquappl {name}: kept from aqua_protocol.json")
+            continue
+        comp = aqua_method(name, study, fits, consts)
+        t0 = time.time()
+        make = None if comp is None else (lambda comp=comp: sm.StreamingCache(comp, study.L, granule=comp.granule))
+        r = sm.perplexity(model, windows, device, make, log=log if args.aqua_verbose else None)
+        r["seconds"] = time.time() - t0
+        res["methods"][name] = r
+        path.write_text(json.dumps(res, indent=1))
+        log(f"aquappl {name}: perplexity {r['perplexity']:.4f} (float32 loss {r['perplexity_f32']:.4f})" +
+            (f", {r['bits_per_compressed_value']:.3f} bits per compressed value, "
+             f"{r['bits_per_value_whole_cache']:.3f} for the whole cache" if "bits_per_compressed_value" in r else "")
+            + f" ({r['seconds']:.0f} s; {memory_note(args.device)})")
+        gc.collect()
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+    del model, study, consts, fits
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    return res
+
+
+def stage_szprotocol(args, out):
+    """Ours on SplitZip's benchmark data (bench_codec_throughput.py, its paper protocol): the first 4 WikiText-2
+    test rows of at least 80 characters (whitespace normalised), each prefilled on its own; our lossless bits
+    (exact costs) on their KV, with the one-step and the strong predictor. SplitZip's own numbers come from its
+    script (run_on_nuc.sh SPLITZIP_OFFICIAL=1, splitzip_protocol_official.json)."""
+    import gc
+    import torch
+    from kv_compare.capture import capture_ids, load_model
+    from kv_compare.predict import CONFIGS, LABELS, Study
+    rows_path = out / "wikitext2_test_rows.json"
+    if not rows_path.is_file():
+        raise SystemExit("szprotocol needs wikitext2_test_rows.json in the run folder (run_on_nuc.sh writes it)")
+    texts = []
+    for row in json.loads(rows_path.read_text()):
+        t = " ".join(row.split())
+        if len(t) >= 80:
+            texts.append(t)
+        if len(texts) == 4:
+            break
+    device = torch.device(args.device)
+    tokenizer, model = load_model(args.model, args.revision, device)
+    names = []
+    for i, t in enumerate(texts):
+        ids = tokenizer(t)["input_ids"]
+        capture_ids(model, ids, out / "captures", f"szp{i}", device)
+        names.append(f"szp{i}")
+        log(f"szprotocol: prompt {i}: {len(ids)} tokens")
+    del model
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    study = Study(out / "captures", args.device, TRAIN, "tables", names, None, log=log)
+    res = {"prompts": [{"name": n, "tokens": d.tokens, "chars": len(t)} for n, d, t in zip(names, study.tests, texts)],
+           "ours": {}}
+    for name in args.sz_protocol_configs:
+        cfg = CONFIGS[name]
+        if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
+            continue
+        per_layer, _ = study.lossless(cfg)
+        tot = sum(float(v.sum()) for v in per_layer.values())
+        cnt = sum(v.numel() for v in per_layer.values())
+        res["ours"][LABELS[name]] = tot / cnt
+        log(f"szprotocol: {LABELS[name]}: {tot / cnt:.3f} bits per value on SplitZip's prompts")
+        study._f.clear(); study._att.clear(); study._qmap.clear()
+    (out / "szprotocol.json").write_text(json.dumps(res, indent=1))
+    return res
+
+
+def szprotocol_lines(out):
+    res = json.loads((out / "szprotocol.json").read_text()) if (out / "szprotocol.json").is_file() else None
+    off = (json.loads((out / "splitzip_protocol_official.json").read_text())
+           if (out / "splitzip_protocol_official.json").is_file() else None)
+    if not res and not off:
+        return []
+    lines = ["## SplitZip's protocol (bench_codec_throughput.py, Llama-3.2-3B in place of Qwen3-32B)", "",
+             "SplitZip's paper protocol: the code book calibrated on KV of WikiText-2 train prompts, the benchmark on "
+             "KV of the first 4 WikiText-2 test prompts (rows of at least 80 characters, each prefilled on its own), "
+             "repeated to 268M values; compression ratio with metadata, encode / decode GB/s (mean of 5 repeats of "
+             "50 runs after warm-up), bitwise round trip checked. Ours: lossless bits (exact cost) on the KV of the "
+             "same prompts, our predictors calibrated on our calibration documents.", "",
+             "| Method | Bits per value | Compression ratio | Encode | Decode |", "| --- | --- | --- | --- | --- |"]
+    if off:
+        lines.append(f"| SplitZip, the authors' script | {16 / off['compression_ratio']:.3f} | "
+                     f"{off['compression_ratio']:.4f} | {off['encode_gbs']['mean']:.0f} GB/s | "
+                     f"{off['decode_gbs']['mean']:.0f} GB/s |")
+    if res:
+        for k, b in res["ours"].items():
+            lines.append(f"| Ours: {k.replace('Our ', '')} | {b:.3f} | {16 / b:.4f} | - | - |")
+        lines += ["", "Prompts: " + ", ".join(f"{p['tokens']} tokens" for p in res["prompts"]) +
+                  ". Our GPU decode speed on these short prompts is not meaningful; the measured GPU speeds are in "
+                  "the transfer tables (one 8,192-token document)."]
+    return lines + [""]
+
+
+def aqua_protocol_lines(out):
+    res = json.loads((out / "aqua_protocol.json").read_text())
+    ms = res["methods"]
+    if "exact" not in ms:
+        return []
+    ex = ms["exact"]
+    n = ex["tokens_per_window"]
+    off = None
+    if (out / "aqua_official.json").is_file():
+        off = json.loads((out / "aqua_official.json").read_text())
+    lines = ["## AQUA-KV's protocol: WikiText-2 perplexity with a streaming compressed cache", "",
+             f"The authors' evaluation ({res['source']}, evaluate_perplexity.py) for every method, in one harness "
+             f"(kv_compare/streaming.py): the whole WikiText-2 test split in {res['protocol'].split('seqlen ')[1].split(',')[0]}-token windows "
+             f"({res['windows']} windows), 32 tokens per forward pass, the first 4 tokens and the most recent tokens "
+             "(at least 128 before a block is compressed) in BF16, every older token compressed and read back. "
+             "Perplexity with the authors' BF16 loss (comparable to the paper) and with a float32 loss from the "
+             "same logits (resolves small gaps; the change is per window, mean +- standard error). Bits per value: "
+             "over the compressed values (as the papers count) and for the whole cache at the end of each window.", "",
+             "| Method | Bits per compressed value | Bits, whole cache | Perplexity (BF16 loss) | Perplexity (float32) | "
+             "Change vs exact | Paper (Llama 3.2 3B, Table 1) |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    names = {"exact": "exact BF16 cache", "higgs2": "HIGGS 2-bit, no predictor (gs1024)"}
+
+    def label(k):
+        if k in names:
+            return names[k]
+        if k.startswith("aqua"):
+            return f"AQUA-KV {k[4:]}-bit (our faithful re-implementation, our calibration documents)"
+        if k.startswith("kivi"):
+            b, g = k[4:].split("g")
+            return f"KIVI {b}-bit, group {g}"
+        if k.startswith("higgs"):
+            return f"HIGGS {k[5:]}-bit, no predictor"
+        if k.startswith("ours"):
+            return f"Ours, GPU codec, step {k[4:].rstrip('t')}" + (", token step" if k.endswith("t") else "")
+        return k
+    for k, r in ms.items():
+        if k == "exact":
+            ch = "-"
+        else:
+            d = [math.exp((a - b) / n) - 1 for a, b in zip(r["nll_sums_f32"], ex["nll_sums_f32"])]
+            m = sum(d) / len(d)
+            se = (sum((x - m) ** 2 for x in d) / (len(d) - 1)) ** 0.5 / len(d) ** 0.5 if len(d) > 1 else 0.0
+            ch = f"{100 * (r['perplexity_f32'] / ex['perplexity_f32'] - 1):+.2f}% ({100 * m:+.2f}% +- {100 * se:.2f})"
+        bits = f"{r['bits_per_compressed_value']:.3f}" if "bits_per_compressed_value" in r else "16"
+        whole = f"{r['bits_per_value_whole_cache']:.3f}" if "bits_per_value_whole_cache" in r else "16"
+        paper = AQUA_PAPER.get(k)
+        lines.append(f"| {label(k)} | {bits} | {whole} | {r['perplexity']:.3f} | {r['perplexity_f32']:.3f} | {ch} | "
+                     + (f"{paper[0]:.2f} bits, {paper[1]:.2f}" if paper else "-") + " |")
+    if off:
+        for k, v in off.items():
+            lines.append(f"| AQUA-KV, the authors' own scripts ({k}) | - | - | {v:.3f} | - | - | "
+                         + (f"{AQUA_PAPER['aqua2'][0]:.2f} bits, {AQUA_PAPER['aqua2'][1]:.2f}" if "2-bit" in k else
+                            f"16 bits, {AQUA_PAPER['exact'][1]:.2f}" if "no quantization" in k else "-") + " |")
+    return lines + [""]
 
 
 def chunk_spans(tokens):
@@ -1521,6 +1727,9 @@ def stage_report(args, out):
                          " / ".join(f"{x:+.3f}%" for x in own) + " (GPU kernels round differently at another sequence length).")
     if (out / "lossy_eval.json").is_file():
         lines += [""] + eval_lines(out)
+    if (out / "aqua_protocol.json").is_file():
+        lines += [""] + aqua_protocol_lines(out)
+    lines += szprotocol_lines(out)
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
@@ -1589,6 +1798,15 @@ def parser():
                    help="gpu_speed: numbers of layers coded by ours in the measured SplitZip mixes (empty: skip)")
     p.add_argument("--lossy-speed-kappas", default="0.25,0.5,1,2,4",
                    help="gpu_speed: steps of the GPU lossy codec timed on the whole test document (empty: skip)")
+    p.add_argument("--aqua-methods",
+                   default="exact,higgs2,kivi2g128,kivi2g32,kivi4g32,aqua2,aqua3,aqua4,ours0.5,ours1,ours2,ours4,ours2t,ours4t",
+                   help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, ours<step>[t])")
+    p.add_argument("--aqua-windows", type=int, default=0, help="aquappl: only the first N windows (0: all)")
+    p.add_argument("--sz-protocol-configs", default="prev,fast",
+                   help="szprotocol: our predictors to cost on SplitZip's prompts")
+    p.add_argument("--aqua-seqlen", type=int, default=8192, help="aquappl: window length (the protocol's 8192)")
+    p.add_argument("--aqua-rerun", default="", help="aquappl: methods to measure again even if kept")
+    p.add_argument("--aqua-verbose", action="store_true", help="aquappl: log every window")
     p.add_argument("--sz-ranks", default="0,256,512",
                    help="szcodec: products of the SplitZip-format codec (0 = dense, else reduced rank)")
     p.add_argument("--sz-configs", default="32x4",
@@ -1653,6 +1871,9 @@ def main(argv=None):
     args.format_ranks = [int(r) for r in args.format_ranks.split(",") if r]
     args.sz_ranks = [int(r) for r in args.sz_ranks.split(",") if r]
     args.lossy_docs = [d for d in args.lossy_docs.split(",") if d]
+    args.aqua_methods = [m for m in args.aqua_methods.split(",") if m]
+    args.aqua_rerun = [m for m in args.aqua_rerun.split(",") if m]
+    args.sz_protocol_configs = [c for c in args.sz_protocol_configs.split(",") if c]
     if any(d not in ("test", "eval") for d in args.lossy_docs):
         raise SystemExit("--lossy-docs takes test, eval or test,eval")
     args.sz_configs = [tuple(int(x) for x in t.split("x")) for t in args.sz_configs.split(",") if t]
@@ -1729,6 +1950,10 @@ def main(argv=None):
             stage_szcodec(args, out)
         if "exans" in stages:
             stage_exans(args, out)
+        if "aquappl" in stages:
+            stage_aquappl(args, out)
+        if "szprotocol" in stages:
+            stage_szprotocol(args, out)
         if "report" in stages:
             stage_report(args, out)
     except BaseException as exc:

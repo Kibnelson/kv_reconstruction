@@ -47,7 +47,8 @@ RUN=${RUN:-$HOME/kv_reconstruction/runs/llama32_3b_compare}
 # authors' baseline checks and timings), for the locked scoreboard. About 1.5 hours.
 if [ "${LOCK:-0}" = 1 ]; then
     CHECKS=1
-    STAGES=${STAGES:-lossless,frontier,lossy,gpu_speed,pool,szcodec,exans,report}
+    SPLITZIP_OFFICIAL=1
+    STAGES=${STAGES:-lossless,frontier,lossy,gpu_speed,pool,szcodec,exans,aquappl,szprotocol,report}
     EXTRA="--lossy-docs test,eval --lossy-variants base,sinks,both --kappas 0.5,1,2,4 ${EXTRA:-}"
 fi
 STAGES=${STAGES:-gpu_speed,report}
@@ -83,9 +84,9 @@ if [ "${CHECKS:-0}" = 1 ]; then
 fi
 # stage evalcap: the WikiText-2 raw test split as one text file (joined with blank lines, as AQUA-KV's evaluation
 # reads it), made once with the AQUA-KV environment's datasets library (or this one's, if it has it).
-if [[ ",$STAGES," == *",evalcap,"* ]]; then
+if [[ ",$STAGES," == *",evalcap,"* || ",$STAGES," == *",aquappl,"* || ",$STAGES," == *",szprotocol,"* ]]; then
     WT=$RUN/wikitext2_test.txt
-    if [ ! -s "$WT" ]; then
+    if [ ! -s "$WT" ] || [ ! -s "$RUN/wikitext2_test_rows.json" ]; then
         PY=python
         [ -x "$HOME/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python" ] && \
             PY=$HOME/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python
@@ -97,10 +98,64 @@ try:
 except Exception:
     d = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split="test")
 open(sys.argv[1], "w", encoding="utf-8").write("\n\n".join(d["text"]))
-print(f"wrote {sys.argv[1]}: {len(d)} lines")
+import json, os
+open(os.path.join(os.path.dirname(sys.argv[1]), "wikitext2_test_rows.json"), "w").write(json.dumps(d["text"]))
+print(f"wrote {sys.argv[1]} and the test rows: {len(d)} lines")
 EOF
     fi
     EXTRA="--eval-text $WT ${EXTRA:-}"
+fi
+# AQUA_OFFICIAL=1: AQUA-KV's own scripts, as its README runs them for unsloth/Llama-3.2-3B, in its environment:
+# WikiText-2 perplexity without quantization, predictors trained on 256 x 8192 RedPajama tokens (2-bit HIGGS grid),
+# then the perplexity with them (prefix 4, recent buffer 128). The predictors are kept for later runs.
+if [ "${AQUA_OFFICIAL:-0}" = 1 ]; then
+    OFF=$HOME/kv_reconstruction/runs/_llama_official
+    AQUA_PY=$OFF/envs/aqua/bin/python
+    AQUA_SRC=$OFF/sources/aqua
+    D=$RUN/aqua_official
+    mkdir -p "$D"
+    export HF_DATASETS_TRUST_REMOTE_CODE=1
+    COMMON="--model_name unsloth/Llama-3.2-3B --model_seqlen 8192 --edenn_d 2 --edenn_n 16 --hadamard_groupsize 1024"
+    echo "AQUA-KV official: perplexity without quantization ($D/no_quant.log)"
+    (cd "$AQUA_SRC" && "$AQUA_PY" evaluate_perplexity.py $COMMON --no_quant) > "$D/no_quant.log" 2>&1 \
+        || echo "AQUA-KV no-quant evaluation failed (see $D/no_quant.log)"
+    if [ ! -s "$D/predictors_2bit.pt" ]; then
+        echo "AQUA-KV official: training predictors on RedPajama ($D/train_2bit.log; this can take an hour or more)"
+        (cd "$AQUA_SRC" && "$AQUA_PY" train_predictors.py $COMMON --predictors_output_path "$D/predictors_2bit.pt" \
+            --dataset pajama --total_nsamples ${AQUA_NSAMPLES:-256} --valid_nsamples 32 --offload_activations) \
+            > "$D/train_2bit.log" 2>&1 || echo "AQUA-KV training failed (see $D/train_2bit.log)"
+    fi
+    if [ -s "$D/predictors_2bit.pt" ]; then
+        echo "AQUA-KV official: perplexity with the predictors ($D/ppl_2bit.log)"
+        (cd "$AQUA_SRC" && "$AQUA_PY" evaluate_perplexity.py $COMMON --predictors_input_path "$D/predictors_2bit.pt" \
+            --prefix_size 4 --recent_buffer_size 128) > "$D/ppl_2bit.log" 2>&1 \
+            || echo "AQUA-KV evaluation failed (see $D/ppl_2bit.log)"
+    fi
+    python - "$D" "$RUN/aqua_official.json" <<'EOF'
+import json, re, sys
+from pathlib import Path
+d, res = Path(sys.argv[1]), {}
+for name, label in (("no_quant.log", "no quantization"), ("ppl_2bit.log", "HIGGS 2-bit with trained predictors")):
+    p = d / name
+    m = re.findall(r"WikiText-2 perplexity: ([0-9.]+)", p.read_text(errors="replace")) if p.is_file() else []
+    if m:
+        res[label] = float(m[-1])
+Path(sys.argv[2]).write_text(json.dumps(res, indent=1))
+print("AQUA-KV official:", res)
+EOF
+fi
+# SPLITZIP_OFFICIAL=1: SplitZip's own benchmark (bench_codec_throughput.py) unchanged, its paper protocol, with
+# Llama-3.2-3B in place of Qwen3-32B: code book from WikiText-2 train KV, KV of WikiText-2 test prompts.
+if [ "${SPLITZIP_OFFICIAL:-0}" = 1 ]; then
+    OFF=$HOME/kv_reconstruction/runs/_llama_official
+    SZ_SRC=$OFF/sources/splitzip
+    SZ_PY=python
+    [ -x "$OFF/envs/splitzip/bin/python" ] && SZ_PY=$OFF/envs/splitzip/bin/python
+    echo "SplitZip official protocol ($RUN/splitzip_protocol_official.log)"
+    (cd "$SZ_SRC" && "$SZ_PY" bench_codec_throughput.py --device cuda:0 --model unsloth/Llama-3.2-3B --rows 65536 \
+        --hidden-dim 4096 --chunk-size 1024 --warmup 10 --iters 50 --repeats 5 \
+        --output "$RUN/splitzip_protocol_official.json") > "$RUN/splitzip_protocol_official.log" 2>&1 \
+        || echo "SplitZip's benchmark failed (see $RUN/splitzip_protocol_official.log)"
 fi
 python -u scripts/bench_llama_compare.py --device cuda --output "$RUN" --stages "$STAGES" ${EXTRA:-} 2>&1 \
     | tee -a "$RUN/console.log"

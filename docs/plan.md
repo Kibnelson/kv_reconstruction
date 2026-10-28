@@ -47,8 +47,79 @@ What we learned:
   at the entropy of these symbols, so fewer lossless bytes need a stronger prediction.
 - At 800 Gb/s no layer of ours beats SplitZip yet.
 
+## Each baseline evaluated its own way
+
+Each method is compared under the baselines' own evaluations, from their papers and released code. For each
+baseline we pick the evaluation the NUC (RTX A4500, 20 GB) can run, and run ours in it too.
+
+### AQUA-KV ([paper](https://arxiv.org/abs/2501.19392), goodevening13/aquakv `e744183`)
+
+- **Their evaluation:**
+  - **WikiText-2 perplexity** (`evaluate_perplexity.py`), on the base model. The whole test split is cut into
+    8,192-token windows, and each window is fed 32 tokens at a time to a compressed cache. The first 4 tokens
+    and the most recent tokens (at least 128 before a block is compressed) stay in BF16, and every older token is
+    compressed and read back. Bits are counted per compressed value.
+  - **LongBench v1:** 14 English tasks, instruct models, inputs not truncated.
+  - **Calibration:** 256 x 8,192 RedPajama tokens.
+  - **Their Llama-3.2-3B numbers** (Table 1):
+
+    | Method | Bits per value | WikiText-2 perplexity |
+    | --- | --- | --- |
+    | Exact | 16 | 6.98 |
+    | AQUA-KV, HIGGS 2-bit | 2.16 | 7.03 |
+    | KIVI-2b-gs128-r128 | 2.25 | 9.33 |
+    | HIGGS-2b-gs1024 | 2.02 | 7.47 |
+- **On the NUC:** the full perplexity protocol, all 35 windows. Stage `aquappl` (`kv_compare/streaming.py`)
+  runs every method in one harness:
+  - exact;
+  - HIGGS without predictors;
+  - KIVI with AQUA-KV's setting (group 128) and the KIVI paper's (group 32);
+  - our faithful AQUA-KV re-implementation;
+  - our GPU codec, each block coded to a real stream.
+
+  `AQUA_OFFICIAL=1` also runs the authors' own scripts unchanged: no quantization, predictor training on
+  RedPajama, then perplexity. The harness is right when its exact, HIGGS and KIVI rows reproduce 6.98, 7.47 and
+  9.33, and the authors' run gives 7.03.
+- **LongBench:** a subset later. Untruncated inputs take days on the A4500.
+
+### KIVI ([paper](https://arxiv.org/abs/2402.02750), jy-yuan/KIVI `876b4d2`)
+
+- **Their evaluation:**
+  - LongBench, 15 tasks: group 32, recent 128 tokens in full precision; LongChat, Mistral and Llama models.
+  - LM-Eval: CoQA, TruthfulQA and GSM8K.
+  - Passkey retrieval.
+
+  AQUA-KV's paper also runs KIVI in its perplexity protocol (group 128, recent 128).
+- **On the NUC:** AQUA-KV's perplexity protocol, with KIVI 2- and 4-bit. A LongBench subset and GSM8K come
+  later.
+
+### SplitZip ([paper](https://arxiv.org/abs/2605.01708), Intelligent-Microsystems-Lab/SplitZip `42c7431`)
+
+- **Their evaluation** (lossless):
+  - compression ratio including metadata, and encode/decode GB/s;
+  - the KV comes from WikiText-2 test prompts and the code book is calibrated on WikiText-2 train
+    (`bench_codec_throughput.py`: 268M values, timed after warm-up, bitwise round trip checked);
+  - Mooncake transfer time and SGLang TTFT, but the integration is not released;
+  - H200, Qwen3-32B.
+- **On the NUC:** their script unchanged with Llama-3.2-3B, since Qwen3-32B does not fit in 20 GB. Ours on the
+  KV of the same test prompts. Already measured: the authors' codec on our KV, 12.05 bits, 309 GB/s decode.
+
+### ExANS (openlake `de6c38b`, [blog](https://www.theopenlake.com/blog/exans-lossless-gpu-compression-for-bf16-kv-cache))
+
+- **Their evaluation** (lossless): compression ratio, stored bits per value, and median encode/decode GB/s on a
+  real KV snapshot (H100, 256K context), with independent blocks and with position-aligned batches. No
+  benchmark script is released.
+- **On the NUC:** the authors' codec, built from source, on our captured KV. Done: 10.86 bits, 54 GB/s decode.
+  The position-aligned batch mode is still to measure.
+
+**Why this matters for the lossy comparison.** Our lossy tests so far are a transfer protocol: compress a prompt
+once, then score its continuation. AQUA-KV's protocol is stricter, because every token is scored against a cache
+that is compressed while it grows. It is also the one with published Llama-3.2-3B numbers, so it becomes the
+main lossy comparison.
+
 ## What is next, in order of expected gain
 
+0. **Run the baselines' own evaluations** (above): stage `aquappl` and `AQUA_OFFICIAL=1` first; then SplitZip's script on Llama-3.2-3B, and LongBench and GSM8K subsets.
 1. **A GPU decoder for the 7.87-bit predictor** (layers 0, l−2, l−1, 16 groups, no attention).
    - Gain: 441 MiB per document instead of 504, 13% fewer bytes than our current stream and 35% fewer than
      SplitZip.

@@ -511,6 +511,44 @@ class LossyGpuTests(unittest.TestCase):
         self.assertEqual(r.stdout.count("ok"), 3, r.stdout)
 
 
+class StreamingProtocolTests(unittest.TestCase):
+    def test_streaming_cache_follows_aquakv_buffering(self):
+        """AQUA-KV's perplexity protocol harness: compressing with the identity changes nothing; blocks start after
+        the 4 sinks, the first holds the 156 buffered tokens, later ones 128 (32 tokens per pass); a compressed
+        block is read by the following passes; KIVI-like granules round blocks down."""
+        if torch is None:
+            self.skipTest("PyTorch is required")
+        from transformers import LlamaConfig, LlamaForCausalLM
+        from kv_compare import streaming as sm
+        torch.manual_seed(0)
+        cfg = LlamaConfig(vocab_size=97, hidden_size=64, intermediate_size=96, num_hidden_layers=2,
+                          num_attention_heads=4, num_key_value_heads=2, head_dim=16, max_position_embeddings=1024)
+        model = LlamaForCausalLM(cfg).to(torch.float32).eval()
+        ids = torch.randint(0, 97, (1, 512))
+
+        class Spy:
+            granule = 1
+
+            def __init__(self, fn):
+                self.fn, self.calls = fn, []
+
+            def __call__(self, a, X):
+                self.calls.append((a, X.shape[1]))
+                return self.fn(X), 0.0
+        exact = sm.perplexity(model, [ids], "cpu")
+        ident = Spy(lambda X: X.clone())
+        same = sm.perplexity(model, [ids], "cpu", lambda: sm.StreamingCache(ident, 2))
+        self.assertEqual(same["nll_sums_f32"], exact["nll_sums_f32"])
+        self.assertEqual(ident.calls, [(4, 156), (160, 128), (288, 128)])
+        zero = Spy(torch.zeros_like)
+        changed = sm.perplexity(model, [ids], "cpu", lambda: sm.StreamingCache(zero, 2))
+        self.assertNotEqual(changed["nll_sums_f32"], exact["nll_sums_f32"])
+        grain = Spy(lambda X: X.clone())
+        grain.granule = 64
+        sm.perplexity(model, [ids], "cpu", lambda: sm.StreamingCache(grain, 2, granule=64))
+        self.assertTrue(all(m % 64 == 0 for _, m in grain.calls), grain.calls)
+
+
 class PackageTests(unittest.TestCase):
     def test_package_copies_small_files_and_refuses_overwrite(self):
         sys.path.insert(0, str(ROOT / "scripts"))

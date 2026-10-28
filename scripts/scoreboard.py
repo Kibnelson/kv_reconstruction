@@ -172,6 +172,35 @@ def build(run):
                     if who == "ours_gpu" and gdec:
                         entry[who]["decode_ms"] = gdec
             sb["lossy"]["targets"].append(entry)
+    # ---------------------------------------------------------------- AQUA-KV's own protocol (streaming perplexity)
+    ap = _load(run, "aqua_protocol.json")
+    if ap and "exact" in ap.get("methods", {}):
+        ms = ap["methods"]
+        ex = ms["exact"]
+        tpw = ex["tokens_per_window"]
+
+        def change(r):
+            d = [math.exp((a - b) / tpw) - 1 for a, b in zip(r["nll_sums_f32"], ex["nll_sums_f32"])]
+            m = sum(d) / len(d)
+            se = (sum((x - m) ** 2 for x in d) / (len(d) - 1)) ** 0.5 / len(d) ** 0.5 if len(d) > 1 else 0.0
+            return 100 * (r["perplexity_f32"] / ex["perplexity_f32"] - 1), 100 * se
+        rows = {k: dict(bits=r.get("bits_per_compressed_value", 16.0), ppl=r["perplexity"],
+                        ppl_f32=r["perplexity_f32"], change_pct=change(r)[0], se=change(r)[1])
+                for k, r in ms.items() if k != "exact"}
+        seqlen = ap.get("protocol", "seqlen 8192,").split("seqlen ")[-1].split(",")[0]
+        sb["aqua_protocol"] = {"windows": ap["windows"], "seqlen": seqlen, "exact_ppl": ex["perplexity"],
+                               "exact_ppl_f32": ex["perplexity_f32"], "targets": []}
+        for base in [k for k in rows if not k.startswith("ours")]:
+            b = rows[base]
+            ok = [(k, v) for k, v in rows.items() if k.startswith("ours") and v["change_pct"] <= b["change_pct"] + b["se"]]
+            entry = {"baseline": base, **{f"baseline_{f}": b[f] for f in ("bits", "ppl", "change_pct", "se")}}
+            if ok:
+                k, v = min(ok, key=lambda kv: kv[1]["bits"])
+                entry["ours"] = {"mode": k, **v}
+            sb["aqua_protocol"]["targets"].append(entry)
+        off = _load(run, "aqua_official.json")
+        if off:
+            sb["aqua_protocol"]["authors_scripts"] = off
     # ---------------------------------------------------------------- pool (one cached prefix)
     pool = _load(run, "pool.json")
     if pool and n:
@@ -260,6 +289,23 @@ def markdown(sb, locked=None):
                          f"{t['baseline_se']:.2f} | {cell('ours_cpu')} | {cell('ours_gpu')} | "
                          f"{_f(t.get('baseline_decode_ms'), '.0f')} ms / "
                          f"{_f((t.get('ours_gpu') or {}).get('decode_ms'), '.0f')} ms |")
+    if sb.get("aqua_protocol"):
+        ap = sb["aqua_protocol"]
+        old = {t["baseline"]: t for t in lk.get("aqua_protocol", {}).get("targets", [])}
+        lines += ["", f"**Lossy in AQUA-KV's own protocol** (WikiText-2 perplexity with a streaming compressed cache, "
+                  f"{ap['windows']} windows of {ap.get('seqlen', '8192')} tokens; perplexity with the authors' BF16 loss, "
+                  f"exact cache {ap['exact_ppl']:.3f}, paper 6.98; the change uses a float32 loss; ours = fewest bits "
+                  "per compressed value with a change at most the baseline's plus one standard error):", "",
+                  "| Baseline | Its bits, perplexity, change | Ours, GPU codec |", "| --- | --- | --- |"]
+        for t in ap["targets"]:
+            o = old.get(t["baseline"], {}).get("ours", {}).get("bits")
+            e = t.get("ours")
+            lines.append(f"| {t['baseline']} | {t['baseline_bits']:.3f} bits, {t['baseline_ppl']:.3f}, "
+                         f"{t['baseline_change_pct']:+.2f}% ± {t['baseline_se']:.2f} | " +
+                         (f"{e['bits']:.3f} bits, {e['ppl']:.3f}, {e['change_pct']:+.2f}% ({e['mode']})" if e else
+                          "none at this quality") + (f" (locked {o:.3f})" if o is not None and locked else "") + " |")
+        for k, v in (ap.get("authors_scripts") or {}).items():
+            lines.append(f"| AQUA-KV, the authors' own scripts: {k} | perplexity {v:.3f} | - |")
     if sb["pool"]:
         lines += ["", f"**Pool: one cached 8K prefix** (recomputing it: {_f(sb.get('pool_recompute_ms'), '.0f')} ms):", "",
                   "| Method | Memory | Prefixes that fit | Bring back |", "| --- | --- | --- | --- |"]
