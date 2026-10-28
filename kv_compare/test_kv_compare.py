@@ -228,6 +228,69 @@ class CoderTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
         self.assertIn("ok", r.stdout)
 
+    def test_fused_codec_round_trip_interpreted(self):
+        """The fused one-step codec (prediction, RoPE, spread, coding and next-layer features in one kernel per
+        direction) restores a tiny Llama's whole KV bit for bit, special words included, in both modes and with
+        either stage-1 decoder; its features and priors match a PyTorch reference."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None or torch is None:
+            self.skipTest("Triton and PyTorch are required")
+        r = subprocess.run([sys.executable, "-c", FUSED_CHECK, str(ROOT)], capture_output=True, text=True, timeout=1800)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertEqual(r.stdout.count("ok"), 2, r.stdout)
+
+
+FUSED_CHECK = r"""
+import os, sys, json, tempfile
+os.environ["TRITON_INTERPRET"] = "1"
+sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+import numpy as np
+import torch
+from transformers import LlamaConfig, LlamaForCausalLM
+from kv_compare.capture import capture_ids, model_meta
+from kv_compare.predict import Study
+from kv_compare.core import words_to_float
+from kv_compare import fused
+torch.manual_seed(0)
+cfg = LlamaConfig(vocab_size=97, hidden_size=128, intermediate_size=192, num_hidden_layers=3, num_attention_heads=4,
+                  num_key_value_heads=2, head_dim=32, max_position_embeddings=2048, rope_theta=500000.0)
+model = LlamaForCausalLM(cfg).to(torch.bfloat16).eval()
+names = [f"train{i}" for i in range(4)] + ["tables", "test"]
+root = Path(tempfile.mkdtemp()) / "c"
+reports = []
+for i, n in enumerate(names):
+    ids = [int(v) for v in np.random.default_rng(i).integers(0, 97, size=64)]
+    reports.append(capture_ids(model, ids, root, n, torch.device("cpu"), queries=n.startswith("train")))
+(root / "meta.json").write_text(json.dumps(dict(model_meta(model, "tiny", None), tokens=64, captures=reports)))
+study = Study(root, "cpu", names[:4], "tables", ["test"], log=lambda m: None)
+consts = fused.prepare(study, log=lambda m: None)
+doc = study.tests[0]
+L, T, W = study.L, doc.tokens, study.W
+w32 = torch.stack([doc.words(l, "cpu") for l in range(L)])
+w32[1, 3, :5] = torch.tensor([0x0000, 0x8000, 0x7F80, 0x7FC0, 0xFF80])      # zeros, Inf, NaN, -Inf
+words = (w32 - 65536 * (w32 >= 32768).to(torch.int32)).to(torch.int16)
+for mode, rows, search in (("uniform", 4, False), ("exact", 2, True)):
+    codec = fused.FusedOneStep(consts, study.C, study.hd, tokens_per_program=16, rows=rows, kchunk=32, warps=4,
+                               mode=mode, search=search)
+    xall, prior = codec.model(words)
+    pos, pr = torch.arange(T), torch.ones(T)
+    for l in range(L):                       # features and priors against the PyTorch reference
+        x = words_to_float(w32[l])
+        f = fused._feat_ref(x, study.rope, pos, consts["isx"][l])
+        f = torch.where(torch.isnan(f), torch.zeros_like(f), f)
+        assert float((f == xall[l].float()).float().mean()) > 0.999, ("features", l)
+        assert float((prior[l] - pr).abs().max()) < 2e-3, ("prior", l)
+        m = fused.reference_mu(consts, l, None if l == 0 else xall[l - 1].float(), pos, study.C, study.hd)
+        q = torch.floor((x - m.double()).abs().float() * consts["inv"][l][None, :])
+        pr = torch.where(torch.isnan(q), torch.full_like(q, 524288.0), q).clamp(max=524288.0).sum(1) / (W * fused.QS)
+    buf, starts = codec.encode(words, xall, prior)
+    dec = codec.decode(buf, starts, T)
+    assert torch.equal(dec, words), ("round trip", mode, int((dec != words).sum()))
+    print("ok", mode, codec.bits(starts, T) / (L * T * W))
+"""
+
 
 class PackageTests(unittest.TestCase):
     def test_package_copies_small_files_and_refuses_overwrite(self):

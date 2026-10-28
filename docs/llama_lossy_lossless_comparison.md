@@ -69,7 +69,7 @@ the exact KV.
 | `lossless` | Exact per-word costs on the two test documents, for whole documents and the four 256-token reference chunks. | — |
 | `lossy` | Codes the first 3,072 tokens of each test document with every lossy method. The model then processes the next 512 tokens using that KV. The reference is the captured exact KV restored into the cache; restoring it twice must agree exactly. The model's own prefill of the 3,072-token prompt is reported beside it: on a GPU it can differ slightly (for example +0.05%), because kernels round differently at a different sequence length. | — |
 | `frontier` | Optional. About 37 predictor variants fitted from one covariance per layer: input sets, 1–16 steps, reduced-rank inputs and exact 8-bit integer formats. Each gets exact lossless costs and multiply-adds per value (`frontier.json`). | about 30 minutes on an RTX A4500 |
-| `gpu_speed` | Optional; needs the GPU to itself. Times one layer of the predictor for five frontier variants in float32, BF16 and exact 8-bit integer arithmetic. Then encodes and decodes four real test layers with the Triton value-slice coder, checking the round trip bit for bit (`gpu_speed.json`). | a few minutes |
+| `gpu_speed` | Optional; needs the GPU to itself. Times one layer of the predictor for the frontier variants in float32, BF16 and exact 8-bit integer arithmetic. Then encodes and decodes four real test layers with the Triton value-slice coder, checking the round trip bit for bit, with both stage-1 decoders. Finally it encodes and decodes the whole first test document (every layer, layer by layer) with the fused one-step codec in several kernel shapes (`gpu_speed.json`). | 10–20 minutes (mostly Triton compiling the fused kernels) |
 | `report` | Writes `summary.md`. | — |
 
 Useful options:
@@ -91,6 +91,15 @@ python -u scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_
 ```
 
 The speed stage reports kernel time only: CUDA-event medians after warm-up, with no host transfers. That matches how SplitZip and ExANS publish GB/s, and GB/s counts raw BF16 bytes. The summary combines the predictor and the coder into a decode rate, shown as decoded values per second and as the link speed that rate keeps up with (values per second x bits per value). It also lists SplitZip's own measurement on the same A4500 for reference. The coder's slice tables are computed once per run, so encoder and decoder share them; for transfers between machines they would ship as constants.
+
+Two kinds of decode rate appear in the summary:
+
+- **Estimates from parts.** The predictor and the coder are timed separately (and overlapped on two CUDA streams) on four layers coded at once. A receiver cannot do that: layer l is predicted from the decoded layer l − 1, so it decodes one layer at a time, with less parallel work. These estimates also leave out the small element-wise steps around the coder (RoPE, the spread, the next layer's features).
+- **Measured end to end (fused codec).** One Triton kernel per direction does all of it for the one-step predictor: the 8-bit tensor-core product, RoPE, the spread, the coding and the next layer's 8-bit features, layer by layer over the whole document. Its decode must be bit-exact. The summary's last transfer table uses only these measured numbers. `--fused-configs` sets the kernel shapes tried (tokens per program x rows of lanes x warps), `--fused-modes` the coder modes.
+
+Stage 1 of the decoder (finding the slice symbol) has two versions over the same streams. The direct version, now the default, uses a table for the rare tail slots and one comparison elsewhere. The search version, used before, does a binary search that waits for the slowest of a program's lanes. Both are timed.
+
+A cheaper predictor for fusing was ruled out: predicting each KV head only from its own head in the previous layer costs +0.59 bits per value on SmolLM2-135M (+0.38 for keys from keys and values from values), so the fused codec keeps the full one-step product.
 
 ## Methods
 
