@@ -1,0 +1,801 @@
+{
+  "status": "completed",
+  "gpu_measured": true,
+  "method": "team_dense_uniform",
+  "arm": "reference",
+  "tokens": 8192,
+  "document": "test_text_t8192",
+  "packet_sha256": "3ea64910de6742495ea70cceb667826d4482b7294654988439fbc3ffbe008729",
+  "original_word_sha256": "f992dd546631ff19a89873936461437ca557d0c76c62e1a0749893a57f78a634",
+  "codec_provenance": {
+    "kind": "team",
+    "arm": "dense_uniform",
+    "state": "/home/nelson/kv_reconstruction/runs/team_packet_a4500_20261028_122017_2834427/team_state",
+    "state_sha256": "9057ebeb8dc596b584f1d273c3fe0e9c35abe7e08af0d7b3a0d03b9401daa670",
+    "manifest_sha256": "11392c5a0a9b67caf5d549e6956e7340b95e47fdc6a54f2fd75c11cdb0830d0c"
+  },
+  "profile_calls": 3,
+  "diagnostics": {
+    "full_decode": {
+      "wall_median_ms": 35.287123173475266,
+      "samples": [
+        {
+          "wall_ms": 35.287123173475266,
+          "cuda_interval_ms": 35.28441619873047,
+          "baseline_torch_bytes": 4176491520,
+          "peak_torch_bytes": 5116015616,
+          "incremental_peak_torch_bytes": 939524096
+        }
+      ],
+      "warmup_samples": []
+    },
+    "stage": {
+      "wall_median_ms": 4.293685778975487,
+      "samples": [
+        {
+          "wall_ms": 4.293685778975487,
+          "cuda_interval_ms": 4.290783882141113,
+          "baseline_torch_bytes": 4176491520,
+          "peak_torch_bytes": 4176491520,
+          "incremental_peak_torch_bytes": 0
+        }
+      ],
+      "warmup_samples": []
+    },
+    "native_eager": {
+      "wall_median_ms": 27.806486934423447,
+      "samples": [
+        {
+          "wall_ms": 27.806486934423447,
+          "cuda_interval_ms": 27.80169677734375,
+          "baseline_torch_bytes": 4176491520,
+          "peak_torch_bytes": 4176491520,
+          "incremental_peak_torch_bytes": 0
+        }
+      ],
+      "warmup_samples": []
+    },
+    "output_clone": {
+      "wall_median_ms": 3.392476588487625,
+      "samples": [
+        {
+          "wall_ms": 3.392476588487625,
+          "cuda_interval_ms": 3.3891520500183105,
+          "baseline_torch_bytes": 4176491520,
+          "peak_torch_bytes": 5116015616,
+          "incremental_peak_torch_bytes": 939524096
+        }
+      ],
+      "warmup_samples": []
+    }
+  },
+  "cprofile_top_self": [
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method torch._C._cuda_synchronize>",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 103.467086,
+      "cumulative_ms": 103.467086
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'copy_' of 'torch._C.TensorBase' objects>",
+      "primitive_calls": 9,
+      "total_calls": 9,
+      "self_ms": 7.0698360000000005,
+      "cumulative_ms": 7.0698360000000005
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/torch/cuda/graphs.py",
+      "line": 137,
+      "function": "replay",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.326459,
+      "cumulative_ms": 0.326459
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/kv_compare/team_packet.py",
+      "line": 172,
+      "function": "validate",
+      "primitive_calls": 6,
+      "total_calls": 6,
+      "self_ms": 0.300252,
+      "cumulative_ms": 0.6502340000000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'clone' of 'torch._C.TensorBase' objects>",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.235521,
+      "cumulative_ms": 0.235521
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/kv_compare/team_packet.py",
+      "line": 402,
+      "function": "stage",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.191391,
+      "cumulative_ms": 7.876412000000001
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/kv_compare/team_packet.py",
+      "line": 123,
+      "function": "geometry",
+      "primitive_calls": 15,
+      "total_calls": 15,
+      "self_ms": 0.100526,
+      "cumulative_ms": 0.161413
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+      "primitive_calls": 48,
+      "total_calls": 48,
+      "self_ms": 0.082793,
+      "cumulative_ms": 0.082793
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'numpy' of 'torch._C.TensorBase' objects>",
+      "primitive_calls": 12,
+      "total_calls": 12,
+      "self_ms": 0.081211,
+      "cumulative_ms": 0.081211
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method torch._ops.profiler._record_function_enter_new>",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.069221,
+      "cumulative_ms": 0.069221
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/triton/runtime/jit.py",
+      "line": 695,
+      "function": "run",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.055467,
+      "cumulative_ms": 0.196914
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method __triton_launcher.launch>",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.043463,
+      "cumulative_ms": 0.04778
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'max' of 'torch._C.TensorBase' objects>",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.042678,
+      "cumulative_ms": 0.042678
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/numpy/_core/fromnumeric.py",
+      "line": 89,
+      "function": "_wrapreduction_any_all",
+      "primitive_calls": 48,
+      "total_calls": 48,
+      "self_ms": 0.041648000000000004,
+      "cumulative_ms": 0.131478
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'get' of 'dict' objects>",
+      "primitive_calls": 206,
+      "total_calls": 206,
+      "self_ms": 0.03548900000000001,
+      "cumulative_ms": 0.03548900000000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method torch._ops.profiler.>",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.03393,
+      "cumulative_ms": 0.03393
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/kv_compare/team_packet.py",
+      "line": 335,
+      "function": "header",
+      "primitive_calls": 6,
+      "total_calls": 6,
+      "self_ms": 0.031812,
+      "cumulative_ms": 0.100427
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/kv_compare/team_packet.py",
+      "line": 349,
+      "function": "validate",
+      "primitive_calls": 6,
+      "total_calls": 6,
+      "self_ms": 0.028664000000000002,
+      "cumulative_ms": 0.779325
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'astype' of 'numpy.ndarray' objects>",
+      "primitive_calls": 6,
+      "total_calls": 6,
+      "self_ms": 0.026768000000000004,
+      "cumulative_ms": 0.026768000000000004
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/numpy/_core/fromnumeric.py",
+      "line": 2477,
+      "function": "any",
+      "primitive_calls": 48,
+      "total_calls": 48,
+      "self_ms": 0.026603,
+      "cumulative_ms": 0.15808100000000003
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'disable' of '_lsprof.Profiler' objects>",
+      "primitive_calls": 1,
+      "total_calls": 1,
+      "self_ms": 0.022866,
+      "cumulative_ms": 0.022866
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.compile>",
+      "primitive_calls": 1,
+      "total_calls": 1,
+      "self_ms": 0.021617,
+      "cumulative_ms": 0.021617
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method builtins.isinstance>",
+      "primitive_calls": 154,
+      "total_calls": 154,
+      "self_ms": 0.021291,
+      "cumulative_ms": 0.021291
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/triton/runtime/jit.py",
+      "line": 370,
+      "function": "<lambda>",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.020213000000000002,
+      "cumulative_ms": 0.21712700000000001
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/torch/autograd/profiler.py",
+      "line": 860,
+      "function": "__exit__",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.019222,
+      "cumulative_ms": 0.08020300000000001
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/triton/runtime/jit.py",
+      "line": 1074,
+      "function": "__call__",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.017452000000000002,
+      "cumulative_ms": 0.030309
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/kv_compare/team_packet.py",
+      "line": 117,
+      "function": "_integer",
+      "primitive_calls": 105,
+      "total_calls": 105,
+      "self_ms": 0.017139,
+      "cumulative_ms": 0.017139
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method triton._C.libtriton.native_specialize_impl>",
+      "primitive_calls": 15,
+      "total_calls": 15,
+      "self_ms": 0.01641,
+      "cumulative_ms": 0.01641
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py",
+      "line": 1152,
+      "function": "synchronize",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.013627,
+      "cumulative_ms": 103.51759000000001
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/kv_compare/team_packet.py",
+      "line": 456,
+      "function": "graph_replay_native",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.011611000000000002,
+      "cumulative_ms": 8.70285
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/torch/cuda/_utils.py",
+      "line": 517,
+      "function": "_get_device_index",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.011521,
+      "cumulative_ms": 0.019915000000000002
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/triton/compiler/compiler.py",
+      "line": 479,
+      "function": "launch_metadata",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.011056,
+      "cumulative_ms": 0.012990000000000002
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/triton/runtime/jit.py",
+      "line": 563,
+      "function": "compute_cache_key",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.010424000000000001,
+      "cumulative_ms": 0.016453
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/triton/backends/nvidia/driver.py",
+      "line": 700,
+      "function": "__call__",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.009586,
+      "cumulative_ms": 0.05822800000000001
+    },
+    {
+      "file": "/usr/lib/python3.12/typing.py",
+      "line": 175,
+      "function": "_type_check",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.009516,
+      "cumulative_ms": 0.046059
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'items' of 'dict' objects>",
+      "primitive_calls": 54,
+      "total_calls": 54,
+      "self_ms": 0.008419,
+      "cumulative_ms": 0.008419
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/torch/autograd/profiler.py",
+      "line": 841,
+      "function": "__init__",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.007892,
+      "cumulative_ms": 0.11995700000000001
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/torch/autograd/profiler.py",
+      "line": 854,
+      "function": "__enter__",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.007727,
+      "cumulative_ms": 0.08021
+    },
+    {
+      "file": "<string>",
+      "line": 2,
+      "function": "dynamic_func",
+      "primitive_calls": 3,
+      "total_calls": 3,
+      "self_ms": 0.007719,
+      "cumulative_ms": 0.024129
+    },
+    {
+      "file": "/home/nelson/kv_reconstruction/kv_compare/team_onestep/layerwise.py",
+      "line": 442,
+      "function": "layout",
+      "primitive_calls": 6,
+      "total_calls": 6,
+      "self_ms": 0.0076879999999999995,
+      "cumulative_ms": 0.0076879999999999995
+    }
+  ],
+  "operators": [
+    {
+      "name": "team_gpu/team_dense_uniform/reference/full_decode",
+      "calls": 6,
+      "self_cpu_ms": 0.0,
+      "cpu_total_ms": 0.0,
+      "self_device_ms": 198.36908099999997,
+      "device_total_ms": 198.36908099999997,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "cudaDeviceSynchronize",
+      "calls": 4,
+      "self_cpu_ms": 103.46430099999999,
+      "cpu_total_ms": 103.46430099999999,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "_ldec_kernel",
+      "calls": 168,
+      "self_cpu_ms": 0.0,
+      "cpu_total_ms": 0.0,
+      "self_device_ms": 63.986858000000026,
+      "device_total_ms": 63.986858000000026,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>(cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16::Params)",
+      "calls": 162,
+      "self_cpu_ms": 0.0,
+      "cpu_total_ms": 0.0,
+      "self_device_ms": 46.02801800000002,
+      "device_total_ms": 46.02801800000002,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::copy_",
+      "calls": 12,
+      "self_cpu_ms": 0.06757900000000609,
+      "cpu_total_ms": 7.075957000000003,
+      "self_device_ms": 15.493261999999962,
+      "device_total_ms": 17.35589499999996,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "Memcpy DtoD (Device -> Device)",
+      "calls": 6,
+      "self_cpu_ms": 0.0,
+      "cpu_total_ms": 0.0,
+      "self_device_ms": 15.479917999999975,
+      "device_total_ms": 15.479917999999975,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "_suffix_kernel",
+      "calls": 3,
+      "self_cpu_ms": 0.0,
+      "cpu_total_ms": 0.0,
+      "self_device_ms": 5.789758000000003,
+      "device_total_ms": 5.789758000000003,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "cudaStreamSynchronize",
+      "calls": 6,
+      "self_cpu_ms": 5.553345000000001,
+      "cpu_total_ms": 5.553345000000001,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "Activity Buffer Request",
+      "calls": 1,
+      "self_cpu_ms": 1.331086,
+      "cpu_total_ms": 1.331086,
+      "self_device_ms": 1.862633,
+      "device_total_ms": 1.862633,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "team_gpu/team_dense_uniform/reference/full_decode",
+      "calls": 3,
+      "self_cpu_ms": 1.3153880000000162,
+      "cpu_total_ms": 9.052936000000004,
+      "self_device_ms": 0.0,
+      "device_total_ms": 17.35589499999996,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 2818572288
+    },
+    {
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native::FillFunctor<int>, std::array<char*, 1ul>)",
+      "calls": 6,
+      "self_cpu_ms": 0.0,
+      "cpu_total_ms": 0.0,
+      "self_device_ms": 0.36870700000000123,
+      "device_total_ms": 0.36870700000000123,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "cudaGraphLaunch",
+      "calls": 3,
+      "self_cpu_ms": 0.2978239999999987,
+      "cpu_total_ms": 0.2978239999999987,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "cudaMalloc",
+      "calls": 1,
+      "self_cpu_ms": 0.14564899999999034,
+      "cpu_total_ms": 0.14564899999999034,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "cudaMemcpyAsync",
+      "calls": 12,
+      "self_cpu_ms": 0.1205729999999969,
+      "cpu_total_ms": 0.1205729999999969,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::sub",
+      "calls": 3,
+      "self_cpu_ms": 0.03495399999999654,
+      "cpu_total_ms": 0.03495399999999654,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 98304,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::slice",
+      "calls": 9,
+      "self_cpu_ms": 0.03467699999998058,
+      "cpu_total_ms": 0.04369199999999398,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::empty_strided",
+      "calls": 3,
+      "self_cpu_ms": 0.030286000000020977,
+      "cpu_total_ms": 0.17625700000001143,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 2818572288
+    },
+    {
+      "name": "aten::max",
+      "calls": 3,
+      "self_cpu_ms": 0.02690599999998858,
+      "cpu_total_ms": 0.03666599999999426,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 24,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "cuLaunchKernelEx",
+      "calls": 3,
+      "self_cpu_ms": 0.02172099999998909,
+      "cpu_total_ms": 0.02172099999998909,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "Memcpy HtoD (Pageable -> Device)",
+      "calls": 6,
+      "self_cpu_ms": 0.0,
+      "cpu_total_ms": 0.0,
+      "self_device_ms": 0.013343999999987772,
+      "device_total_ms": 0.013343999999987772,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "detach",
+      "calls": 12,
+      "self_cpu_ms": 0.01275999999997822,
+      "cpu_total_ms": 0.01275999999997822,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::detach",
+      "calls": 12,
+      "self_cpu_ms": 0.01260100000004411,
+      "cpu_total_ms": 0.02536100000002233,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::clone",
+      "calls": 3,
+      "self_cpu_ms": 0.012510999999973137,
+      "cpu_total_ms": 0.223237999999983,
+      "self_device_ms": 0.0,
+      "device_total_ms": 9.888209999999985,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 2818572288
+    },
+    {
+      "name": "aten::as_strided",
+      "calls": 9,
+      "self_cpu_ms": 0.009015000000013401,
+      "cpu_total_ms": 0.009015000000013401,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::empty",
+      "calls": 3,
+      "self_cpu_ms": 0.007462999999997009,
+      "cpu_total_ms": 0.007462999999997009,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 24,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "cudaStreamIsCapturing",
+      "calls": 10,
+      "self_cpu_ms": 0.005243999999993775,
+      "cpu_total_ms": 0.005243999999993775,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::item",
+      "calls": 3,
+      "self_cpu_ms": 0.004191999999993641,
+      "cpu_total_ms": 0.006856999999997242,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::_local_scalar_dense",
+      "calls": 3,
+      "self_cpu_ms": 0.0026650000000036016,
+      "cpu_total_ms": 0.0026650000000036016,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::fill_",
+      "calls": 3,
+      "self_cpu_ms": 0.002297000000008666,
+      "cpu_total_ms": 0.002297000000008666,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::to",
+      "calls": 12,
+      "self_cpu_ms": 0.001911999999994464,
+      "cpu_total_ms": 0.001911999999994464,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::resolve_conj",
+      "calls": 12,
+      "self_cpu_ms": 0.0014050000000139563,
+      "cpu_total_ms": 0.0014050000000139563,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    },
+    {
+      "name": "aten::resolve_neg",
+      "calls": 12,
+      "self_cpu_ms": 0.0008830000000044152,
+      "cpu_total_ms": 0.0008830000000044152,
+      "self_device_ms": 0.0,
+      "device_total_ms": 0.0,
+      "cpu_memory_bytes": 0,
+      "device_memory_bytes": 0
+    }
+  ],
+  "device_kernels": [
+    {
+      "name": "_ldec_kernel",
+      "calls": 168,
+      "total_ms": 63.986857999999984
+    },
+    {
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>(cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16::Params)",
+      "calls": 162,
+      "total_ms": 46.028017999999996
+    },
+    {
+      "name": "_suffix_kernel",
+      "calls": 3,
+      "total_ms": 5.789758
+    },
+    {
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native::FillFunctor<int>, std::array<char*, 1ul>)",
+      "calls": 6,
+      "total_ms": 0.368707
+    }
+  ],
+  "trace_path": "/home/nelson/kv_reconstruction/runs/team_gpu_a4500_20261028_131628_4041134/profiles/team_dense_uniform_reference_t8192/trace.json",
+  "trace_sha256": "23eae0bd1ab56332e0c8ec4e6e300464f1bd49512e3e4e7df7ebe1750d8e58a8",
+  "trace_bytes": 284717,
+  "assertions_outside_profilers": true,
+  "runtime_policy": {
+    "deterministic_algorithms_enabled": false,
+    "deterministic_warn_only": false,
+    "fill_uninitialized_memory": true,
+    "effective_uninitialized_fill": false
+  },
+  "runtime_policy_after": {
+    "deterministic_algorithms_enabled": false,
+    "deterministic_warn_only": false,
+    "fill_uninitialized_memory": true,
+    "effective_uninitialized_fill": false
+  },
+  "graph_capture_counts": {
+    "reference": 1
+  },
+  "kernel_scope": "Chrome CUDA kernel events for three full public decode calls; durations sum device work and may overlap across streams, so they are not wall percentages or an additive critical path; empty list means no kernel attribution captured",
+  "diagnostic_scope": "stage/native eager/clone measured separately after profilers; not additive decompositions of ordinary full graph decode",
+  "memory_scope": "profile retains three owned outputs for assertions outside profiler; diagnostic memory fields are not ordinary inference/serving peaks",
+  "scope": "separate cProfile/Torch diagnostic, excluded from primary unprofiled paired medians; full trace stays local"
+}
