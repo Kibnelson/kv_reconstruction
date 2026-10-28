@@ -712,7 +712,7 @@ def szcodec_rows(consts, study, words, cal, device, log=print, ranks=(None, 256)
         tiles = rank_tiles if not r or (T % (2 * rank_tiles[0]) == 0 and r % rank_tiles[1] == 0 and
                                         W % rank_tiles[2] == 0) else (16, 16, 32, 4)     # (small test models)
         kind = f"rank {r}" if r else "dense"
-        books, done, enc_ms = None, [], {}
+        books, done, enc_ms = {}, [], {}             # code books per escape cost (the one-read layout's differ)
 
         def make(layout, product, BM, nw, chunks):
             codec = SplitZipFormatCodec(consts, study.C, study.hd, rank=rc, product=product, tokens_per_program=BM,
@@ -720,7 +720,6 @@ def szcodec_rows(consts, study, words, cal, device, log=print, ranks=(None, 256)
             return codec
 
         def run(layout, product, BM, nw, chunks=1):
-            nonlocal books
             tag = (f"SplitZip format, {kind} product"
                    f"{' inside the decoding kernel' if product == 'fused' else ' through memory'}, {layout} layout, "
                    f"{BM} tokens x one head, {nw} warps{f', {chunks} chunks' if chunks > 1 else ''}")
@@ -729,12 +728,12 @@ def szcodec_rows(consts, study, words, cal, device, log=print, ranks=(None, 256)
                    "graph": False}
             try:
                 codec = make(layout, product, BM, nw, chunks)
-                if books is None:
+                if codec.esc_raw not in books:
                     t0 = time.perf_counter()
-                    books = codec.calibrate(cal)
+                    books[codec.esc_raw] = codec.calibrate(cal)
                     row["calibrate_s"] = time.perf_counter() - t0
                 else:
-                    codec.share_books(books)
+                    codec.share_books(books[codec.esc_raw])
                 lb = []
                 stream, starts = codec.encode(words, layer_bits=lb)
                 if (layout, BM) not in enc_ms:           # the packer's time depends on the layout only
@@ -764,15 +763,30 @@ def szcodec_rows(consts, study, words, cal, device, log=print, ranks=(None, 256)
             c = [d for d in done if d[1] == layout]
             return min(c) if c else None
 
-        tprod = "acc" if rc is None else "fused"
-        for BM, nw in configs:                       # tile layout: dense through cuBLAS, reduced rank inside
-            run("tile", tprod, BM, nw)
-        if rc is not None and best("tile"):          # the fastest tile again with the product through memory
-            b = best("tile")
-            run("tile", "acc", b[3], b[4])
-        for BM, nw in row_configs:                   # row layout: products through memory
-            run("row", "acc", BM, nw)
-        for layout in ("tile", "row"):               # the fastest of each layout with token chunks on streams
+        prods = ["acc"] if rc is None else ["fused", "acc"]     # reduced rank: the second product inside or not
+        for BM, nw in configs:                       # tile layout
+            run("tile", prods[0], BM, nw)
+        for layout in ("row", "row1"):               # row layouts: two reads per value, or one
+            for BM, nw in row_configs:
+                for product in prods:
+                    run(layout, product, BM, nw)
+        for esc_raw, bk in books.items():            # where the bits go, and the room left in the code books
+            try:
+                from .szcodec import bit_budget
+                t0 = time.perf_counter()
+                bud = bit_budget(bk, words, cal)
+                rows.append(dict(bud, part="szcodec_budget", rank=r, escape_keeps_raw=esc_raw,
+                                 doc=study.tests[0].name, seconds=time.perf_counter() - t0))
+                log(f"  [SplitZip format, {kind}, {'one-read' if esc_raw else 'two-read'} code books, bit budget]: "
+                    f"codes {bud['code']:.3f} + raw {bud['raw']:.3f} + escapes {bud['escape']:.3f} = "
+                    f"{bud['books_bits']:.3f} bits/value ({100 * bud['escape_rate']:.2f}% escaped); 8-bit codes "
+                    f"{bud['k8_bits']:.3f}; books fitted on this document {bud['oracle_bits']:.3f} "
+                    f"(8-bit {bud['oracle_k8_bits']:.3f}); entropy given the context {bud['entropy_bits']:.3f}")
+            except Exception as exc:
+                log(f"  SplitZip format bit budget: not measured ({exc!r})")
+            gc.collect()
+            torch.cuda.empty_cache() if device.type == "cuda" else None
+        for layout in ("tile", "row", "row1"):       # the fastest of each layout with token chunks on streams
             b = best(layout)
             if b and device.type == "cuda":
                 for ch in chunk_counts:
@@ -780,12 +794,13 @@ def szcodec_rows(consts, study, words, cal, device, log=print, ranks=(None, 256)
                         run(layout, b[2], b[3], b[4], ch)
         if done:                                     # parts, a CUDA graph, then mixed with SplitZip
             try:
-                for layout in ("tile", "row"):
+                for layout in ("tile", "row", "row1"):
                     b = best(layout)
                     if not b:
                         continue
                     _, lay, product, BM, nw, ch = b
-                    codec = make(lay, product, BM, nw, 1).share_books(books)
+                    codec = make(lay, product, BM, nw, 1)
+                    codec.share_books(books[codec.esc_raw])
                     stream, starts = codec.encode(words)
                     bufs = codec.buffers(T)
                     dec = torch.empty_like(words)
@@ -816,7 +831,8 @@ def szcodec_rows(consts, study, words, cal, device, log=print, ranks=(None, 256)
                 if device.type != "cuda":
                     raise RuntimeError("no CUDA: no graph or SplitZip mix")
                 _, lay, product, BM, nw, ch = min(done)
-                codec = make(lay, product, BM, nw, ch).share_books(books)
+                codec = make(lay, product, BM, nw, ch)
+                codec.share_books(books[codec.esc_raw])
                 lb = []
                 stream, starts = codec.encode(words, layer_bits=lb)
                 bufs = codec.buffers(T)

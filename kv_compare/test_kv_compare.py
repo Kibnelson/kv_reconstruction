@@ -444,13 +444,16 @@ books = {}
 for rank, product, BM, ours, layout, chunks in (
         (None, "acc", 16, None, "tile", 1), (rc, "fused", 16, None, "tile", 2), (rc, "acc", 32, None, "tile", 1),
         (rc, "fused", 16, [False, True, True], "tile", 1), (None, "acc", 16, [True, False, True], "tile", 1),
-        (None, "acc", 16, None, "row", 1), (rc, "acc", 16, None, "row", 2), (rc, "acc", 16, [True, False, True], "row", 2)):
+        (None, "acc", 16, None, "row", 1), (rc, "acc", 16, None, "row", 2), (rc, "acc", 16, [True, False, True], "row", 2),
+        (rc, "fused", 16, None, "row", 2), (None, "acc", 16, None, "row1", 1), (rc, "fused", 16, None, "row1", 1),
+        (rc, "fused", 16, [False, True, True], "row1", 2)):
     codec = szcodec.SplitZipFormatCodec(consts, study.C, study.hd, rank=rank, product=product, tokens_per_program=BM,
                                         rank_tiles=(16, 16, 32, 4), layout=layout, chunks=chunks)
-    if (rank is not None) in books:
-        codec.share_books(books[rank is not None])
+    key = (rank is not None, layout == "row1")
+    if key in books:
+        codec.share_books(books[key])
     else:
-        books[rank is not None] = codec.calibrate(cal)
+        books[key] = codec.calibrate(cal)
     lb = []
     if ours is None:
         stream, starts = codec.encode(words, layer_bits=lb)
@@ -477,7 +480,7 @@ class SplitZipFormatTests(unittest.TestCase):
             self.skipTest("Triton and PyTorch are required")
         r = subprocess.run([sys.executable, "-c", SZ_CHECK, str(ROOT)], capture_output=True, text=True, timeout=2400)
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
-        self.assertEqual(r.stdout.count("ok"), 8, r.stdout)
+        self.assertEqual(r.stdout.count("ok"), 12, r.stdout)
 
 
 class MixedTests(unittest.TestCase):

@@ -255,14 +255,34 @@ if triton is not None:
                     FEAT)
 
     @triton.jit
-    def _szrow_kernel(buf_ptr, start_ptr, out_ptr, acc_ptr, xout_ptr, sa_ptr, b_ptr, sp_ptr, inv_ptr, isx_ptr,
-                      cos_ptr, sin_ptr, ssum_in_ptr, ssum_out_ptr, smult_ptr, tab_ptr, csym_ptr, t_base, T, W, G, HG,
-                      PRIOR_SCALE, TB: tl.constexpr, H2: tl.constexpr, MODE: tl.constexpr, ONES: tl.constexpr,
-                      FEAT: tl.constexpr, PROF: tl.constexpr):
-        """Row layout: one program = TB tokens x one head, token by token like the rANS per-layer kernel: the
-        head's 128 lanes form one vector, a token's codes then its payloads follow the previous token's, and a
-        running offset carries the position (prefix sums over 128 lanes only). Products from memory (acc_ptr at
-        the chunk's first token) or none (MODE 0). PROF as in _szdec_kernel."""
+    def _bits_m(p, off, mask, m):
+        """_bits with the loads masked by m (lanes outside m read nothing and return garbage)."""
+        i = off >> 5
+        lo = tl.load(p + i, mask=m, other=0)
+        hi = tl.load(p + i + 1, mask=m, other=0)
+        if _ASM:
+            v = tl.inline_asm_elementwise("shf.r.wrap.b32 $0, $1, $2, $3;", "=r,r,r,r", [lo, hi, off & 31],
+                                          dtype=tl.int32, is_pure=True, pack=1)
+            return v & mask
+        else:
+            v = ((hi.to(tl.uint32, bitcast=True).to(tl.uint64) << 32) |
+                 lo.to(tl.uint32, bitcast=True).to(tl.uint64)) >> (off & 31).to(tl.uint64)
+            return (v & mask.to(tl.uint64)).to(tl.int32)
+
+    @triton.jit
+    def _szrow_kernel(buf_ptr, start_ptr, out_ptr, acc_ptr, x_ptr, a_ptr, mu_ptr, xout_ptr, sa_ptr, b_ptr, sp_ptr,
+                      inv_ptr, isx_ptr, cos_ptr, sin_ptr, ssum_in_ptr, ssum_out_ptr, smult_ptr, tab_ptr, csym_ptr,
+                      t_base, T, W, G, HG, K, PRIOR_SCALE, TB: tl.constexpr, H2: tl.constexpr, BK: tl.constexpr,
+                      MODE: tl.constexpr, ONES: tl.constexpr, FEAT: tl.constexpr, PROF: tl.constexpr,
+                      ONE_READ: tl.constexpr):
+        """Row layouts: one program = TB tokens x one head, token by token like the rANS per-layer kernel: the
+        head's 128 lanes form one vector and a running offset carries the position (prefix sums over 128 lanes).
+        ONE_READ False ("row"): a token's k-bit codes, then its payloads (b raw bits, or 16 after an escape).
+        ONE_READ True ("row1"): per lane one field of k + b bits (code, then raw bits), then the escaped lanes'
+        16-bit words in lane order: one read per value, the escapes read only where they are.
+        MODE 0 no product (layer 0); 1 products from memory (acc_ptr at the chunk's first token); 2 the products
+        of the whole TB x 128 tile here with tensor cores (x_ptr [rows, K] times a_ptr [W, K]; the prediction of
+        the tile goes through mu_ptr [T, W], hot in L2). PROF as in _szdec_kernel (timing only)."""
         pid = tl.program_id(0)
         g = pid % G
         blk = pid // G
@@ -283,6 +303,17 @@ if triton is not None:
             for gg in range(0, G):
                 sacc += tl.load(ssum_in_ptr + gg * T + t0 + rb)
             tl.store(smult + rb, fu._mult(sacc.to(tl.float32) * PRIOR_SCALE))
+        if MODE == 2:                                # the tile's products and prediction, the tile arithmetic
+            rt = t0 + rb
+            rh = tl.arange(0, H2)
+            ca = g * HD + rh
+            cb = ca + H2
+            acc_a, acc_b = _acc_tile(acc_ptr, x_ptr, a_ptr, rt - t_base, ca, cb, W, K, TB, H2, BK, 2)
+            mua, mub, _sa, _sb, _cs, _sn = _pred_tile(acc_a, acc_b, sa_ptr, b_ptr, sp_ptr, cos_ptr, sin_ptr,
+                                                      ssum_in_ptr, rt, ca, cb, rh, key, T, G, PRIOR_SCALE, TB, H2,
+                                                      ONES)
+            tl.store(mu_ptr + rt[:, None] * W + ca[None, :], mua)
+            tl.store(mu_ptr + rt[:, None] * W + cb[None, :], mub)
         tl.debug_barrier()
         sao = tl.load(sa_ptr + own)
         bo = tl.load(b_ptr + own)
@@ -297,37 +328,65 @@ if triton is not None:
             t = t0 + i
             cs = tl.load(cos_ptr + t * H2 + hh)
             sn = tl.load(sin_ptr + t * H2 + hh)
-            if MODE == 0:
-                ao = tl.zeros([HD], dtype=tl.float32) * sao + bo
-                ap = tl.zeros([HD], dtype=tl.float32) * sap + bp
+            if MODE == 2:
+                mu = tl.load(mu_ptr + t * W + own)
             else:
-                ao = tl.load(acc_ptr + (t - t_base) * W + own).to(tl.float32) * sao + bo
-                ap = tl.load(acc_ptr + (t - t_base) * W + part).to(tl.float32) * sap + bp
-            mu = tl.where(key, tl.where(low, ao * cs - ap * sn, ao * cs + ap * sn), ao)
+                if MODE == 0:
+                    ao = tl.zeros([HD], dtype=tl.float32) * sao + bo
+                    ap = tl.zeros([HD], dtype=tl.float32) * sap + bp
+                else:
+                    ao = tl.load(acc_ptr + (t - t_base) * W + own).to(tl.float32) * sao + bo
+                    ap = tl.load(acc_ptr + (t - t_base) * W + part).to(tl.float32) * sap + bp
+                mu = tl.where(key, tl.where(low, ao * cs - ap * sn, ao * cs + ap * sn), ao)
             c, wm, ws = _ctx_of(mu, spl * tl.load(smult + i))
             e = tl.load(tab_ptr + c)                 # b | k << 4 | escape code << 7 | (2^b - 1) << 13
             k = (e >> 4) & 7
             km = (e >> 7) & 63
-            if PROF == 2:
-                ko, kt = cc * 4, 512
+            bm = (e >> 13) & 0x7FFF
+            if ONE_READ:
+                fl = k + (e & 15)
+                if PROF == 2:
+                    fo, ft = cc * 12, 1536
+                else:
+                    fo, ft = tl.cumsum(fl, 0) - fl, tl.sum(fl, 0)
+                if PROF == 1:
+                    fv = fl
+                else:
+                    fv = _bits(p, off + fo, km | (bm << k))
+                q = fv & km
+                esc = q == km
+                ec = esc.to(tl.int32)
+                if PROF == 2:
+                    eo, et = cc, 8
+                else:
+                    eo, et = tl.cumsum(ec, 0) - ec, tl.sum(ec, 0)
+                if PROF == 1:
+                    ew = eo
+                else:
+                    ew = _bits_m(p, off + ft + 16 * eo, tl.full([HD], 0xFFFF, tl.int32), esc)
+                pv = tl.where(esc, ew, (fv >> k) & bm)
+                off += ft + 16 * et
             else:
-                ko, kt = tl.cumsum(k, 0) - k, tl.sum(k, 0)
-            if PROF == 1:
-                q = k & 1
-            else:
-                q = _bits(p, off + ko, km)
-            esc = q == km
-            ln = tl.where(esc, 16, e & 15)
-            if PROF == 2:
-                lo_, lt = cc * 8, 1024
-            else:
-                lo_, lt = tl.cumsum(ln, 0) - ln, tl.sum(ln, 0)
-            if PROF == 1:
-                pv = ln
-            else:
-                pv = _bits(p, off + kt + lo_, tl.where(esc, 0xFFFF, (e >> 13) & 0x7FFF))
-            w = _word_of(q, pv, esc, tl.load(csym_ptr + c * 64 + q), (e >> 13) & 0x7FFF, wm, ws)
-            off += kt + lt
+                if PROF == 2:
+                    ko, kt = cc * 4, 512
+                else:
+                    ko, kt = tl.cumsum(k, 0) - k, tl.sum(k, 0)
+                if PROF == 1:
+                    q = k & 1
+                else:
+                    q = _bits(p, off + ko, km)
+                esc = q == km
+                ln = tl.where(esc, 16, e & 15)
+                if PROF == 2:
+                    lo_, lt = cc * 8, 1024
+                else:
+                    lo_, lt = tl.cumsum(ln, 0) - ln, tl.sum(ln, 0)
+                if PROF == 1:
+                    pv = ln
+                else:
+                    pv = _bits(p, off + kt + lo_, tl.where(esc, 0xFFFF, bm))
+                off += kt + lt
+            w = _word_of(q, pv, esc, tl.load(csym_ptr + c * 64 + q), bm, wm, ws)
             tl.store(out_ptr + t * W + own, w.to(tl.int16))
             v = gc._word_val(w)
             tl.store(ssum_out_ptr + g * T + t, tl.sum(fu._sq(v, mu, invl), 0))
@@ -353,38 +412,105 @@ def ctx_ref(mu, s):
     return torch.clamp(c, -8, 28) + 8, wm, ws
 
 
-def choose_books(hist):
+def choose_books(hist, esc_raw=False, kmax=K_MAX):
     """Per context (hist [NC, 2, 65536] counts of (sign agreement, r + 32768)): the raw bits b, code bits k and
     the 2^k - 1 code words (symbols agree * 65536 + floor(r / 2^b) + 32768) of least total size, with escapes
-    costing k + 16 bits. Returns (b [NC], k [NC], code words [NC, 64] (-1 unused), bits on the counts)."""
+    costing k + 16 bits (esc_raw: k + b + 16, the one-read layout keeps the b bits' place). Returns (b [NC],
+    k [NC], code words [NC, 64] (-1 unused), bits on the counts)."""
     nc = hist.shape[0]
     h = hist.to(torch.int64)
     n = h.sum((1, 2)).to(torch.float64)
     best = torch.full((nc,), float("inf"), dtype=torch.float64, device=h.device)
     bsel = torch.zeros(nc, dtype=torch.int64, device=h.device)
     ksel = torch.ones(nc, dtype=torch.int64, device=h.device)
-    words = torch.full((nc, NSYMC), -1, dtype=torch.int64, device=h.device)
+    width = 1 << kmax
+    words = torch.full((nc, width), -1, dtype=torch.int64, device=h.device)
     for b in range(B_MAX + 1):
         span = 65536 >> b
         hb = h.reshape(nc, 2, span, 1 << b).sum(-1).reshape(nc, 2 * span)
-        top_v, top_i = torch.topk(hb, min((1 << K_MAX) - 1, 2 * span), dim=1)
+        top_v, top_i = torch.topk(hb, min(width - 1, 2 * span), dim=1)
         cov = torch.cumsum(top_v, 1).to(torch.float64)
         sym = (top_i // span) * 65536 + (top_i % span) - (32768 >> b) + 32768
-        for k in range(1, K_MAX + 1):
+        for k in range(1, kmax + 1):
             m = (1 << k) - 1
             if m > 2 * span:                         # fewer symbols than code words
                 break
             inside = cov[:, m - 1]
-            cost = n * k + inside * b + (n - inside) * ESC_BITS
+            cost = (n * (k + b) if esc_raw else n * k + inside * b) + (n - inside) * ESC_BITS
             better = cost < best
             if bool(better.any()):
                 best = torch.where(better, cost, best)
                 bsel[better] = b
                 ksel[better] = k
-                rowsym = torch.full((nc, NSYMC), -1, dtype=torch.int64, device=h.device)
+                rowsym = torch.full((nc, width), -1, dtype=torch.int64, device=h.device)
                 rowsym[:, :m] = sym[:, :m]
                 words[better] = rowsym[better]
     return bsel, ksel, words, float(best.sum())
+
+
+def book_cost(hist, b, k, cw, esc_raw=False):
+    """Bits of the values counted in hist [NC, 2, 65536] with code books (b, k, code words): (code bits, raw bits,
+    escape bits, values, escapes)."""
+    code = raw = esc = n = ne = 0.0
+    for c in range(hist.shape[0]):
+        bb = int(b[c])
+        span = 65536 >> bb
+        hb = hist[c].to(torch.int64).reshape(2, span, 1 << bb).sum(-1).reshape(-1)
+        nc_ = float(hb.sum())
+        if nc_ == 0:
+            continue
+        syms = cw[c][cw[c] >= 0]
+        idx = (syms >> 16) * span + (syms & 0xFFFF) - 32768 + (32768 >> bb)
+        inside = float(hb[idx].sum()) if syms.numel() else 0.0
+        code += nc_ * int(k[c])
+        raw += (nc_ if esc_raw else inside) * bb
+        esc += (nc_ - inside) * ESC_BITS
+        n += nc_
+        ne += nc_ - inside
+    return code, raw, esc, n, ne
+
+
+def bit_budget(codec, words, cal):
+    """Where the format's bits go on a document, and how much room the code books leave: per value, the code,
+    raw and escape bits with the codec's code books (fitted on the calibration documents `cal`), the escape
+    rate; the same with up to 255 code words per context (8-bit codes); with code books fitted on the document
+    itself (the best any fixed code book could do, 63 or 255 code words); and the entropy of the symbols given
+    the context (what an ideal adaptive entropy coder would need with these contexts and symbols)."""
+    gens = [codec.symbols(w) for w in cal] + [codec.symbols(words)]
+    out = {k: 0.0 for k in ("values", "code", "raw", "escape", "escapes", "k8_bits", "oracle_bits",
+                            "oracle_k8_bits", "entropy_bits")}
+    for l in range(codec.L):
+        hc = torch.zeros(NC * 2 * 65536, dtype=torch.int64, device=codec.device)
+        for gen in gens[:-1]:
+            _, s = next(gen)
+            hc += torch.bincount((s >> 16).flatten().to(torch.int64) * 65536 + (s & 0xFFFF).flatten(),
+                                 minlength=NC * 2 * 65536)
+        _, s = next(gens[-1])
+        ht = torch.bincount((s >> 16).flatten().to(torch.int64) * 65536 + (s & 0xFFFF).flatten(),
+                            minlength=NC * 2 * 65536).view(NC, 2, 65536)
+        hc = hc.view(NC, 2, 65536)
+        b, kk, cw = codec.books[l]
+        code, raw, esc, n, ne = book_cost(ht, b, kk, cw, codec.esc_raw)
+        out["values"] += n
+        out["code"] += code
+        out["raw"] += raw
+        out["escape"] += esc
+        out["escapes"] += ne
+        b8, k8, w8, _ = choose_books(hc, codec.esc_raw, kmax=8)
+        out["k8_bits"] += sum(book_cost(ht, b8, k8, w8, codec.esc_raw)[:3])
+        out["oracle_bits"] += choose_books(ht, codec.esc_raw)[3]
+        out["oracle_k8_bits"] += choose_books(ht, codec.esc_raw, kmax=8)[3]
+        f = ht.reshape(NC, -1).to(torch.float64)
+        nc_ = f.sum(1, keepdim=True)
+        nz = f > 0
+        out["entropy_bits"] += float((f[nz] * torch.log2((nc_.expand_as(f))[nz] / f[nz])).sum())
+    for gen in gens:
+        gen.close()
+    v = out.pop("values")
+    res = {k: x / v for k, x in out.items()}
+    res["escape_rate"] = res.pop("escapes")
+    res["books_bits"] = res["code"] + res["raw"] + res["escape"]
+    return res
 
 
 class SplitZipFormatCodec:
@@ -401,11 +527,10 @@ class SplitZipFormatCodec:
             raise RuntimeError("Triton is required")
         if product not in ("fused", "acc"):
             raise ValueError("product is 'fused' or 'acc'")
-        if layout not in ("tile", "row"):
-            raise ValueError("layout is 'tile' or 'row'")
+        if layout not in ("tile", "row", "row1"):
+            raise ValueError("layout is 'tile', 'row' or 'row1'")
         self.layout, self.chunks = layout, int(chunks)
-        if layout == "row":
-            product = "acc"
+        self.esc_raw = layout == "row1"              # escapes keep their b raw bits' place
         self.lw = lw.LayerwiseOneStep(consts, C, hd, tokens_per_program=tokens_per_program, rank=rank,
                                       requant="epilogue" if rank is not None else "kernel", rank_tiles=rank_tiles,
                                       fuse=fuse)
@@ -467,7 +592,7 @@ class SplitZipFormatCodec:
                 hist += torch.bincount((s >> 16).flatten().to(torch.int64) * 65536 + (s & 0xFFFF).flatten(),
                                        minlength=NC * 2 * 65536)
                 cal_n += s.numel()
-            b, kk, cw, bits = choose_books(hist.view(NC, 2, 65536))
+            b, kk, cw, bits = choose_books(hist.view(NC, 2, 65536), esc_raw=self.esc_raw)
             cal_bits += bits
             esc = (1 << kk) - 1
             tab[l] = (b | (kk << 4) | (esc << 7) | (((1 << b) - 1) << 13)).to(torch.int32)
@@ -483,7 +608,9 @@ class SplitZipFormatCodec:
         return self
 
     def share_books(self, other):
-        """Use another codec's code books (same predictor; a different tile size or warp count)."""
+        """Use another codec's code books (same predictor and escape cost; a different tile or warp count)."""
+        if other.esc_raw != self.esc_raw:
+            raise ValueError("code books chosen for the other escape cost")
         self.tab, self.csym, self.books = other.tab, other.csym, other.books
         self.calibration_bits = other.calibration_bits
         return self
@@ -526,11 +653,21 @@ class SplitZipFormatCodec:
             ktot = kl.sum(1)
             po = torch.cumsum(pl, 1) - pl + ktot[:, None]
             nbits = ktot + pl.sum(1)
+        elif self.layout == "row1":                  # token by token: k + b bit fields, then the escaped words
+            def seg(t):
+                return t.view(T // BM, BM, G, 2 * H2).permute(0, 2, 1, 3).reshape(S, BM, 2 * H2)
+            fesc = cval == ((1 << kk) - 1)
+            fval = torch.where(fesc, cval, cval | (pval << kk))
+            eval_ = torch.where(fesc, pval, torch.zeros_like(pval))
+            elen = torch.where(fesc, torch.full_like(b, ESC_BITS), torch.zeros_like(b))
+            kl, pl, cv, pv = seg(kk + b), seg(elen), seg(fval), seg(eval_)
+            del kk, plen, cval, pval, b, fesc, fval, eval_, elen
         else:                                        # per segment, token by token: its codes, then its payloads
             def seg(t):
                 return t.view(T // BM, BM, G, 2 * H2).permute(0, 2, 1, 3).reshape(S, BM, 2 * H2)
             kl, pl, cv, pv = seg(kk), seg(plen), seg(cval), seg(pval)
             del kk, plen, cval, pval, b
+        if self.layout != "tile":
             krow, prow = kl.sum(2), pl.sum(2)
             rs = torch.cumsum(krow + prow, 1) - (krow + prow)
             ko = (rs[..., None] + torch.cumsum(kl, 2) - kl).reshape(S, -1)
@@ -599,6 +736,8 @@ class SplitZipFormatCodec:
                 "scratch": [self.lw._scratch(Tc) if self.rank is not None else None for _ in range(self.chunks)],
                 "zq": [torch.empty(Tc, r, dtype=torch.int8, device=dev) if self.product == "fused" else None
                        for _ in range(self.chunks)],
+                "mu": (torch.empty(T, self.W, dtype=torch.float32, device=dev)
+                       if self.product == "fused" and self.layout != "tile" else None),
                 "streams": [torch.cuda.Stream(dev) for _ in range(self.chunks)] if cuda and self.chunks > 1 else None}
 
     def products(self, words):
@@ -673,11 +812,14 @@ class SplitZipFormatCodec:
             return
         ones = l == 0 or not ours[l - 1]
         feat = l < L - 1 and ours[l + 1]
-        if self.layout == "row":
-            self._launch(_szrow_kernel, (P,), stream, starts[l], words[l], accp, x[l % 2], k["sa"][l], k["b"][l],
-                         k["sp"][l], k["inv"][l], k["isx"][l], k["cos"], k["sin"], ssum[(l + 1) % 2], ssum[l % 2],
-                         bufs["smult"][c * P * self.BM:], self.tab[l], self.csym[l], c * Tc, T, W, self.G, self.HG,
-                         self.prior_scale, TB=self.BM, H2=self.hd // 2, MODE=mode, ONES=ones, FEAT=feat, PROF=prof)
+        if self.layout != "tile":
+            mu = bufs["mu"] if bufs["mu"] is not None else accp
+            self._launch(_szrow_kernel, (P,), stream, starts[l], words[l], accp, xp, ap, mu, x[l % 2], k["sa"][l],
+                         k["b"][l], k["sp"][l], k["inv"][l], k["isx"][l], k["cos"], k["sin"], ssum[(l + 1) % 2],
+                         ssum[l % 2], bufs["smult"][c * P * self.BM:], self.tab[l], self.csym[l], c * Tc, T, W,
+                         self.G, self.HG, K, self.prior_scale, TB=self.BM, H2=self.hd // 2,
+                         BK=min(self.bk, K) if K else 16, MODE=mode, ONES=ones, FEAT=feat, PROF=prof,
+                         ONE_READ=self.layout == "row1")
         else:
             self._launch(_szdec_kernel, (P,), stream, starts[l], words[l], xp, ap, accp, x[l % 2], k["sa"][l],
                          k["b"][l], k["sp"][l], k["inv"][l], k["isx"][l], k["cos"], k["sin"], ssum[(l + 1) % 2],

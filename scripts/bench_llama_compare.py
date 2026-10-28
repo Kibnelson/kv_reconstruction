@@ -497,13 +497,16 @@ def szcodec_lines(out):
     lines = ["## Our prediction in SplitZip's format: the real codec (kv_compare/szcodec.py)", "",
              "Fixed-length codes chosen per value by our one-step prediction (sign agreement + magnitude residual, "
              "per-context b raw bits and a k-bit code, escapes carry the word), so every value of a tile is placed by "
-             "two prefix sums, as in SplitZip; no entropy coder. Code books from "
+             "prefix sums, as in SplitZip; no entropy coder. Code books from "
              f"{', '.join(res['calibration'])}; measured on {res['doc']} on the {res['gpu']}, bit-exact round trip "
-             "checked. Reduced rank: the second product runs inside the decoding kernel (tensor cores), so the int32 "
-             "products never go through memory. Bits include the 32-bit segment starts and padding.", "",
+             "checked. Bits include the 32-bit segment starts and padding.", "",
              "Layouts: tile = a program decodes tokens x 128 lanes at once (prefix sums over the tile); row = token by "
-             "token over the head's 128 lanes, like our rANS kernel (prefix sums over 128 lanes, a running offset). "
-             "Chunks: token chunks decoded on separate CUDA streams.", "",
+             "token over the head's 128 lanes, like our rANS kernel (prefix sums over 128 lanes, a running offset), a "
+             "token's codes then its payloads (two reads per value); row1 = the same with each value's code and raw "
+             "bits in one field and the escaped words after the token (one read per value; an escape keeps its raw "
+             "bits' place, so code books are chosen for that cost). Reduced rank \"inside\": the second product runs "
+             "in the decoding kernel on tensor cores (row layouts: for the program's whole tile, its prediction kept "
+             "in L2 for the token loop). Chunks: token chunks decoded on separate CUDA streams.", "",
              "| Product | Layout | Tokens x head per program, warps | Bits per value | Decode | G values/s | Exact |",
              "| --- | --- | --- | --- | --- | --- | --- |"]
     for r in rows:
@@ -517,6 +520,7 @@ def szcodec_lines(out):
         else:
             lines.append(f"| {prod} | {lay} | {tile} | {r['stream_bits_per_value']:.3f} | {r['decode_ms']:.2f} ms | "
                          f"{r['decode_gvalues_per_s']:.1f} | {r['bit_exact']} |")
+    lines += sz_budget_lines(res)
     parts = [r for r in res["rows"] if r["part"] == "szcodec_parts"]
     if parts:
         lines += ["", "Where the decode time goes (the fastest mode of each layout, one chunk; the ablations decode "
@@ -573,6 +577,114 @@ def szcodec_lines(out):
         lines.append(f"| {R} Gb/s | {ms(ts)}, {mib(szr)} | {cell(a, R)} | {cell(b, R)} ({desc(b)}) | "
                      f"{cell(c, R)} ({desc(c)}) | {cell(d, R)} ({desc(d)}) | {ts / t(top, R):.2f}x ({desc(top)}"
                      f"{', SplitZip format' if top['part'].startswith('szcodec') else ', rANS'}) |")
+    return lines + [""]
+
+
+def sz_budget_lines(res):
+    """The SplitZip-format codec's bit budget (kv_compare.szcodec.bit_budget) per product and code-book kind."""
+    bud = [r for r in res["rows"] if r["part"] == "szcodec_budget"]
+    if not bud:
+        return []
+    lines = ["", "Where the format's bits go on the test document, and the room left (bits per value; without the "
+             "segment starts and padding): codes + raw bits + escapes with the code books fitted on the calibration "
+             "documents, the share of values escaped, the same with up to 255 code words per context (8-bit codes), "
+             "with code books fitted on this document itself (the best a fixed code book could do), and the entropy "
+             "of the symbols given the context (an ideal adaptive coder with the same contexts; our rANS codec is a "
+             "different symbolization).", "",
+             "| Product | Code books | Codes | Raw bits | Escapes | Total | Escaped | 8-bit codes | Fitted on the "
+             "document (6-bit / 8-bit) | Entropy given the context |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for r in bud:
+        lines.append(f"| {'rank ' + str(r['rank']) if r['rank'] else 'dense'} | "
+                     f"{'one read (escapes keep the raw bits)' if r['escape_keeps_raw'] else 'two reads'} | "
+                     f"{r['code']:.3f} | {r['raw']:.3f} | {r['escape']:.3f} | {r['books_bits']:.3f} | "
+                     f"{100 * r['escape_rate']:.2f}% | {r['k8_bits']:.3f} | {r['oracle_bits']:.3f} / "
+                     f"{r['oracle_k8_bits']:.3f} | {r['entropy_bits']:.3f} |")
+    return lines
+
+
+def bytes_time_lines(out):
+    """Every measured lossless mode as a trade of bytes against time: the modes no other mode beats on both bits
+    and decode time, then per link the fastest mode and the fewest bytes within +10%, +25% and +50% of its time."""
+    modes = {}
+
+    def add(label, bits, rate, n):
+        if label not in modes or rate > modes[label][1]:
+            modes[label] = (bits, rate, n)
+    g = json.loads((out / "gpu_speed.json").read_text())["rows"] if (out / "gpu_speed.json").is_file() else []
+    z = json.loads((out / "szcodec.json").read_text())["rows"] if (out / "szcodec.json").is_file() else []
+    parts = ("splitzip_official", "fused", "layerwise", "mixed", "szcodec", "szcodec_mixed")
+    n0 = next((r["values"] for r in z + g if r["part"] == "splitzip_official" and r.get("bit_exact")), None)
+    for r in g + z:
+        if r["part"] not in parts or not r.get("bit_exact") or not r.get("decode_gvalues_per_s"):
+            continue
+        if r.get("values") != n0:
+            continue
+        n = n0
+        kind = f"rank {r['rank']}" if r.get("rank") else "dense"
+        if r["part"] == "splitzip_official":
+            add("SplitZip (authors' codec)", r["stream_bits_per_value"], r["decode_gvalues_per_s"], n)
+        elif r["part"] == "fused":
+            add("ours, rANS, fused one-kernel codec", r["stream_bits_per_value"], r["decode_gvalues_per_s"], n)
+        elif r["part"] == "layerwise":
+            add(f"ours, rANS, {kind}", r["stream_bits_per_value"], r["decode_gvalues_per_s"], n)
+        elif r["part"] == "mixed" and r["ours_layers"]:      # (all layers ours: our codec alone)
+            whole = r["ours_layers"] == len(r["ours_mask"])
+            add(f"ours, rANS, {r['mode']}" if whole else
+                f"ours, rANS + SplitZip, {r['mode']}, {r['ours_layers']} layers ours", r["stream_bits_per_value"],
+                r["decode_gvalues_per_s"], n)
+        elif r["part"] == "szcodec":
+            add(f"ours, SplitZip format, {kind}", r["stream_bits_per_value"], r["decode_gvalues_per_s"], n)
+        elif r["part"] == "szcodec_mixed" and r["ours_layers"]:
+            whole = r["ours_layers"] == len(r["ours_mask"])
+            add(f"ours, SplitZip format, {kind}" if whole else
+                f"ours, SplitZip format + SplitZip, {kind}, {r['ours_layers']} layers ours",
+                r["stream_bits_per_value"], r["decode_gvalues_per_s"], n)
+    if (out / "exans.json").is_file() and n0:
+        for d, v in json.loads((out / "exans.json").read_text()).get("documents", {}).items():
+            if d == "test_text":
+                add("ExANS (authors' codec)", v["bits_per_value"], v["decode_gbps_wall"] / 2, n0)
+    if not modes or "SplitZip (authors' codec)" not in modes:
+        return []
+    n = n0
+    mib = lambda bits: bits * n / 8 / 2 ** 20
+    t = lambda m, R: max(m[0] / R, 1 / m[1]) * n / 1e9
+    sz = modes["SplitZip (authors' codec)"]
+    front, best_ms = [], float("inf")
+    for label, m in sorted(modes.items(), key=lambda kv: (kv[1][0], -kv[1][1])):
+        d = n / m[1] / 1e6
+        if d < best_ms:
+            front.append((label, m))
+            best_ms = d
+    shown = []                                       # from the fastest: a mode per 0.15 bits saved at least
+    for label, m in reversed(front):
+        if not shown or shown[-1][1][0] - m[0] >= 0.15 or label == front[0][0]:
+            shown.append((label, m))
+    front = list(reversed(shown))
+    lines = ["", "## Bytes against time: every measured lossless mode", "",
+             "Fewer bytes cost decode time. The modes below are the ones no other measured mode beats on both bits "
+             "and decode time (one per 0.15 bits per value or more), from fewest bytes to fastest decode (one "
+             f"document, {n / 1e6:.0f}M values; every one a real stream decoded bit-exact):", "",
+             "| Mode | Bits per value | Sent | Bytes vs SplitZip | Decode |", "| --- | --- | --- | --- | --- |"]
+    for label, m in front:
+        lines.append(f"| {label} | {m[0]:.3f} | {mib(m[0]):.0f} MiB | {100 * (1 - m[0] / sz[0]):.0f}% fewer | "
+                     f"{n / m[1] / 1e6:.1f} ms |")
+    lines += ["", "Per link: the fastest mode, and the fewest bytes one can send while spending at most 10%, 25% or 50% "
+              "more time than the fastest (time = the longer of the wire time and the decode; each cell: time, "
+              "bytes sent, mode):", "",
+              "| Link | Fastest | Fewest bytes within +10% | within +25% | within +50% | Fewest bytes at all |",
+              "| --- | --- | --- | --- | --- | --- |"]
+    cell = lambda lm, R: f"{1e3 * t(lm[1], R):.1f} ms, {mib(lm[1][0]):.0f} MiB ({lm[0]})"
+    for R, _band in LINK_BANDS:
+        ranked = sorted(modes.items(), key=lambda kv: t(kv[1], R))
+        fast = ranked[0]
+        tf = t(fast[1], R)
+        cells = []
+        for x in (1.10, 1.25, 1.50):
+            ok = [kv for kv in modes.items() if t(kv[1], R) <= x * tf]
+            cells.append(cell(min(ok, key=lambda kv: kv[1][0]), R))
+        least = min(modes.items(), key=lambda kv: (kv[1][0], -kv[1][1]))
+        lines.append(f"| {R} Gb/s | {cell(fast, R)} | " + " | ".join(cells) + f" | {cell(least, R)} |")
     return lines + [""]
 
 
@@ -1333,6 +1445,8 @@ def stage_report(args, out):
         lines += format_lines(out)
     if (out / "szcodec.json").is_file():
         lines += szcodec_lines(out)
+    if (out / "gpu_speed.json").is_file() or (out / "szcodec.json").is_file():
+        lines += bytes_time_lines(out)
     lines += lossy_link_lines(out)
     if (out / "cheap_products.json").is_file():
         cp = json.loads((out / "cheap_products.json").read_text())
@@ -1455,10 +1569,10 @@ def parser():
                    help="gpu_speed: steps of the GPU lossy codec timed on the whole test document (empty: skip)")
     p.add_argument("--sz-ranks", default="0,256,512",
                    help="szcodec: products of the SplitZip-format codec (0 = dense, else reduced rank)")
-    p.add_argument("--sz-configs", default="16x2,16x4,32x2,32x4",
+    p.add_argument("--sz-configs", default="32x4",
                    help="szcodec, tile layout: tokens per program x warps (a program is that many tokens x one head)")
-    p.add_argument("--sz-row-configs", default="16x1,32x1,64x1,32x2,32x4",
-                   help="szcodec, row layout: tokens per program x warps")
+    p.add_argument("--sz-row-configs", default="16x1,32x1",
+                   help="szcodec, row layouts (two reads per value, and one): tokens per program x warps")
     p.add_argument("--sz-chunks", default="2,4",
                    help="szcodec: token chunks on CUDA streams, tried for the fastest of each layout")
     p.add_argument("--format-ranks", default="256",
