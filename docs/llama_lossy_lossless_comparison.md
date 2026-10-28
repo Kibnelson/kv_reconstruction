@@ -257,26 +257,40 @@ With the first 4 tokens exact, our CPU coder matches AQUA-KV 3-bit quality at 2.
 - **Mixed with SplitZip:** 13.0 ms and 621 MiB at 400 Gb/s (14 layers ours), 1.09x SplitZip. Our rANS mix gives 1.07x.
 - **At 800 Gb/s:** the best mix is still SplitZip alone.
 
-## Next run: a faster SplitZip-format decoder, and bytes against time
+## Results: two decoder ideas that did not pay, the bit budget, bytes against time (`612a70d`)
 
-- **One read per value** (layout `row1`). Each value's code and raw bits sit in one field, and a token's
-  escaped words come after its fields, so a value needs one stream read instead of two. Escapes keep the raw
-  bits' place, so their code books are chosen for that cost.
-- **The second product inside the token-by-token kernel.** The tile's product runs on tensor cores at the
-  start of each program, and its prediction is kept in L2 for the token loop, so the int32 products no longer
-  go through memory.
-- **Bit budget.** Where the format's bits go (codes, raw bits, escapes, escape rate), and how much room is left:
-  up to 255 code words per context, code books fitted on the document itself, and the entropy of the symbols
-  given the context.
-- **Bytes against time.** Every measured lossless mode is placed as a trade of bytes for decode time: the modes
-  no other mode beats on both. Then, per link, the fastest mode and the fewest bytes reachable for +10%, +25%
-  and +50% more time. A slightly slower mode that sends far fewer bytes then shows as such.
+- **One read per value** (`row1`): coding takes 12.4 ms against 11.7 ms with two reads (rank 256). The escape
+  prefix sum and the masked escape reads cost more than the read they save, and the format costs 0.11 bits
+  more. Not kept as the default.
+- **Second product inside the token-by-token kernel:** 34 ms against 18 ms through memory. A one-warp program
+  is too small for the tensor-core product. Not kept.
+- **Fastest of ours alone, unchanged:** the row kernel with the product through memory, rank 256, 2 chunks:
+  17.2 ms, 10.20 bits.
+- **Bit budget** (dense; rank 256 in brackets):
 
-```bash
-cd ~/kv_llama32 && git checkout llama32-3b-lossy-lossless-compare \
-    && git pull --ff-only origin llama32-3b-lossy-lossless-compare \
-    && STAGES=szcodec,report bash scripts/run_on_nuc.sh
-```
+  | Part | Bits per value |
+  | --- | --- |
+  | codes | 4.78 (4.79) |
+  | raw bits | 4.08 (4.50) |
+  | escapes, 6.1% (5.5%) of values | 0.97 (0.88) |
+  | total | 9.83 (10.18) |
+  | 8-bit codes | 9.83, no gain |
+  | code books fitted on the test document itself | 9.80 (10.16), within 0.03 |
+  | entropy given the context | 8.96 (9.32) |
+
+  The code books are as good as fixed code books get. The remaining 0.85 bits are the price of fixed-length
+  codes, and our rANS codec (9.0 / 9.4 bits) already sits at that entropy. Fewer lossless bytes need a stronger
+  prediction, not better code books.
+- **Bytes against time** (`summary.md`): at 400 Gb/s the fastest mode takes 13.0 ms and sends 621 MiB.
+  Allowing more time gives:
+
+  | Time allowed | Time | Sent |
+  | --- | --- | --- |
+  | +10% | 14.3 ms | 610 MiB |
+  | +25% | 16.2 ms | 585 MiB |
+  | +50% | 19.2 ms | 567 MiB |
+
+  For comparison, SplitZip sends 675 MiB in 14.1 ms, and our fewest measured bytes are 504 MiB at 58.6 ms.
 
 ## Reference: SmolLM2-135M (same protocol, NumPy implementation)
 
