@@ -43,6 +43,13 @@ if not v.startswith("2.11"):
 EOF
 
 RUN=${RUN:-$HOME/kv_reconstruction/runs/llama32_3b_compare}
+# LOCK=1: measure everything once on this commit (every stage but the captures, both lossy document sets, the
+# authors' baseline checks and timings), for the locked scoreboard. About 1.5 hours.
+if [ "${LOCK:-0}" = 1 ]; then
+    CHECKS=1
+    STAGES=${STAGES:-lossless,frontier,lossy,gpu_speed,pool,szcodec,exans,report}
+    EXTRA="--lossy-docs test,eval --lossy-variants base,sinks,both --kappas 0.5,1,2,4 ${EXTRA:-}"
+fi
 STAGES=${STAGES:-gpu_speed,report}
 echo "running on branch $cur, commit $(git log --oneline -1); stages $STAGES; output $RUN"
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader
@@ -99,6 +106,7 @@ python -u scripts/bench_llama_compare.py --device cuda --output "$RUN" --stages 
     | tee -a "$RUN/console.log"
 
 NAME=llama32_3b_compare_a4500_$(date +%Y%m%d_%H%M)
+[ "${LOCK:-0}" = 1 ] && NAME=${NAME}_lock
 python scripts/package_llama_compare.py "$RUN" --destination "benchmark_results/$NAME"
 git add "benchmark_results/$NAME"
 git commit -m "Add Llama-3.2-3B results ($NAME, stages $STAGES)"

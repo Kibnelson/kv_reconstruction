@@ -212,13 +212,22 @@ def stage_lossless(args, out):
 
 
 def stage_lossy(args, out):
+    """--lossy-docs: test (the two test documents, lossy.json), eval (the WikiText-2 windows, lossy_eval.json),
+    or both in turn (test,eval)."""
+    res = None
+    for which in args.lossy_docs:
+        res = _stage_lossy(args, out, which)
+    return res
+
+
+def _stage_lossy(args, out, which):
     import torch
     from kv_compare import baselines
     from kv_compare.capture import load_model
     from kv_compare.core import words_to_float
     from kv_compare.predict import CONFIGS, Study
     from kv_compare.quality import continuation_nll, matrices_from_doc, matrices_from_values
-    if args.lossy_docs == "eval":                 # the larger quality test (stage evalcap): its own result file
+    if which == "eval":                           # the larger quality test (stage evalcap): its own result file
         docs = [f"eval{i}" for i in range(args.eval_docs)]
         P, M, result_file = args.eval_prompt_tokens, args.eval_continuation_tokens, "lossy_eval.json"
     else:
@@ -1403,6 +1412,18 @@ def eval_lines(out):
 
 def stage_report(args, out):
     lines = [f"# KV transfer codecs on {args.model}", ""]
+    try:                                             # the pinned best first, beside the locked scoreboard
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import scoreboard
+        sb = scoreboard.build(out)
+        locked_path = ROOT / "benchmark_results" / "locked_scoreboard.json"
+        locked = json.loads(locked_path.read_text()) if locked_path.is_file() else None
+        (out / "scoreboard.json").write_text(json.dumps(sb, indent=1))
+        md = scoreboard.markdown(sb, locked)
+        (out / "scoreboard.md").write_text("\n".join(md) + "\n")
+        lines += md
+    except Exception as exc:
+        log(f"report: scoreboard not built ({exc!r})")
     meta = json.loads((out / "captures" / "meta.json").read_text())
     lines.append(f"Captures: {len(meta['captures'])} documents x {meta['tokens']} tokens; {meta['layers']} layers, "
                  f"{meta['kv_heads']} KV heads x {meta['head_dim']}; torch {meta['torch']}, transformers {meta['transformers']}.")
@@ -1526,8 +1547,9 @@ def parser():
     p.add_argument("--eval-prompt-tokens", type=int, default=3072, help="lossy --lossy-docs eval: transferred prompt")
     p.add_argument("--eval-continuation-tokens", type=int, default=1024,
                    help="lossy --lossy-docs eval: continuation tokens scored")
-    p.add_argument("--lossy-docs", default="test", choices=["test", "eval"],
-                   help="lossy: the two test documents (lossy.json) or the evalcap windows (lossy_eval.json)")
+    p.add_argument("--lossy-docs", default="test",
+                   help="lossy: test (the two test documents, lossy.json), eval (the evalcap windows, "
+                        "lossy_eval.json), or test,eval")
     p.add_argument("--lossy-variants", default="base,sinks,token,both",
                    help="lossy stage, ours and gpu: base; sinks (the first --sink-tokens tokens exact); token (the "
                         "step follows the token's adaptive spread); both")
@@ -1630,6 +1652,9 @@ def main(argv=None):
     args.layer_ranks = [int(r) for r in args.layer_ranks.split(",") if r]
     args.format_ranks = [int(r) for r in args.format_ranks.split(",") if r]
     args.sz_ranks = [int(r) for r in args.sz_ranks.split(",") if r]
+    args.lossy_docs = [d for d in args.lossy_docs.split(",") if d]
+    if any(d not in ("test", "eval") for d in args.lossy_docs):
+        raise SystemExit("--lossy-docs takes test, eval or test,eval")
     args.sz_configs = [tuple(int(x) for x in t.split("x")) for t in args.sz_configs.split(",") if t]
     args.sz_row_configs = [tuple(int(x) for x in t.split("x")) for t in args.sz_row_configs.split(",") if t]
     args.sz_chunks = [int(c) for c in args.sz_chunks.split(",") if c]

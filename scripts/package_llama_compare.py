@@ -27,7 +27,8 @@ FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.js
          "exans/build_fix.diff": "exans_build_fix.diff", "exans/official_test.log": "exans_official_test.log",
          "time_aqua.json": "time_aqua.json", "time_kivi.json": "time_kivi.json",
          "lossy_eval.json": "lossy_eval.json", "captures/eval_meta.json": "eval_capture_meta.json",
-         "szcodec.json": "szcodec.json", "captures/meta.json": "capture_meta.json"}
+         "szcodec.json": "szcodec.json", "scoreboard.json": "scoreboard.json", "scoreboard.md": "scoreboard.md",
+         "captures/meta.json": "capture_meta.json"}
 REQUIRED = ("summary.md", "run_args.json", "environment.json", "captures/meta.json")
 
 
