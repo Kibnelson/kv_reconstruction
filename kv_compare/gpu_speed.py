@@ -387,24 +387,45 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
     xall, prior = FusedOneStep(consts, study.C, study.hd, tokens_per_program=32, rows=4, warps=4).model(words)
     rows = []
 
-    def run(TB, chunks, mode, search, features="inline", lean=False, split=False, parts=False):
+    def run(TB, chunks, mode, search, features="inline", lean=False, split=False, parts=False, product="cublas",
+            tiles=(128, 128, 64, 4), graph=False):
         variant = ", ".join(x for x in ("features in a separate pass" if features == "pass" else "",
                                         "lean registers" if lean else "",
-                                        "products on high-priority streams" if split else "") if x)
+                                        "products on high-priority streams" if split else "",
+                                        f"Triton product {tiles[0]}x{tiles[1]}x{tiles[2]} ({tiles[3]} warps)"
+                                        if product == "triton" else "",
+                                        "CUDA graph" if graph else "") if x)
         tag = f"per layer, {TB} tokens per program, {chunks} chunk{'s' if chunks > 1 else ''}, {mode}" + \
               (", stage-1 search" if search else "") + (f", {variant}" if variant else "")
         row = {"part": "layerwise", "tokens_per_program": TB, "chunks": chunks, "mode": mode, "search": search,
                "variant": variant, "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name}
         try:
             codec = LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=TB, mode=mode, search=search,
-                                     chunks=chunks, features=features, lean=lean, split_streams=split)
+                                     chunks=chunks, features=features, lean=lean, split_streams=split,
+                                     product=product, gemm_tiles=tiles)
             buf, starts = codec.encode(words, xall, prior)
             bufs = codec.buffers(T)
             dec = codec.decode(buf, starts, T, bufs=bufs)
             ok = bool(torch.equal(dec, words))
             bits = codec.bits(starts, T) / n
             te = timer(lambda: codec.encode(words, xall, prior, out=buf), device, warmup=1, reps=3)
-            td = timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs), device, warmup=2, reps=5)
+            if graph:                                # the whole decode captured once, then replayed
+                g = torch.cuda.CUDAGraph()
+                side = torch.cuda.Stream(device)
+                side.wait_stream(torch.cuda.current_stream(device))
+                with torch.cuda.stream(side):
+                    codec.decode(buf, starts, T, out=dec, bufs=bufs)
+                torch.cuda.current_stream(device).wait_stream(side)
+                with torch.cuda.graph(g):
+                    codec.decode(buf, starts, T, out=dec, bufs=bufs)
+                dec.zero_()
+                g.replay()
+                torch.cuda.synchronize(device)
+                ok = ok and bool(torch.equal(dec, words))
+                td = timer(g.replay, device, warmup=2, reps=5)
+            else:
+                td = timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs), device, warmup=2, reps=5)
+            row["bit_exact"] = ok
             row.update(bit_exact=ok, stream_bits_per_value=bits, exact_model_bits_per_value=model_bits,
                        encode_ms=1e3 * te, decode_ms=1e3 * td, decode_gvalues_per_s=n / td / 1e9)
             log(f"  [{tag}]: exact={ok}, {bits:.4f} bits/value; encode {1e3 * te:.1f} ms (after the forward pass), "
@@ -434,10 +455,13 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
         TB, ch = best["tokens_per_program"], best["chunks"]
         run(TB, ch, modes[0], True, parts=True)              # the same again, timed in parts
         run(TB, ch, modes[0], False)
-        run(TB, ch, modes[0], True, features="pass")
-        run(TB, ch, modes[0], True, lean=True)
-        run(TB, ch, modes[0], True, split=True)
-        run(TB, ch, modes[0], True, features="pass", lean=True, split=True)
+        run(TB, ch, modes[0], True, graph=True)
+        for tiles in ((128, 128, 64, 4), (64, 128, 64, 4), (64, 64, 64, 4)):
+            run(TB, ch, modes[0], True, product="triton", tiles=tiles, parts=tiles == (64, 128, 64, 4))
+            run(TB, ch, modes[0], True, product="triton", tiles=tiles, graph=True)
+        for c2 in (4, 8):
+            run(TB, c2, modes[0], True, product="triton", tiles=(64, 128, 64, 4), graph=True)
+            run(TB, c2, modes[0], True, graph=True)
         for mode in modes[1:]:
             run(TB, ch, mode, True)
     del xall, prior

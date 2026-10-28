@@ -601,7 +601,8 @@ def speed_lines(out):
         for r in lw:
             if "coding_only_ms" in r:
                 lines += ["", f"Where the decode time goes ({r['tokens_per_program']} tokens per program, {r['chunks']} "
-                          f"chunk(s)): the 27 products alone {r['products_only_ms']:.1f} ms, the 28 coding kernels alone "
+                          f"chunk(s){', ' + r['variant'] if r.get('variant') else ''}): the 27 products alone "
+                          f"{r['products_only_ms']:.1f} ms, the 28 coding kernels alone "
                           f"(products precomputed) {r['coding_only_ms']:.1f} ms, both as decoded {r['decode_ms']:.1f} ms; "
                           f"overlap hides {r['products_only_ms'] + r['coding_only_ms'] - r['decode_ms']:.1f} ms."]
     lines += ["", "Reference: " + res["splitzip_reference"] + ".", ""]

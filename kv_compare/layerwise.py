@@ -39,6 +39,30 @@ def int_mm(x, A, out=None):
 if triton is not None:
 
     @triton.jit
+    def _igemm_kernel(x_ptr, a_ptr, c_ptr, M, N, K, BM: tl.constexpr, BN: tl.constexpr, BK: tl.constexpr,
+                      GROUP: tl.constexpr):
+        """Exact int8 product C [M, N] int32 = X [M, K] times A [N, K] transposed (a small-footprint kernel that
+        can share SMs with the coding kernel; the result equals cuBLAS's bit for bit, being integer)."""
+        pid = tl.program_id(0)
+        nm = tl.cdiv(M, BM)
+        nn = tl.cdiv(N, BN)
+        gw = GROUP * nn                              # grouped order: consecutive programs share A tiles in L2
+        gid = pid // gw
+        fm = gid * GROUP
+        gs = tl.minimum(nm - fm, GROUP)
+        pm = fm + (pid % gw) % gs
+        pn = (pid % gw) // gs
+        rm = pm * BM + tl.arange(0, BM)
+        rn = pn * BN + tl.arange(0, BN)
+        rk = tl.arange(0, BK)
+        acc = tl.zeros([BM, BN], dtype=tl.int32)
+        for k0 in range(0, K, BK):
+            xt = tl.load(x_ptr + rm[:, None] * K + (k0 + rk)[None, :])
+            at = tl.load(a_ptr + rn[:, None] * K + (k0 + rk)[None, :])
+            acc = tl.dot(xt, tl.trans(at), acc, out_dtype=tl.int32)
+        tl.store(c_ptr + rm[:, None] * N + rn[None, :], acc)
+
+    @triton.jit
     def _lane_mu(acc_row, own, part, sao, bo, sap, bp, cs, sn, low, key):
         """The fused tile's prediction for one token, per lane: scale and bias, then RoPE for keys (lane in the
         first half: own * cos - partner * sin; second half: own * cos + partner * sin)."""
@@ -205,7 +229,7 @@ class LayerwiseOneStep:
     """Encode / decode a document's KV (all layers) with cuBLAS products and one coding kernel per layer."""
 
     def __init__(self, consts, C, hd, tokens_per_program=128, mode="uniform", search=True, chunks=1, fuse=False,
-                 features="inline", lean=False, split_streams=False):
+                 features="inline", lean=False, split_streams=False, product="cublas", gemm_tiles=(128, 128, 64, 4)):
         """features: "inline" (the coding kernel makes the next layer's features) or "pass" (a separate kernel);
         lean: reload per-channel constants every token (fewer registers); split_streams: per chunk, the products on
         a high-priority CUDA stream and the coding on another, so pending products are scheduled first."""
@@ -220,6 +244,9 @@ class LayerwiseOneStep:
         if features not in ("inline", "pass"):
             raise ValueError("features is 'inline' or 'pass'")
         self.features, self.lean, self.split = features, bool(lean), bool(split_streams)
+        if product not in ("cublas", "triton"):
+            raise ValueError("product is 'cublas' or 'triton'")
+        self.product, self.gemm_tiles = product, tuple(int(v) for v in gemm_tiles)
         self.device = consts["Aq"].device
         self.tables = gc.slice_tables(self.device)
         self.opts = {} if fuse else {"enable_fp_fusion": False}
@@ -311,7 +338,7 @@ class LayerwiseOneStep:
                         if layer == 0:
                             acc.zero_()
                         else:
-                            int_mm(bufs["xbuf"][(layer + 1) % 2][rows], k["Aq"][layer], out=acc)
+                            self._product(bufs["xbuf"][(layer + 1) % 2][rows], k["Aq"][layer], acc)
                     if gstreams:
                         streams[c].wait_stream(gstreams[c])
                 if products_only:
@@ -335,6 +362,18 @@ class LayerwiseOneStep:
         for s in (streams or []) + (gstreams or []):
             cur.wait_stream(s)
         return words
+
+    def _product(self, x, A, out):
+        if self.product == "cublas" or not x.is_cuda:
+            return int_mm(x, A, out=out)
+        BM, BN, BK, nw = self.gemm_tiles
+        M, K = x.shape
+        N = A.shape[0]
+        if M % BM or N % BN or K % BK:
+            return int_mm(x, A, out=out)
+        grid = ((M // BM) * (N // BN),)
+        _igemm_kernel[grid](x, A, out, M, N, K, BM=BM, BN=BN, BK=BK, GROUP=8, num_warps=nw, num_stages=3)
+        return out
 
     def products(self, xall):
         """The exact int32 products of every layer from features xall (for timing the coding alone)."""
