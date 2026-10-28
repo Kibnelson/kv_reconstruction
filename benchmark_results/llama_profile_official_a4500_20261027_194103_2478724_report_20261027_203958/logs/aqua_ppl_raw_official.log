@@ -1,0 +1,36 @@
+/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/aquakv/edenn.py:35: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  GRIDS[dim][size] = torch.load(file, map_location='cpu')
+Using the latest cached version of the dataset since wikitext couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'wikitext-2-raw-v1' at /home/nelson/.cache/huggingface/datasets/wikitext/wikitext-2-raw-v1/0.0.0/b08601e04326c79dfdd32d625aee71d232d685c3 (last modified on Thu Oct 22 06:06:13 2026).
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.40it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.24it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.06it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (289077 > 131072). Running this sequence through the model will result in indexing errors
+LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(128256, 3072, padding_idx=128004)
+    (layers): ModuleList(
+      (0-27): 28 x LlamaDecoderLayer(
+        (self_attn): LlamaSdpaAttention(
+          (q_proj): Linear(in_features=3072, out_features=3072, bias=False)
+          (k_proj): Linear(in_features=3072, out_features=1024, bias=False)
+          (v_proj): Linear(in_features=3072, out_features=1024, bias=False)
+          (o_proj): Linear(in_features=3072, out_features=3072, bias=False)
+          (rotary_emb): LlamaRotaryEmbedding()
+        )
+        (mlp): LlamaMLP(
+          (gate_proj): Linear(in_features=3072, out_features=8192, bias=False)
+          (up_proj): Linear(in_features=3072, out_features=8192, bias=False)
+          (down_proj): Linear(in_features=8192, out_features=3072, bias=False)
+          (act_fn): SiLU()
+        )
+        (input_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+        (post_attention_layernorm): LlamaRMSNorm((3072,), eps=1e-05)
+      )
+    )
+    (norm): LlamaRMSNorm((3072,), eps=1e-05)
+    (rotary_emb): LlamaRotaryEmbedding()
+  )
+  (lm_head): Linear(in_features=3072, out_features=128256, bias=False)
+)
+Evaluating perplexity:   0%|          | 0/35 [00:00<?, ?it/s]Evaluating perplexity:   3%|▎         | 1/35 [00:08<04:40,  8.25s/it]Evaluating perplexity:   6%|▌         | 2/35 [00:16<04:25,  8.05s/it]Evaluating perplexity:   9%|▊         | 3/35 [00:24<04:17,  8.03s/it]Evaluating perplexity:  11%|█▏        | 4/35 [00:32<04:09,  8.03s/it]Evaluating perplexity:  14%|█▍        | 5/35 [00:40<04:01,  8.05s/it]Evaluating perplexity:  17%|█▋        | 6/35 [00:48<03:54,  8.07s/it]Evaluating perplexity:  20%|██        | 7/35 [00:56<03:46,  8.09s/it]Evaluating perplexity:  23%|██▎       | 8/35 [01:04<03:39,  8.11s/it]Evaluating perplexity:  26%|██▌       | 9/35 [01:12<03:31,  8.14s/it]Evaluating perplexity:  29%|██▊       | 10/35 [01:21<03:23,  8.16s/it]Evaluating perplexity:  31%|███▏      | 11/35 [01:29<03:16,  8.18s/it]Evaluating perplexity:  34%|███▍      | 12/35 [01:37<03:08,  8.19s/it]Evaluating perplexity:  37%|███▋      | 13/35 [01:45<03:00,  8.21s/it]Evaluating perplexity:  40%|████      | 14/35 [01:54<02:52,  8.22s/it]Evaluating perplexity:  43%|████▎     | 15/35 [02:02<02:44,  8.23s/it]Evaluating perplexity:  46%|████▌     | 16/35 [02:10<02:36,  8.23s/it]Evaluating perplexity:  49%|████▊     | 17/35 [02:18<02:28,  8.24s/it]Evaluating perplexity:  51%|█████▏    | 18/35 [02:27<02:20,  8.24s/it]Evaluating perplexity:  54%|█████▍    | 19/35 [02:35<02:11,  8.25s/it]Evaluating perplexity:  57%|█████▋    | 20/35 [02:43<02:03,  8.25s/it]Evaluating perplexity:  60%|██████    | 21/35 [02:51<01:55,  8.26s/it]Evaluating perplexity:  63%|██████▎   | 22/35 [03:00<01:47,  8.26s/it]Evaluating perplexity:  66%|██████▌   | 23/35 [03:08<01:39,  8.27s/it]Evaluating perplexity:  69%|██████▊   | 24/35 [03:16<01:30,  8.27s/it]Evaluating perplexity:  71%|███████▏  | 25/35 [03:24<01:22,  8.27s/it]Evaluating perplexity:  74%|███████▍  | 26/35 [03:33<01:14,  8.27s/it]Evaluating perplexity:  77%|███████▋  | 27/35 [03:41<01:06,  8.28s/it]Evaluating perplexity:  80%|████████  | 28/35 [03:49<00:57,  8.28s/it]Evaluating perplexity:  83%|████████▎ | 29/35 [03:58<00:49,  8.28s/it]Evaluating perplexity:  86%|████████▌ | 30/35 [04:06<00:41,  8.28s/it]Evaluating perplexity:  89%|████████▊ | 31/35 [04:14<00:33,  8.28s/it]Evaluating perplexity:  91%|█████████▏| 32/35 [04:22<00:24,  8.29s/it]Evaluating perplexity:  94%|█████████▍| 33/35 [04:31<00:16,  8.29s/it]Evaluating perplexity:  97%|█████████▋| 34/35 [04:39<00:08,  8.29s/it]Evaluating perplexity: 100%|██████████| 35/35 [04:47<00:00,  8.29s/it]Evaluating perplexity: 100%|██████████| 35/35 [04:47<00:00,  8.22s/it]
+WikiText-2 perplexity: 6.986454579145998
+

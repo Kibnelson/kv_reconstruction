@@ -1,0 +1,578 @@
+{
+  "format": "llama_profile_official_v1",
+  "status": "partial",
+  "gpu_measured": true,
+  "identity": "4f48d8744eda379092bfdb6976e78b5d1f6424c24c9109c449d7d7af04c526ba",
+  "recipe": {
+    "base_results_sha256": "740c42b8e668bd4b0088e9c4625c9cff930bcb8c2a490304d5b1242eaa9e0bd4",
+    "baseline_results_sha256": "c5413a98f198637d969bcc57806d0fb2aa67050f1296d623a1aeafeb324fc0e7",
+    "code": {
+      "scripts/run_llama_profile_baselines.py": "2a2c8bc0871dae6354f7c541918b8489ed0f0f0e7bb71e3cd4646b48d120b436",
+      "scripts/run_llama_profile_a4500.sh": "effb4022391f2158fab1b6ca300bdd4d528835220a224ec2fee96b43571cfda9",
+      "scripts/package_llama_profile.py": "9c5c186100659d7d12f8e6ab7f8f265b4126b1a94ce795aed975f5c2124c90c0",
+      "scripts/setup_qwen_cuda_toolchain.py": "c6f383bdf3026e1af6261d878762ca3cb6415a020c33606bff96b0fc7e5c9f39",
+      "kv_compare/causal_profile.py": "8ab17bff0ce1bed20098b6746e5638f964326d4c1c6f3480c871ce2606dbf2f9",
+      "kv_compare/official_exans.py": "df2134b5709b26cf631bf281b1a05225d9256277a3e4c62f915e6985b4869185",
+      "native/exans_build_compat.h": "a1c9a5b2c6621b6f929a481250067e4618f8dd3d46084fa1be1a783dc2a70182",
+      "scripts/bench_llama_baselines.py": "bd3cbde7a9ec8dbaf296377fbcf0369761911f117cae6663fb63f04b7a740924",
+      "kv_compare/framed_baselines.py": "7719b5cb246791be1e4d73921b95515d2207b6b0fdc6a1292bdf1ce243467c27",
+      "scripts/package_llama_causal.py": "ee1e6ae032de9761ee0f41f4cce663059c17c0abad5d0609bd88a13cacb7380b",
+      "kv_compare/profile_recovery.py": "e68776ee9cbedd5d6ce0ee5e7b32b5147bf24ebaaa156431aa3404230733aab4",
+      "scripts/prepare_aqua_calibration.py": "af2ff9f8cc7bd610ada5bc57a08e75bb43a4a6cb5e88bb33d1974ec4b699a339",
+      "benchmark_fixtures/aqua_redpajama_backup_manifest.json": "4caecc08c02a2ce96590eba1c8751e5eef4806f81d10c107670373309a462d5e"
+    },
+    "pins": {
+      "aqua": [
+        "goodevening13/aquakv",
+        "e744183f2f3a4a90381f20a6975456871fd1ae29"
+      ],
+      "exans": [
+        "openlake-project/openlake",
+        "de6c38bcc5438475bd1abf1e9b3d154cef414ef6"
+      ]
+    },
+    "stages": [
+      "profile",
+      "exans",
+      "aqua"
+    ],
+    "document": "test_text",
+    "kappas": [
+      0.0,
+      1.0
+    ],
+    "policy": "lite",
+    "aqua_calibration": "backup"
+  },
+  "stages": {
+    "profile": {
+      "status": "completed",
+      "artifacts": {
+        "profile.json": "2a29a39fa69bcfbfd28e61061e6766d218cf20dec9a09e5f97a5229d24cc6daf",
+        "traces/lite_k0_encode.json.gz": "ae8e0c607df004c630ee47fa43a4760f2a0dc1032a5c1b8a6c570f36fa66ed8e",
+        "traces/lite_k0_decode.json.gz": "4091db0362fa58f6a1ae0db1c0934ddf032d33f454effaac8f2746870e8e7b70",
+        "traces/lite_k1_encode.json.gz": "2913950cabf5b8b15c85ca36d51aa3665b1d819a56e4a74ad8ae55d8b6c89ba4",
+        "traces/lite_k1_decode.json.gz": "c171526020cd0eef5739d78a24fc7b0910d76995905128400c279f3a0f171f01"
+      }
+    },
+    "toolchain": {
+      "status": "completed",
+      "artifacts": {
+        "toolchain.json": "8effe586da002eea6ef9d9f10f543712340e232b171b7049f30964c089152d94"
+      }
+    },
+    "exans_build": {
+      "status": "completed",
+      "artifacts": {
+        "exans_build.json": "33c775969775b093f7ffba55db1812460fa29cb1b95a1921f51badb04a8634d1",
+        "exans_build/libopenlake_expans.so": "c909c7663c02b4aad0773955d1a2d455437100f7770adfe544691e208b277def"
+      }
+    },
+    "aqua_setup": {
+      "status": "completed",
+      "artifacts": {
+        "aqua_environment.json": "f2b5863f90e489bbd48d9c17fa1bfab4fe1599c9d3ad0f7aa26ca87b5c74f6b3"
+      }
+    },
+    "aqua_raw": {
+      "status": "completed",
+      "artifacts": {
+        "logs/aqua_ppl_raw_official.log": "bad3c903df3303375af5dd74588ad3c4e658a52352735f138787adb3a8439efe",
+        "aqua_ppl_raw_official.json": "9d85c561e90f04deaf24cc9519e4f15ddc4114982468c8a4eb4aa37f1501e18d"
+      },
+      "perplexity": 6.986454579145998
+    },
+    "aqua_train": {
+      "status": "blocked",
+      "reason": "exit -9; see /home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/logs/aqua_train_official.log",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_profile_baselines.py\", line 158, in step\n    info=action() or {}\n         ^^^^^^^^\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_profile_baselines.py\", line 413, in aqua_train\n    self.command(\"aqua_train_official\",[self.args.aqua_python.absolute(),source/\"train_predictors.py\",*self.aqua_common(),\n  File \"/home/nelson/kv_reconstruction/scripts/run_llama_profile_baselines.py\", line 137, in command\n    call(argv,path)\n  File \"/home/nelson/kv_reconstruction/scripts/bench_llama_baselines.py\", line 65, in call\n    raise RuntimeError(f\"exit {code}; see {log_path}\")\nRuntimeError: exit -9; see /home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/logs/aqua_train_official.log\n"
+    },
+    "exans": {
+      "status": "completed",
+      "artifacts": {
+        "exans.json": "27bcaf1cf82a5db3319746c20737dd419829938d1eac916f899351fd6bf094c2",
+        "exans_receiver.json": "a3e977eed90d1b5c11507f01516be594f39fef245262ecc35eb9a0cf6f545cab",
+        "exans_validation.json": "c17480ad2f9539a5df97eca31bff7665bd7240dff173d8ae83300c4c7435d9f7",
+        "exans/test_code.kvc": "09c7aac7b1934e29b1f65750ceb4c77863698aa58d2beae58b2820698cdb44e7",
+        "exans/test_code.npy": "2917dc6bc0624df6d78edda8c3a5d2fe0748d9da002c8abe85b0a5545cf79e2b",
+        "exans/test_text.kvc": "bf7ac7a68a4dbb850029f0357835b8616a1c947f93ac13c75290a938a5ef4d69",
+        "exans/test_text.npy": "0ff79686cfb87038bc5d5219775d10f5dcf7ba40b28ea5d6c87425125aae1bf5",
+        "exans/overflow_tail_validation.kvc": "94ef83412cbf8f56f5a3a3b86f72ae75387522c8e721cb8eec0a8094ed73d9a0",
+        "exans/overflow_tail_validation.npy": "f6842a4544a039f598a9f138b8f9e33963c99c1910995de9c3ba78caadde8d71"
+      }
+    }
+  },
+  "device": "NVIDIA RTX A4500",
+  "software": {
+    "torch": "2.11.0+cu128",
+    "triton": "3.6.0",
+    "numpy": "2.3.5",
+    "transformers": "4.57.6"
+  },
+  "inputs": [
+    {
+      "document": "test_code",
+      "path": "/home/nelson/kv_reconstruction/runs/llama_causal_a4500_20261027_184615_1307629/reconstructed/block32_k0_test_code.npy",
+      "file_sha256": "2917dc6bc0624df6d78edda8c3a5d2fe0748d9da002c8abe85b0a5545cf79e2b",
+      "original_word_sha256": "188717d6361374d897326795e1973a7c32c5966203f553ad06a05a304dd9fa30",
+      "shape": [
+        28,
+        512,
+        2048
+      ],
+      "values": 29360128,
+      "tokens": 512,
+      "layers": 28
+    },
+    {
+      "document": "test_text",
+      "path": "/home/nelson/kv_reconstruction/runs/llama_causal_a4500_20261027_184615_1307629/reconstructed/block32_k0_test_text.npy",
+      "file_sha256": "0ff79686cfb87038bc5d5219775d10f5dcf7ba40b28ea5d6c87425125aae1bf5",
+      "original_word_sha256": "63f7f46151acd50b6813cc54e515842016e072f0fdf851dcb51d5fde8b1547d0",
+      "shape": [
+        28,
+        512,
+        2048
+      ],
+      "values": 29360128,
+      "tokens": 512,
+      "layers": 28
+    }
+  ],
+  "base_run": "/home/nelson/kv_reconstruction/runs/llama_causal_a4500_20261027_184615_1307629",
+  "baseline_run": "/home/nelson/kv_reconstruction/runs/llama_baselines_a4500_20261027_191350_1897426",
+  "commands": [
+    {
+      "name": "cuda_toolchain",
+      "argv": [
+        "/home/nelson/kv_reconstruction/.venv/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/setup_qwen_cuda_toolchain.py"
+      ],
+      "log": "logs/cuda_toolchain.log",
+      "status": "completed",
+      "wall_seconds": 8.481978619471192
+    },
+    {
+      "name": "exans_configure",
+      "argv": [
+        "cmake",
+        "-S",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/exans/crates/openlake_kv_client/cuda",
+        "-B",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/exans_build",
+        "-DOPENLAKE_EXPANS_BUILD=ON",
+        "-DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON",
+        "-DCMAKE_CUDA_ARCHITECTURES=86",
+        "-DNVCOMP_ROOT=/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/nvidia/libnvcomp",
+        "-DCMAKE_CUDA_FLAGS=--pre-include=/home/nelson/kv_reconstruction/native/exans_build_compat.h"
+      ],
+      "log": "logs/exans_configure.log",
+      "status": "completed",
+      "wall_seconds": 2.472687855362892
+    },
+    {
+      "name": "exans_build",
+      "argv": [
+        "cmake",
+        "--build",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/exans_build",
+        "--target",
+        "openlake_expans_test",
+        "-j",
+        "2"
+      ],
+      "log": "logs/exans_build.log",
+      "status": "completed",
+      "wall_seconds": 2.6216808762401342
+    },
+    {
+      "name": "exans_author_smoke",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/exans_build/openlake_expans_test"
+      ],
+      "log": "logs/exans_author_smoke.log",
+      "status": "failed",
+      "error": "exit 127; see /home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/logs/exans_author_smoke.log",
+      "wall_seconds": 0.006609231233596802
+    },
+    {
+      "name": "aqua_accelerate",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--no-input",
+        "-c",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_constraints.txt",
+        "accelerate==1.1.1"
+      ],
+      "log": "logs/aqua_accelerate.log",
+      "status": "completed",
+      "wall_seconds": 1.9704889580607414
+    },
+    {
+      "name": "aqua_pip_check",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "log": "logs/aqua_pip_check.log",
+      "status": "completed",
+      "wall_seconds": 0.7182273156940937
+    },
+    {
+      "name": "aqua_preflight",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import importlib.metadata,json,torch,accelerate; from transformers.utils import is_accelerate_available; wanted={'torch':'2.5.1','transformers':'4.46.3','datasets':'2.20.0','numpy':'1.26.4','pyarrow':'20.0.0','accelerate':'1.1.1'}; got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted); assert torch.cuda.is_available() and is_accelerate_available(); from fast_hadamard_transform import hadamard_transform; x=hadamard_transform(torch.ones(2,1024,device='cuda')); torch.cuda.synchronize(); print(json.dumps({'packages':got,'cuda':torch.version.cuda,'gpu':torch.cuda.get_device_name(0)}))"
+      ],
+      "log": "logs/aqua_preflight.log",
+      "status": "completed",
+      "wall_seconds": 1.8820989411324263
+    },
+    {
+      "name": "aqua_verify_runtime",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import torch,importlib.metadata; from transformers.utils import is_accelerate_available; wanted={'torch':'2.5.1','transformers':'4.46.3','datasets':'2.20.0','numpy':'1.26.4','accelerate':'1.1.1'}; got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted); assert torch.cuda.is_available() and is_accelerate_available(); print(got)"
+      ],
+      "log": "logs/aqua_verify_runtime.log",
+      "status": "completed",
+      "wall_seconds": 1.2211998235434294
+    },
+    {
+      "name": "aqua_identify_test",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import json,sys,hashlib; from datasets import load_dataset; from transformers import AutoTokenizer; train=sys.argv[3]=='train'; ds=load_dataset('togethercomputer/RedPajama-Data-1T-Sample' if train else 'wikitext', **({'split':'train'} if train else {'name':'wikitext-2-raw-v1','split':'test'})); d={'dataset_fingerprint':ds._fingerprint,'rows':len(ds),'training':train}; text=None if train else '\\n\\n'.join(ds['text']); ids=None if train else AutoTokenizer.from_pretrained(sys.argv[1],padding_side='left')(text,return_tensors='pt')['input_ids']; d.update({} if train else {'text_sha256':hashlib.sha256(text.encode()).hexdigest(), 'token_ids_sha256':hashlib.sha256(ids.numpy().astype('<i8').tobytes()).hexdigest(),'tokens':ids.numel()}); open(sys.argv[2],'w').write(json.dumps(d,indent=2)+'\\n')",
+        "/home/nelson/.cache/huggingface/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_test_data.json",
+        "test"
+      ],
+      "log": "logs/aqua_identify_test.log",
+      "status": "completed",
+      "wall_seconds": 5.890139184892178
+    },
+    {
+      "name": "aqua_ppl_raw_official",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/evaluate_perplexity.py",
+        "--model_name",
+        "/home/nelson/.cache/huggingface/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331",
+        "--model_seqlen",
+        "8192",
+        "--edenn_d",
+        "2",
+        "--edenn_n",
+        "16",
+        "--hadamard_groupsize",
+        "1024",
+        "--prefix_size",
+        "4",
+        "--recent_buffer_size",
+        "128",
+        "--no_quant"
+      ],
+      "log": "logs/aqua_ppl_raw_official.log",
+      "status": "completed",
+      "wall_seconds": 292.48520487360656
+    },
+    {
+      "name": "aqua_verify_runtime",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import torch,importlib.metadata; from transformers.utils import is_accelerate_available; wanted={'torch':'2.5.1','transformers':'4.46.3','datasets':'2.20.0','numpy':'1.26.4','accelerate':'1.1.1'}; got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted); assert torch.cuda.is_available() and is_accelerate_available(); print(got)"
+      ],
+      "log": "logs/aqua_verify_runtime.attempt1.log",
+      "status": "completed",
+      "wall_seconds": 1.2204905413091183
+    },
+    {
+      "name": "aqua_identify_train",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import json,sys,hashlib; from datasets import load_dataset; from transformers import AutoTokenizer; train=sys.argv[3]=='train'; ds=load_dataset('togethercomputer/RedPajama-Data-1T-Sample' if train else 'wikitext', **({'split':'train'} if train else {'name':'wikitext-2-raw-v1','split':'test'})); d={'dataset_fingerprint':ds._fingerprint,'rows':len(ds),'training':train}; text=None if train else '\\n\\n'.join(ds['text']); ids=None if train else AutoTokenizer.from_pretrained(sys.argv[1],padding_side='left')(text,return_tensors='pt')['input_ids']; d.update({} if train else {'text_sha256':hashlib.sha256(text.encode()).hexdigest(), 'token_ids_sha256':hashlib.sha256(ids.numpy().astype('<i8').tobytes()).hexdigest(),'tokens':ids.numel()}); open(sys.argv[2],'w').write(json.dumps(d,indent=2)+'\\n')",
+        "/home/nelson/.cache/huggingface/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_train_data.json",
+        "train"
+      ],
+      "log": "logs/aqua_identify_train.log",
+      "status": "failed",
+      "error": "exit 1; see /home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/logs/aqua_identify_train.log",
+      "wall_seconds": 1.9269884265959263
+    },
+    {
+      "name": "exans_configure",
+      "argv": [
+        "cmake",
+        "-S",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/exans/crates/openlake_kv_client/cuda",
+        "-B",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/exans_build",
+        "-DOPENLAKE_EXPANS_BUILD=ON",
+        "-DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON",
+        "-DCMAKE_CUDA_ARCHITECTURES=86",
+        "-DNVCOMP_ROOT=/home/nelson/kv_reconstruction/.venv/lib/python3.12/site-packages/nvidia/libnvcomp",
+        "-DCMAKE_CUDA_FLAGS=--pre-include=/home/nelson/kv_reconstruction/native/exans_build_compat.h"
+      ],
+      "log": "logs/exans_configure.attempt1.log",
+      "status": "completed",
+      "wall_seconds": 0.2667568102478981
+    },
+    {
+      "name": "exans_build",
+      "argv": [
+        "cmake",
+        "--build",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/exans_build",
+        "--target",
+        "openlake_expans_test",
+        "-j",
+        "2"
+      ],
+      "log": "logs/exans_build.attempt1.log",
+      "status": "completed",
+      "wall_seconds": 0.16761511005461216
+    },
+    {
+      "name": "exans_runtime_links",
+      "argv": [
+        "ldd",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/exans_build/openlake_expans_test"
+      ],
+      "log": "logs/exans_runtime_links.log",
+      "status": "completed",
+      "wall_seconds": 0.01939140073955059
+    },
+    {
+      "name": "exans_author_smoke",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/exans_build/openlake_expans_test"
+      ],
+      "log": "logs/exans_author_smoke.attempt1.log",
+      "status": "completed",
+      "wall_seconds": 0.16927787102758884
+    },
+    {
+      "name": "aqua_verify_runtime",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import torch,importlib.metadata; from transformers.utils import is_accelerate_available; wanted={'torch':'2.5.1','transformers':'4.46.3','datasets':'2.20.0','numpy':'1.26.4','accelerate':'1.1.1'}; got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted); assert torch.cuda.is_available() and is_accelerate_available(); print(got)"
+      ],
+      "log": "logs/aqua_verify_runtime.attempt2.log",
+      "status": "completed",
+      "wall_seconds": 1.1698111053556204
+    },
+    {
+      "name": "aqua_prepare_backup",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/prepare_aqua_calibration.py",
+        "--source",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua",
+        "--model-path",
+        "/home/nelson/.cache/huggingface/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331",
+        "--output",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_calibration_tokens.pt",
+        "--receipt",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_calibration_backup.json",
+        "--cache",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/calibration_backup_cache"
+      ],
+      "log": "logs/aqua_prepare_backup.log",
+      "status": "failed",
+      "error": "exit 1; see /home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/logs/aqua_prepare_backup.log",
+      "wall_seconds": 298.00111799687147
+    },
+    {
+      "name": "exans_receiver",
+      "argv": [
+        "/home/nelson/kv_reconstruction/.venv/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/run_llama_profile_baselines.py",
+        "--device",
+        "cuda:0",
+        "--receive",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/exans_receiver_request.json"
+      ],
+      "log": "logs/exans_receiver.log",
+      "status": "completed",
+      "wall_seconds": 2.4742196910083294
+    },
+    {
+      "name": "aqua_verify_runtime",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "-c",
+        "import torch,importlib.metadata; from transformers.utils import is_accelerate_available; wanted={'torch':'2.5.1','transformers':'4.46.3','datasets':'2.20.0','numpy':'1.26.4','accelerate':'1.1.1'}; got={p:importlib.metadata.version(p).split('+')[0] for p in wanted}; assert got==wanted,(got,wanted); assert torch.cuda.is_available() and is_accelerate_available(); print(got)"
+      ],
+      "log": "logs/aqua_verify_runtime.attempt3.log",
+      "status": "completed",
+      "wall_seconds": 1.2214902956038713
+    },
+    {
+      "name": "aqua_prepare_backup",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "/home/nelson/kv_reconstruction/scripts/prepare_aqua_calibration.py",
+        "--source",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua",
+        "--model-path",
+        "/home/nelson/.cache/huggingface/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331",
+        "--output",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_calibration_tokens.pt",
+        "--receipt",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_calibration_backup.json",
+        "--cache",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/calibration_backup_cache"
+      ],
+      "log": "logs/aqua_prepare_backup.attempt1.log",
+      "status": "completed",
+      "wall_seconds": 33.22647974640131
+    },
+    {
+      "name": "aqua_train_official",
+      "argv": [
+        "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python",
+        "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/train_predictors.py",
+        "--model_name",
+        "/home/nelson/.cache/huggingface/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331",
+        "--model_seqlen",
+        "8192",
+        "--edenn_d",
+        "2",
+        "--edenn_n",
+        "16",
+        "--hadamard_groupsize",
+        "1024",
+        "--dataset",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_calibration_tokens.pt",
+        "--total_nsamples",
+        "256",
+        "--valid_nsamples",
+        "32",
+        "--offload_activations",
+        "--predictors_output_path",
+        "/home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/aqua_predictors.pt"
+      ],
+      "log": "logs/aqua_train_official.log",
+      "status": "failed",
+      "error": "exit -9; see /home/nelson/kv_reconstruction/runs/llama_profile_official_a4500_20261027_194103_2478724/logs/aqua_train_official.log",
+      "wall_seconds": 113.88930567540228
+    }
+  ],
+  "resume_history": [
+    {
+      "previous_identity": "f9996a5a9de72d5172fab06a8e87d385c0c00011dc626cbc63e38ba1a86beae1",
+      "previous_recipe": {
+        "base_results_sha256": "740c42b8e668bd4b0088e9c4625c9cff930bcb8c2a490304d5b1242eaa9e0bd4",
+        "baseline_results_sha256": "c5413a98f198637d969bcc57806d0fb2aa67050f1296d623a1aeafeb324fc0e7",
+        "code": {
+          "scripts/run_llama_profile_baselines.py": "2a6cdbb98b289d4c82cde7646480fd43c5761fbda95e38df406de065acbb0b36",
+          "scripts/run_llama_profile_a4500.sh": "effb4022391f2158fab1b6ca300bdd4d528835220a224ec2fee96b43571cfda9",
+          "scripts/package_llama_profile.py": "36624c25ba469a40d863243628a6099a277b1c718d9bc70240f29566cd9355f9",
+          "scripts/setup_qwen_cuda_toolchain.py": "c6f383bdf3026e1af6261d878762ca3cb6415a020c33606bff96b0fc7e5c9f39",
+          "kv_compare/causal_profile.py": "8ab17bff0ce1bed20098b6746e5638f964326d4c1c6f3480c871ce2606dbf2f9",
+          "kv_compare/official_exans.py": "df2134b5709b26cf631bf281b1a05225d9256277a3e4c62f915e6985b4869185",
+          "native/exans_build_compat.h": "a1c9a5b2c6621b6f929a481250067e4618f8dd3d46084fa1be1a783dc2a70182",
+          "scripts/bench_llama_baselines.py": "bd3cbde7a9ec8dbaf296377fbcf0369761911f117cae6663fb63f04b7a740924",
+          "kv_compare/framed_baselines.py": "7719b5cb246791be1e4d73921b95515d2207b6b0fdc6a1292bdf1ce243467c27",
+          "scripts/package_llama_causal.py": "ee1e6ae032de9761ee0f41f4cce663059c17c0abad5d0609bd88a13cacb7380b"
+        },
+        "pins": {
+          "aqua": [
+            "goodevening13/aquakv",
+            "e744183f2f3a4a90381f20a6975456871fd1ae29"
+          ],
+          "exans": [
+            "openlake-project/openlake",
+            "de6c38bcc5438475bd1abf1e9b3d154cef414ef6"
+          ]
+        },
+        "stages": [
+          "profile",
+          "exans",
+          "aqua"
+        ],
+        "document": "test_text",
+        "kappas": [
+          0.0,
+          1.0
+        ],
+        "policy": "lite"
+      },
+      "archived_result": "resume_history/results_f9996a5a9de72d5172fab06a8e87d385c0c00011dc626cbc63e38ba1a86beae1.json",
+      "archived_sha256": "0535ffe58027b2a372a4d7e8b5dd6888a9bb8e0a473f02db1a69d3fda5a45d14",
+      "preserved_completed_stages": [
+        "aqua_raw",
+        "aqua_setup",
+        "profile",
+        "toolchain"
+      ],
+      "reason": "runtime-library discovery and explicit calibration-source recovery; completed artifacts unchanged"
+    },
+    {
+      "previous_identity": "9b652800348041cc546ebc97e3e982334f2b84908df9cdf21acdbba0aeca3335",
+      "previous_recipe": {
+        "base_results_sha256": "740c42b8e668bd4b0088e9c4625c9cff930bcb8c2a490304d5b1242eaa9e0bd4",
+        "baseline_results_sha256": "c5413a98f198637d969bcc57806d0fb2aa67050f1296d623a1aeafeb324fc0e7",
+        "code": {
+          "scripts/run_llama_profile_baselines.py": "ae34a763aef1abd81082004d73f45bb88bdfc86f21ef2c677f2b1fa7f2d857f0",
+          "scripts/run_llama_profile_a4500.sh": "effb4022391f2158fab1b6ca300bdd4d528835220a224ec2fee96b43571cfda9",
+          "scripts/package_llama_profile.py": "9c5c186100659d7d12f8e6ab7f8f265b4126b1a94ce795aed975f5c2124c90c0",
+          "scripts/setup_qwen_cuda_toolchain.py": "c6f383bdf3026e1af6261d878762ca3cb6415a020c33606bff96b0fc7e5c9f39",
+          "kv_compare/causal_profile.py": "8ab17bff0ce1bed20098b6746e5638f964326d4c1c6f3480c871ce2606dbf2f9",
+          "kv_compare/official_exans.py": "df2134b5709b26cf631bf281b1a05225d9256277a3e4c62f915e6985b4869185",
+          "native/exans_build_compat.h": "a1c9a5b2c6621b6f929a481250067e4618f8dd3d46084fa1be1a783dc2a70182",
+          "scripts/bench_llama_baselines.py": "bd3cbde7a9ec8dbaf296377fbcf0369761911f117cae6663fb63f04b7a740924",
+          "kv_compare/framed_baselines.py": "7719b5cb246791be1e4d73921b95515d2207b6b0fdc6a1292bdf1ce243467c27",
+          "scripts/package_llama_causal.py": "ee1e6ae032de9761ee0f41f4cce663059c17c0abad5d0609bd88a13cacb7380b",
+          "kv_compare/profile_recovery.py": "fb7acf7cbe087f628194281371d72a92fb73fc721faaf77237d63c02d1ea89f3",
+          "scripts/prepare_aqua_calibration.py": "a3f32784b1d6c4be67f20d32265bfe4c9d9598bfd9ad1196c2236cc711b52e16",
+          "benchmark_fixtures/aqua_redpajama_backup_manifest.json": "4caecc08c02a2ce96590eba1c8751e5eef4806f81d10c107670373309a462d5e"
+        },
+        "pins": {
+          "aqua": [
+            "goodevening13/aquakv",
+            "e744183f2f3a4a90381f20a6975456871fd1ae29"
+          ],
+          "exans": [
+            "openlake-project/openlake",
+            "de6c38bcc5438475bd1abf1e9b3d154cef414ef6"
+          ]
+        },
+        "stages": [
+          "profile",
+          "exans",
+          "aqua"
+        ],
+        "document": "test_text",
+        "kappas": [
+          0.0,
+          1.0
+        ],
+        "policy": "lite",
+        "aqua_calibration": "backup"
+      },
+      "archived_result": "resume_history/results_9b652800348041cc546ebc97e3e982334f2b84908df9cdf21acdbba0aeca3335.json",
+      "archived_sha256": "f947dd652f21207650c587062ec7bb5c695700215df4795706004b846d202e39",
+      "preserved_completed_stages": [
+        "aqua_raw",
+        "aqua_setup",
+        "exans_build",
+        "profile",
+        "toolchain"
+      ],
+      "reason": "checkpoint-preserving runtime/calibration compatibility repair; completed artifacts unchanged"
+    }
+  ]
+}
