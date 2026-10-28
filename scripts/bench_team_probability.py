@@ -154,10 +154,14 @@ def probability_codec(spec, device, tokens=8192):
                            decoder_mode='graph' if tokens == 512 else 'direct', lookup=False)
 
 
-def _release(codec, torch, device):
-    if codec is not None:
-        codec.close()
-    torch.cuda.synchronize(device); gc.collect(); torch.cuda.empty_cache()
+def _release(torch):
+    """Collect storage after the caller synchronizes and drops its codec.
+
+    TeamLookupCodec owns ordinary tensors and graphs, with no close() API.
+    The caller must drop its last reference before collecting cached storage.
+    """
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
 def segment_receipt(packet):
@@ -226,7 +230,9 @@ def calibrate_worker(q, torch, device):
                 payload_bytes=packet.payload_bytes, state_sha256=manifest['state_sha256'],
                 original_exact=True, features_equal_control=True, priors_equal_control=True))
             del value,packet,features,prior
-            _release(codec,torch,device); del codec
+            torch.cuda.synchronize(device)
+            del codec
+            _release(torch)
         del reference_features,reference_prior
         selections[method] = choose_head_factors(observations[method],factors=FACTORS)
     c, r = scale_state(consts,rank,selections[OWN[0]]['factors'],selections[OWN[1]]['factors'])
@@ -252,7 +258,10 @@ def calibrate_worker(q, torch, device):
         selected_checks[method] = dict(codec=spec, **actual, head_words=head_word_costs(packet),
             complete_packet_bytes=packet.packet_bytes, payload_bytes=packet.payload_bytes,
             calibration_control_packet_bytes=baseline, exact_segment_composition=True, original_exact=True)
-        del packet,value; _release(codec,torch,device); del codec
+        del packet,value
+        torch.cuda.synchronize(device)
+        del codec
+        _release(torch)
     del words
     after = runtime_snapshot(torch)
     if before != after: raise AssertionError('calibration runtime policy changed')
@@ -300,7 +309,9 @@ def encode_worker(q, torch, device):
                 original_exact=True,control_matches_frozen=(variant=='control'),codec=spec))
             log(f"TEST {q['method']} / {variant} / {e['document']}: {entry['complete_bpv']:.6f} bpv")
             del packet,source,value,imported,blob;gc.collect();torch.cuda.empty_cache()
-        _release(codec,torch,device);del codec
+        torch.cuda.synchronize(device)
+        del codec
+        _release(torch)
     after=runtime_snapshot(torch)
     if before != after:raise AssertionError('TEST encode runtime policy changed')
     write(out/'encoder_results.json',dict(status='completed',gpu_measured=True,recipe_identity=q['recipe_identity'],

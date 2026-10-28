@@ -4,7 +4,9 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
+import weakref
 from unittest.mock import patch
 
 from scripts import bench_team_probability as bench
@@ -41,6 +43,28 @@ def encodes(selected):
 
 
 class RunnerTests(unittest.TestCase):
+    def test_released_codec_storage_is_collected_without_a_close_api(self):
+        import torch
+        from kv_compare.team_lookup import TeamLookupCodec
+        from kv_compare.team_packet import save_state
+        from tests.test_team_packet import fixed_state
+        with tempfile.TemporaryDirectory() as directory:
+            save_state(directory,fixed_state())
+            codec=TeamLookupCodec(directory,'cpu','dense_uniform',decoder_mode='direct',lookup=False)
+            self.assertFalse(hasattr(codec,'close'))
+            # Force collection rather than relying on CPython reference counts.
+            codec.cycle=codec
+            reference=weakref.ref(codec)
+            tensor=weakref.ref(codec.native.k['Aq'])
+            del codec
+            calls=[]
+            def empty_cache():
+                self.assertIsNone(reference())
+                self.assertIsNone(tensor())
+                calls.append('cache')
+            bench._release(SimpleNamespace(cuda=SimpleNamespace(empty_cache=empty_cache)))
+            self.assertEqual(calls,['cache'])
+
     def test_state_comparison_is_bit_exact_including_signed_zero(self):
         import torch
         a=dict(x=torch.tensor([0.,-0.],dtype=torch.float32),rank=256)
