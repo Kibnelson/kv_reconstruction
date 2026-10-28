@@ -1,0 +1,631 @@
+{
+  "status": "analysis_of_completed_gpu_runs",
+  "gpu_measured": true,
+  "new_measurements": false,
+  "scope": "Recorded GPU measurements on identical frozen words from separate runs; retiming is prepared separately. Model link costs are estimates, not network measurements.",
+  "sources": {
+    "lite": {
+      "path": "benchmark_results/lite_fast_a4500_20261028_060544_3215314_report_20261028_060828/results.json",
+      "sha256": "5b5c606bcac572b2651f74ae432fa0780474b68cd9276eada7623a006d650a9d"
+    },
+    "lite_receiver": {
+      "path": "benchmark_results/lite_fast_a4500_20261028_060544_3215314_report_20261028_060828/independent_replay.json",
+      "sha256": "15f2582942f5d79cbfc9b1be8bba8b6444e9044b2b9aba476857cefb976d4bc5"
+    },
+    "base": {
+      "path": "benchmark_results/lite_fast_a4500_20261028_060544_3215314_report_20261028_060828/base_results.json",
+      "sha256": "740c42b8e668bd4b0088e9c4625c9cff930bcb8c2a490304d5b1242eaa9e0bd4"
+    },
+    "baselines": {
+      "path": "benchmark_results/llama_profile_official_a4500_20261027_194103_2478724_report_20261027_203958/baseline_results.json",
+      "sha256": "c5413a98f198637d969bcc57806d0fb2aa67050f1296d623a1aeafeb324fc0e7"
+    },
+    "exans": {
+      "path": "benchmark_results/llama_profile_official_a4500_20261027_194103_2478724_report_20261027_203958/exans.json",
+      "sha256": "27bcaf1cf82a5db3319746c20737dd419829938d1eac916f899351fd6bf094c2"
+    },
+    "exans_receiver": {
+      "path": "benchmark_results/llama_profile_official_a4500_20261027_194103_2478724_report_20261027_203958/exans_receiver.json",
+      "sha256": "a3e977eed90d1b5c11507f01516be594f39fef245262ecc35eb9a0cf6f545cab"
+    }
+  },
+  "source_commit": "e4f91bdd269a13cb8694f4bce9962c65c8a77e99",
+  "aggregates": [
+    {
+      "method": "lite_host_rope",
+      "kappa": 0.0,
+      "mode": "lossless",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 32588548,
+      "complete_bpv": 8.879674639020648,
+      "saved_percent": 44.50203350612095,
+      "original_exact": true,
+      "encode_ms": 229.06882967799902,
+      "decode_ms": 306.99959909543395,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6280255317687988,
+          "ppl": 5.093807222295391,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.179115056991577,
+          "ppl": 8.838481244703246,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {
+        "raw_bf16": {
+          "packet_bytes_ratio": 0.554976668909549,
+          "encode_time_ratio": 541.5252818141788,
+          "decode_time_ratio": 905.4977584942355
+        },
+        "splitzip_official_framed": {
+          "packet_bytes_ratio": 0.7373422571031747,
+          "encode_time_ratio": 262.0532084795188,
+          "decode_time_ratio": 588.9658730725938
+        },
+        "exans_official_fixed_framed": {
+          "packet_bytes_ratio": 0.7172771728925643,
+          "encode_time_ratio": 14.821276200857904,
+          "decode_time_ratio": 79.772652461557
+        }
+      }
+    },
+    {
+      "method": "lite_host_rope",
+      "kappa": 0.5,
+      "mode": "lossy",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 14651895,
+      "complete_bpv": 3.9923245566231866,
+      "saved_percent": 75.04797152110508,
+      "original_exact": false,
+      "encode_ms": 451.1375315487385,
+      "decode_ms": 362.0366211980581,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6346502304077148,
+          "ppl": 5.127664182324104,
+          "ppl_change_percent": 0.6646690491254151,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.2092666625976562,
+          "ppl": 9.109033947803123,
+          "ppl_change_percent": 3.061076848038966,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {}
+    },
+    {
+      "method": "lite_host_rope",
+      "kappa": 1.0,
+      "mode": "lossy",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 11388527,
+      "complete_bpv": 3.1031273433140347,
+      "saved_percent": 80.60545410428728,
+      "original_exact": false,
+      "encode_ms": 453.2462367787957,
+      "decode_ms": 362.49411245808005,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6274657249450684,
+          "ppl": 5.0909564722626905,
+          "ppl_change_percent": -0.055965016112548324,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.1968014240264893,
+          "ppl": 8.996192425863043,
+          "ppl_change_percent": 1.784369698745592,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {}
+    },
+    {
+      "method": "raw_bf16",
+      "kappa": 0,
+      "mode": "lossless",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 58720573,
+      "complete_bpv": 16.00008637564523,
+      "saved_percent": -0.0005398477826767945,
+      "original_exact": true,
+      "encode_ms": 0.42300671339035034,
+      "decode_ms": 0.3390396013855934,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6280255317687988,
+          "ppl": 5.093807222295391,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.179115056991577,
+          "ppl": 8.838481244703246,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {
+        "raw_bf16": {
+          "packet_bytes_ratio": 1.0,
+          "encode_time_ratio": 1.0,
+          "decode_time_ratio": 1.0
+        },
+        "splitzip_official_framed": {
+          "packet_bytes_ratio": 1.328600459100287,
+          "encode_time_ratio": 0.4839168498312897,
+          "decode_time_ratio": 0.6504332755632583
+        },
+        "exans_official_fixed_framed": {
+          "packet_bytes_ratio": 1.2924456343397517,
+          "encode_time_ratio": 0.02736950000045194,
+          "decode_time_ratio": 0.08809812251132683
+        }
+      }
+    },
+    {
+      "method": "fp8_e4m3fn_saturating",
+      "kappa": 0,
+      "mode": "lossy",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 29360458,
+      "complete_bpv": 8.000089917864118,
+      "saved_percent": 49.99943801334926,
+      "original_exact": false,
+      "encode_ms": 1.2384643778204918,
+      "decode_ms": 0.4103202372789383,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6319688558578491,
+          "ppl": 5.11393341098253,
+          "ppl_change_percent": 0.3951109221222092,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.1858718395233154,
+          "ppl": 8.898403152059727,
+          "ppl_change_percent": 0.6779661086274478,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {}
+    },
+    {
+      "method": "splitzip_official_framed",
+      "kappa": 0,
+      "mode": "lossless",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 44197315,
+      "complete_bpv": 12.042812619890487,
+      "saved_percent": 24.73242112568446,
+      "original_exact": true,
+      "encode_ms": 0.8741309866309166,
+      "decode_ms": 0.5212519317865372,
+      "quality": [
+        {
+          "document": "test_code",
+          "nll": 1.6280255317687988,
+          "ppl": 5.093807222295391,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        },
+        {
+          "document": "test_text",
+          "nll": 2.179115056991577,
+          "ppl": 8.838481244703246,
+          "ppl_change_percent": 0.0,
+          "scored_tokens": 127
+        }
+      ],
+      "vs_baseline": {
+        "raw_bf16": {
+          "packet_bytes_ratio": 0.7526717254615346,
+          "encode_time_ratio": 2.0664707177454864,
+          "decode_time_ratio": 1.5374367172928325
+        },
+        "splitzip_official_framed": {
+          "packet_bytes_ratio": 1.0,
+          "encode_time_ratio": 1.0,
+          "decode_time_ratio": 1.0
+        },
+        "exans_official_fixed_framed": {
+          "packet_bytes_ratio": 0.9727872856637285,
+          "encode_time_ratio": 0.05655827031026901,
+          "decode_time_ratio": 0.1354452882734761
+        }
+      }
+    },
+    {
+      "method": "exans_official_fixed_framed",
+      "kappa": 0.0,
+      "mode": "lossless",
+      "documents": [
+        "test_code",
+        "test_text"
+      ],
+      "values": 29360128,
+      "packet_bytes": 45433689,
+      "complete_bpv": 12.379697799682617,
+      "saved_percent": 22.626888751983643,
+      "original_exact": true,
+      "encode_ms": 15.455405227839947,
+      "decode_ms": 3.848431631922722,
+      "quality": [],
+      "vs_baseline": {
+        "raw_bf16": {
+          "packet_bytes_ratio": 0.7737269355324581,
+          "encode_time_ratio": 36.53702113606341,
+          "decode_time_ratio": 11.350979697341783
+        },
+        "splitzip_official_framed": {
+          "packet_bytes_ratio": 1.0279739617666819,
+          "encode_time_ratio": 17.680880170383052,
+          "decode_time_ratio": 7.383054905394057
+        },
+        "exans_official_fixed_framed": {
+          "packet_bytes_ratio": 1.0,
+          "encode_time_ratio": 1.0,
+          "decode_time_ratio": 1.0
+        }
+      }
+    }
+  ],
+  "network_model": {
+    "measured_network": false,
+    "scope": "serial size/timing model; no transport, serialization, staging, disk I/O, queueing, overlap or serving measurement",
+    "links": [
+      {
+        "effective_gbps": 0.1,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 2607.0838400000002,
+            "fresh_ms": 3143.152268773433,
+            "precompressed_ms": 2914.083439095434
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 4697.64584,
+            "fresh_ms": 4698.407886314776,
+            "precompressed_ms": 4697.984879601386
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 3535.7852,
+            "fresh_ms": 3537.1805829184173,
+            "precompressed_ms": 3536.3064519317863
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 3634.69512,
+            "fresh_ms": 3653.9989568597625,
+            "precompressed_ms": 3638.5435516319226
+          }
+        ],
+        "best_fresh": "lite_host_rope",
+        "best_precompressed": "lite_host_rope"
+      },
+      {
+        "effective_gbps": 0.25,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 1042.833536,
+            "fresh_ms": 1578.901964773433,
+            "precompressed_ms": 1349.833135095434
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 1879.058336,
+            "fresh_ms": 1879.820382314776,
+            "precompressed_ms": 1879.3973756013856
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 1414.31408,
+            "fresh_ms": 1415.7094629184176,
+            "precompressed_ms": 1414.8353319317866
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 1453.878048,
+            "fresh_ms": 1473.1818848597627,
+            "precompressed_ms": 1457.7264796319228
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "lite_host_rope"
+      },
+      {
+        "effective_gbps": 0.5,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 521.416768,
+            "fresh_ms": 1057.485196773433,
+            "precompressed_ms": 828.416367095434
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 939.529168,
+            "fresh_ms": 940.291214314776,
+            "precompressed_ms": 939.8682076013856
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 707.15704,
+            "fresh_ms": 708.5524229184175,
+            "precompressed_ms": 707.6782919317866
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 726.939024,
+            "fresh_ms": 746.2428608597627,
+            "precompressed_ms": 730.7874556319227
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "splitzip_official_framed"
+      },
+      {
+        "effective_gbps": 1.0,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 260.708384,
+            "fresh_ms": 796.776812773433,
+            "precompressed_ms": 567.707983095434
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 469.764584,
+            "fresh_ms": 470.52663031477596,
+            "precompressed_ms": 470.1036236013856
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 353.57852,
+            "fresh_ms": 354.9739029184175,
+            "precompressed_ms": 354.09977193178656
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 363.469512,
+            "fresh_ms": 382.7733488597627,
+            "precompressed_ms": 367.31794363192273
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "splitzip_official_framed"
+      },
+      {
+        "effective_gbps": 2.5,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 104.2833536,
+            "fresh_ms": 640.351782373433,
+            "precompressed_ms": 411.28295269543395
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 187.9058336,
+            "fresh_ms": 188.66787991477594,
+            "precompressed_ms": 188.2448732013856
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 141.431408,
+            "fresh_ms": 142.82679091841746,
+            "precompressed_ms": 141.95265993178654
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 145.3878048,
+            "fresh_ms": 164.69164165976267,
+            "precompressed_ms": 149.23623643192272
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "splitzip_official_framed"
+      },
+      {
+        "effective_gbps": 5.0,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 52.1416768,
+            "fresh_ms": 588.210105573433,
+            "precompressed_ms": 359.141275895434
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 93.9529168,
+            "fresh_ms": 94.71496311477594,
+            "precompressed_ms": 94.29195640138559
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 70.715704,
+            "fresh_ms": 72.11108691841746,
+            "precompressed_ms": 71.23695593178654
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 72.6939024,
+            "fresh_ms": 91.99773925976267,
+            "precompressed_ms": 76.54233403192272
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "splitzip_official_framed"
+      },
+      {
+        "effective_gbps": 10.0,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 26.0708384,
+            "fresh_ms": 562.1392671734329,
+            "precompressed_ms": 333.07043749543396
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 46.9764584,
+            "fresh_ms": 47.73850471477594,
+            "precompressed_ms": 47.31549800138559
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 35.357852,
+            "fresh_ms": 36.753234918417455,
+            "precompressed_ms": 35.87910393178654
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 36.3469512,
+            "fresh_ms": 55.65078805976267,
+            "precompressed_ms": 40.19538283192272
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "splitzip_official_framed"
+      },
+      {
+        "effective_gbps": 25.0,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 10.42833536,
+            "fresh_ms": 546.496764133433,
+            "precompressed_ms": 317.42793445543396
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 18.790583360000003,
+            "fresh_ms": 19.552629674775947,
+            "precompressed_ms": 19.129622961385596
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 14.143140800000001,
+            "fresh_ms": 15.538523718417455,
+            "precompressed_ms": 14.664392731786538
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 14.53878048,
+            "fresh_ms": 33.84261733976267,
+            "precompressed_ms": 18.38721211192272
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "splitzip_official_framed"
+      },
+      {
+        "effective_gbps": 50.0,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 5.21416768,
+            "fresh_ms": 541.2825964534329,
+            "precompressed_ms": 312.21376677543395
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 9.395291680000001,
+            "fresh_ms": 10.157337994775945,
+            "precompressed_ms": 9.734331281385595
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 7.071570400000001,
+            "fresh_ms": 8.466953318417454,
+            "precompressed_ms": 7.592822331786538
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 7.26939024,
+            "fresh_ms": 26.57322709976267,
+            "precompressed_ms": 11.117821871922722
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "splitzip_official_framed"
+      },
+      {
+        "effective_gbps": 100.0,
+        "estimates": [
+          {
+            "method": "lite_host_rope",
+            "transfer_ms": 2.60708384,
+            "fresh_ms": 538.6755126134329,
+            "precompressed_ms": 309.6066829354339
+          },
+          {
+            "method": "raw_bf16",
+            "transfer_ms": 4.697645840000001,
+            "fresh_ms": 5.4596921547759445,
+            "precompressed_ms": 5.036685441385594
+          },
+          {
+            "method": "splitzip_official_framed",
+            "transfer_ms": 3.5357852000000003,
+            "fresh_ms": 4.931168118417454,
+            "precompressed_ms": 4.0570371317865375
+          },
+          {
+            "method": "exans_official_fixed_framed",
+            "transfer_ms": 3.63469512,
+            "fresh_ms": 22.93853197976267,
+            "precompressed_ms": 7.483126751922722
+          }
+        ],
+        "best_fresh": "splitzip_official_framed",
+        "best_precompressed": "splitzip_official_framed"
+      }
+    ]
+  }
+}

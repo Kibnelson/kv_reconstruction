@@ -1,0 +1,36 @@
+{
+  "status": "software_checks_passed",
+  "gpu_measured": false,
+  "parent_commit": "e4f91bdd269a13cb8694f4bce9962c65c8a77e99",
+  "tests": 9,
+  "passed": 8,
+  "skipped_actual_cuda": 1,
+  "software": {
+    "torch": "2.14.1+cpu",
+    "triton": "3.6.0",
+    "numpy": "2.3.5"
+  },
+  "original_measured_core_unchanged": true,
+  "completed_host_rope_source_unchanged": true,
+  "files": {
+    "kv_compare/lite_scoreboard.py": "86279da24732f4aadc52347569a3ec0212abe3df24ee67a81203154d970266ff",
+    "scripts/bench_lite_baselines.py": "a38c039d2e208b571b0a4b5041c6eb8b2ce4ef97cb31216e7383e0224c0ab50b",
+    "scripts/package_lite_baselines.py": "535d4ab4084f3cc9f02ab805cfd5a2763eb9b431186881de0fbaa60cae438c31",
+    "scripts/run_lite_baselines_a4500.sh": "3cad9469f551f31ff6c38a7acefcafefcb70be4994026890311299a4ef91373c",
+    "tests/test_lite_baseline_tuning.py": "2bb7393e3f68a932fdfa511fa5c709252c0f461efef6a3816dae13eb5d1a4044",
+    "docs/lite_baseline_tuning.md": "ae71dcac272d8a1685e3d0d62762ec3e8b086f82386843d53bc2c7a86cd64851"
+  },
+  "checks": [
+    "B8/B16/B32/B64 packet replay with lossless and lossy reconstructions",
+    "all BF16 patterns through charged raw fallback",
+    "nonzero position and partial-stream geometry",
+    "complete software worker and fresh packet-only receiver",
+    "preserve official baseline runtime configuration",
+    "decimal Gb/s and byte accounting",
+    "same-word/document coverage",
+    "separate lossy/lossless rankings",
+    "CPU cannot become actual GPU benchmark success",
+    "small-report packaging"
+  ],
+  "scope": "CPU interpreter/protocol checks only; no new CUDA execution, speedup, network or serving result"
+}
