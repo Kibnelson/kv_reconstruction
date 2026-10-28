@@ -232,6 +232,31 @@ Keeping the first 4 tokens exact (0.02 bits per value) is what was missing: with
 
 **Pool (one 8K prefix; recompute 992 ms, raw BF16 896 MiB, 14 prefixes fit):** SplitZip 675 MiB (19 fit), back in 3 ms; ExANS 608 MiB (21), 18 ms; ours lossless 501-527 MiB (24-25), 23 ms (rank 256) to 101 ms (fewest bits); AQUA-KV 2-bit 118 MiB (108), 78 ms, adding it 0.95 s; our GPU codec step 4 with sinks 107 MiB (119), 27 ms, adding it 55 ms.
 
+## Results: WikiText-2 quality and our prediction in SplitZip's format (`123a83e`, `610f1d3`)
+
+**Lossy quality on WikiText-2** (8 windows of 4,096 tokens, 3,072-token prompt, 8,192 scored tokens; perplexity change ± standard error across windows):
+
+| Method | Bits per value | Perplexity change |
+| --- | --- | --- |
+| AQUA-KV 2-bit | 2.11 | +0.92% ± 0.21 |
+| AQUA-KV 3-bit | 3.07 | +0.04% ± 0.07 |
+| KIVI 4-bit | 5.23 | +0.08% ± 0.09 |
+| Ours (`fast`), step 4, sinks | 2.41 | +0.11% ± 0.06 |
+| Ours (`fast`), step 2, sinks + token step | 2.21 | +0.04% ± 0.10 |
+| Ours (`fast`), step 4, sinks + token step | 1.79 | +0.80% ± 0.16 |
+| Ours, GPU codec, step 2, sinks | 2.78 | +0.04% ± 0.08 |
+| Ours, GPU codec, step 4, sinks | 2.18 | +1.11% ± 0.11 |
+
+With the first 4 tokens exact, our CPU coder matches AQUA-KV 3-bit quality at 2.2 bits per value, and AQUA-KV 2-bit quality at 1.8 bits. Our GPU codec matches AQUA-KV 3-bit at 2.8 bits and is level with AQUA-KV 2-bit at about 2.1-2.2 bits. Without the sinks every one of our rows is worse on all 8 windows.
+
+**Our prediction in SplitZip's format** (`kv_compare/szcodec.py`, test_text, bit-exact):
+- **Bits:** 9.84 per value with the dense product, 10.19 at rank 256 and 10.02 at rank 512. SplitZip gives 12.05 and our rANS codec 9.0-9.4.
+- **Decode, first kernel:** the whole-tile kernel took 27 ms.
+- **Decode, row kernel:** decoding token by token over a head's 128 lanes takes 17.1 ms (rank 256, 2 chunks, CUDA graph).
+- **Where the time goes** (row kernel, rank 256): products 7.1 ms; coding 11.7 ms, of which stream reads take 4.8 ms and prefix sums 3.3 ms.
+- **Mixed with SplitZip:** 13.0 ms and 621 MiB at 400 Gb/s (14 layers ours), 1.09x SplitZip. Our rANS mix gives 1.07x.
+- **At 800 Gb/s:** the best mix is still SplitZip alone.
+
 ## Next run: a larger quality test and our prediction in SplitZip's format
 
 - **Lossy quality on WikiText-2** (stage `evalcap`, then `lossy --lossy-docs eval`). The two-document table scores
