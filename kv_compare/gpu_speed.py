@@ -299,7 +299,8 @@ def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exa
 
 
 # ---------------------------------------------------------------------------------------------- fused codec
-def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64, layer_configs=(), ranks=()):
+def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64, layer_configs=(), ranks=(),
+               lossy_kappas=()):
     """The one-step codec on a whole test document (every layer, decoded layer by layer as a receiver must), in
     two implementations: fused (one kernel per direction, configs: tokens per program, rows, warps) and per layer
     (cuBLAS int8 product, then one coding kernel; layer_configs: tokens per program, token chunks on separate CUDA
@@ -372,8 +373,69 @@ def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64,
             run(best["tokens_per_program"], best["rows"], best["warps"], mode, False)
     if layer_configs:
         rows += layerwise_rows(consts, study, words, layer_configs, device, log, modes, model_bits, ranks)
+    if lossy_kappas:
+        rows += lossy_rows(consts, study, words, device, log, lossy_kappas)
     del words
     return rows
+
+
+def lossy_rows(consts, study, words, device, log=print, kappas=(0.5, 1.0, 2.0), configs=((64, 2),), ranks=(256,)):
+    """The closed-loop lossy per-layer codec (kv_compare.lossy_gpu) on the whole document: forward quantization,
+    encode and decode times, the stream's bits, and the decode checked against the encoder's reconstruction."""
+    import gc
+    from .layerwise import prepare_rank
+    from .lossy_gpu import LossyLayerwise
+    L, T, W = words.shape
+    n = L * T * W
+    rows = []
+    rcs = {None: None}
+    for r in ranks:
+        try:
+            rcs[r] = prepare_rank(study, consts, r, log)
+        except Exception as exc:
+            log(f"  lossy: rank {r} not prepared ({exc!r})")
+    for kappa in kappas:
+        for TB, ch in configs:
+            for r, rc in rcs.items():
+                tag = f"lossy per layer, step {kappa}, {TB} tokens per program, {ch} chunks" + \
+                      (f", rank {r} product (epilogue 128x128x64)" if r else ", dense product")
+                row = {"part": "lossy_layerwise", "kappa": kappa, "tokens_per_program": TB, "chunks": ch,
+                       "rank": r, "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name}
+                try:
+                    codec = LossyLayerwise(consts, study.C, study.hd, kappa, tokens_per_program=TB, chunks=ch,
+                                           rank=rc, requant="epilogue" if rc else "kernel",
+                                           rank_tiles=(128, 128, 64, 4))
+                    rec, xall, prior = codec.quantize(words)
+                    tq = timer(lambda: codec.quantize(words), device, warmup=1, reps=3)
+                    buf, starts, _ = codec.encode(words, rec, xall, prior)
+                    te = timer(lambda: codec.encode(words, rec, xall, prior, out=buf), device, warmup=1, reps=3)
+                    bufs = codec.buffers(T)
+                    dec = codec.decode(buf, starts, T, bufs=bufs)
+                    ok = bool(torch.equal(dec, rec))
+                    td = timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs), device, warmup=2, reps=5)
+                    bits = codec.bits(starts, T) / n
+                    x = (words.to(torch.int32) & 0xFFFF)
+                    xr = (rec.to(torch.int32) & 0xFFFF)
+                    fin = [torch.isfinite(_wf(x[l])) for l in range(L)]
+                    rel = float(sum(((_wf(xr[l]) - _wf(x[l]))[fin[l]] ** 2).sum() for l in range(L)) /
+                                sum((_wf(x[l])[fin[l]] ** 2).sum() for l in range(L))) ** 0.5
+                    row.update(bit_exact=ok, stream_bits_per_value=bits, quantize_ms=1e3 * tq, encode_ms=1e3 * te,
+                               decode_ms=1e3 * td, decode_gvalues_per_s=n / td / 1e9, rel_error=rel)
+                    log(f"  [{tag}]: exact={ok}, {bits:.4f} bits/value, KV error {100 * rel:.2f}%; quantize "
+                        f"{1e3 * tq:.1f} ms + encode {1e3 * te:.1f} ms, decode {1e3 * td:.1f} ms -> "
+                        f"{n / td / 1e9:.1f} G values/s")
+                    del codec, rec, xall, prior, buf, starts, bufs, dec
+                except Exception as exc:
+                    row["error"] = repr(exc)[:240]
+                    log(f"  [{tag}]: not measured ({row['error']})")
+                gc.collect()
+                torch.cuda.empty_cache() if device.type == "cuda" else None
+                rows.append(row)
+    return rows
+
+
+def _wf(w):
+    return (w.to(torch.int32) << 16).view(torch.float32).to(torch.float64)
 
 
 def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uniform",), model_bits=None, ranks=()):

@@ -226,6 +226,28 @@ def stage_lossy(args, out):
 
     chosen = set(args.lossy_methods)
     fits, aqua = {}, {}
+    gconsts = None
+    if "gpu" in chosen:                  # our GPU codec: the per-layer one-step predictor's integer constants
+        from kv_compare import fused as _fused
+        log("preparing the GPU lossy codec's one-step predictor")
+        gconsts = _fused.prepare(study, log=log)
+
+    def gpu_lossy(doc, kappa):
+        """Our closed-loop lossy codec on the GPU (kv_compare.lossy_gpu): a real stream, decoded bit for bit as
+        the encoder reconstructed it; its bits are the stream's."""
+        from kv_compare.lossy_gpu import LossyLayerwise
+        w = torch.stack([doc.words(l, device, P) for l in range(study.L)])
+        w16 = (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
+        TB, ch = (64, 2) if P % 128 == 0 else (16, 1)
+        codec = LossyLayerwise(gconsts, study.C, study.hd, kappa, tokens_per_program=TB, chunks=ch)
+        rec, xall, prior = codec.quantize(w16)
+        buf, starts, _ = codec.encode(w16, rec, xall, prior)
+        dec = codec.decode(buf, starts, P)
+        if not torch.equal(dec, rec):
+            raise RuntimeError("the GPU lossy decode differs from the encoder's reconstruction")
+        vals = torch.stack([words_to_float(dec[l].to(torch.int32) & 0xFFFF).to(torch.float32).cpu()
+                            for l in range(study.L)])
+        return vals, codec.bits(starts, P) / (study.L * P * study.W)
     if "ours" in chosen:
         log(f"fitting our predictor ({cfg.name}) for closed-loop coding")
         study.keep_qmaps = True          # the closed loop needs every layer's query map; keep them (~0.7 GB)
@@ -245,7 +267,7 @@ def stage_lossy(args, out):
     result = {"prompt_tokens": P, "continuation_tokens": M, "lossy_config": cfg.name,
               "reference": "captured exact KV restored into the cache", "documents": {}}
     previous = None
-    if chosen != {"ours", "aqua", "kivi", "fp8"} and (out / "lossy.json").is_file():
+    if chosen != {"ours", "aqua", "kivi", "fp8", "gpu"} and (out / "lossy.json").is_file():
         previous = json.loads((out / "lossy.json").read_text())
         if (previous.get("prompt_tokens"), previous.get("continuation_tokens")) != (P, M):
             raise SystemExit("--lossy-methods merges into lossy.json, which used other prompt/continuation lengths")
@@ -269,6 +291,9 @@ def stage_lossy(args, out):
             methods += [(f"KIVI, {b}-bit", lambda b=b: baselines.kivi_official(study, doc, P, b)) for b in (2, 4)]
         if "fp8" in chosen:
             methods += [("FP8 cast", lambda: baselines.fp8_cast(study, doc, P))]
+        if "gpu" in chosen:
+            methods += [(f"Ours, GPU codec (one-step, measured stream), step {k}", lambda k=k: gpu_lossy(doc, k))
+                        for k in args.kappas]
         if previous and doc.name in previous["documents"]:          # keep the rows of methods not rerun
             old = previous["documents"][doc.name]
             stale = tuple(p for m, p in (("aqua", "AQUA-KV-style"), ("kivi", "KIVI-style")) if m in chosen)
@@ -477,7 +502,7 @@ def stage_gpu_speed(args, out):
         study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
         log(f"gpu_speed: fused one-step codec, whole {study.tests[0].name} ({study.L} layers), configs {args.fused_configs}")
         rows += fused_rows(study, device, args.fused_configs, log, modes=args.fused_modes,
-                           layer_configs=args.layer_configs, ranks=args.layer_ranks)
+                           layer_configs=args.layer_configs, ranks=args.layer_ranks, lossy_kappas=args.lossy_speed_kappas)
         del study
     bits = {}
     if (out / "frontier.json").is_file():
@@ -907,6 +932,71 @@ def splitzip_mix_lines(out, res):
     return lines + [""]
 
 
+def lossy_link_lines(out):
+    """Transfer of one whole document's KV per link speed, lossless and lossy methods side by side, with quality:
+    time = max(bits / link, decode time) where the decode was measured on this GPU (ours, SplitZip), else the
+    time on the wire alone (a lower bound for that method). Bits and quality from the lossy stage."""
+    if not ((out / "lossy.json").is_file() and (out / "gpu_speed.json").is_file()):
+        return []
+    lres = json.loads((out / "lossy.json").read_text())
+    rows = json.loads((out / "gpu_speed.json").read_text())["rows"]
+    docs = list(lres["documents"])
+    whole = [r for r in rows if r["part"] in ("fused", "layerwise") and r.get("bit_exact")]
+    if not whole:
+        return []
+    n = whole[0]["values"]
+    lossy_speed = {}
+    for r in rows:                                   # GPU lossy codec: dense product, the lossy stage's shape
+        if r["part"] == "lossy_layerwise" and r.get("bit_exact") and r.get("rank") is None:
+            k = float(r["kappa"])
+            if k not in lossy_speed or r["decode_gvalues_per_s"] > lossy_speed[k]:
+                lossy_speed[k] = r["decode_gvalues_per_s"]
+    links = (1, 10, 25, 100, 200, 400)
+    ms = lambda t: f"{1e3 * t:,.0f}"
+    lines = ["", f"## Lossless and lossy side by side ({whole[0]['doc']}: {n / 1e6:.0f}M values per link)", "",
+             "Time to move one document's KV over an ideal link, decoding overlapped with arrival: max(bits / link, "
+             "decode time) with the decode measured on this GPU; a * marks a method whose decode was not measured "
+             "(its time on the wire only, so a lower bound). Bits and quality of the lossy rows from the lossy stage "
+             f"(first {lres['prompt_tokens']} tokens of each test document; quality = perplexity change of the next "
+             f"{lres['continuation_tokens']} tokens, {' / '.join(docs)}).", "",
+             "| Method | Bits per value | Perplexity change | " + " | ".join(f"{R} Gb/s (ms)" for R in links) + " |",
+             "| --- | --- | --- | " + " | ".join("---" for _ in links) + " |"]
+
+    def times(bits, rate):
+        cells = []
+        for R in links:
+            t = bits * n / (R * 1e9)
+            if rate:
+                t = max(t, n / (rate * 1e9))
+            cells.append(ms(t) + ("" if rate else "*"))
+        return cells
+
+    sz = 12.021
+    if (out / "lossless.json").is_file():
+        ll = json.loads((out / "lossless.json").read_text())["methods"].get("SplitZip-style")
+        if ll and whole[0]["doc"] in ll.get("per_layer", {}):
+            sz = float(np.mean(ll["per_layer"][whole[0]["doc"]]))
+    lines.append(f"| SplitZip (lossless) | {sz:.2f} | 0 | " + " | ".join(times(sz, 311.0 / 2)) + " |")
+    best = []
+    for R in links:                                  # ours lossless: the best measured mode for each link
+        best.append(min(max(r["stream_bits_per_value"] * n / (R * 1e9), n / (r["decode_gvalues_per_s"] * 1e9))
+                        for r in whole))
+    lo, hi = min(r["stream_bits_per_value"] for r in whole), max(r["stream_bits_per_value"] for r in whole)
+    lines.append(f"| Ours, lossless (best measured mode per link) | {lo:.2f}-{hi:.2f} | 0 | " +
+                 " | ".join(ms(t) for t in best) + " |")
+    for label in lres["documents"][docs[0]]:
+        if label == "exact KV":
+            continue
+        rs = [lres["documents"][d][label] for d in docs if label in lres["documents"][d]]
+        bits = float(np.mean([x["bits"] for x in rs]))
+        ppl = " / ".join(f"{x['ppl_change_pct']:+.2f}%" for x in rs)
+        rate = None
+        if label.startswith("Ours, GPU codec"):
+            rate = lossy_speed.get(float(label.rsplit("step ", 1)[1]))
+        lines.append(f"| {label} | {bits:.2f} | {ppl} | " + " | ".join(times(bits, rate)) + " |")
+    return lines + [""]
+
+
 def frontier_lines(out):
     res = json.loads((out / "frontier.json").read_text())
     lines = [f"## Bits against compute ({len(res['variants'])} predictor variants, {res['layers']} layers)", "",
@@ -966,6 +1056,7 @@ def stage_report(args, out):
         lines += pool_lines(out)
     if (out / "format.json").is_file():
         lines += format_lines(out)
+    lines += lossy_link_lines(out)
     if (out / "cheap_products.json").is_file():
         cp = json.loads((out / "cheap_products.json").read_text())
         lines += ["## Cheaper one-step products (scripts/probe_cheap_products.py)", "",
@@ -1036,7 +1127,7 @@ def parser():
     p.add_argument("--continuation-tokens", type=int, default=512)
     p.add_argument("--max-layers", type=int, default=None, help="lossless and frontier stages: first N layers (smoke tests)")
     p.add_argument("--no-queries", action="store_true", help="skip q_proj capture (drops the attention input)")
-    p.add_argument("--lossy-methods", default="ours,aqua,kivi,fp8",
+    p.add_argument("--lossy-methods", default="ours,aqua,kivi,fp8,gpu",
                    help="lossy stage: methods to (re)run; a subset is merged into the existing lossy.json")
     p.add_argument("--frontier-quick", action="store_true", help="frontier stage: a smaller grid of variants")
     p.add_argument("--speed-tokens", type=int, default=8192, help="gpu_speed: tokens per timed layer")
@@ -1064,6 +1155,8 @@ def parser():
     p.add_argument("--cuda-home", type=Path, default=None,
                    help="exans: CUDA toolkit with nvcc (default: $CUDA_HOME, the earlier official run's toolkit, "
                         "or the nvcc on PATH)")
+    p.add_argument("--lossy-speed-kappas", default="0.25,0.5,1,2,4",
+                   help="gpu_speed: steps of the GPU lossy codec timed on the whole test document (empty: skip)")
     p.add_argument("--format-ranks", default="256",
                    help="format: reduced-rank products to probe besides the dense one (empty: dense only)")
     p.add_argument("--layer-ranks", default="512,384,256",
@@ -1100,8 +1193,8 @@ def main(argv=None):
     args.configs = [c for c in args.configs.split(",") if c]
     args.kappas = [float(k) for k in args.kappas.split(",") if k]
     args.lossy_methods = [m for m in args.lossy_methods.split(",") if m]
-    if not set(args.lossy_methods) <= {"ours", "aqua", "kivi", "fp8"}:
-        raise SystemExit("--lossy-methods takes a comma list of ours, aqua, kivi, fp8")
+    if not set(args.lossy_methods) <= {"ours", "aqua", "kivi", "fp8", "gpu"}:
+        raise SystemExit("--lossy-methods takes a comma list of ours, aqua, kivi, fp8, gpu")
     args.speed_formats = [f for f in args.speed_formats.split(",") if f]
     args.speed_modes = [m for m in args.speed_modes.split(",") if m]
     args.speed_layers = [int(l) for l in args.speed_layers.split(",") if l]
@@ -1115,6 +1208,7 @@ def main(argv=None):
     args.layer_configs = [tuple(int(x) for x in t.split("x")) for t in args.layer_configs.split(",") if t]
     args.layer_ranks = [int(r) for r in args.layer_ranks.split(",") if r]
     args.format_ranks = [int(r) for r in args.format_ranks.split(",") if r]
+    args.lossy_speed_kappas = [float(k) for k in args.lossy_speed_kappas.split(",") if k]
     if args.cuda_home is None:
         import shutil as _sh
         cand = [os.environ.get("CUDA_HOME"), str(Path.home() / "kv_reconstruction/runs/_matched_baselines/cuda12_8/toolkit")]
