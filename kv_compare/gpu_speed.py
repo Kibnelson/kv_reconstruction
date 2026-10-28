@@ -484,12 +484,13 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
             for rt in ((64, 128, 64, 4), (128, 128, 64, 4), (64, 64, 64, 4)):
                 run(TB, ch, modes[0], True, rank=rc, requant="epilogue", rank_tiles=rt, parts=rt == (64, 128, 64, 4))
             done = [x for x in rows[first:] if x.get("bit_exact")]
-            if done:                                 # the fastest of these with 1 and 4 chunks, and as a graph
+            if done:                                 # the fastest of these with other chunk counts, and as a graph
                 b = max(done, key=lambda x: x["decode_gvalues_per_s"])
                 rt = next((t for t in ((64, 128, 64, 4), (128, 128, 64, 4), (64, 64, 64, 4))
                            if b["variant"].endswith(f"{t[0]}x{t[1]}x{t[2]} ({t[3]} warps))")), (64, 128, 64, 4))
-                for c2 in (1, 4):
-                    run(TB, c2, modes[0], True, rank=rc, requant=b["requant"], rank_tiles=rt, parts=c2 == 1)
+                for c2 in (1, 2, 4):
+                    if c2 != ch:
+                        run(TB, c2, modes[0], True, rank=rc, requant=b["requant"], rank_tiles=rt, parts=c2 == 1)
                 run(TB, ch, modes[0], True, rank=rc, requant=b["requant"], rank_tiles=rt, graph=True)
             del rc
     del xall, prior
