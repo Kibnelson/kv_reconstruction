@@ -32,6 +32,16 @@ source identity, different original KV or a changed root framework environment
 cause a failure instead of silently combining results. Ctrl-C leaves checkpoints
 in the run directory; the command's child process group is terminated.
 
+The runtime/data recovery update supports a narrow migration from the initial
+3e8ff46 release. It verifies the completed artifacts, archives the original
+results/recipe under `resume_history/`, and preserves profiling, toolchain,
+AQUA setup and BF16 PPL. It does not rerun those stages. Model, inputs, modes,
+source pins and official evaluation settings must still match.
+
+ExANS standalone executables now receive the CUDA/nvCOMP runtime library paths,
+including `libcudart.so.12`. These loader-path additions apply only to ExANS
+children; they do not change AQUA's runtime used by the saved BF16 reference.
+
 ## Profiling
 
 Defaults are Lite, test_text, 512 tokens/all 28 layers, lossless and lossy κ=1.
@@ -101,6 +111,40 @@ The runner invokes the unchanged author scripts with the README settings:
   author's default 32-token evaluation steps.
 - Raw BF16 and quantized evaluation use matching full WikiText/token digests;
   dataset fingerprints and calibration configuration are recorded.
+
+### Calibration source availability
+
+The original `togethercomputer/RedPajama-Data-1T-Sample` endpoint returned 401
+and the author's loader could not access it. The default remains
+`--aqua-calibration original`; there is no automatic dataset substitution.
+
+An explicit alternative is available:
+
+```bash
+bash scripts/run_llama_profile_a4500.sh \
+  --resume runs/llama_profile_official_a4500_20261027_194103_2478724 \
+  --aqua-calibration backup
+```
+
+This selects `liang2kl/RedPajama-Data-1T-Sample-Backup` at
+`c2c1504dcb5887121b04787e36055e32aeb9017c`, with 930,514 expected records.
+The manifest pins all 11 Parquet shard sizes and SHA256s (3,024,841,588 download
+bytes). This authenticates that particular backup, **not equivalence or row order
+against the removed original**. The report explicitly labels backup calibration.
+
+The sampler follows the released `get_red_pajama` rule, including seed 0,
+tokenizer type/BOS/EOS settings, long-document rejection and random window
+selection. Tests compare its tokens with the released function on identical
+records. The resulting 256 × 8,192 token batches are passed via the author's
+supported local pretokenized-file input; training, holdout, quantizers and full
+WikiText evaluation are unchanged. Row selections, text/token hashes and the
+token-file checksum are retained; raw text/tokens are not published.
+
+Selecting the backup is a documented calibration provenance variation. It must
+not be described as exact reproduction of the original calibration data. If
+strict original-data provenance is required, leave AQUA blocked until the
+original sample/cache becomes available. Completed ExANS and profiling results
+can still be retained.
 
 The README says efficient inference kernels are TBU. This evaluates the released
 implementation. Official AQUA PPL and full evaluation-command wall time are

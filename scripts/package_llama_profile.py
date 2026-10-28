@@ -45,7 +45,8 @@ def main(argv=None):
                 raise ValueError("ExANS correctness/accounting proof differs")
     files=["results.json","summary.md","console.log","base_results.json","baseline_results.json",
         "profile.json","toolchain.json","exans_build.json","exans.json","exans_receiver.json","exans_validation.json",
-        "aqua_environment.json","aqua_ppl_raw_official.json","aqua_ppl_higgs2_official.json","aqua_train_data.json","aqua_test_data.json"]
+        "aqua_environment.json","aqua_ppl_raw_official.json","aqua_ppl_higgs2_official.json","aqua_train_data.json","aqua_test_data.json","aqua_calibration_backup.json"]
+    files += [str(p.relative_to(run)) for p in (run/"resume_history").glob("*.json")]
     files += [str(p.relative_to(run)) for p in (run/"logs").glob("*.log")]
     dest.mkdir(parents=True)
     manifest=dict(status=r["status"],gpu_measured=r["gpu_measured"],files={},local_traces={},

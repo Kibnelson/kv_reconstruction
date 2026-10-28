@@ -25,13 +25,16 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from scripts.bench_llama_baselines import call, device_check, verified_inputs, log
 from scripts.package_llama_causal import sha
+from kv_compare.profile_recovery import recover_partial,runtime_environment
 
 PINS={"aqua":("goodevening13/aquakv","e744183f2f3a4a90381f20a6975456871fd1ae29"),
       "exans":("openlake-project/openlake","de6c38bcc5438475bd1abf1e9b3d154cef414ef6")}
 FILES=["scripts/run_llama_profile_baselines.py","scripts/run_llama_profile_a4500.sh",
        "scripts/package_llama_profile.py","scripts/setup_qwen_cuda_toolchain.py",
        "kv_compare/causal_profile.py","kv_compare/official_exans.py","native/exans_build_compat.h",
-       "scripts/bench_llama_baselines.py","kv_compare/framed_baselines.py","scripts/package_llama_causal.py"]
+       "scripts/bench_llama_baselines.py","kv_compare/framed_baselines.py","scripts/package_llama_causal.py",
+       "kv_compare/profile_recovery.py","scripts/prepare_aqua_calibration.py",
+       "benchmark_fixtures/aqua_redpajama_backup_manifest.json"]
 
 
 def write(path,data):
@@ -88,14 +91,15 @@ class Suite:
         code={f:sha(ROOT/f) for f in FILES}
         recipe=dict(base_results_sha256=sha(args.base_run/"results.json"),
             baseline_results_sha256=sha(args.baseline_run/"results.json"),code=code,pins=PINS,
-            stages=args.stages,document=args.document,kappas=args.kappas,policy="lite")
+            stages=args.stages,document=args.document,kappas=args.kappas,policy="lite",
+            aqua_calibration=getattr(args,"aqua_calibration","original"))
         identity=hashlib.sha256(json.dumps(recipe,sort_keys=True).encode()).hexdigest()
         self.result=dict(format="llama_profile_official_v1",status="running",gpu_measured=False,
             identity=identity,recipe=recipe,stages={})
         if (self.out/"results.json").exists():
             old=json.loads((self.out/"results.json").read_text())
             if old["identity"]!=identity:
-                raise ValueError("resume identity changed; choose a new output directory")
+                old=recover_partial(old,recipe,self.out)
             self.result=old
         self.save()
 
@@ -115,6 +119,8 @@ class Suite:
         old=os.environ.copy()
         try:
             child_env=dict(env or self.env)
+            if name.startswith("exans") and child_env.get("CUDA_HOME"):
+                child_env=runtime_environment(child_env,child_env["CUDA_HOME"],getattr(self,"nvcomp_runtime",()))
             if name.startswith("aqua") and getattr(self,"aqua_visible_device",None) is not None:
                 child_env["CUDA_VISIBLE_DEVICES"]=self.aqua_visible_device
             os.environ.update(child_env)
@@ -248,11 +254,14 @@ class Suite:
             raise ValueError("use the existing pinned nvidia-libnvcomp-cu12==5.3.0.16 SDK")
         spec=importlib.util.find_spec("nvidia.libnvcomp")
         sdk=Path(next(iter(spec.submodule_search_locations)))
+        home=Path(self.env["CUDA_HOME"])
+        self.nvcomp_runtime=(sdk/"lib64",sdk/"lib")
         header=ROOT/"native/exans_build_compat.h"
         self.command("exans_configure",["cmake","-S",source/"crates/openlake_kv_client/cuda","-B",build,
             "-DOPENLAKE_EXPANS_BUILD=ON","-DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON","-DCMAKE_CUDA_ARCHITECTURES=86",
             "-DNVCOMP_ROOT="+str(sdk),"-DCMAKE_CUDA_FLAGS=--pre-include="+str(header)])
         self.command("exans_build",["cmake","--build",build,"--target","openlake_expans_test","-j","2"])
+        self.command("exans_runtime_links",["ldd",build/"openlake_expans_test"])
         self.command("exans_author_smoke",[build/"openlake_expans_test"])
         check_source(source,"exans")
         library=build/"libopenlake_expans.so"
@@ -383,13 +392,25 @@ class Suite:
 
     def aqua_train(self):
         source=self.cache/"sources/aqua"; check_source(source,"aqua")
-        self.aqua_verify(); self.aqua_data(training=True)
+        self.aqua_verify()
+        backup=getattr(self.args,"aqua_calibration","original")=="backup"
+        data="pajama"; calibration=[]
+        if backup:
+            tokens=self.out/"aqua_calibration_tokens.pt"; receipt=self.out/"aqua_calibration_backup.json"
+            self.command("aqua_prepare_backup",[self.args.aqua_python.absolute(),ROOT/"scripts/prepare_aqua_calibration.py",
+                "--source",source,"--model-path",self.aqua_common()[1],"--output",tokens,"--receipt",receipt,
+                "--cache",self.cache/"calibration_backup_cache"])
+            data=str(tokens); calibration=[tokens,receipt]
+        else:
+            self.aqua_data(training=True)
+            calibration=[self.out/"aqua_train_data.json"]
         target=self.out/"aqua_predictors.pt"
         self.command("aqua_train_official",[self.args.aqua_python.absolute(),source/"train_predictors.py",*self.aqua_common(),
-            "--dataset","pajama","--total_nsamples","256","--valid_nsamples","32","--offload_activations",
+            "--dataset",data,"--total_nsamples","256","--valid_nsamples","32","--offload_activations",
             "--predictors_output_path",target],source)
         check_source(source,"aqua")
-        return dict(artifacts=self.artifacts(target,self.out/"aqua_train_data.json"),scope="unchanged author 256x8192 RedPajama calibration, 32 holdout; first-layer HIGGS4, residual HIGGS2")
+        return dict(artifacts=self.artifacts(target,*calibration),calibration_source="pinned backup" if backup else "original",
+            scope="unchanged author training; 256x8192, holdout32, HIGGS2/first-layer4; "+("explicit backup calibration, original equivalence unverified" if backup else "original RedPajama"))
 
     def aqua_eval(self,quantized):
         source=self.cache/"sources/aqua"; check_source(source,"aqua")
@@ -438,6 +459,8 @@ class Suite:
             "| Stage | Status | Detail |","|---|---|---|"]
         for name,e in r["stages"].items():
             lines.append(f"| {name} | {e['status']} | {e.get('reason',e.get('scope','')).replace('|','/')} |")
+        if r.get("recipe",{}).get("aqua_calibration")=="backup":
+            lines += ["","AQUA calibration explicitly uses a pinned third-party RedPajama backup. The author code and sampling settings are preserved; equivalence to the removed original dataset is unverified."]
         prior=self.out/"baseline_results.json"
         if prior.exists():
             saved=json.loads(prior.read_text()); groups={}
@@ -462,7 +485,9 @@ class Suite:
             for row in data:
                 for direction,d in row["profiles"].items():
                     lines += ["",f"Top self-device operators, Lite {row['kappa']:g} {direction}:",""]
-                    lines += [f"- {o['name']}: {o['self_device_ms']:.3f} ms across {o['calls']} calls" for o in d["top_self_device"][:5]]
+                    # CUDA user-annotation spans include idle time and are not kernels.
+                    top=[o for o in d["top_self_device"] if not o["name"].startswith("kv/")]
+                    lines += [f"- {o['name']}: {o['self_device_ms']:.3f} ms across {o['calls']} calls" for o in top[:5]]
         if (self.out/"exans.json").exists():
             lines += ["","| ExANS document | Complete bpv | Saved | Encode ms | Decode ms | Raw blocks | Exact |","|---|---:|---:|---:|---:|---:|---|"]
             for e in json.loads((self.out/"exans.json").read_text())["rows"]:
@@ -471,7 +496,7 @@ class Suite:
             raw=r["stages"]["aqua_raw"]["perplexity"]; quant=r["stages"]["aqua"]["perplexity"]
             lines += ["",f"Official WikiText2 PPL: BF16 **{raw:.5f}**, AQUA HIGGS2 **{quant:.5f}** ({100*(quant/raw-1):+.3f}%)."]
         lines += ["","ExANS: unchanged pinned author kernels and native C ABI; documented compiler-injected allocation-error overload. Physical fixed slots, input padding and local raw overflow fallback are charged. Native allocator peaks are unmeasured.",
-            "AQUA: unchanged author train/evaluation, official calibration/context/buffers. Its command wall time includes model inference and is not compared numerically with transfer codec latency. Physical AQUA wire bytes are unmeasured.",
+            "AQUA: unchanged author train/evaluation; calibration source is recorded explicitly and context/buffers are preserved. Its command wall time includes model inference and is not compared numerically with transfer codec latency. Physical AQUA wire bytes are unmeasured.",
             "Profiler scopes are nested/inclusive, not additive; GPU operator self-times and CUDA events are diagnostics. Ordinary wall samples are the performance control.",
             "No CPU-estimated GPU performance, pool attention, network/SSD, T-to-P or serving speedup is claimed."]
         if r.get("error"): lines += ["","Failure: "+r["error"]]
@@ -486,6 +511,8 @@ def main(argv=None):
     p.add_argument("--stages",default="profile,exans,aqua")
     p.add_argument("--document",default="test_text"); p.add_argument("--kappas",default="0,1")
     p.add_argument("--aqua-python",type=Path,default=ROOT/"runs/_llama_official/envs/aqua/bin/python")
+    p.add_argument("--aqua-calibration",choices=["original","backup"],default="original",
+        help="original keeps author Hub data; backup explicitly opts into pinned RedPajama backup calibration")
     p.add_argument("--receive",type=Path,help=argparse.SUPPRESS)
     args=p.parse_args(argv)
     if args.receive:
