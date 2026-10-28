@@ -1,0 +1,38 @@
+{
+  "status": "software_checked",
+  "gpu_measured": false,
+  "parent_commit": "c11cc1609c29d45870e279b6c438827ccc8a1749",
+  "tests": {
+    "run": 15,
+    "passed": 13,
+    "skipped_actual_cuda": 2
+  },
+  "software": {
+    "torch": "2.14.1+cpu",
+    "triton": "3.6.0",
+    "numpy": "2.3.5"
+  },
+  "syntax_checks": [
+    "python -m py_compile for new Python files",
+    "bash -n scripts/run_lite_symbol_probe_a4500.sh",
+    "git diff --cached --check"
+  ],
+  "inherited_files_checked": 53,
+  "changed_inherited_files": [],
+  "links_gbps": [
+    1,
+    100,
+    200,
+    300,
+    400
+  ],
+  "code_sha256": {
+    "scripts/bench_lite_symbol_probe.py": "9e08c4f62dafd05e72cbd5d4ce1e8cdb1ac9acf4eb9d29d6fc6c3d07acfcee21",
+    "scripts/package_lite_symbol_probe.py": "797453b665b726ecfc380de001c2aa7a66c8273901ae8a9fd3088f3a23365706",
+    "scripts/run_lite_symbol_probe_a4500.sh": "79a8e68f599023e060231c8c653dce3333ac4526c2d3139e81dadc5020bf51b7",
+    "kv_compare/lite_symbol_probe.py": "8b59de4c3f4028dc0774f2941a287f2da157d8b4f2ca129f2646d24a47a4fd04",
+    "tests/test_lite_symbol_probe.py": "66524f53f460a2be688fe715182f1e69797221e0b7d51773325054932c51459e",
+    "tests/test_lite_symbol_probe_runner.py": "292d475dc901b8387b83ef486ce1b759a2947f95b42666d0221f730f5f123b3a"
+  },
+  "scope": "CPU reference arithmetic, exact symbol mapping, source-encoder replay spy, calibration/accounting and protocol checks only; no GPU execution, new entropy packet or candidate decoder-speed measurement"
+}
