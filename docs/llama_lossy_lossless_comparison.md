@@ -201,6 +201,37 @@ The official ExANS codes 10.86-10.87 bits per value here (its re-implementation 
 
 With HIGGS and its closed-loop fit, AQUA-KV reaches at 2.1 bits the quality our codec needs about 3.2 bits for, and at 3.1 bits better quality than ours at 4 bits: about one bit per value better. It does this with more KV error (5.3% at 3 bits against our 3.8% at 2.6 bits), so mean squared error is not what decides quality here. Two differences are likely: AQUA-KV keeps the first 4 tokens (the attention sinks, which receive much of every query's attention) in BF16, and HIGGS scales each token's error with that token's residual, while our step is the same for every token. Our GPU codec at step 4 (+776% perplexity) points the same way. KIVI is behind both. The GPU codec decodes at 17 G values/s (dense) and 25 G values/s (rank 256).
 
+## Results: both uses, the SplitZip mix and the lossy fixes (`7dc5fb6`, run at commit `7bde391`)
+
+**Transfer, lossless, one document (470M values), time and bytes sent:**
+
+| Link | SplitZip | ExANS | Ours alone | Ours + SplitZip mix (layers ours) | Mix vs SplitZip |
+| --- | --- | --- | --- | --- | --- |
+| 1-50 Gb/s | | | 26% fewer bytes | the same (all ours) | 1.34-1.35x |
+| 100 Gb/s | 57 ms, 675 MiB | 51 ms, 608 MiB | 42 ms, 505 MiB | 42 ms, 505 MiB (28) | 1.33x |
+| 200 Gb/s | 28 ms, 675 MiB | 26 ms, 608 MiB | 23 ms, 527 MiB | 23 ms, 541 MiB (24, rank 384) | 1.25x |
+| 400 Gb/s | 14 ms, 675 MiB | 18 ms, 608 MiB | 23 ms, 527 MiB | 13 ms, 628 MiB (8, rank 512) | 1.07x |
+| 800 Gb/s | 7 ms, 675 MiB | 18 ms, 608 MiB | 23 ms, 527 MiB | 7 ms, 675 MiB (0) | 1.00x |
+
+SplitZip's own codec, run here: 12.05 bits per value, 309 GB/s decode. Every mix is a real stream decoded bit-exact; SplitZip coded per layer decodes in 6.5 ms for the document (3.0 ms as one tensor). Our codec alone is slower from 400 Gb/s because its decode (23 ms) sets the time; the link is busy for 11 ms and carries 22% fewer bytes.
+
+**Lossy, with the attention sinks kept exact** (perplexity change, test_text / test_code; 2 documents x 512 continuation tokens, so differences of a few tenths of a percent are within noise):
+
+| Method | Bits per value | Perplexity change | Decode (one document) |
+| --- | --- | --- | --- |
+| AQUA-KV 2-bit | 2.11 | +1.46% / -0.35% | 78 ms (authors' code) |
+| AQUA-KV 3-bit | 3.07 | +0.06% / -0.23% | 78 ms |
+| KIVI 4-bit | 5.23 | +0.28% / +0.23% | 46 ms (authors' code) |
+| Ours (`fast`), step 4, sinks | 2.14 / 2.05 | +0.09% / -0.25% | no GPU decoder |
+| Ours (`fast`), step 2, sinks + token step | 2.17 / 2.16 | +0.03% / +0.14% | no GPU decoder |
+| Ours (`fast`), step 4, sinks + token step | 1.77 / 1.77 | +1.77% / -0.72% | no GPU decoder |
+| Ours, GPU codec, step 4, sinks | 1.96 / 1.88 | +0.98% / +0.68% | 27 ms |
+| Ours, GPU codec, step 2, sinks + token step | 2.28 / 2.27 | -0.58% / -1.13% | 27 ms |
+
+Keeping the first 4 tokens exact (0.02 bits per value) is what was missing: without it our codec at 2.1-2.4 bits lost 4-20% perplexity, with it the same streams lose under 1%. With the sinks our lossy codec matches AQUA-KV 3-bit quality at about 2.2 bits and AQUA-KV 2-bit quality at 1.8-1.9 bits; the token step saves about 0.3-0.4 bits per value more but only together with the sinks (without them it fails at large steps).
+
+**Pool (one 8K prefix; recompute 992 ms, raw BF16 896 MiB, 14 prefixes fit):** SplitZip 675 MiB (19 fit), back in 3 ms; ExANS 608 MiB (21), 18 ms; ours lossless 501-527 MiB (24-25), 23 ms (rank 256) to 101 ms (fewest bits); AQUA-KV 2-bit 118 MiB (108), 78 ms, adding it 0.95 s; our GPU codec step 4 with sinks 107 MiB (119), 27 ms, adding it 55 ms.
+
 ## Next run: both uses (T and P), the SplitZip mix and two lossy fixes
 
 - **Transfer (T), two versions.** Version 1 is our codec alone; version 2 mixes it with the authors' SplitZip codec per layer (`kv_compare/mixed.py`): the layers where ours saves the most are coded by ours, the rest by SplitZip, for 0-28 layers of ours, each mix a real stream decoded bit-exact and timed. With 0 layers of ours the mix is SplitZip, so the best mix per link is never slower than SplitZip. Every cell gives the time and the bytes sent, so a link where we are slower also shows how many fewer bytes we send and how long the link is actually busy.
