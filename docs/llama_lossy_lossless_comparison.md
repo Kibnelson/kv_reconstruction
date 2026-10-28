@@ -232,11 +232,33 @@ Keeping the first 4 tokens exact (0.02 bits per value) is what was missing: with
 
 **Pool (one 8K prefix; recompute 992 ms, raw BF16 896 MiB, 14 prefixes fit):** SplitZip 675 MiB (19 fit), back in 3 ms; ExANS 608 MiB (21), 18 ms; ours lossless 501-527 MiB (24-25), 23 ms (rank 256) to 101 ms (fewest bits); AQUA-KV 2-bit 118 MiB (108), 78 ms, adding it 0.95 s; our GPU codec step 4 with sinks 107 MiB (119), 27 ms, adding it 55 ms.
 
-## Next run: both uses (T and P), the SplitZip mix and two lossy fixes
+## Next run: a larger quality test and our prediction in SplitZip's format
 
-- **Transfer (T), two versions.** Version 1 is our codec alone; version 2 mixes it with the authors' SplitZip codec per layer (`kv_compare/mixed.py`): the layers where ours saves the most are coded by ours, the rest by SplitZip, for 0-28 layers of ours, each mix a real stream decoded bit-exact and timed. With 0 layers of ours the mix is SplitZip, so the best mix per link is never slower than SplitZip. Every cell gives the time and the bytes sent, so a link where we are slower also shows how many fewer bytes we send and how long the link is actually busy.
-- **Pool (P), every method.** Memory per cached 8K prefix, prefixes that fit, time back from GPU or CPU memory, the cost of adding it, and quality. AQUA-KV's and KIVI's decode and encode times come from the authors' own code (`scripts/time_baseline_decoders.py`; AQUA-KV's HIGGS kernel in its own environment, the codes kept on the GPU), SplitZip and ExANS from their official codecs.
-- **Lossy fixes**, in our CPU coder (strong `fast` predictor) and our GPU codec, each also combined: `sinks` (the first 4 tokens exact, as AQUA-KV keeps them) and `token step` (the step follows the token's adaptive spread, like a per-token scale). `--lossy-variants`, `--sink-tokens`.
+- **Lossy quality on WikiText-2** (stage `evalcap`, then `lossy --lossy-docs eval`). The two-document table scores
+  1,024 continuation tokens, so differences of a few tenths of a percent are noise. `evalcap` captures 8 windows of
+  4,096 consecutive tokens of the WikiText-2 raw test split (joined with blank lines, as AQUA-KV's evaluation reads
+  it; each window starts with the BOS token). The lossy stage then runs every method on each window, with a
+  3,072-token prompt and 1,024 scored tokens, for 8,192 scored tokens in all. Results go to `lossy_eval.json`. The
+  report gives the pooled perplexity change, the per-window mean ± standard error and how many windows got worse.
+  `scripts/run_on_nuc.sh` writes the text once with the AQUA-KV environment's `datasets` library.
+- **Our prediction in SplitZip's format, as a real codec** (stage `szcodec`, `kv_compare/szcodec.py`). It uses
+  fixed-length codes chosen per value by our one-step prediction (the "sign + magnitude" variant the `format`
+  probe measured at 10.2 bits dense and 10.5 bits rank 256). Every value of a 32-token × one-head tile is placed by
+  two prefix sums, so there is no entropy coder. Escapes now carry the word in place of the raw bits, which costs
+  less than the probe's side stream. With the reduced-rank product, the second product runs inside the decoding
+  kernel on tensor cores, so the int32 products never go through memory. The stage measures:
+  - dense and rank 256 / 512 products, over four tile shapes, each decoded bit-exact and timed, plus a CUDA graph;
+  - mixes with the authors' SplitZip per layer;
+  - a per-link table against SplitZip, our rANS codec and the rANS mix.
+
+  The aim is to beat SplitZip at 400-800 Gb/s, where our rANS decode (23 ms) is the bottleneck.
+
+```bash
+cd ~/kv_llama32 && git checkout llama32-3b-lossy-lossless-compare \
+    && git pull --ff-only origin llama32-3b-lossy-lossless-compare \
+    && STAGES=evalcap,lossy,szcodec,report \
+       EXTRA="--lossy-docs eval --lossy-variants base,sinks,both --kappas 0.5,1,2,4" bash scripts/run_on_nuc.sh
+```
 
 ## Reference: SmolLM2-135M (same protocol, NumPy implementation)
 

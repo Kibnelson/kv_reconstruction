@@ -425,6 +425,57 @@ for ours in ([True, False, True], [False, True, True], [False, False, False], [T
 """
 
 
+SZ_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
+from kv_compare import szcodec, layerwise, mixed
+rc = layerwise.prepare_rank(study, consts, 32, log=lambda m: None)
+def w16(d):
+    w = torch.stack([d.words(l, "cpu") for l in range(L)])
+    return (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
+cal = [w16(d) for d in study.train]
+c0 = szcodec.SplitZipFormatCodec(consts, study.C, study.hd, tokens_per_program=16)
+_, s0 = next(c0.symbols(words))          # layer 0: prior 1 and no product, so the prediction is the rotated bias
+m0 = layerwise._mu_from_acc(torch.zeros(T, W, dtype=torch.int32), consts["sa"][0], consts["b"][0], consts["cos"],
+                            consts["sin"], study.C, study.hd)
+ref, _, _ = szcodec.ctx_ref(m0, consts["sp"][0][None, :].expand(T, W).contiguous())
+assert float(((s0 >> 17).long() == ref).float().mean()) > 0.99, "contexts"
+sz = mixed.TorchSplitZipStyle("cpu")
+sz.calibrate(words.view(torch.bfloat16))
+books = {}
+for rank, product, BM, ours in ((None, "acc", 16, None), (rc, "fused", 16, None), (rc, "acc", 32, None),
+                                (rc, "fused", 16, [False, True, True]), (None, "acc", 16, [True, False, True])):
+    codec = szcodec.SplitZipFormatCodec(consts, study.C, study.hd, rank=rank, product=product, tokens_per_program=BM,
+                                        rank_tiles=(16, 16, 32, 4))
+    if (rank is not None) in books:
+        codec.share_books(books[rank is not None])
+    else:
+        books[rank is not None] = codec.calibrate(cal)
+    lb = []
+    if ours is None:
+        stream, starts = codec.encode(words, layer_bits=lb)
+        dec, bits = codec.decode(stream, starts, T), codec.bits(stream, starts)
+    else:
+        stream, starts, enc = codec.encode(words, layer_bits=lb, ours=ours, other=sz)
+        dec, bits = codec.decode(stream, starts, T, ours=ours, sz=enc, other=sz), codec.bits(stream, starts, enc, ours)
+    assert torch.equal(dec, words), ("round trip", product, ours, int((dec != words).sum()))
+    assert bits == sum(lb), ("layer bits", bits, sum(lb))
+    print("ok", rank is not None, product, BM, ours, bits / (L * T * W))
+"""
+
+
+class SplitZipFormatTests(unittest.TestCase):
+    def test_splitzip_format_codec_round_trip_interpreted(self):
+        """Our prediction with SplitZip-style fixed-length codes (kv_compare.szcodec) restores the KV bit for bit:
+        dense and reduced-rank products (the second one inside the decoding kernel), two tile sizes, and mixed
+        per layer with a SplitZip-style codec; contexts as documented."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None or torch is None:
+            self.skipTest("Triton and PyTorch are required")
+        r = subprocess.run([sys.executable, "-c", SZ_CHECK, str(ROOT)], capture_output=True, text=True, timeout=2400)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertEqual(r.stdout.count("ok"), 5, r.stdout)
+
+
 class MixedTests(unittest.TestCase):
     def test_mixed_codec_round_trip_interpreted(self):
         """Our per-layer codec mixed with a SplitZip-style codec per layer restores the KV bit for bit for any mix

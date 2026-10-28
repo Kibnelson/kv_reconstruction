@@ -74,6 +74,27 @@ if [ "${CHECKS:-0}" = 1 ]; then
     python scripts/time_baseline_decoders.py kivi --source "$KIVI_SRC" --output "$RUN/time_kivi.json" \
         2>&1 | tail -n 10 | tee -a "$RUN/console.log" || echo "KIVI timing failed (see above)"
 fi
+# stage evalcap: the WikiText-2 raw test split as one text file (joined with blank lines, as AQUA-KV's evaluation
+# reads it), made once with the AQUA-KV environment's datasets library (or this one's, if it has it).
+if [[ ",$STAGES," == *",evalcap,"* ]]; then
+    WT=$RUN/wikitext2_test.txt
+    if [ ! -s "$WT" ]; then
+        PY=python
+        [ -x "$HOME/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python" ] && \
+            PY=$HOME/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python
+        "$PY" - "$WT" <<'EOF'
+import sys
+from datasets import load_dataset
+try:
+    d = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
+except Exception:
+    d = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split="test")
+open(sys.argv[1], "w", encoding="utf-8").write("\n\n".join(d["text"]))
+print(f"wrote {sys.argv[1]}: {len(d)} lines")
+EOF
+    fi
+    EXTRA="--eval-text $WT ${EXTRA:-}"
+fi
 python -u scripts/bench_llama_compare.py --device cuda --output "$RUN" --stages "$STAGES" ${EXTRA:-} 2>&1 \
     | tee -a "$RUN/console.log"
 

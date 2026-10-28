@@ -92,7 +92,8 @@ def memory_note(device=None):
     return note
 
 
-STAGES = ("capture", "lossless", "lossy", "frontier", "gpu_speed", "pool", "format", "exans", "report")
+STAGES = ("capture", "evalcap", "lossless", "lossy", "frontier", "gpu_speed", "pool", "format", "szcodec", "exans",
+          "report")
 BRANCH = "llama32-3b-lossy-lossless-compare"
 
 
@@ -133,6 +134,33 @@ def stage_capture(args, out):
     meta = model_meta(model, args.model, args.revision)
     queries = set(TRAIN) if not args.no_queries else set()
     return capture_documents(model, tokenizer, documents, out / "captures", device, args.tokens, queries, meta, log)
+
+
+def stage_evalcap(args, out):
+    """Capture evaluation documents for a larger lossy-quality test: --eval-docs windows of --eval-tokens tokens from
+    --eval-text (WikiText-2 raw test, joined with blank lines as AQUA-KV's perplexity evaluation does), each window
+    starting with the BOS token like a real request, then consecutive text. Saved as eval0, eval1, ..."""
+    import torch
+    from kv_compare.capture import capture_ids, load_model
+    if args.eval_text is None or not Path(args.eval_text).is_file():
+        raise SystemExit("evalcap needs --eval-text (a text file, e.g. WikiText-2 raw test)")
+    device = torch.device(args.device)
+    tokenizer, model = load_model(args.model, args.revision, device)
+    ids = tokenizer(Path(args.eval_text).read_text(encoding="utf-8"), add_special_tokens=False)["input_ids"]
+    bos = tokenizer.bos_token_id
+    step = args.eval_tokens - (1 if bos is not None else 0)
+    if len(ids) < step * args.eval_docs:
+        raise SystemExit(f"{args.eval_text} has {len(ids)} tokens; {step * args.eval_docs} needed")
+    reports = []
+    for i in range(args.eval_docs):
+        window = ([bos] if bos is not None else []) + ids[i * step:(i + 1) * step]
+        log(f"evalcap eval{i}: tokens {i * step}-{(i + 1) * step - 1} of {Path(args.eval_text).name}")
+        info = capture_ids(model, window, out / "captures", f"eval{i}", device)
+        info["source"] = f"{args.eval_text} tokens {i * step}-{(i + 1) * step - 1}"
+        reports.append(info)
+    (out / "captures" / "eval_meta.json").write_text(json.dumps({"text": str(args.eval_text), "tokens": args.eval_tokens,
+                                                                  "captures": reports}, indent=1))
+    return reports
 
 
 def chunk_spans(tokens):
@@ -190,14 +218,18 @@ def stage_lossy(args, out):
     from kv_compare.core import words_to_float
     from kv_compare.predict import CONFIGS, Study
     from kv_compare.quality import continuation_nll, matrices_from_doc, matrices_from_values
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    if args.lossy_docs == "eval":                 # the larger quality test (stage evalcap): its own result file
+        docs = [f"eval{i}" for i in range(args.eval_docs)]
+        P, M, result_file = args.eval_prompt_tokens, args.eval_continuation_tokens, "lossy_eval.json"
+    else:
+        docs, P, M, result_file = TESTS, args.prompt_tokens, args.continuation_tokens, "lossy.json"
+    study = Study(out / "captures", args.device, TRAIN, "tables", docs, None, log=log)
     cfg = CONFIGS[args.lossy_config]
     if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
         log(f"{args.lossy_config} needs calibration queries; using fast_noatt")
         cfg = CONFIGS["fast_noatt"]
     import gc
     device = torch.device(args.device)
-    P, M = args.prompt_tokens, args.continuation_tokens
 
     # References first (fails in seconds, before the fits). The reference is the captured exact KV restored into
     # the cache: what a lossless transfer delivers. The captures come from prefilling the whole 8,192-token
@@ -256,7 +288,9 @@ def stage_lossy(args, out):
     if "ours" in chosen:
         log(f"fitting our predictor ({cfg.name}) for closed-loop coding")
         study.keep_qmaps = True          # the closed loop needs every layer's query map; keep them (~0.7 GB)
+        all_tests, study.tests = study.tests, study.tests[:1]      # the fit needs no test costs; one is enough
         study.lossless(cfg, fits)
+        study.tests = all_tests
         study._f.clear(); study._att.clear()
     if "aqua" in chosen:
         for b in (2, 3, 4):              # one fit per bit width, each on its own closed-loop reconstructions
@@ -272,8 +306,8 @@ def stage_lossy(args, out):
     result = {"prompt_tokens": P, "continuation_tokens": M, "lossy_config": cfg.name,
               "reference": "captured exact KV restored into the cache", "documents": {}}
     previous = None
-    if chosen != {"ours", "aqua", "kivi", "fp8", "gpu"} and (out / "lossy.json").is_file():
-        previous = json.loads((out / "lossy.json").read_text())
+    if chosen != {"ours", "aqua", "kivi", "fp8", "gpu"} and (out / result_file).is_file():
+        previous = json.loads((out / result_file).read_text())
         if (previous.get("prompt_tokens"), previous.get("continuation_tokens")) != (P, M):
             raise SystemExit("--lossy-methods merges into lossy.json, which used other prompt/continuation lengths")
         log(f"rerunning {sorted(chosen)}; other rows are kept from the existing lossy.json")
@@ -328,7 +362,7 @@ def stage_lossy(args, out):
             order = [k for k in previous["documents"][doc.name] if k in rows]
             rows = {k: rows[k] for k in order + [k for k in rows if k not in order]}
         result["documents"][doc.name] = rows
-        (out / "lossy.json").write_text(json.dumps(result, indent=1))          # partial results survive a crash
+        (out / result_file).write_text(json.dumps(result, indent=1))           # partial results survive a crash
     log(f"lossy stage done ({memory_note(args.device)})")
     del model, study, fits, aqua
     gc.collect()
@@ -418,6 +452,110 @@ def stage_format(args, out):
     gc.collect()
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
     return res
+
+
+def stage_szcodec(args, out):
+    """Our prediction in SplitZip's format as a real GPU codec (kv_compare.szcodec): fixed-length codes chosen by
+    the one-step prediction, decoded bit-exact and timed on the first test document; dense and reduced-rank
+    products, tile sizes, a CUDA graph, and mixes with the authors' SplitZip per layer."""
+    import gc
+    import torch
+    from kv_compare import fused
+    from kv_compare.gpu_speed import szcodec_rows
+    from kv_compare.predict import Study
+    device = torch.device(args.device)
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    consts = fused.prepare(study, log=log)
+
+    def w16(d):
+        T = d.tokens - d.tokens % 128
+        w = torch.stack([d.words(l, device, rows=T) for l in range(study.L)])
+        return (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
+    words = w16(study.tests[0])
+    cal = [w16(d) for d in study.train[:2]]
+    log(f"szcodec: {study.tests[0].name}, {words.numel() / 1e6:.0f}M values; code books from "
+        f"{', '.join(d.name for d in study.train[:2])}; products {args.sz_ranks or ['dense']}, tiles {args.sz_configs}")
+    rows = szcodec_rows(consts, study, words, cal, device, log, ranks=[r or None for r in args.sz_ranks],
+                        configs=args.sz_configs, splitzip_source=(args.splitzip_source or (out / "splitzip"))
+                        if device.type == "cuda" else None, counts=args.mix_counts)
+    res = {"gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu", "doc": study.tests[0].name,
+           "calibration": [d.name for d in study.train[:2]], "rows": rows}
+    (out / "szcodec.json").write_text(json.dumps(res, indent=1))
+    del study, consts, words, cal
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    return res
+
+
+def szcodec_lines(out):
+    """The SplitZip-format codec: the measured modes, then time and bytes per link next to SplitZip, our rANS codec
+    and the rANS mix (from gpu_speed.json when present)."""
+    res = json.loads((out / "szcodec.json").read_text())
+    rows = [r for r in res["rows"] if r["part"] == "szcodec"]
+    ok = [r for r in rows if r.get("bit_exact")]
+    lines = ["## Our prediction in SplitZip's format: the real codec (kv_compare/szcodec.py)", "",
+             "Fixed-length codes chosen per value by our one-step prediction (sign agreement + magnitude residual, "
+             "per-context b raw bits and a k-bit code, escapes carry the word), so every value of a tile is placed by "
+             "two prefix sums, as in SplitZip; no entropy coder. Code books from "
+             f"{', '.join(res['calibration'])}; measured on {res['doc']} on the {res['gpu']}, bit-exact round trip "
+             "checked. Reduced rank: the second product runs inside the decoding kernel (tensor cores), so the int32 "
+             "products never go through memory. Bits include the 32-bit segment starts and padding.", "",
+             "| Product | Tokens x head per program, warps | Bits per value | Decode | G values/s | Exact |",
+             "| --- | --- | --- | --- | --- | --- |"]
+    for r in rows:
+        prod = ("dense (cuBLAS, through memory)" if not r["rank"] else
+                f"rank {r['rank']}, " + ("inside the kernel" if r["product"] == "fused" else "through memory"))
+        tile = f"{r['tokens_per_program']}, {r['warps']}" + (", CUDA graph" if r.get("graph") else "")
+        if "error" in r:
+            lines.append(f"| {prod} | {tile} | not measured: {r['error'][:120]} | | | |")
+        else:
+            lines.append(f"| {prod} | {tile} | {r['stream_bits_per_value']:.3f} | {r['decode_ms']:.2f} ms | "
+                         f"{r['decode_gvalues_per_s']:.1f} | {r['bit_exact']} |")
+    if not ok:
+        return lines + [""]
+    n = ok[0]["values"]
+    szr = next((r for r in res["rows"] if r["part"] == "splitzip_official" and r.get("bit_exact")), None)
+    g = json.loads((out / "gpu_speed.json").read_text())["rows"] if (out / "gpu_speed.json").is_file() else []
+    if szr is None:
+        szr = next((r for r in g if r["part"] == "splitzip_official" and r.get("bit_exact")), None)
+    if szr is None:
+        return lines + ["", "(SplitZip not measured in this run: no per-link comparison.)", ""]
+    rans = [r for r in g if r["part"] in ("fused", "layerwise") and r.get("bit_exact") and r.get("values") == n]
+    rmix = [r for r in g if r["part"] == "mixed" and r.get("bit_exact") and r.get("values") == n]
+    smix = [r for r in res["rows"] if r["part"] == "szcodec_mixed" and r.get("bit_exact")]
+    t = lambda r, R: max(r["stream_bits_per_value"] / R, 1 / r["decode_gvalues_per_s"]) * n / 1e9
+    ms = lambda sec: f"{1e3 * sec:.1f} ms"
+    mib = lambda r: f"{r['stream_bits_per_value'] * n / 8 / 2 ** 20:.0f} MiB"
+
+    def best(pool, R):
+        return min(pool, key=lambda r: t(r, R)) if pool else None
+
+    def desc(r):
+        if r is None:
+            return "-"
+        kind = f"rank {r['rank']}" if r.get("rank") else "dense"
+        if r["part"] == "szcodec_mixed":
+            return f"{kind}, {r['ours_layers']} layers ours"
+        if r["part"] == "mixed":
+            return f"{r['mode']}, {r['ours_layers']} layers ours"
+        return kind
+
+    def cell(r, R):
+        return f"{ms(t(r, R))}, {mib(r)}" if r is not None else "not measured"
+    lines += ["", f"Per link ({n / 1e6:.0f}M values; time = the longer of the wire time and the decode, decoding "
+              f"overlapped with arrival; SplitZip: the authors' codec run here, {szr['stream_bits_per_value']:.3f} bits/value, "
+              f"{szr['decode_ms']:.2f} ms decode). Each column is the fastest measured mode of that kind for the link; "
+              "the mixes code the layers where ours saves the most with ours and the rest with SplitZip.", "",
+              "| Link | SplitZip | Ours, rANS | Ours, rANS + SplitZip | Ours, SplitZip format | SplitZip format + SplitZip | "
+              "Best of ours vs SplitZip |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    for R, _band in LINK_BANDS:
+        ts = t(szr, R)
+        a, b, c, d = best(rans, R), best(rmix, R), best(ok, R), best(smix, R)
+        top = min((x for x in (a, b, c, d) if x is not None), key=lambda x: t(x, R))
+        lines.append(f"| {R} Gb/s | {ms(ts)}, {mib(szr)} | {cell(a, R)} | {cell(b, R)} ({desc(b)}) | "
+                     f"{cell(c, R)} ({desc(c)}) | {cell(d, R)} ({desc(d)}) | {ts / t(top, R):.2f}x ({desc(top)}"
+                     f"{', SplitZip format' if top['part'].startswith('szcodec') else ', rANS'}) |")
+    return lines + [""]
 
 
 def format_lines(out):
@@ -1101,6 +1239,38 @@ def frontier_lines(out):
     return lines + [""]
 
 
+def eval_lines(out):
+    """The larger quality test (lossy --lossy-docs eval): every method on the WikiText-2 windows, averaged."""
+    res = json.loads((out / "lossy_eval.json").read_text())
+    docs = list(res["documents"])
+    if not docs:
+        return []
+    em = out / "captures" / "eval_meta.json"
+    src = json.loads(em.read_text()) if em.is_file() else {}
+    n = len(docs)
+    lines = [f"## Lossy quality on WikiText-2 ({n} windows; prompt {res['prompt_tokens']} tokens, perplexity of the "
+             f"next {res['continuation_tokens']} tokens)", "",
+             f"Windows of {src.get('tokens', '?')} consecutive tokens of {Path(src.get('text', 'WikiText-2')).name} "
+             "(the raw test split joined with blank lines, as AQUA-KV's evaluation reads it), each starting with the BOS "
+             f"token; {n * res['continuation_tokens']:,} scored tokens in all. Pooled change = perplexity over all scored "
+             "tokens against the exact KV; per-window = mean ± standard error of the windows' own changes (the spread "
+             "says how far a difference between two rows can be trusted).", "",
+             "| Method | Bits per value | KV relative error | Perplexity change, pooled | Per-window mean ± SE | "
+             "Windows worse |", "| --- | --- | --- | --- | --- | --- |"]
+    labels = [k for k in res["documents"][docs[0]] if k != "exact KV" and all(k in res["documents"][d] for d in docs)]
+    for label in labels:
+        r = [res["documents"][d][label] for d in docs]
+        base = [res["documents"][d]["exact KV"]["nll"] for d in docs]
+        pooled = 100 * (math.exp(float(np.mean([x["nll"] for x in r])) - float(np.mean(base))) - 1)
+        ch = np.array([x["ppl_change_pct"] for x in r])
+        se = float(ch.std(ddof=1) / math.sqrt(n)) if n > 1 else float("nan")
+        lines.append(f"| {label} | {np.mean([x['bits'] for x in r]):.3f} | {100 * np.mean([x['rel_error'] for x in r]):.2f}% | "
+                     f"{pooled:+.2f}% | {ch.mean():+.2f}% ± {se:.2f} | {int((ch > 0).sum())} of {n} |")
+    lines += ["", "Same methods and settings as the two-document table above (AQUA-KV and KIVI as the authors' code "
+              "has them; our variants: sinks = the first tokens exact, token step = one step per token)."]
+    return lines + [""]
+
+
 def stage_report(args, out):
     lines = [f"# KV transfer codecs on {args.model}", ""]
     meta = json.loads((out / "captures" / "meta.json").read_text())
@@ -1143,6 +1313,8 @@ def stage_report(args, out):
         lines += pool_lines(out)
     if (out / "format.json").is_file():
         lines += format_lines(out)
+    if (out / "szcodec.json").is_file():
+        lines += szcodec_lines(out)
     lines += lossy_link_lines(out)
     if (out / "cheap_products.json").is_file():
         cp = json.loads((out / "cheap_products.json").read_text())
@@ -1194,6 +1366,8 @@ def stage_report(args, out):
         if all(x is not None for x in own):
             lines.append("The model's own prefill of the prompt alone differs from it by " +
                          " / ".join(f"{x:+.3f}%" for x in own) + " (GPU kernels round differently at another sequence length).")
+    if (out / "lossy_eval.json").is_file():
+        lines += [""] + eval_lines(out)
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
@@ -1214,6 +1388,14 @@ def parser():
     p.add_argument("--continuation-tokens", type=int, default=512)
     p.add_argument("--max-layers", type=int, default=None, help="lossless and frontier stages: first N layers (smoke tests)")
     p.add_argument("--no-queries", action="store_true", help="skip q_proj capture (drops the attention input)")
+    p.add_argument("--eval-text", type=Path, default=None, help="evalcap: the evaluation text (WikiText-2 raw test)")
+    p.add_argument("--eval-docs", type=int, default=8, help="evalcap / lossy --lossy-docs eval: evaluation windows")
+    p.add_argument("--eval-tokens", type=int, default=4096, help="evalcap: tokens per evaluation window")
+    p.add_argument("--eval-prompt-tokens", type=int, default=3072, help="lossy --lossy-docs eval: transferred prompt")
+    p.add_argument("--eval-continuation-tokens", type=int, default=1024,
+                   help="lossy --lossy-docs eval: continuation tokens scored")
+    p.add_argument("--lossy-docs", default="test", choices=["test", "eval"],
+                   help="lossy: the two test documents (lossy.json) or the evalcap windows (lossy_eval.json)")
     p.add_argument("--lossy-variants", default="base,sinks,token,both",
                    help="lossy stage, ours and gpu: base; sinks (the first --sink-tokens tokens exact); token (the "
                         "step follows the token's adaptive spread); both")
@@ -1253,6 +1435,10 @@ def parser():
                    help="gpu_speed: numbers of layers coded by ours in the measured SplitZip mixes (empty: skip)")
     p.add_argument("--lossy-speed-kappas", default="0.25,0.5,1,2,4",
                    help="gpu_speed: steps of the GPU lossy codec timed on the whole test document (empty: skip)")
+    p.add_argument("--sz-ranks", default="0,256,512",
+                   help="szcodec: products of the SplitZip-format codec (0 = dense, else reduced rank)")
+    p.add_argument("--sz-configs", default="16x4,32x4,32x8,64x8",
+                   help="szcodec: tiles, tokens per program x warps (a program is that many tokens x one head)")
     p.add_argument("--format-ranks", default="256",
                    help="format: reduced-rank products to probe besides the dense one (empty: dense only)")
     p.add_argument("--layer-ranks", default="512,384,256",
@@ -1307,6 +1493,8 @@ def main(argv=None):
     args.layer_configs = [tuple(int(x) for x in t.split("x")) for t in args.layer_configs.split(",") if t]
     args.layer_ranks = [int(r) for r in args.layer_ranks.split(",") if r]
     args.format_ranks = [int(r) for r in args.format_ranks.split(",") if r]
+    args.sz_ranks = [int(r) for r in args.sz_ranks.split(",") if r]
+    args.sz_configs = [tuple(int(x) for x in t.split("x")) for t in args.sz_configs.split(",") if t]
     args.lossy_speed_kappas = [float(k) for k in args.lossy_speed_kappas.split(",") if k]
     args.mix_counts = [int(c) for c in args.mix_counts.split(",") if c]
     if args.splitzip_source is not None and not (args.splitzip_source / "codec_gpu.py").is_file():
@@ -1360,6 +1548,8 @@ def main(argv=None):
     try:
         if "capture" in stages:
             stage_capture(args, out)
+        if "evalcap" in stages:
+            stage_evalcap(args, out)
         if "lossless" in stages:
             stage_lossless(args, out)
         if "lossy" in stages:
@@ -1372,6 +1562,8 @@ def main(argv=None):
             stage_pool(args, out)
         if "format" in stages:
             stage_format(args, out)
+        if "szcodec" in stages:
+            stage_szcodec(args, out)
         if "exans" in stages:
             stage_exans(args, out)
         if "report" in stages:

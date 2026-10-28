@@ -26,7 +26,8 @@ FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.js
          "check_aqua.json": "check_aqua.json", "check_kivi.json": "check_kivi.json", "exans.json": "exans.json",
          "exans/build_fix.diff": "exans_build_fix.diff", "exans/official_test.log": "exans_official_test.log",
          "time_aqua.json": "time_aqua.json", "time_kivi.json": "time_kivi.json",
-         "captures/meta.json": "capture_meta.json"}
+         "lossy_eval.json": "lossy_eval.json", "captures/eval_meta.json": "eval_capture_meta.json",
+         "szcodec.json": "szcodec.json", "captures/meta.json": "capture_meta.json"}
 REQUIRED = ("summary.md", "run_args.json", "environment.json", "captures/meta.json")
 
 
@@ -52,6 +53,20 @@ def check(run):
             if rows["exact KV"]["ppl_change_pct"] != 0.0:
                 raise SystemExit(f"{doc}: lossy rows are not measured against the exact KV")
         checks.append(f"lossy: {len(next(iter(res['documents'].values())))} rows x {len(res['documents'])} documents")
+    if (run / "lossy_eval.json").is_file():
+        res = json.loads((run / "lossy_eval.json").read_text())
+        for doc, rows in res["documents"].items():
+            if rows["exact KV"]["ppl_change_pct"] != 0.0:
+                raise SystemExit(f"{doc}: lossy_eval rows are not measured against the exact KV")
+        if res["documents"] and "## Lossy quality on WikiText-2" not in summary:
+            raise SystemExit("summary.md lacks the WikiText-2 table: rerun --stages report")
+        checks.append(f"lossy_eval: {len(res['documents'])} WikiText-2 windows")
+    if (run / "szcodec.json").is_file():
+        res = json.loads((run / "szcodec.json").read_text())
+        if "## Our prediction in SplitZip's format: the real codec" not in summary:
+            raise SystemExit("summary.md lacks the SplitZip-format codec section: rerun --stages report")
+        rows = [r for r in res["rows"] if r["part"].startswith("szcodec")]
+        checks.append(f"szcodec: {len(rows)} rows, {sum(1 for r in rows if r.get('bit_exact'))} bit-exact")
     if (run / "frontier.json").is_file():
         res = json.loads((run / "frontier.json").read_text())
         checks.append(f"frontier: {len(res['variants'])} variants, {res['layers']} layers")
@@ -62,7 +77,7 @@ def check(run):
         res = json.loads((run / "pool.json").read_text())
         checks.append(f"pool: {len(res.get('codec_rows', []))} codec timings, {res.get('tokens')} tokens")
     if not checks:
-        raise SystemExit("no lossless.json, lossy.json, frontier.json, gpu_speed.json or pool.json in the run")
+        raise SystemExit("no lossless.json, lossy.json, frontier.json, gpu_speed.json, pool.json or szcodec.json in the run")
     return checks
 
 

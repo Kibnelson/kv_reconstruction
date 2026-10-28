@@ -658,3 +658,169 @@ def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uni
             del rc
     del xall, prior
     return rows
+
+
+# ---------------------------------------------------------------------------------------- SplitZip-format codec
+def szcodec_rows(consts, study, words, cal, device, log=print, ranks=(None, 256), configs=((16, 4), (32, 4), (32, 8),
+                 (64, 8)), splitzip_source=None, counts=(), rank_tiles=(128, 128, 64, 4)):
+    """Our prediction with SplitZip-style fixed-length codes (kv_compare.szcodec) on the whole document: per product
+    (dense through cuBLAS; reduced rank with the second product inside the decoding kernel, and through memory),
+    tiles of BM tokens x one head with a number of warps; code books fitted on `cal` (word tensors of the calibration
+    documents). Bit-exact check, the stream's bits (per layer too), encode and decode times; the fastest per product
+    again as a CUDA graph; with splitzip_source, the authors' SplitZip codec on the same document and mixes of the
+    two per layer (counts of our layers, those that save the most)."""
+    import gc
+    import time
+    from .layerwise import prepare_rank
+    from .szcodec import SplitZipFormatCodec
+    L, T, W = words.shape
+    n = L * T * W
+    rows = []
+    sz = commit = None
+    if splitzip_source is not None:
+        try:
+            from .mixed import load_splitzip
+            sz, commit = load_splitzip(splitzip_source, device, log)
+            cover = sz.calibrate(cal[0].view(torch.bfloat16))
+            enc = sz.encode(words.view(torch.bfloat16))
+            dec = sz.decode(enc)
+            ok = bool(torch.equal(dec.view(torch.int16), words.reshape(-1)))
+            td = timer(lambda: sz.decode(enc), device, warmup=3, reps=10)
+            te = timer(lambda: sz.encode(words.view(torch.bfloat16)), device, warmup=3, reps=10)
+            b = 8 * enc.compressed_bytes / n
+            rows.append({"part": "splitzip_official", "commit": commit, "bit_exact": ok, "coverage": cover,
+                         "stream_bits_per_value": b, "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
+                         "decode_gvalues_per_s": n / td / 1e9, "decode_gbps": 2 * n / td / 1e9, "values": n,
+                         "doc": study.tests[0].name,
+                         "layer_bits_per_value": [8 * sz.encode(words[l].view(torch.bfloat16)).compressed_bytes /
+                                                  (T * W) for l in range(L)]})
+            log(f"  SplitZip (official {commit[:7]}): exact={ok}, {b:.4f} bits/value, decode {1e3 * td:.2f} ms")
+            del enc, dec
+        except Exception as exc:
+            log(f"  SplitZip official: not measured ({exc!r})")
+            sz = None
+    for r in ranks:
+        try:
+            rc = prepare_rank(study, consts, r, log) if r else None
+        except Exception as exc:
+            log(f"  SplitZip format: rank {r} not prepared ({exc!r})")
+            continue
+        books, done = None, []
+        tiles = rank_tiles if not r or (T % rank_tiles[0] == 0 and r % rank_tiles[1] == 0 and
+                                        W % rank_tiles[2] == 0) else (16, 16, 32, 4)     # (small test models)
+
+        def run(product, BM, nw):
+            nonlocal books
+            tag = (f"SplitZip format, {'rank ' + str(r) if r else 'dense'} product"
+                   f"{' inside the decoding kernel' if product == 'fused' else ' through memory'}, "
+                   f"{BM} tokens x one head, {nw} warps")
+            row = {"part": "szcodec", "rank": r, "product": product, "tokens_per_program": BM, "warps": nw,
+                   "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name, "graph": False}
+            try:
+                codec = SplitZipFormatCodec(consts, study.C, study.hd, rank=rc, product=product,
+                                            tokens_per_program=BM, warps=nw, rank_tiles=tiles)
+                if books is None:
+                    t0 = time.perf_counter()
+                    books = codec.calibrate(cal)
+                    row["calibrate_s"] = time.perf_counter() - t0
+                else:
+                    codec.share_books(books)
+                lb = []
+                stream, starts = codec.encode(words, layer_bits=lb)
+                te = timer(lambda: codec.encode(words), device, warmup=1, reps=2)
+                bufs = codec.buffers(T)
+                dec = codec.decode(stream, starts, T, bufs=bufs)
+                ok = bool(torch.equal(dec, words))
+                td = timer(lambda: codec.decode(stream, starts, T, out=dec, bufs=bufs), device, warmup=2, reps=5)
+                bits = codec.bits(stream, starts) / n
+                row.update(bit_exact=ok, stream_bits_per_value=bits, calibration_bits=codec.calibration_bits,
+                           layer_bits_per_value=[v / (T * W) for v in lb], encode_ms=1e3 * te,
+                           decode_ms=1e3 * td, decode_gvalues_per_s=n / td / 1e9)
+                log(f"  [{tag}]: exact={ok}, {bits:.4f} bits/value (calibration {codec.calibration_bits:.3f}); "
+                    f"encode {1e3 * te:.0f} ms (PyTorch packer), decode {1e3 * td:.2f} ms -> {n / td / 1e9:.1f} G values/s")
+                if ok:
+                    done.append((td, BM, nw, product))
+                del codec, stream, starts, dec, bufs
+            except Exception as exc:
+                row["error"] = repr(exc)[:400]
+                log(f"  [{tag}]: not measured ({row['error']})")
+            gc.collect()
+            torch.cuda.empty_cache() if device.type == "cuda" else None
+            rows.append(row)
+
+        for BM, nw in configs:                       # dense: through cuBLAS; reduced rank: the product inside
+            run("acc" if rc is None else "fused", BM, nw)
+        if rc is not None and done:                  # the fastest tile again with the product through memory
+            _, BM, nw, _p = min(done)
+            run("acc", BM, nw)
+        if done and device.type == "cuda":           # the fastest as a CUDA graph, then mixed with SplitZip
+            try:
+                _, BM, nw, product = min(done)
+                codec = SplitZipFormatCodec(consts, study.C, study.hd, rank=rc, product=product, tokens_per_program=BM,
+                                            warps=nw, rank_tiles=tiles).share_books(books)
+                lb = []
+                stream, starts = codec.encode(words, layer_bits=lb)
+                bufs = codec.buffers(T)
+                dec = torch.empty_like(words)
+                row = {"part": "szcodec", "rank": r, "product": product, "tokens_per_program": BM, "warps": nw,
+                       "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name, "graph": True}
+                try:
+                    g = torch.cuda.CUDAGraph()
+                    side = torch.cuda.Stream(device)
+                    side.wait_stream(torch.cuda.current_stream(device))
+                    with torch.cuda.stream(side):
+                        codec.decode(stream, starts, T, out=dec, bufs=bufs)
+                    torch.cuda.current_stream(device).wait_stream(side)
+                    with torch.cuda.graph(g):
+                        codec.decode(stream, starts, T, out=dec, bufs=bufs)
+                    dec.zero_()
+                    g.replay()
+                    torch.cuda.synchronize(device)
+                    ok = bool(torch.equal(dec, words))
+                    td = timer(g.replay, device, warmup=2, reps=5)
+                    bits = codec.bits(stream, starts) / n
+                    row.update(bit_exact=ok, stream_bits_per_value=bits, layer_bits_per_value=[v / (T * W) for v in lb],
+                               decode_ms=1e3 * td, decode_gvalues_per_s=n / td / 1e9)
+                    log(f"  [SplitZip format, {'rank ' + str(r) if r else 'dense'}, {BM} x {nw}, CUDA graph]: exact={ok}, "
+                        f"decode {1e3 * td:.2f} ms -> {n / td / 1e9:.1f} G values/s")
+                    del g
+                except Exception as exc:
+                    row["error"] = repr(exc)[:400]
+                    log(f"  [SplitZip format, CUDA graph]: not measured ({row['error']})")
+                rows.append(row)
+                szr = next((x for x in rows if x["part"] == "splitzip_official" and x.get("bit_exact")), None)
+                if sz is not None and szr is not None and counts:
+                    sav = [z - b for b, z in zip([v / (T * W) for v in lb], szr["layer_bits_per_value"])]
+                    order = sorted(range(L), key=lambda l: -sav[l])
+                    for m in counts:
+                        mask = [False] * L
+                        for l in order[:min(m, L)]:
+                            mask[l] = True
+                        mrow = {"part": "szcodec_mixed", "rank": r, "product": product, "tokens_per_program": BM,
+                                "warps": nw, "ours_layers": int(sum(mask)), "ours_mask": mask, "values": n,
+                                "doc": study.tests[0].name}
+                        try:
+                            stream_m, starts_m, enc = codec.encode(words, ours=mask, other=sz)
+                            dec = codec.decode(stream_m, starts_m, T, bufs=bufs, ours=mask, sz=enc, other=sz)
+                            ok = bool(torch.equal(dec, words))
+                            td = timer(lambda: codec.decode(stream_m, starts_m, T, out=dec, bufs=bufs, ours=mask, sz=enc,
+                                                            other=sz), device, warmup=2, reps=5)
+                            bits = codec.bits(stream_m, starts_m, enc, mask) / n
+                            mrow.update(bit_exact=ok, stream_bits_per_value=bits, decode_ms=1e3 * td,
+                                        decode_gvalues_per_s=n / td / 1e9)
+                            log(f"  [SplitZip format {'rank ' + str(r) if r else 'dense'} + SplitZip, {mrow['ours_layers']} of "
+                                f"{L} layers ours]: exact={ok}, {bits:.4f} bits/value, decode {1e3 * td:.2f} ms")
+                            del stream_m, starts_m, enc
+                        except Exception as exc:
+                            mrow["error"] = repr(exc)[:400]
+                            log(f"  [SplitZip format mix, {m} layers]: not measured ({mrow['error']})")
+                        gc.collect()
+                        rows.append(mrow)
+                del codec, stream, starts, bufs, dec
+            except Exception as exc:                 # the sweep's rows are kept
+                log(f"  SplitZip format: graph / mix not measured ({exc!r})")
+                rows.append({"part": "szcodec_error", "rank": r, "error": repr(exc)[:400]})
+        del books, rc
+        gc.collect()
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+    return rows
