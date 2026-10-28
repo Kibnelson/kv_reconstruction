@@ -455,7 +455,12 @@ def pool_lines(out):
     c = res["copies"]["raw BF16"]
     lines.append(f"| Raw KV in CPU memory, copied back (pinned / pageable) | {1e3 * c['h2d_pinned']:.0f} / "
                  f"{1e3 * c['h2d_pageable']:.0f} ms | CPU | {raw / 2 ** 20:.0f} MiB |")
-    for r in sorted(rows, key=lambda r: r["decode_ms"]):
+    best = {}
+    for r in rows:                                   # the fastest decode per implementation and mode
+        k = (r["part"], r["mode"])
+        if k not in best or r["decode_ms"] < best[k]["decode_ms"]:
+            best[k] = r
+    for r in sorted(best.values(), key=lambda r: r["decode_ms"]):
         impl = "fused" if r["part"] == "fused" else "per layer"
         key = f"ours lossless ({r['mode']})"
         cp = res["copies"].get(key, {}).get("h2d_pinned")
@@ -798,6 +803,7 @@ def gpu_sharing_note(device):
         if torch.device(device).type != "cuda" or not torch.cuda.is_available():
             return None
         free, total = torch.cuda.mem_get_info(torch.device(device))
+        free += torch.cuda.memory_reserved(torch.device(device))   # cached by this process (an earlier stage)
         note = f"GPU memory free {free / 2 ** 30:.1f} of {total / 2 ** 30:.1f} GB at start"
         if free < 0.8 * total:
             note += (" - WARNING: other processes are using this GPU; memory may run out and any timing is "
