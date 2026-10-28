@@ -1,0 +1,635 @@
+{
+  "status": "software_profiled",
+  "gpu_measured": false,
+  "scope": "CPU-only synthetic 32MiB bit-pattern transport fixture; no model compression result, GPU transfer or A4500 performance claim",
+  "fixture": {
+    "payload_bytes": 33554432,
+    "wire_bytes": 33604029,
+    "shape": [
+      28,
+      8192,
+      2048
+    ],
+    "payload_pattern": "arange int32 converted to int16",
+    "wire_sha256": "6c7f457093b49729a3918bdd7b9420aa10edc3536f58ebe62291114ebe7d93f1"
+  },
+  "sample_order": [
+    [
+      "reference_export",
+      "optimized_export",
+      "reference_import",
+      "optimized_import"
+    ],
+    [
+      "optimized_import",
+      "reference_import",
+      "optimized_export",
+      "reference_export"
+    ],
+    [
+      "reference_export",
+      "optimized_export",
+      "reference_import",
+      "optimized_import"
+    ],
+    [
+      "optimized_import",
+      "reference_import",
+      "optimized_export",
+      "reference_export"
+    ],
+    [
+      "reference_export",
+      "optimized_export",
+      "reference_import",
+      "optimized_import"
+    ],
+    [
+      "optimized_import",
+      "reference_import",
+      "optimized_export",
+      "reference_export"
+    ]
+  ],
+  "measurements": {
+    "reference_export": {
+      "wall_median_ms": 77.31252799931099,
+      "samples_ms": [
+        76.98752600117587,
+        73.03435199719388,
+        79.6529899998859,
+        82.96767499996349,
+        77.63752999744611,
+        75.47056900148164
+      ]
+    },
+    "optimized_export": {
+      "wall_median_ms": 42.290937000871054,
+      "samples_ms": [
+        42.63925800114521,
+        41.9426160005969,
+        40.8078000000387,
+        40.24174900041544,
+        55.2226529980544,
+        56.08610000126646
+      ]
+    },
+    "reference_import": {
+      "wall_median_ms": 59.08320050002658,
+      "samples_ms": [
+        62.44257200160064,
+        60.98683600066579,
+        55.19070499940426,
+        54.50824299987289,
+        62.83052199796657,
+        57.17956499938737
+      ]
+    },
+    "optimized_import": {
+      "wall_median_ms": 34.90824849905039,
+      "samples_ms": [
+        33.29094400032773,
+        36.24864800076466,
+        34.585724999487866,
+        30.927715000871103,
+        35.23077199861291,
+        42.15921300055925
+      ]
+    }
+  },
+  "phase_diagnostics": {
+    "reference_export": {
+      "implementation": "reference",
+      "direction": "export",
+      "profiled": true,
+      "phases": {
+        "packet_validation": {
+          "wall_ms": 0.16791699817986228
+        },
+        "header_encode": {
+          "wall_ms": 0.03152600038447417
+        },
+        "directory_encode": {
+          "wall_ms": 0.017054997442755848
+        },
+        "D2H": {
+          "wall_ms": 0.004375997377792373
+        },
+        "dtype_layout_copy": {
+          "wall_ms": 6.247031997190788
+        },
+        "payload_tobytes": {
+          "wall_ms": 19.932131999667035
+        },
+        "framing_assembly": {
+          "wall_ms": 18.38029400096275
+        },
+        "checksum": {
+          "wall_ms": 23.011282999505056
+        },
+        "checksum_append": {
+          "wall_ms": 22.60446600121213
+        }
+      },
+      "cuda_events_requested": false,
+      "scope": "separate instrumented diagnostic; includes Python dispatch/allocation; do not add to ordinary timings",
+      "total_wall_ms": 90.49773000151617,
+      "wire_bytes": 33604029,
+      "payload_bytes": 33554432,
+      "ownership": "immutable owned bytes",
+      "mutable_input_snapshot": false,
+      "payload_sized_host_operations": [
+        "D2H if CUDA",
+        "astype copy",
+        "tobytes copy",
+        "frame assembly copy",
+        "checksum append copy"
+      ],
+      "allocation_scope": "D2H includes host tensor allocation; astype/tobytes/frame assembly each allocate; phases are not additive ordinary timings"
+    },
+    "optimized_export": {
+      "implementation": "low_copy",
+      "direction": "export",
+      "profiled": true,
+      "phases": {
+        "packet_validation": {
+          "wall_ms": 0.2771969993773382
+        },
+        "header_encode": {
+          "wall_ms": 0.035692999517777935
+        },
+        "D2H": {
+          "wall_ms": 0.00726999860489741
+        },
+        "dtype_layout_copy": {
+          "wall_ms": 0.01536300260340795
+        },
+        "directory_views": {
+          "wall_ms": 0.03387000106158666
+        },
+        "checksum": {
+          "wall_ms": 21.58454800155596
+        },
+        "framing_assembly": {
+          "wall_ms": 16.92567899954156
+        }
+      },
+      "cuda_events_requested": false,
+      "scope": "separate instrumented diagnostic; includes Python dispatch/allocation; do not add to ordinary timings",
+      "total_wall_ms": 39.02604399991105,
+      "wire_bytes": 33604029,
+      "payload_bytes": 33554432,
+      "ownership": "immutable owned bytes",
+      "mutable_input_snapshot": false,
+      "payload_sized_host_operations": [
+        "D2H if CUDA",
+        "one final frame assembly copy"
+      ],
+      "dtype_layout_copy_performed": false,
+      "allocation_scope": "D2H includes host tensor allocation; final join allocates one owned immutable frame; no pinned workspace"
+    },
+    "reference_import": {
+      "implementation": "reference",
+      "direction": "import",
+      "profiled": true,
+      "phases": {
+        "snapshot": {
+          "wall_ms": 0.0028340000426396728
+        },
+        "frame_parse": {
+          "wall_ms": 0.009914998372551054
+        },
+        "checksum_input_copy": {
+          "wall_ms": 12.158801000623498
+        },
+        "checksum": {
+          "wall_ms": 23.93297600065125
+        },
+        "header_parse": {
+          "wall_ms": 0.1789130001270678
+        },
+        "directory_parse": {
+          "wall_ms": 0.15229299970087595
+        },
+        "payload_bytes_slice": {
+          "wall_ms": 11.626728999544866
+        },
+        "payload_cpu_copy": {
+          "wall_ms": 8.152319001965225
+        },
+        "H2D": {
+          "wall_ms": 0.01472100120736286
+        },
+        "packet_validation": {
+          "wall_ms": 0.4143090009165462
+        }
+      },
+      "cuda_events_requested": false,
+      "scope": "separate instrumented diagnostic; includes Python dispatch/allocation; do not add to ordinary timings",
+      "total_wall_ms": 56.73253900022246,
+      "wire_bytes": 33604029,
+      "payload_bytes": 33554432,
+      "ownership": "owned CPU payload copy or owned GPU upload; owned directory tensors",
+      "mutable_input_snapshot": false,
+      "payload_sized_host_operations": [
+        "mutable input snapshot if needed",
+        "checksum input slice",
+        "payload bytes slice",
+        "NumPy owned copy",
+        "H2D if CUDA"
+      ],
+      "allocation_scope": "payload_cpu_copy allocates owned host storage; H2D includes GPU allocation"
+    },
+    "optimized_import": {
+      "implementation": "low_copy",
+      "direction": "import",
+      "profiled": true,
+      "phases": {
+        "snapshot": {
+          "wall_ms": 0.001272001100005582
+        },
+        "frame_parse": {
+          "wall_ms": 0.007771002856316045
+        },
+        "checksum": {
+          "wall_ms": 22.30556699942099
+        },
+        "header_parse": {
+          "wall_ms": 0.0941279977269005
+        },
+        "directory_parse": {
+          "wall_ms": 0.07616199945914559
+        },
+        "payload_view": {
+          "wall_ms": 0.042673000280046836
+        },
+        "packet_validation": {
+          "wall_ms": 0.3560229997674469
+        },
+        "payload_cpu_copy": {
+          "wall_ms": 11.351736000506207
+        }
+      },
+      "cuda_events_requested": false,
+      "scope": "separate instrumented diagnostic; includes Python dispatch/allocation; do not add to ordinary timings",
+      "total_wall_ms": 34.29109399803565,
+      "wire_bytes": 33604029,
+      "payload_bytes": 33554432,
+      "ownership": "owned CPU clone or owned blocking GPU upload; owned directory tensors",
+      "mutable_input_snapshot": false,
+      "host_payload_owner_retained_until_upload_complete": true,
+      "payload_sized_host_operations": [
+        "mutable input snapshot if needed",
+        "one owned CPU clone if CPU destination",
+        "blocking H2D if CUDA"
+      ],
+      "allocation_scope": "CPU clone or H2D allocates returned owned payload; no pinned workspace"
+    }
+  },
+  "cprofile": {
+    "reference_export": [
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 201, 'export')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 33.069313,
+        "cumulative_ms": 83.230992
+      },
+      {
+        "function": "('~', 0, '<built-in method _hashlib.openssl_sha256>')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 24.114292000000003,
+        "cumulative_ms": 24.114292000000003
+      },
+      {
+        "function": "('~', 0, \"<method 'tobytes' of 'numpy.ndarray' objects>\")",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_ms": 18.520921,
+        "cumulative_ms": 18.520921
+      },
+      {
+        "function": "('~', 0, \"<method 'astype' of 'numpy.ndarray' objects>\")",
+        "primitive_calls": 4,
+        "calls": 4,
+        "self_ms": 6.699295,
+        "cumulative_ms": 6.699295
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_transport.py', 86, 'reference_export')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 2.1858890000000004,
+        "cumulative_ms": 85.416881
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 172, 'validate')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.403843,
+        "cumulative_ms": 0.646529
+      },
+      {
+        "function": "('/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py', 183, 'encode')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.084814,
+        "cumulative_ms": 0.15595900000000001
+      },
+      {
+        "function": "('/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py', 205, 'iterencode')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.06899100000000001,
+        "cumulative_ms": 0.06899100000000001
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/gpu_validation_support/numpy/_core/fromnumeric.py', 2477, 'any')",
+        "primitive_calls": 8,
+        "calls": 8,
+        "self_ms": 0.064415,
+        "cumulative_ms": 0.113207
+      },
+      {
+        "function": "('~', 0, \"<method 'numpy' of 'torch._C.TensorBase' objects>\")",
+        "primitive_calls": 5,
+        "calls": 5,
+        "self_ms": 0.057142000000000005,
+        "cumulative_ms": 0.057142000000000005
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 123, 'geometry')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.03452,
+        "cumulative_ms": 0.050023000000000005
+      },
+      {
+        "function": "('~', 0, \"<method 'reduce' of 'numpy.ufunc' objects>\")",
+        "primitive_calls": 8,
+        "calls": 8,
+        "self_ms": 0.032818,
+        "cumulative_ms": 0.032818
+      }
+    ],
+    "optimized_export": [
+      {
+        "function": "('~', 0, \"<method 'update' of '_hashlib.HASH' objects>\")",
+        "primitive_calls": 5,
+        "calls": 5,
+        "self_ms": 25.008145000000003,
+        "cumulative_ms": 25.008145000000003
+      },
+      {
+        "function": "('~', 0, \"<method 'join' of 'bytes' objects>\")",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 19.616749000000002,
+        "cumulative_ms": 19.616749000000002
+      },
+      {
+        "function": "('~', 0, \"<method 'numpy' of 'torch._C.TensorBase' objects>\")",
+        "primitive_calls": 7,
+        "calls": 7,
+        "self_ms": 0.21111800000000003,
+        "cumulative_ms": 0.21111800000000003
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 172, 'validate')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.18547500000000003,
+        "cumulative_ms": 0.46535300000000007
+      },
+      {
+        "function": "('~', 0, \"<method 'reduce' of 'numpy.ufunc' objects>\")",
+        "primitive_calls": 8,
+        "calls": 8,
+        "self_ms": 0.153978,
+        "cumulative_ms": 0.153978
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_transport.py', 79, '_checksum_parts')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.13579,
+        "cumulative_ms": 25.154801000000003
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_transport.py', 109, 'fast_export')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.091755,
+        "cumulative_ms": 45.654506000000005
+      },
+      {
+        "function": "('~', 0, \"<method 'disable' of '_lsprof.Profiler' objects>\")",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.024486,
+        "cumulative_ms": 0.024486
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_transport.py', 71, '_little_view')",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_ms": 0.022892,
+        "cumulative_ms": 0.025516
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 123, 'geometry')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.020711000000000004,
+        "cumulative_ms": 0.028862000000000002
+      },
+      {
+        "function": "('~', 0, \"<method 'astype' of 'numpy.ndarray' objects>\")",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.019368000000000003,
+        "cumulative_ms": 0.019368000000000003
+      },
+      {
+        "function": "('~', 0, \"<method 'numel' of 'torch._C.TensorBase' objects>\")",
+        "primitive_calls": 2,
+        "calls": 2,
+        "self_ms": 0.017926,
+        "cumulative_ms": 0.017926
+      }
+    ],
+    "reference_import": [
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 209, 'import_bytes')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 27.684592000000002,
+        "cumulative_ms": 57.323105000000005
+      },
+      {
+        "function": "('~', 0, '<built-in method _hashlib.openssl_sha256>')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 22.084353,
+        "cumulative_ms": 22.084353
+      },
+      {
+        "function": "('~', 0, \"<method 'copy' of 'numpy.ndarray' objects>\")",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_ms": 6.830108000000001,
+        "cumulative_ms": 6.830108000000001
+      },
+      {
+        "function": "('~', 0, \"<method 'to' of 'torch._C.TensorBase' objects>\")",
+        "primitive_calls": 5,
+        "calls": 5,
+        "self_ms": 0.10553400000000002,
+        "cumulative_ms": 0.10553400000000002
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 160, '__init__')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.100951,
+        "cumulative_ms": 0.44402200000000003
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 172, 'validate')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.096773,
+        "cumulative_ms": 0.20977700000000002
+      },
+      {
+        "function": "('~', 0, '<built-in method torch.from_numpy>')",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_ms": 0.080788,
+        "cumulative_ms": 0.080788
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 123, 'geometry')",
+        "primitive_calls": 2,
+        "calls": 2,
+        "self_ms": 0.040739000000000004,
+        "cumulative_ms": 0.055612
+      },
+      {
+        "function": "('~', 0, '<built-in method numpy.frombuffer>')",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_ms": 0.038006000000000005,
+        "cumulative_ms": 0.038006000000000005
+      },
+      {
+        "function": "('~', 0, \"<method 'reduce' of 'numpy.ufunc' objects>\")",
+        "primitive_calls": 8,
+        "calls": 8,
+        "self_ms": 0.030535000000000007,
+        "cumulative_ms": 0.030535000000000007
+      },
+      {
+        "function": "('~', 0, \"<method 'disable' of '_lsprof.Profiler' objects>\")",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.025337000000000002,
+        "cumulative_ms": 0.025337000000000002
+      },
+      {
+        "function": "('~', 0, \"<method 'any' of 'torch._C.TensorBase' objects>\")",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.023865000000000004,
+        "cumulative_ms": 0.023865000000000004
+      }
+    ],
+    "optimized_import": [
+      {
+        "function": "('~', 0, '<built-in method _hashlib.openssl_sha256>')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 23.311735,
+        "cumulative_ms": 23.311735
+      },
+      {
+        "function": "('~', 0, \"<method 'clone' of 'torch._C.TensorBase' objects>\")",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_ms": 11.064283000000001,
+        "cumulative_ms": 11.064283000000001
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 172, 'validate')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.092645,
+        "cumulative_ms": 0.177931
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 160, '__init__')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.087198,
+        "cumulative_ms": 0.36387400000000003
+      },
+      {
+        "function": "('~', 0, \"<method 'to' of 'torch._C.TensorBase' objects>\")",
+        "primitive_calls": 4,
+        "calls": 4,
+        "self_ms": 0.05503000000000001,
+        "cumulative_ms": 0.05503000000000001
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_transport.py', 193, 'fast_import')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.048964,
+        "cumulative_ms": 35.133029
+      },
+      {
+        "function": "('/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py', 344, 'raw_decode')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.045386,
+        "cumulative_ms": 0.045386
+      },
+      {
+        "function": "('~', 0, \"<method 'disable' of '_lsprof.Profiler' objects>\")",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.045367000000000005,
+        "cumulative_ms": 0.045367000000000005
+      },
+      {
+        "function": "('~', 0, '<built-in method torch.from_numpy>')",
+        "primitive_calls": 3,
+        "calls": 3,
+        "self_ms": 0.035924000000000005,
+        "cumulative_ms": 0.035924000000000005
+      },
+      {
+        "function": "('~', 0, \"<method 'copy' of 'numpy.ndarray' objects>\")",
+        "primitive_calls": 2,
+        "calls": 2,
+        "self_ms": 0.029434000000000002,
+        "cumulative_ms": 0.029434000000000002
+      },
+      {
+        "function": "('/workspace/scratch/cf461553fac4/kv_lite_finish/kv_compare/team_packet.py', 123, 'geometry')",
+        "primitive_calls": 2,
+        "calls": 2,
+        "self_ms": 0.027945,
+        "cumulative_ms": 0.03839700000000001
+      },
+      {
+        "function": "('<stdin>', 10, '<lambda>')",
+        "primitive_calls": 1,
+        "calls": 1,
+        "self_ms": 0.025207,
+        "cumulative_ms": 35.158236
+      }
+    ]
+  }
+}
