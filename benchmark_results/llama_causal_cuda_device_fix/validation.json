@@ -1,0 +1,23 @@
+{
+  "format": "causal_cuda_device_startup_fix_v1",
+  "gpu_measured": false,
+  "source_parent": "7e6991847253def67a01dc6fd5e0e759012a988c",
+  "reported_failure": "torch.cuda.set_device(torch.device(cuda)) requires an explicit index",
+  "change": "Resolve unindexed CUDA to the current device; default CLI is cuda:0; preserve explicit device indices.",
+  "tests": {
+    "passed": 7,
+    "failed": 0,
+    "scope": "CUDA API calls mocked on CPU; existing startup/guard tests included. No GPU execution."
+  },
+  "checks": [
+    "unindexed cuda resolved before set_device, allocation and synchronization",
+    "explicit cuda:1 preserved",
+    "default cuda:0",
+    "CPU/interpreter production fallback rejected",
+    "cached model shard and report preservation guards"
+  ],
+  "files_sha256": {
+    "scripts/bench_llama_causal.py": "e079d4c0fecb0534e0c30f1be652205c336e73a630ddcbebd8043190d242124a",
+    "tests/test_llama_causal.py": "2b430ea78657a291d758558fc5878fe7f77397ed4b90e81b711a733e4c50c073"
+  }
+}

@@ -39,6 +39,8 @@ def device_check(device, software_check=False):
     elif d.type != "cuda" or os.environ.get("TRITON_INTERPRET") or not torch.cuda.is_available():
         raise RuntimeError("Actual CUDA required; no CPU/interpreter benchmark substitution")
     if d.type == "cuda":
+        if d.index is None:
+            d = torch.device("cuda", torch.cuda.current_device())
         torch.cuda.set_device(d)
         torch.ones(1, device=d).add_(1); torch.cuda.synchronize(d)
         torch.backends.cuda.matmul.allow_tf32 = False
@@ -324,7 +326,7 @@ def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--source-run", type=Path)
     p.add_argument("--output", type=Path)
-    p.add_argument("--device", default="cuda")
+    p.add_argument("--device", default="cuda:0")
     p.add_argument("--policies", default="block32,lite")
     p.add_argument("--kappas", default="0.5,1")
     p.add_argument("--tokens", type=int, default=512)

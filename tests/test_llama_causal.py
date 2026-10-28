@@ -214,6 +214,56 @@ class CausalTests(unittest.TestCase):
         self.assertLess(packed.numel(), buf.numel())
 
 
+class DeviceTests(unittest.TestCase):
+    def test_unindexed_cuda_is_resolved_before_every_cuda_call(self):
+        from scripts import bench_llama_causal as bench
+        from unittest import mock
+        with mock.patch.dict(os.environ, {}, clear=True), \
+                mock.patch.object(torch.cuda, "is_available", return_value=True), \
+                mock.patch.object(torch.cuda, "current_device", return_value=2) as current, \
+                mock.patch.object(torch.cuda, "set_device") as select, \
+                mock.patch.object(torch.cuda, "synchronize") as sync, \
+                mock.patch.object(torch, "ones") as ones, \
+                mock.patch.object(torch, "use_deterministic_algorithms"), \
+                mock.patch.object(torch, "backends", mock.Mock()):
+            _, device = bench.device_check("cuda")
+            self.assertEqual(device, torch.device("cuda:2"))
+            current.assert_called_once_with()
+            select.assert_called_once_with(device)
+            sync.assert_called_once_with(device)
+            self.assertEqual(ones.call_args.kwargs["device"], device)
+
+    def test_explicit_cuda_index_is_preserved(self):
+        from scripts import bench_llama_causal as bench
+        from unittest import mock
+        with mock.patch.dict(os.environ, {}, clear=True), \
+                mock.patch.object(torch.cuda, "is_available", return_value=True), \
+                mock.patch.object(torch.cuda, "current_device", side_effect=AssertionError("explicit index replaced")), \
+                mock.patch.object(torch.cuda, "set_device") as select, \
+                mock.patch.object(torch.cuda, "synchronize"), \
+                mock.patch.object(torch, "ones"), \
+                mock.patch.object(torch, "use_deterministic_algorithms"), \
+                mock.patch.object(torch, "backends", mock.Mock()):
+            _, device = bench.device_check("cuda:1")
+            self.assertEqual(device, torch.device("cuda:1"))
+            select.assert_called_once_with(device)
+
+    def test_production_guard_still_rejects_cpu_and_interpreter(self):
+        from scripts import bench_llama_causal as bench
+        from unittest import mock
+        for value, environment in (("cpu", {}), ("cuda", {"TRITON_INTERPRET":"1"})):
+            with mock.patch.dict(os.environ, environment, clear=True), \
+                    mock.patch.object(torch.cuda, "is_available", return_value=True), \
+                    mock.patch.object(torch.cuda, "set_device") as select:
+                with self.assertRaisesRegex(RuntimeError, "Actual CUDA required"):
+                    bench.device_check(value)
+                select.assert_not_called()
+
+    def test_default_cli_device_has_an_explicit_index(self):
+        from scripts import bench_llama_causal as bench
+        self.assertEqual(bench.parser().parse_args([]).device, "cuda:0")
+
+
 class TableTests(unittest.TestCase):
     def test_missing_cached_weight_shard_is_detected_before_fitting(self):
         from scripts import bench_llama_causal as bench
