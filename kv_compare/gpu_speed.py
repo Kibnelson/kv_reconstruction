@@ -142,11 +142,30 @@ def predictor_rows(Hk, hd, Hq, T, device, variants, formats, log=print, seed=0):
                 att = v.get("att")
                 sec = timer(layer, device)
                 parts_only = timer(products, device) if att else sec
+                graph_sec = None
+                if device.type == "cuda" and not att:      # the same products replayed from a CUDA graph
+                    try:
+                        graph = torch.cuda.CUDAGraph()
+                        side = torch.cuda.Stream(device)
+                        side.wait_stream(torch.cuda.current_stream(device))
+                        with torch.cuda.stream(side):
+                            for _ in range(2):
+                                products()
+                        torch.cuda.current_stream(device).wait_stream(side)
+                        with torch.cuda.graph(graph):
+                            products()
+                        graph_sec = timer(graph.replay, device)
+                        del graph
+                    except Exception as exc:                 # capture unsupported: report the plain timing only
+                        log(f"  predictor {v['label']} [{fmt}]: CUDA graph not measured ({exc!r})")
                 rows.append({"part": "predictor", "variant": v["label"], "format": fmt, "tokens": T,
                              "ms_per_layer": 1e3 * sec, "gvalues_per_s": T * W / sec / 1e9,
                              "gb_per_s": 2 * T * W / sec / 1e9,
-                             "ms_without_attention": 1e3 * parts_only if att else None})
-                log(f"  predictor {v['label']} [{fmt}]: {1e3 * sec:.2f} ms/layer, {T * W / sec / 1e9:.1f} G values/s")
+                             "ms_without_attention": 1e3 * parts_only if att else None,
+                             "ms_per_layer_graph": 1e3 * graph_sec if graph_sec else None,
+                             "gvalues_per_s_graph": T * W / graph_sec / 1e9 if graph_sec else None})
+                log(f"  predictor {v['label']} [{fmt}]: {1e3 * sec:.2f} ms/layer, {T * W / sec / 1e9:.1f} G values/s"
+                    + (f"; as a CUDA graph {1e3 * graph_sec:.2f} ms, {T * W / graph_sec / 1e9:.1f} G values/s" if graph_sec else ""))
                 del layer, products
             except Exception as exc:                         # e.g. _int_mm unsupported on this device
                 rows.append({"part": "predictor", "variant": v["label"], "format": fmt, "error": repr(exc)})

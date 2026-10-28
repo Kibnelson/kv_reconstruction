@@ -292,6 +292,8 @@ def stage_gpu_speed(args, out):
     variants = [
         {"label": "P, 1 pivot step", "ne": W, "steps": 1},
         {"label": "P, 16 pivot steps, rank 128", "ne": W, "rank": 128, "steps": 16},
+        {"label": "P, 4 pivot steps", "ne": W, "steps": 4},
+        {"label": "P, 8 pivot steps", "ne": W, "steps": 8},
         {"label": "P, 16 pivot steps", "ne": W, "steps": 16},
         {"label": "L0+P2+P, 16 pivot steps", "ne": 3 * W, "steps": 16},
         {"label": "L0+P2+P+ATT, 16 pivot steps", "ne": 3 * W + Qw, "steps": 16, "att": True},
@@ -354,12 +356,14 @@ def speed_lines(out):
              "data of the real shapes (the inputs product, then one product per group in sequence; the attention "
              "input adds the query map and the windowed attention, in BF16 for the integer formats). Not included: "
              "RoPE rotation and the spread arithmetic (element-wise).", "",
-             "| Predictor | Format | ms per layer | G values/s | GB/s |", "| --- | --- | --- | --- | --- |"]
+             "| Predictor | Format | ms per layer | G values/s | GB/s | As a CUDA graph: ms, G values/s |",
+             "| --- | --- | --- | --- | --- | --- |"]
     for r in pred:
         if "error" in r:
-            lines.append(f"| {r['variant']} | {r['format']} | not measured | | |")
+            lines.append(f"| {r['variant']} | {r['format']} | not measured | | | |")
         else:
-            lines.append(f"| {r['variant']} | {r['format']} | {r['ms_per_layer']:.2f} | {r['gvalues_per_s']:.1f} | {r['gb_per_s']:.1f} |")
+            gr = (f"{r['ms_per_layer_graph']:.2f}, {r['gvalues_per_s_graph']:.1f}" if r.get("ms_per_layer_graph") else "")
+            lines.append(f"| {r['variant']} | {r['format']} | {r['ms_per_layer']:.2f} | {r['gvalues_per_s']:.1f} | {r['gb_per_s']:.1f} | {gr} |")
     if coder:
         lines += ["", f"Value-slice coder (Triton) on {coder[0]['values']:,} real values ({res['coder_config']} "
                   f"predictions, layers {res['coder_layers']}); the round trip must be bit-exact.", "",
@@ -371,8 +375,9 @@ def speed_lines(out):
     ok = [r for r in coder if r["bit_exact"]]
     if ok and pred:
         best = max(ok, key=lambda r: r["decode_gvalues_per_s"])
-        lines += ["", "Decode estimate per predictor (fastest exact integer format, else BF16, then the fastest coder; "
-                  "run one after the other, not overlapped). Link it keeps up with = decoded values/s x bits per value.", "",
+        lines += ["", f"Decode estimate per predictor (fastest exact integer format, else BF16, CUDA graph if faster; then "
+                  f"the fastest coder, {best.get('mode', 'exact')} mode; one after the other, not overlapped). Bits include "
+                  "that coder's measured overhead. Link it keeps up with = decoded values/s x bits per value.", "",
                   "| Predictor | Bits per value | Decode G values/s | Decode GB/s | Keeps up with a link of |",
                   "| --- | --- | --- | --- | --- |"]
         for v in dict.fromkeys(r["variant"] for r in pred):
@@ -380,9 +385,11 @@ def speed_lines(out):
             cand = cand or [r for r in pred if r["variant"] == v and "error" not in r and r["format"] == "bf16"]
             if not cand:
                 continue
-            p_ = max(cand, key=lambda r: r["gvalues_per_s"])
-            g = 1 / (1 / p_["gvalues_per_s"] + 1 / best["decode_gvalues_per_s"])
+            p_ = max(cand, key=lambda r: max(r["gvalues_per_s"], r.get("gvalues_per_s_graph") or 0))
+            pg = max(p_["gvalues_per_s"], p_.get("gvalues_per_s_graph") or 0)
+            g = 1 / (1 / pg + 1 / best["decode_gvalues_per_s"])
             b = res["bits_per_value"].get(v)
+            b = None if b is None else b + best["stream_bits_per_value"] - best["exact_model_bits_per_value"]
             link = f"{g * b:.0f} Gb/s" if b else "n/a"
             lines.append(f"| {v} ({p_['format']}) | {'n/a' if b is None else f'{b:.3f}'} | {g:.1f} | {2 * g:.1f} | {link} |")
     for r in over:
@@ -397,45 +404,73 @@ def speed_lines(out):
 
 
 def mix_lines(out, res):
-    """Transfer time of one document's KV over links of several speeds: raw BF16, SplitZip, ours, and ours mixed
-    with SplitZip-style coding per layer (the layers that save most bits use ours, as many as our decoder can
-    keep pace with). Computed from the measured codec speeds and bits with an ideal link (time = bits / link
-    speed, decoding overlapped with arrival); no network was measured."""
+    """Transfer time of one document's KV over links of several speeds: raw BF16, SplitZip, ours, and a per-layer
+    mix of SplitZip-style coding with two of our predictors (the one-step and the 16-group lite version). Each
+    layer takes one option; the mix minimises max(time on the wire, decode time), decode times adding up (both of
+    ours share the GPU's cores). Computed from the measured codec speeds and bits with an ideal link (decoding
+    overlapped with arrival); no network was measured."""
     if not ((out / "lossless.json").is_file() and (out / "frontier.json").is_file()):
         return []
     ll = json.loads((out / "lossless.json").read_text())
     fr = {r["label"]: r for r in json.loads((out / "frontier.json").read_text())["variants"]}
     meta = json.loads((out / "captures" / "meta.json").read_text())
     docs = [d for d in TESTS if d in ll["methods"]["SplitZip-style"]["per_layer"]]
-    if "P, 16 pivot steps" not in fr or not docs:
+    if not docs or "P, 16 pivot steps" not in fr:
         return []
+    per_layer = lambda label: np.mean([fr[label]["per_layer"][d] for d in docs], 0)
     sz = np.mean([ll["methods"]["SplitZip-style"]["per_layer"][d] for d in docs], 0)
+    Ts = 311.0 / 2                                                     # SplitZip native decode on the A4500
+    pred = {r["variant"]: max(r["gvalues_per_s"], r.get("gvalues_per_s_graph") or 0)
+            for r in res["rows"] if r["part"] == "predictor" and r.get("format") == "int8x8" and "error" not in r}
+    L = len(sz)
+    n = int(meta["tokens"]) * 2 * int(meta["kv_heads"]) * int(meta["head_dim"]) * L
     lines = []
     for over in [r for r in res["rows"] if r["part"] == "overlap"]:
         mode = over.get("mode", "exact")
         crow = [r for r in res["rows"] if r["part"] == "coder" and r.get("mode", "exact") == mode and r["bit_exact"]]
-        extra = min(r["stream_bits_per_value"] - r["exact_model_bits_per_value"] for r in crow) if crow else 0.0
-        ours = np.mean([fr["P, 16 pivot steps"]["per_layer"][d] for d in docs], 0) + extra
-        To, Ts = over["overlapped_gvalues_per_s"], 311.0 / 2              # G values/s; SplitZip native on the A4500
-        n = int(meta["tokens"]) * 2 * int(meta["kv_heads"]) * int(meta["head_dim"]) * len(ours)
-        order = np.argsort(-(sz - ours))
-        lines += ["", f"Transfer time of one document's KV ({n / 1e6:.0f}M values) with the {mode} coder, computed from "
-                  f"the measured speeds (ours {To:.1f} G values/s overlapped, SplitZip {Ts:.0f}) and an ideal link "
-                  "(decoding overlapped with arrival; no network measured). Mixed: the layers that save most bits use "
-                  "ours, as many as our decoder keeps pace with; the rest SplitZip-style.", "",
-                  "| Link | Raw BF16 | SplitZip | Ours | Mixed (layers ours) | Mixed vs SplitZip |", "| --- | --- | --- | --- | --- | --- |"]
+        if not crow:
+            continue
+        cbest = max(crow, key=lambda r: r["decode_gvalues_per_s"])
+        extra = cbest["stream_bits_per_value"] - cbest["exact_model_bits_per_value"]
+        opts = [("SplitZip", sz, Ts), ("lite", per_layer("P, 16 pivot steps") + extra, over["overlapped_gvalues_per_s"])]
+        if "P, 1 pivot step" in fr and "P, 1 pivot step" in pred:
+            t1 = 1 / (1 / pred["P, 1 pivot step"] + 1 / cbest["decode_gvalues_per_s"])     # not overlapped
+            opts.insert(1, ("one-step", per_layer("P, 1 pivot step") + extra, t1))
+        B = np.stack([o[1] for o in opts])                            # [options, layers] bits per value
+        C = np.array([1 / o[2] for o in opts])                        # ns per value
+        lines += ["", f"Transfer time of one document's KV ({n / 1e6:.0f}M values), {mode} coder, computed from the "
+                  "measured speeds and an ideal link (decoding overlapped with arrival; no network measured). "
+                  "Options per layer: " + "; ".join(f"{o[0]} ({float(np.mean(o[1])):.2f} bits/value, {o[2]:.1f} G values/s)"
+                                                    for o in opts) + ".", "",
+                  "| Link | Raw BF16 | SplitZip | Ours (lite) | Mixed | Layers per option | Mixed vs SplitZip |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
+        # every layer holds the same number of values, so decode time depends only on how many layers take each
+        # option; for each count combination the fewest bits come from an exact DP over the layers
+        K = len(opts)
+        combos = {}                                                  # counts of options 1..K-1 -> (bits, choice)
+        dp = {tuple([0] * (K - 1)): (0.0, [])}
+        for l in range(L):
+            nxt = {}
+            for cnt, (bits, ch) in dp.items():
+                for o in range(K):
+                    c2 = list(cnt)
+                    if o:
+                        c2[o - 1] += 1
+                    c2 = tuple(c2)
+                    val = bits + B[o, l]
+                    if c2 not in nxt or val < nxt[c2][0]:
+                        nxt[c2] = (val, ch + [o])
+            dp = nxt
         for R in (10, 25, 50, 100, 200, 400, 700):
-            t_raw, t_sz, t_ours = 16 / R, max(sz.mean() / R, 1 / Ts), max(ours.mean() / R, 1 / To)
             best = None
-            for k in range(len(ours) + 1):
-                sel = np.zeros(len(ours), bool)
-                sel[order[:k]] = True
-                f = sel.mean()
-                t = max(np.where(sel, ours, sz).mean() / R, f / To + (1 - f) / Ts)
-                best = (t, k) if best is None or t < best[0] else best
+            for cnt, (bits, ch) in dp.items():
+                ch = np.array(ch)
+                t = max(bits / L / R, C[ch].mean())
+                best = (t, ch) if best is None or t < best[0] else best
+            t_sz, t_ours = max(sz.mean() / R, 1 / Ts), max(opts[-1][1].mean() / R, 1 / opts[-1][2])
+            counts = ", ".join(f"{int((best[1] == i).sum())} {o[0]}" for i, o in enumerate(opts) if (best[1] == i).any())
             ms = lambda t: f"{t * n / 1e6:.0f} ms"
-            lines.append(f"| {R} Gb/s | {ms(t_raw)} | {ms(t_sz)} | {ms(t_ours)} | {ms(best[0])} ({best[1]} of {len(ours)}) | "
-                         f"{t_sz / best[0]:.2f}x |")
+            lines.append(f"| {R} Gb/s | {ms(16 / R)} | {ms(t_sz)} | {ms(t_ours)} | {ms(best[0])} | {counts} | {t_sz / best[0]:.2f}x |")
     return lines + ([""] if lines else [])
 
 
