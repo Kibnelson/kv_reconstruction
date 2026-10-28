@@ -240,6 +240,19 @@ class CoderTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
         self.assertEqual(r.stdout.count("ok"), 2, r.stdout)
 
+    def test_layerwise_codec_round_trip_interpreted(self):
+        """The per-layer one-step codec (int8 product, then one coding kernel per layer; streams kept open across
+        layers) restores the same KV bit for bit, with one and two token chunks, both modes and both stage-1
+        decoders."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None or torch is None:
+            self.skipTest("Triton and PyTorch are required")
+        r = subprocess.run([sys.executable, "-c", LAYERWISE_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=1800)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertEqual(r.stdout.count("ok"), 2, r.stdout)
+
 
 FUSED_CHECK = r"""
 import os, sys, json, tempfile
@@ -289,6 +302,19 @@ for mode, rows, search in (("uniform", 4, False), ("exact", 2, True)):
     dec = codec.decode(buf, starts, T)
     assert torch.equal(dec, words), ("round trip", mode, int((dec != words).sum()))
     print("ok", mode, codec.bits(starts, T) / (L * T * W))
+"""
+
+
+LAYERWISE_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
+from kv_compare import layerwise
+xall, prior = fused.FusedOneStep(consts, study.C, study.hd, tokens_per_program=16, rows=4, kchunk=32, warps=4).model(words)
+for mode, chunks, search in (("uniform", 1, True), ("exact", 2, False)):
+    codec = layerwise.LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=16, mode=mode, search=search,
+                                       chunks=chunks)
+    buf, starts = codec.encode(words, xall, prior)
+    dec = codec.decode(buf, starts, T)
+    assert torch.equal(dec, words), ("round trip", mode, chunks, int((dec != words).sum()))
+    print("ok", mode, chunks, codec.bits(starts, T) / (L * T * W))
 """
 
 

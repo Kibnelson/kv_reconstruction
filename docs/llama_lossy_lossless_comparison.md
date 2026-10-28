@@ -70,6 +70,7 @@ the exact KV.
 | `lossy` | Codes the first 3,072 tokens of each test document with every lossy method. The model then processes the next 512 tokens using that KV. The reference is the captured exact KV restored into the cache; restoring it twice must agree exactly. The model's own prefill of the 3,072-token prompt is reported beside it: on a GPU it can differ slightly (for example +0.05%), because kernels round differently at a different sequence length. | — |
 | `frontier` | Optional. About 37 predictor variants fitted from one covariance per layer: input sets, 1–16 steps, reduced-rank inputs and exact 8-bit integer formats. Each gets exact lossless costs and multiply-adds per value (`frontier.json`). | about 30 minutes on an RTX A4500 |
 | `gpu_speed` | Optional; needs the GPU to itself. Times one layer of the predictor for the frontier variants in float32, BF16 and exact 8-bit integer arithmetic. Then encodes and decodes four real test layers with the Triton value-slice coder, checking the round trip bit for bit, with both stage-1 decoders. Finally it encodes and decodes the whole first test document (every layer, layer by layer) with the fused one-step codec in several kernel shapes (`gpu_speed.json`). | 10–20 minutes (mostly Triton compiling the fused kernels) |
+| `pool` | Optional; needs the GPU to itself. GPU-resident KV pool: how long it takes to bring back a cached 8,192-token prefix by recomputing it (the model's prefill), by copying raw KV from CPU memory, or by decoding our compressed KV; what adding a prefix costs; how many tokens fit (`pool.json`). | 10–15 minutes |
 | `report` | Writes `summary.md`. | — |
 
 Useful options:
@@ -95,11 +96,34 @@ The speed stage reports kernel time only: CUDA-event medians after warm-up, with
 Two kinds of decode rate appear in the summary:
 
 - **Estimates from parts.** The predictor and the coder are timed separately (and overlapped on two CUDA streams) on four layers coded at once. A receiver cannot do that: layer l is predicted from the decoded layer l − 1, so it decodes one layer at a time, with less parallel work. These estimates also leave out the small element-wise steps around the coder (RoPE, the spread, the next layer's features).
+- **Measured end to end (per-layer codec).** For each layer, cuBLAS computes the exact 8-bit product (int32 result), then one Triton kernel of one-warp programs (a block of tokens x one head) scales, rotates, codes and makes the next layer's features. Streams stay open across layers, so many small programs cost almost no extra stream state. `--layer-configs` sets tokens per program x token chunks; each chunk decodes on its own CUDA stream, so one chunk's product overlaps another chunk's coding.
 - **Measured end to end (fused codec).** One Triton kernel per direction does all of it for the one-step predictor: the 8-bit tensor-core product, RoPE, the spread, the coding and the next layer's 8-bit features, layer by layer over the whole document. Its decode must be bit-exact. The summary's last transfer table uses only these measured numbers. `--fused-configs` sets the kernel shapes tried (tokens per program x rows of lanes x warps), `--fused-modes` the coder modes.
 
 Stage 1 of the decoder (finding the slice symbol) has two versions over the same streams. The direct version, now the default, uses a table for the rare tail slots and one comparison elsewhere. The search version, used before, does a binary search that waits for the slowest of a program's lanes. Both are timed.
 
 A cheaper predictor for fusing was ruled out: predicting each KV head only from its own head in the previous layer costs +0.59 bits per value on SmolLM2-135M (+0.38 for keys from keys and values from values), so the fused codec keeps the full one-step product.
+
+### Link speeds in the tables
+
+The transfer tables use link speeds that real prefill/decode deployments have:
+
+| Band | Speeds | Where |
+| --- | --- | --- |
+| Ordinary cloud and storage | 1–15 Gb/s | between regular cloud servers, remote KV storage (CacheGen, KVServe) |
+| Consumer and workstation | 10–100 Gb/s | 10 GbE consumer machines, 50 Gb/s workstations, cross-cluster cloud links (KVServe) |
+| Datacenter RDMA, per GPU | 200–400 Gb/s | one InfiniBand/RoCE NIC per GPU: Azure ND H100 v5, AWS P5, Mooncake's H800 nodes |
+| Inside one machine | hundreds of GB/s | NVLink; compression does not pay there |
+
+On a slow link the transfer time is the link time for any codec that decodes fast enough, so bits per value decide it. SplitZip codes only the exponents, so it is at most 16/12 = 1.33x faster than raw however slow the link; our ratio is set by the predictor. On a 200–400 Gb/s link, decode speed decides it, and SplitZip's much faster decoder wins on this GPU. Those links come with H100-class GPUs, and each GPU moves its own share of the KV, so the rate that matters there is the per-GPU decode rate.
+
+### GPU-resident pool
+
+The `pool` stage asks whether keeping finished requests' KV compressed in GPU memory pays. The alternatives for a reused prefix are to recompute it, to keep it raw (in GPU memory, or in CPU memory and copy it back over PCIe), or to keep it compressed and decode it. The stage measures each on this machine. The lossy rows of its capacity table use the lossy stage's bits and quality; a GPU decoder for the lossy codec does not exist yet.
+
+```bash
+python -u scripts/bench_llama_compare.py --device cuda --output runs/llama32_3b_compare \
+    --stages pool,report 2>&1 | tee -a runs/llama32_3b_compare/console.log
+```
 
 ## Methods
 

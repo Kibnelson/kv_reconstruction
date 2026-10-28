@@ -21,6 +21,9 @@ Stages (all by default; --stages picks a subset, reusing earlier outputs in the 
   gpu_speed  (optional, needs the GPU to itself) measured throughput: the predictor of five frontier variants in
              fp32, BF16 and exact 8-bit integer formats, and the Triton value-slice coder encoding and decoding
              real KV (bit-exact round trip) -> gpu_speed.json
+  pool       (optional, needs the GPU to itself) GPU-resident KV pool: bringing a cached prefix back by
+             recomputing it, copying raw KV from CPU memory, or decoding our compressed KV; the cost of adding it;
+             tokens that fit -> pool.json
   report     summary.md
 
 Document roles (same protocol as the SmolLM2 study): calibration = PEP 484 and six CPython modules, scales =
@@ -334,13 +337,14 @@ def stage_gpu_speed(args, out):
                 del layer_fn
     else:
         log("gpu_speed: the coder needs a CUDA GPU (or TRITON_INTERPRET=1 for a slow CPU check); skipped")
-    if device.type == "cuda" and args.fused_configs:
+    if device.type == "cuda" and (args.fused_configs or args.layer_configs):
         del data
         gc.collect()
         torch.cuda.empty_cache()
         study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
         log(f"gpu_speed: fused one-step codec, whole {study.tests[0].name} ({study.L} layers), configs {args.fused_configs}")
-        rows += fused_rows(study, device, args.fused_configs, log, modes=args.fused_modes)
+        rows += fused_rows(study, device, args.fused_configs, log, modes=args.fused_modes,
+                           layer_configs=args.layer_configs)
         del study
     bits = {}
     if (out / "frontier.json").is_file():
@@ -353,6 +357,133 @@ def stage_gpu_speed(args, out):
     (out / "gpu_speed.json").write_text(json.dumps(res, indent=1))
     log(f"gpu_speed done ({memory_note(args.device)})")
     return res
+
+
+def stage_pool(args, out):
+    import gc
+    import torch
+    from kv_compare.capture import load_model
+    from kv_compare.gpu_speed import fused_rows
+    from kv_compare.pool import copy_seconds, prefill_seconds
+    from kv_compare.predict import Study
+    device = torch.device(args.device)
+    if device.type != "cuda":
+        log("pool: needs a CUDA GPU; skipped")
+        return None
+    note = gpu_sharing_note(args.device)
+    if note and "WARNING" in note:
+        log("pool: " + note)
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    doc = study.tests[0]
+    L, W = study.L, study.W
+    log(f"pool: our codec on the whole {doc.name} (fused {args.pool_fused}, per layer {args.pool_layer})")
+    rows = fused_rows(study, device, [args.pool_fused], log, modes=("uniform", "exact"), layer_configs=[args.pool_layer])
+    ids = [int(v) for v in doc.ids[: doc.tokens]]
+    del study
+    gc.collect()
+    torch.cuda.empty_cache()
+    log("pool: loading the model for the recompute baseline")
+    _tok, model = load_model(args.model, args.revision, device)
+    torch.cuda.empty_cache()
+    free, total = torch.cuda.mem_get_info(device)
+    prefill = {}
+    for T in args.pool_tokens:
+        if T <= len(ids):
+            prefill[T] = prefill_seconds(model, ids[:T], device)
+            log(f"  prefill of {T} tokens: {1e3 * prefill[T]:.1f} ms")
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
+    T = max(r["tokens"] for r in rows if "tokens" in r)
+    n = L * T * W
+    ok = [r for r in rows if r.get("bit_exact")]
+    formats = {"raw BF16": 16.0}
+    if (out / "lossless.json").is_file():
+        sz = json.loads((out / "lossless.json").read_text())["methods"]["SplitZip-style"]["per_layer"]
+        if doc.name in sz:
+            formats["SplitZip"] = float(np.mean(sz[doc.name]))
+    for r in ok:
+        formats[f"ours lossless ({r['mode']})"] = min(formats.get(f"ours lossless ({r['mode']})", 99.0), r["stream_bits_per_value"])
+    copies = {}
+    for name, bits in formats.items():
+        copies[name] = copy_seconds(bits * n / 8, device)
+        log(f"  copy of {name} ({bits * n / 8 / 2 ** 20:.0f} MiB): host to GPU {1e3 * copies[name]['h2d_pinned']:.1f} ms "
+            f"pinned, {1e3 * copies[name]['h2d_pageable']:.1f} ms pageable")
+    lossy = {}
+    if (out / "lossy.json").is_file():
+        lres = json.loads((out / "lossy.json").read_text())
+        if doc.name in lres["documents"]:
+            for label, v in lres["documents"][doc.name].items():
+                if label.startswith("Ours, step"):
+                    lossy[label] = {"bits": v["bits"], "rel_error": v["rel_error"], "ppl_change_pct": v["ppl_change_pct"]}
+    res = {"gpu": torch.cuda.get_device_name(device), "gpu_memory_at_start": note, "doc": doc.name, "tokens": T,
+           "layers": L, "values": n, "free_after_model_bytes": free, "total_bytes": total,
+           "prefill_seconds": {str(k): v for k, v in prefill.items()}, "copies": copies, "formats_bits": formats,
+           "lossy": lossy, "codec_rows": rows}
+    (out / "pool.json").write_text(json.dumps(res, indent=1))
+    log(f"pool done ({memory_note(args.device)})")
+    return res
+
+
+def pool_lines(out):
+    res = json.loads((out / "pool.json").read_text())
+    T, n, L = res["tokens"], res["values"], res["layers"]
+    raw = 2 * n
+    mb = lambda bits: bits * n / 8 / 2 ** 20
+    pre = res["prefill_seconds"].get(str(T))
+    rows = [r for r in res["codec_rows"] if r.get("bit_exact")]
+    lines = [f"## GPU-resident KV pool ({res['gpu']}, measured)", "",
+             f"A pool keeps finished requests' KV so that a later request with the same prefix skips its prefill. "
+             f"Bringing back one cached prefix of {T} tokens ({res['doc']}, {L} layers, {raw / 2 ** 20:.0f} MiB of "
+             "raw BF16 KV). Times are CUDA-event medians; our decode is bit-exact. Copies are host to GPU over "
+             "this machine's PCIe link.", "",
+             "| Way to bring the prefix back | Time | Kept in | Memory held |", "| --- | --- | --- | --- |"]
+    if pre:
+        lines.append(f"| Recompute: the model's prefill | {1e3 * pre:.0f} ms | nothing | 0 |")
+    lines.append(f"| Raw KV kept in GPU memory | 0 ms | GPU | {raw / 2 ** 20:.0f} MiB |")
+    c = res["copies"]["raw BF16"]
+    lines.append(f"| Raw KV in CPU memory, copied back (pinned / pageable) | {1e3 * c['h2d_pinned']:.0f} / "
+                 f"{1e3 * c['h2d_pageable']:.0f} ms | CPU | {raw / 2 ** 20:.0f} MiB |")
+    for r in sorted(rows, key=lambda r: r["decode_ms"]):
+        impl = "fused" if r["part"] == "fused" else "per layer"
+        key = f"ours lossless ({r['mode']})"
+        cp = res["copies"].get(key, {}).get("h2d_pinned")
+        lines.append(f"| Ours ({impl}, {r['mode']}{', search' if r['search'] else ''}) kept in GPU memory, decoded | "
+                     f"{r['decode_ms']:.0f} ms | GPU | {mb(r['stream_bits_per_value']):.0f} MiB |")
+        if cp is not None:
+            lines.append(f"| Ours ({impl}, {r['mode']}) in CPU memory: copy, then decode | {1e3 * cp:.0f} + "
+                         f"{r['decode_ms']:.0f} ms | CPU | {mb(r['stream_bits_per_value']):.0f} MiB |")
+    if "SplitZip" in res["copies"]:
+        b = res["formats_bits"]["SplitZip"]
+        lines.append(f"| SplitZip kept in GPU memory, decoded (its published A4500 speed, not run here) | "
+                     f"{1e3 * raw / 311e9:.0f} ms | GPU | {mb(b):.0f} MiB |")
+    if pre and rows:
+        fwd = next((r["model_ms"] for r in rows if r["part"] == "fused"), None)
+        lines += ["", "Adding the prefix to the pool (ours): the encoder's forward pass (features and spreads of the "
+                  "exact KV, the same for both implementations) plus the encode, against the prefill that produced "
+                  "the KV.", "", "| Codec | Forward + encode ms | Share of the prefill |", "| --- | --- | --- |"]
+        for r in rows:
+            f = r.get("model_ms", fwd)
+            if f is None:
+                continue
+            e = f + r["encode_ms"]
+            lines.append(f"| {('fused' if r['part'] == 'fused' else 'per layer')}, {r['mode']}"
+                         f"{', search' if r['search'] else ''} | {f:.0f} + {r['encode_ms']:.0f} | {100 * e / (1e3 * pre):.0f}% |")
+    free = res["free_after_model_bytes"]
+    lines += ["", f"Capacity: KV bytes per token = {L} layers x {n // (L * T)} values x bits / 8. Pool = the "
+              f"{free / 2 ** 30:.1f} GiB free after loading the model (no room left for activations, so an upper "
+              "bound).", "", "| Format | Bits per value | KiB per token | Tokens per GiB | Tokens in the free memory | vs raw |",
+              "| --- | --- | --- | --- | --- | --- |"]
+    per_tok = n // T
+    fmts = dict(res["formats_bits"])
+    for label, v in res["lossy"].items():
+        fmts[f"{label} (lossy: {100 * v['rel_error']:.1f}% KV error, perplexity {v['ppl_change_pct']:+.2f}%; "
+             "GPU decoder not built yet)"] = v["bits"]
+    for name, bits in fmts.items():
+        bpt = per_tok * bits / 8
+        lines.append(f"| {name} | {bits:.2f} | {bpt / 1024:.1f} | {2 ** 30 / bpt:,.0f} | {free / bpt:,.0f} | "
+                     f"{16 / bits:.2f}x |")
+    return lines + [""]
 
 
 def speed_lines(out):
@@ -431,8 +562,32 @@ def speed_lines(out):
             lines.append(head + f" {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | {r['exact_model_bits_per_value']:.4f} | "
                          f"{r['model_ms']:.1f} + {r['encode_ms']:.1f} | {r['decode_ms']:.1f} | {g:.1f} | {2 * g:.1f} | "
                          f"{g * r['stream_bits_per_value']:.0f} Gb/s |")
+    lw = [r for r in res["rows"] if r["part"] == "layerwise"]
+    if lw:
+        lines += ["", "Whole-document decode, per-layer one-step codec (measured; same document, predictor and checks): "
+                  "for each layer a cuBLAS int8 product (the previous layer's 8-bit features times the 8-bit "
+                  "coefficients, exact int32), then one Triton kernel of one-warp programs (a token block x one head) "
+                  "that scales, rotates, codes and makes the next layer's features. Streams stay open across layers. "
+                  "Chunks: the tokens are split into that many parts, each decoded on its own CUDA stream, so one "
+                  "part's product runs while another part decodes. Encode time excludes the encoder's forward pass "
+                  "(as in the fused table).", "",
+                  "| Tokens per program | Chunks | Mode | Stage 1 | Bit-exact | Stream bits/value | Encode ms | Decode ms | Decode G values/s | Decode GB/s | Keeps up with a link of |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+        for r in lw:
+            head = f"| {r['tokens_per_program']} | {r['chunks']} | {r['mode']} | {'search' if r['search'] else 'direct'} |"
+            if "error" in r:
+                lines.append(head + " not measured | | | | | | |")
+                continue
+            g = r["decode_gvalues_per_s"]
+            lines.append(head + f" {r['bit_exact']} | {r['stream_bits_per_value']:.4f} | {r['encode_ms']:.1f} | "
+                         f"{r['decode_ms']:.1f} | {g:.1f} | {2 * g:.1f} | {g * r['stream_bits_per_value']:.0f} Gb/s |")
     lines += ["", "Reference: " + res["splitzip_reference"] + ".", ""]
     return lines
+
+
+LINK_BANDS = [(1, "ordinary cloud, storage"), (5, "ordinary cloud"), (10, "consumer, cloud Ethernet"),
+              (25, "cloud Ethernet"), (50, "workstation"), (100, "workstation, cross-cluster"),
+              (200, "datacenter RDMA, per GPU"), (400, "datacenter RDMA, per GPU"), (800, "next-generation RDMA")]
 
 
 def mix_lines(out, res):
@@ -491,7 +646,7 @@ def mix_lines(out, res):
                   ". SplitZip and raw BF16 are references only.", "",
                   "| Link | Raw BF16 | SplitZip | Ours, best single predictor | Ours, per-layer choice (layers) | Ours vs SplitZip |",
                   "| --- | --- | --- | --- | --- | --- |"]
-        for R in (10, 25, 50, 100, 200, 400, 700):
+        for R, _band in LINK_BANDS:
             single = min(((max(float(np.mean(o[1])) / R, 1 / o[2]), o[0]) for o in opts))
             best = min(((max(bits / L / R, float(np.dot(cnt, C)) / L), cnt) for cnt, bits in dp.items()))
             t_sz = max(sz_bits / R, 1 / Ts)
@@ -499,22 +654,26 @@ def mix_lines(out, res):
             counts = ", ".join(f"{c} {opts[i][0].replace('P, ', '')}" for i, c in enumerate(best[1]) if c)
             lines.append(f"| {R} Gb/s | {ms(16 / R)} | {ms(t_sz)} | {ms(single[0])} ({single[1].replace('P, ', '')}) | "
                          f"{ms(best[0])} ({counts}) | {t_sz / best[0]:.2f}x |")
-    fused = [r for r in res["rows"] if r["part"] == "fused" and r.get("bit_exact")]
+    fused = [r for r in res["rows"] if r["part"] in ("fused", "layerwise") and r.get("bit_exact")]
     if fused:
         f = max(fused, key=lambda r: r["decode_gvalues_per_s"])
+        impl = ("fused one-step codec" if f["part"] == "fused" else "per-layer one-step codec")
+        shape = (f"{f['tokens_per_program']} x {f['rows']} ({f['warps']})" if f["part"] == "fused"
+                 else f"{f['tokens_per_program']} tokens per program, {f['chunks']} chunk(s)")
         n = f["values"]
         sz = (float(np.mean(ll["methods"]["SplitZip-style"]["per_layer"][f["doc"]]))
               if f["doc"] in ll["methods"]["SplitZip-style"]["per_layer"] else sz_bits)
-        lines += ["", f"Our codec alone, measured end to end (fused one-step codec, whole {f['doc']}: {n / 1e6:.0f}M values, "
+        lines += ["", f"Our codec alone, measured end to end ({impl}, whole {f['doc']}: {n / 1e6:.0f}M values, "
                   f"{f['stream_bits_per_value']:.3f} bits/value, decoded layer by layer at {f['decode_gvalues_per_s']:.1f} G "
-                  f"values/s; {f['tokens_per_program']} x {f['rows']} ({f['warps']}), {f['mode']}). SplitZip: "
-                  f"{sz:.3f} bits/value on the same document, its measured A4500 decode speed. Ideal link as above.", "",
-                  "| Link | Raw BF16 | SplitZip | Ours (fused, measured) | Ours vs SplitZip |", "| --- | --- | --- | --- | --- |"]
-        for R in (10, 25, 50, 100, 200, 400, 700):
+                  f"values/s; {shape}, {f['mode']}). SplitZip: {sz:.3f} bits/value on the same document, its measured "
+                  "A4500 decode speed. Ideal link as above; the bands are typical deployments (see the doc).", "",
+                  "| Link | Typical setting | Raw BF16 | SplitZip | Ours (measured) | Ours vs SplitZip |",
+                  "| --- | --- | --- | --- | --- | --- |"]
+        for R, band in LINK_BANDS:
             t_o = max(f["stream_bits_per_value"] / R, 1 / f["decode_gvalues_per_s"])
             t_sz = max(sz / R, 1 / Ts)
             ms = lambda t: f"{t * n / 1e6:.0f} ms"
-            lines.append(f"| {R} Gb/s | {ms(16 / R)} | {ms(t_sz)} | {ms(t_o)} | {t_sz / t_o:.2f}x |")
+            lines.append(f"| {R} Gb/s | {band} | {ms(16 / R)} | {ms(t_sz)} | {ms(t_o)} | {t_sz / t_o:.2f}x |")
     return lines + ([""] if lines else [])
 
 
@@ -558,6 +717,8 @@ def stage_report(args, out):
     if (out / "gpu_speed.json").is_file():
         lines += speed_lines(out)
         lines += mix_lines(out, json.loads((out / "gpu_speed.json").read_text()))
+    if (out / "pool.json").is_file():
+        lines += pool_lines(out)
     if (out / "lossy.json").is_file():
         res = json.loads((out / "lossy.json").read_text())
         docs = list(res["documents"])
@@ -608,6 +769,12 @@ def parser():
     p.add_argument("--fused-configs", default="32x8x8,64x8x8,32x4x4,16x4x4,64x16x16",
                    help="gpu_speed: fused one-step codec on the whole test document, tokens per program x rows x "
                         "warps (empty: skip)")
+    p.add_argument("--layer-configs", default="128x1,128x2,128x4,64x2,256x2",
+                   help="gpu_speed: per-layer one-step codec (cuBLAS product + one coding kernel per layer), tokens "
+                        "per program x token chunks decoded on separate CUDA streams (empty: skip)")
+    p.add_argument("--pool-fused", default="32x4x4", help="pool: fused codec shape (TBxRxW)")
+    p.add_argument("--pool-layer", default="128x2", help="pool: per-layer codec shape (TBxC)")
+    p.add_argument("--pool-tokens", default="2048,8192", help="pool: prefix lengths for the recompute baseline")
     p.add_argument("--fused-modes", default="uniform,exact",
                    help="gpu_speed: fused codec modes (every config in the first; the fastest also in the others)")
     return p
@@ -647,6 +814,12 @@ def main(argv=None):
     if any(len(t) != 3 for t in args.fused_configs):
         raise SystemExit("--fused-configs takes TBxRxW items (tokens per program x rows x warps)")
     args.fused_modes = [m for m in args.fused_modes.split(",") if m]
+    args.layer_configs = [tuple(int(x) for x in t.split("x")) for t in args.layer_configs.split(",") if t]
+    args.pool_fused = tuple(int(x) for x in args.pool_fused.split("x"))
+    args.pool_layer = tuple(int(x) for x in args.pool_layer.split("x"))
+    args.pool_tokens = [int(t) for t in args.pool_tokens.split(",") if t]
+    if any(len(t) != 2 for t in args.layer_configs):
+        raise SystemExit("--layer-configs takes TBxC items (tokens per program x chunks)")
     stages = [s for s in args.stages.split(",") if s]
     out = args.output
     if "capture" in stages:
@@ -684,6 +857,8 @@ def main(argv=None):
             stage_frontier(args, out)
         if "gpu_speed" in stages:
             stage_gpu_speed(args, out)
+        if "pool" in stages:
+            stage_pool(args, out)
         if "report" in stages:
             stage_report(args, out)
     except BaseException as exc:

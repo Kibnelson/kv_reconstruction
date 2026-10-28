@@ -298,11 +298,13 @@ def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exa
 
 
 # ---------------------------------------------------------------------------------------------- fused codec
-def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64):
-    """The fused one-step codec on a whole test document (every layer, decoded layer by layer as a receiver
-    must): bit-exact check, coded bits, the predictor's exact-model bits, and the time of the encoder's forward
-    pass, the encoder and the decoder. configs: (tokens per program, rows, warps); every config runs in the first
-    mode with the search-free stage 1; the fastest also with the stage-1 search and in the other modes."""
+def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64, layer_configs=()):
+    """The one-step codec on a whole test document (every layer, decoded layer by layer as a receiver must), in
+    two implementations: fused (one kernel per direction, configs: tokens per program, rows, warps) and per layer
+    (cuBLAS int8 product, then one coding kernel; layer_configs: tokens per program, token chunks on separate CUDA
+    streams). Bit-exact check, coded bits, the predictor's exact-model bits, and the time of the encoder's forward
+    pass, the encoder and the decoder. Every config runs in the first mode (fused: search-free stage 1; per layer:
+    with the stage-1 search); the fastest also with the other stage 1 and in the other modes."""
     import gc
     from .fused import FusedOneStep, prepare, reference_mu
     consts = prepare(study, log)
@@ -367,5 +369,57 @@ def fused_rows(study, device, configs, log=print, modes=("uniform",), kchunk=64)
         run(best["tokens_per_program"], best["rows"], best["warps"], modes[0], True)
         for mode in modes[1:]:
             run(best["tokens_per_program"], best["rows"], best["warps"], mode, False)
+    if layer_configs:
+        rows += layerwise_rows(consts, study, words, layer_configs, device, log, modes, model_bits)
     del words
+    return rows
+
+
+def layerwise_rows(consts, study, words, configs, device, log=print, modes=("uniform",), model_bits=None):
+    """The per-layer one-step codec (kv_compare.layerwise) on the same document: configs (tokens per program,
+    chunks)."""
+    import gc
+    from .fused import FusedOneStep
+    from .layerwise import LayerwiseOneStep
+    L, T, W = words.shape
+    n = L * T * W
+    xall, prior = FusedOneStep(consts, study.C, study.hd, tokens_per_program=32, rows=4, warps=4).model(words)
+    rows = []
+
+    def run(TB, chunks, mode, search):
+        tag = f"per layer, {TB} tokens per program, {chunks} chunk{'s' if chunks > 1 else ''}, {mode}" + \
+              (", stage-1 search" if search else "")
+        row = {"part": "layerwise", "tokens_per_program": TB, "chunks": chunks, "mode": mode, "search": search,
+               "values": n, "layers": L, "tokens": T, "doc": study.tests[0].name}
+        try:
+            codec = LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=TB, mode=mode, search=search,
+                                     chunks=chunks)
+            buf, starts = codec.encode(words, xall, prior)
+            bufs = codec.buffers(T)
+            dec = codec.decode(buf, starts, T, bufs=bufs)
+            ok = bool(torch.equal(dec, words))
+            bits = codec.bits(starts, T) / n
+            te = timer(lambda: codec.encode(words, xall, prior, out=buf), device, warmup=1, reps=3)
+            td = timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs), device, warmup=2, reps=5)
+            row.update(bit_exact=ok, stream_bits_per_value=bits, exact_model_bits_per_value=model_bits,
+                       encode_ms=1e3 * te, decode_ms=1e3 * td, decode_gvalues_per_s=n / td / 1e9)
+            log(f"  [{tag}]: exact={ok}, {bits:.4f} bits/value; encode {1e3 * te:.1f} ms (after the forward pass), "
+                f"decode {1e3 * td:.1f} ms -> {n / td / 1e9:.1f} G values/s")
+            del codec, buf, starts, dec, bufs
+        except Exception as exc:
+            row["error"] = repr(exc)[:240]
+            log(f"  [{tag}]: not measured ({row['error']})")
+        gc.collect()
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+        rows.append(row)
+
+    for TB, chunks in configs:
+        run(TB, chunks, modes[0], True)
+    ok = [r for r in rows if r.get("bit_exact")]
+    if ok:
+        best = max(ok, key=lambda r: r["decode_gvalues_per_s"])
+        run(best["tokens_per_program"], best["chunks"], modes[0], False)
+        for mode in modes[1:]:
+            run(best["tokens_per_program"], best["chunks"], mode, True)
+    del xall, prior
     return rows

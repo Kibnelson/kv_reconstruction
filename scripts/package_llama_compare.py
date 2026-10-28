@@ -4,7 +4,7 @@
     python scripts/package_llama_compare.py runs/llama32_3b_compare \\
         --destination benchmark_results/llama32_3b_compare_a4500_$(date +%Y%m%d)
 
-Copies summary.md, lossless.json, lossy.json, frontier.json, gpu_speed.json, run_args.json, environment.json,
+Copies summary.md, lossless.json, lossy.json, frontier.json, gpu_speed.json, pool.json, run_args.json, environment.json,
 run.log and the capture metadata
 (captures/meta.json -> capture_meta.json). Captured KV (*.npy) stays local. Checks that the JSON reports parse and
 agree with summary.md's method list, and writes manifest.json with each file's size and SHA256. Prints the git
@@ -22,6 +22,7 @@ import sys
 FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.json": "lossy.json",
          "run_args.json": "run_args.json", "environment.json": "environment.json", "run.log": "run.log",
          "console.log": "console.log", "frontier.json": "frontier.json", "gpu_speed.json": "gpu_speed.json",
+         "pool.json": "pool.json",
          "captures/meta.json": "capture_meta.json"}
 REQUIRED = ("summary.md", "run_args.json", "environment.json", "captures/meta.json")
 
@@ -54,8 +55,11 @@ def check(run):
     if (run / "gpu_speed.json").is_file():
         res = json.loads((run / "gpu_speed.json").read_text())
         checks.append(f"gpu_speed: {len(res.get('rows', []))} timings on {res.get('gpu')}")
+    if (run / "pool.json").is_file():
+        res = json.loads((run / "pool.json").read_text())
+        checks.append(f"pool: {len(res.get('codec_rows', []))} codec timings, {res.get('tokens')} tokens")
     if not checks:
-        raise SystemExit("no lossless.json, lossy.json, frontier.json or gpu_speed.json in the run")
+        raise SystemExit("no lossless.json, lossy.json, frontier.json, gpu_speed.json or pool.json in the run")
     return checks
 
 
