@@ -1,0 +1,674 @@
+{
+ "prompt_tokens": 3072,
+ "continuation_tokens": 512,
+ "lossy_config": "fast",
+ "reference": "captured exact KV restored into the cache",
+ "documents": {
+  "test_text": {
+   "exact KV": {
+    "bits": 16.0,
+    "nll": 1.5359054803848267,
+    "ppl": 4.64553006245451,
+    "ppl_change_pct": 0.0,
+    "rel_error": 0.0,
+    "model_prefill_nll": 1.5364097356796265,
+    "model_prefill_ppl_change_pct": 0.050438245287343086
+   },
+   "Ours, step 0.25": {
+    "bits": 5.174628119067858,
+    "nll": 1.5384007692337036,
+    "ppl": 4.657136476471967,
+    "ppl_change_pct": 0.24984046731848508,
+    "rel_error": 0.004782844848073379
+   },
+   "Ours, step 0.5": {
+    "bits": 4.2103031731940765,
+    "nll": 1.539191722869873,
+    "ppl": 4.660821512656439,
+    "ppl_change_pct": 0.3291648099646549,
+    "rel_error": 0.009463893358383787
+   },
+   "Ours, step 1.0": {
+    "bits": 3.3071183481125765,
+    "nll": 1.5483778715133667,
+    "ppl": 4.703833767891023,
+    "ppl_change_pct": 1.2550495778237858,
+    "rel_error": 0.01878718809464577
+   },
+   "Ours, step 2.0": {
+    "bits": 2.5641577571409067,
+    "nll": 1.5732665061950684,
+    "ppl": 4.822374811441011,
+    "ppl_change_pct": 3.8067722436191387,
+    "rel_error": 0.037493031165073
+   },
+   "Ours, step 4.0": {
+    "bits": 2.1368228175855415,
+    "nll": 1.6713472604751587,
+    "ppl": 5.319329494144074,
+    "ppl_change_pct": 14.504252962116349,
+    "rel_error": 0.0748851452302163
+   },
+   "FP8 cast": {
+    "bits": 8.0,
+    "nll": 1.5391724109649658,
+    "ppl": 4.660731504183717,
+    "ppl_change_pct": 0.3272272813831689,
+    "rel_error": 0.02636743240747476
+   },
+   "AQUA-KV, 2-bit": {
+    "bits": 2.1051693870907737,
+    "nll": 1.5504326820373535,
+    "ppl": 4.71350919219788,
+    "ppl_change_pct": 1.4633234276704377,
+    "rel_error": 0.1000183389981047
+   },
+   "AQUA-KV, 3-bit": {
+    "bits": 3.0681995210193453,
+    "nll": 1.5364749431610107,
+    "ppl": 4.64817627228821,
+    "ppl_change_pct": 0.05696249508935214,
+    "rel_error": 0.0533238926682189
+   },
+   "AQUA-KV, 4-bit": {
+    "bits": 4.031229654947917,
+    "nll": 1.5351476669311523,
+    "ppl": 4.642010950857204,
+    "ppl_change_pct": -0.07575263855782444,
+    "rel_error": 0.029555867901337084
+   },
+   "KIVI, 2-bit": {
+    "bits": 3.2708333333333335,
+    "nll": 1.7247592210769653,
+    "ppl": 5.611169815602582,
+    "ppl_change_pct": 20.786427816976992,
+    "rel_error": 0.2193734643823236
+   },
+   "KIVI, 4-bit": {
+    "bits": 5.229166666666667,
+    "nll": 1.5386767387390137,
+    "ppl": 4.658421881479675,
+    "ppl_change_pct": 0.2775101840230665,
+    "rel_error": 0.043673070282157986
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.25": {
+    "bits": 5.120583670479911,
+    "nll": 1.544495940208435,
+    "ppl": 4.685609204471962,
+    "ppl_change_pct": 0.862746370782852,
+    "rel_error": 0.008221320241223646
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.5": {
+    "bits": 4.1367376418340776,
+    "nll": 1.5451796054840088,
+    "ppl": 4.68881368805223,
+    "ppl_change_pct": 0.9317263049816615,
+    "rel_error": 0.016295669844389567
+   },
+   "Ours, GPU codec (one-step, measured stream), step 1.0": {
+    "bits": 3.2022305443173362,
+    "nll": 1.6014106273651123,
+    "ppl": 4.96002423773547,
+    "ppl_change_pct": 6.769823272111042,
+    "rel_error": 0.03245661924618092
+   },
+   "Ours, GPU codec (one-step, measured stream), step 2.0": {
+    "bits": 2.4174673897879466,
+    "nll": 1.7214950323104858,
+    "ppl": 5.592883758930452,
+    "ppl_change_pct": 20.392800901936248,
+    "rel_error": 0.064863983059783
+   },
+   "Ours, GPU codec (one-step, measured stream), step 4.0": {
+    "bits": 1.940583728608631,
+    "nll": 3.7062430381774902,
+    "ppl": 40.70060829571359,
+    "ppl_change_pct": 776.1240966807788,
+    "rel_error": 0.1295564654084531
+   },
+   "Ours, step 0.25, sinks": {
+    "bits": 5.189090316368942,
+    "nll": 1.5387533903121948,
+    "ppl": 4.6587789705309754,
+    "ppl_change_pct": 0.28519690752932814,
+    "rel_error": 0.004780304319932765
+   },
+   "Ours, step 0.5, sinks": {
+    "bits": 4.225563102428071,
+    "nll": 1.5385446548461914,
+    "ppl": 4.657806619617146,
+    "ppl_change_pct": 0.26426601480540324,
+    "rel_error": 0.009457817844072186
+   },
+   "Ours, step 1.0, sinks": {
+    "bits": 3.322201263554278,
+    "nll": 1.5381290912628174,
+    "ppl": 4.655871406937442,
+    "ppl_change_pct": 0.22260849340984823,
+    "rel_error": 0.01877650300977573
+   },
+   "Ours, step 2.0, sinks": {
+    "bits": 2.5763358900682216,
+    "nll": 1.5358306169509888,
+    "ppl": 4.645182295139728,
+    "ppl_change_pct": -0.0074860631640971675,
+    "rel_error": 0.037474405692374896
+   },
+   "Ours, step 4.0, sinks": {
+    "bits": 2.144427620586402,
+    "nll": 1.5367940664291382,
+    "ppl": 4.64965985020058,
+    "ppl_change_pct": 0.08889809538523696,
+    "rel_error": 0.07483386933128419
+   },
+   "Ours, step 0.25, token step": {
+    "bits": 4.904407192899222,
+    "nll": 1.536495566368103,
+    "ppl": 4.648272133578555,
+    "ppl_change_pct": 0.0590260118260133,
+    "rel_error": 0.005696356781168137
+   },
+   "Ours, step 0.5, token step": {
+    "bits": 3.919232369007463,
+    "nll": 1.5385117530822754,
+    "ppl": 4.657653372084451,
+    "ppl_change_pct": 0.2609671978645256,
+    "rel_error": 0.011410459014900357
+   },
+   "Ours, step 1.0, token step": {
+    "bits": 2.971493636749383,
+    "nll": 1.5389984846115112,
+    "ppl": 4.659920950639118,
+    "ppl_change_pct": 0.3097792499701324,
+    "rel_error": 0.023759522990922665
+   },
+   "Ours, step 2.0, token step": {
+    "bits": 2.155408499615736,
+    "nll": 1.581908941268921,
+    "ppl": 4.864232488243018,
+    "ppl_change_pct": 4.707803476638239,
+    "rel_error": 0.057285852729842913
+   },
+   "Ours, step 4.0, token step": {
+    "bits": 1.754669601973303,
+    "nll": 4.60349178314209,
+    "ppl": 99.83230048843654,
+    "ppl_change_pct": 2048.9969744311416,
+    "rel_error": 0.18068847794320309
+   },
+   "Ours, step 0.25, sinks + token step": {
+    "bits": 4.91894377393033,
+    "nll": 1.538730502128601,
+    "ppl": 4.658672340762861,
+    "ppl_change_pct": 0.2829015877987118,
+    "rel_error": 0.005693951915139516
+   },
+   "Ours, step 0.5, sinks + token step": {
+    "bits": 3.935006068170688,
+    "nll": 1.5376678705215454,
+    "ppl": 4.653724517608869,
+    "ppl_change_pct": 0.1763944058954081,
+    "rel_error": 0.011403097053290668
+   },
+   "Ours, step 1.0, sinks + token step": {
+    "bits": 2.9884343326824387,
+    "nll": 1.53566575050354,
+    "ppl": 4.644416523563731,
+    "ppl_change_pct": -0.023970114837468248,
+    "rel_error": 0.023738473247533375
+   },
+   "Ours, step 2.0, sinks + token step": {
+    "bits": 2.1739355829920926,
+    "nll": 1.5362482070922852,
+    "ppl": 4.6471224825440745,
+    "ppl_change_pct": 0.03427854449666867,
+    "rel_error": 0.056970488601759725
+   },
+   "Ours, step 4.0, sinks + token step": {
+    "bits": 1.7726346271266842,
+    "nll": 1.5534710884094238,
+    "ppl": 4.727852527968967,
+    "ppl_change_pct": 1.7720790611127857,
+    "rel_error": 0.16646182832944997
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.25, sinks": {
+    "bits": 5.134416852678571,
+    "nll": 1.5362505912780762,
+    "ppl": 4.647133562160674,
+    "ppl_change_pct": 0.034517045086501774,
+    "rel_error": 0.008216034990656507
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.5, sinks": {
+    "bits": 4.151851109095982,
+    "nll": 1.535989761352539,
+    "ppl": 4.6459216087234285,
+    "ppl_change_pct": 0.008428451945285964,
+    "rel_error": 0.01628512017996298
+   },
+   "Ours, GPU codec (one-step, measured stream), step 1.0, sinks": {
+    "bits": 3.2185843331473216,
+    "nll": 1.5371215343475342,
+    "ppl": 4.6511827139638795,
+    "ppl_change_pct": 0.12167936561329196,
+    "rel_error": 0.032435338854891874
+   },
+   "Ours, GPU codec (one-step, measured stream), step 2.0, sinks": {
+    "bits": 2.434879121326265,
+    "nll": 1.5410923957824707,
+    "ppl": 4.669688633935196,
+    "ppl_change_pct": 0.5200390731713744,
+    "rel_error": 0.06482192803251045
+   },
+   "Ours, GPU codec (one-step, measured stream), step 4.0, sinks": {
+    "bits": 1.9587169828869047,
+    "nll": 1.545640468597412,
+    "ppl": 4.690975087343021,
+    "ppl_change_pct": 0.9782527349419423,
+    "rel_error": 0.12947220112325522
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.25, token step": {
+    "bits": 4.948994227818081,
+    "nll": 1.5449268817901611,
+    "ppl": 4.6876288634601515,
+    "ppl_change_pct": 0.906221689229536,
+    "rel_error": 0.009216155691611917
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.5, token step": {
+    "bits": 3.9580564953031994,
+    "nll": 1.5747441053390503,
+    "ppl": 4.829505615271785,
+    "ppl_change_pct": 3.9602704178835824,
+    "rel_error": 0.018499219467484278
+   },
+   "Ours, GPU codec (one-step, measured stream), step 1.0, token step": {
+    "bits": 3.0055716378348216,
+    "nll": 1.7325398921966553,
+    "ppl": 5.654998770764705,
+    "ppl_change_pct": 21.729892923711546,
+    "rel_error": 0.038447295018729136
+   },
+   "Ours, GPU codec (one-step, measured stream), step 2.0, token step": {
+    "bits": 2.259944370814732,
+    "nll": 3.7821381092071533,
+    "ppl": 43.90982544200515,
+    "ppl_change_pct": 845.2059259477695,
+    "rel_error": 0.08829953100819737
+   },
+   "Ours, GPU codec (one-step, measured stream), step 4.0, token step": {
+    "bits": 2.507655552455357,
+    "nll": 6.050501346588135,
+    "ppl": 424.32571097433515,
+    "ppl_change_pct": 9034.064472077458,
+    "rel_error": 0.17512910627980188
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.25, sinks + token step": {
+    "bits": 4.963257562546503,
+    "nll": 1.5400068759918213,
+    "ppl": 4.6646223447829485,
+    "ppl_change_pct": 0.410981784032427,
+    "rel_error": 0.009207983504194796
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.5, sinks + token step": {
+    "bits": 3.973600841703869,
+    "nll": 1.5353009700775146,
+    "ppl": 4.642722640292139,
+    "ppl_change_pct": -0.06043276277686305,
+    "rel_error": 0.01848279434595612
+   },
+   "Ours, GPU codec (one-step, measured stream), step 1.0, sinks + token step": {
+    "bits": 3.0223606654575894,
+    "nll": 1.538659691810608,
+    "ppl": 4.6583424703722365,
+    "ppl_change_pct": 0.27580077505637846,
+    "rel_error": 0.03841387648682685
+   },
+   "Ours, GPU codec (one-step, measured stream), step 2.0, sinks + token step": {
+    "bits": 2.277737572079613,
+    "nll": 1.5300787687301636,
+    "ppl": 4.618540604550889,
+    "ppl_change_pct": -0.5809769292368094,
+    "rel_error": 0.08823177786016984
+   },
+   "Ours, GPU codec (one-step, measured stream), step 4.0, sinks + token step": {
+    "bits": 2.52517336890811,
+    "nll": 1.5609174966812134,
+    "ppl": 4.763189451437717,
+    "ppl_change_pct": 2.532744108883045,
+    "rel_error": 0.17499819676374945
+   }
+  },
+  "test_code": {
+   "exact KV": {
+    "bits": 16.0,
+    "nll": 1.211100697517395,
+    "ppl": 3.3571778569582986,
+    "ppl_change_pct": 0.0,
+    "rel_error": 0.0,
+    "model_prefill_nll": 1.2114951610565186,
+    "model_prefill_ppl_change_pct": 0.03945413500963113
+   },
+   "Ours, step 0.25": {
+    "bits": 4.854276624070015,
+    "nll": 1.2095837593078613,
+    "ppl": 3.3520890862420623,
+    "ppl_change_pct": -0.15157882403188383,
+    "rel_error": 0.004684290382693794
+   },
+   "Ours, step 0.5": {
+    "bits": 3.906314308284542,
+    "nll": 1.2164210081100464,
+    "ppl": 3.3750866838894225,
+    "ppl_change_pct": 0.5334488577662055,
+    "rel_error": 0.009262734908176804
+   },
+   "Ours, step 1.0": {
+    "bits": 3.0431654830373986,
+    "nll": 1.21392023563385,
+    "ppl": 3.366656904878464,
+    "ppl_change_pct": 0.2823516752476607,
+    "rel_error": 0.018387618156902617
+   },
+   "Ours, step 2.0": {
+    "bits": 2.3792592180030043,
+    "nll": 1.2170190811157227,
+    "ppl": 3.377105835866834,
+    "ppl_change_pct": 0.593593183251584,
+    "rel_error": 0.03671743663813861
+   },
+   "Ours, step 4.0": {
+    "bits": 2.0461105008091516,
+    "nll": 1.2210943698883057,
+    "ppl": 3.390896598948156,
+    "ppl_change_pct": 1.0043775881569683,
+    "rel_error": 0.07322186755999961
+   },
+   "FP8 cast": {
+    "bits": 8.0,
+    "nll": 1.2079155445098877,
+    "ppl": 3.346501743364073,
+    "ppl_change_pct": -0.31800857890498246,
+    "rel_error": 0.02636199626373277
+   },
+   "AQUA-KV, 2-bit": {
+    "bits": 2.1051693870907737,
+    "nll": 1.2076382637023926,
+    "ppl": 3.3455739512938005,
+    "ppl_change_pct": -0.3456446503257715,
+    "rel_error": 0.08825075793670674
+   },
+   "AQUA-KV, 3-bit": {
+    "bits": 3.0681995210193453,
+    "nll": 1.208779215812683,
+    "ppl": 3.3493932693688477,
+    "ppl_change_pct": -0.23187891500344726,
+    "rel_error": 0.04720626925495894
+   },
+   "AQUA-KV, 4-bit": {
+    "bits": 4.031229654947917,
+    "nll": 1.2101274728775024,
+    "ppl": 3.353912158134449,
+    "ppl_change_pct": -0.09727512103896441,
+    "rel_error": 0.026521698642998543
+   },
+   "KIVI, 2-bit": {
+    "bits": 3.2708333333333335,
+    "nll": 1.245073914527893,
+    "ppl": 3.473191509160098,
+    "ppl_change_pct": 3.455689783052218,
+    "rel_error": 0.21174103396930177
+   },
+   "KIVI, 4-bit": {
+    "bits": 5.229166666666667,
+    "nll": 1.2134147882461548,
+    "ppl": 3.3649556669199865,
+    "ppl_change_pct": 0.23167703032376252,
+    "rel_error": 0.042171137714093955
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.25": {
+    "bits": 4.8879343668619795,
+    "nll": 1.2112839221954346,
+    "ppl": 3.357793031146086,
+    "ppl_change_pct": 0.018324146470605207,
+    "rel_error": 0.00804989878763605
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.5": {
+    "bits": 3.9097042992001487,
+    "nll": 1.2090435028076172,
+    "ppl": 3.350278587434734,
+    "ppl_change_pct": -0.2055080135020093,
+    "rel_error": 0.01595005713630229
+   },
+   "Ours, GPU codec (one-step, measured stream), step 1.0": {
+    "bits": 2.99405270531064,
+    "nll": 1.2226077318191528,
+    "ppl": 3.396032137756762,
+    "ppl_change_pct": 1.157349489778503,
+    "rel_error": 0.031768919209525306
+   },
+   "Ours, GPU codec (one-step, measured stream), step 2.0": {
+    "bits": 2.2564697265625,
+    "nll": 1.2788331508636475,
+    "ppl": 3.592445437138536,
+    "ppl_change_pct": 7.007897412781006,
+    "rel_error": 0.06348465696067315
+   },
+   "Ours, GPU codec (one-step, measured stream), step 4.0": {
+    "bits": 1.8579486665271578,
+    "nll": 2.8535852432250977,
+    "ppl": 17.349873984496817,
+    "ppl_change_pct": 416.79936910510634,
+    "rel_error": 0.12671295970140808
+   },
+   "Ours, step 0.25, sinks": {
+    "bits": 4.8684845803724155,
+    "nll": 1.2107822895050049,
+    "ppl": 3.356109074793056,
+    "ppl_change_pct": -0.03183573259387673,
+    "rel_error": 0.00468115451402801
+   },
+   "Ours, step 0.5, sinks": {
+    "bits": 3.921189817173163,
+    "nll": 1.2117705345153809,
+    "ppl": 3.3594273722158716,
+    "ppl_change_pct": 0.06700613888868112,
+    "rel_error": 0.009255481738026856
+   },
+   "Ours, step 1.0, sinks": {
+    "bits": 3.0570669753780644,
+    "nll": 1.2104803323745728,
+    "ppl": 3.3550958267138546,
+    "ppl_change_pct": -0.06201727561524484,
+    "rel_error": 0.01837713615240782
+   },
+   "Ours, step 2.0, sinks": {
+    "bits": 2.389485057752371,
+    "nll": 1.2149674892425537,
+    "ppl": 3.370184495289855,
+    "ppl_change_pct": 0.3874277409699367,
+    "rel_error": 0.03669249910295252
+   },
+   "Ours, step 4.0, sinks": {
+    "bits": 2.05212690728804,
+    "nll": 1.2085986137390137,
+    "ppl": 3.34878841661934,
+    "ppl_change_pct": -0.24989561758159695,
+    "rel_error": 0.07315908322774951
+   },
+   "Ours, step 0.25, token step": {
+    "bits": 4.8709368484118905,
+    "nll": 1.2105077505111694,
+    "ppl": 3.355187818450642,
+    "ppl_change_pct": -0.05927712478897007,
+    "rel_error": 0.004792402727860459
+   },
+   "Ours, step 0.5, token step": {
+    "bits": 3.8879337726368806,
+    "nll": 1.2104387283325195,
+    "ppl": 3.3549562440696086,
+    "ppl_change_pct": -0.06617501316128482,
+    "rel_error": 0.009624952512961641
+   },
+   "Ours, step 1.0, token step": {
+    "bits": 2.9452282977124833,
+    "nll": 1.2118072509765625,
+    "ppl": 3.3595507207650237,
+    "ppl_change_pct": 0.07068031268604447,
+    "rel_error": 0.020229942643344125
+   },
+   "Ours, step 2.0, token step": {
+    "bits": 2.13999645581267,
+    "nll": 1.2320753335952759,
+    "ppl": 3.4283371016170086,
+    "ppl_change_pct": 2.1196149769432404,
+    "rel_error": 0.05058683996816482
+   },
+   "Ours, step 4.0, token step": {
+    "bits": 1.7504184857536036,
+    "nll": 3.828627586364746,
+    "ppl": 45.99936473866648,
+    "ppl_change_pct": 1270.1795585040363,
+    "rel_error": 0.16762354572132906
+   },
+   "Ours, step 0.25, sinks + token step": {
+    "bits": 4.88546806308485,
+    "nll": 1.2126659154891968,
+    "ppl": 3.362436686608247,
+    "ppl_change_pct": 0.1566443564807951,
+    "rel_error": 0.004788299834019898
+   },
+   "Ours, step 0.5, sinks + token step": {
+    "bits": 3.903716310837569,
+    "nll": 1.2107447385787964,
+    "ppl": 3.3559830521549894,
+    "ppl_change_pct": -0.03558955927320806,
+    "rel_error": 0.009615846221612094
+   },
+   "Ours, step 1.0, sinks + token step": {
+    "bits": 2.9622498241546196,
+    "nll": 1.2110836505889893,
+    "ppl": 3.357120627875517,
+    "ppl_change_pct": -0.001704678310765484,
+    "rel_error": 0.020199133612513926
+   },
+   "Ours, step 2.0, sinks + token step": {
+    "bits": 2.1584951690993037,
+    "nll": 1.2124685049057007,
+    "ppl": 3.3617729715343203,
+    "ppl_change_pct": 0.13687432634816865,
+    "rel_error": 0.05021694757627716
+   },
+   "Ours, step 4.0, sinks + token step": {
+    "bits": 1.7684876903795694,
+    "nll": 1.2038307189941406,
+    "ppl": 3.3328597492061576,
+    "ppl_change_pct": -0.7243616152697196,
+    "rel_error": 0.1523733879369333
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.25, sinks": {
+    "bits": 4.901675269717262,
+    "nll": 1.2106759548187256,
+    "ppl": 3.3557522229606693,
+    "ppl_change_pct": -0.04246525082590713,
+    "rel_error": 0.0080447430693145
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.5, sinks": {
+    "bits": 3.9247349330357144,
+    "nll": 1.2130341529846191,
+    "ppl": 3.3636750898715038,
+    "ppl_change_pct": 0.19353257974519256,
+    "rel_error": 0.015939826808205874
+   },
+   "Ours, GPU codec (one-step, measured stream), step 1.0, sinks": {
+    "bits": 3.0103243873232888,
+    "nll": 1.209995150566101,
+    "ppl": 3.353468390086302,
+    "ppl_change_pct": -0.11049360594072022,
+    "rel_error": 0.03174830908730507
+   },
+   "Ours, GPU codec (one-step, measured stream), step 2.0, sinks": {
+    "bits": 2.2738153366815474,
+    "nll": 1.2134299278259277,
+    "ppl": 3.365006611320376,
+    "ppl_change_pct": 0.2331945072808983,
+    "rel_error": 0.06344327507899956
+   },
+   "Ours, GPU codec (one-step, measured stream), step 4.0, sinks": {
+    "bits": 1.8760557628813244,
+    "nll": 1.2178539037704468,
+    "ppl": 3.379926297454827,
+    "ppl_change_pct": 0.6776060568068676,
+    "rel_error": 0.12663030625670932
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.25, token step": {
+    "bits": 4.894364856538319,
+    "nll": 1.2134053707122803,
+    "ppl": 3.3649239774852258,
+    "ppl_change_pct": 0.23073309955479182,
+    "rel_error": 0.008132852625040836
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.5, token step": {
+    "bits": 3.903412591843378,
+    "nll": 1.2059316635131836,
+    "ppl": 3.339869263350839,
+    "ppl_change_pct": -0.5155697536722514,
+    "rel_error": 0.016342167114731767
+   },
+   "Ours, GPU codec (one-step, measured stream), step 1.0, token step": {
+    "bits": 2.955991472516741,
+    "nll": 1.2455517053604126,
+    "ppl": 3.4748513647230683,
+    "ppl_change_pct": 3.5051317737269327,
+    "rel_error": 0.03419798904675067
+   },
+   "Ours, GPU codec (one-step, measured stream), step 2.0, token step": {
+    "bits": 2.2553463890438987,
+    "nll": 2.4580917358398438,
+    "ppl": 11.68249696544064,
+    "ppl_change_pct": 247.98564339469712,
+    "rel_error": 0.0796941145294411
+   },
+   "Ours, GPU codec (one-step, measured stream), step 4.0, token step": {
+    "bits": 2.50540524437314,
+    "nll": 5.695132732391357,
+    "ppl": 297.41626773874634,
+    "ppl_change_pct": 8759.11561469115,
+    "rel_error": 0.15655291550963063
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.25, sinks + token step": {
+    "bits": 4.908612205868676,
+    "nll": 1.2098044157028198,
+    "ppl": 3.3528288277467575,
+    "ppl_change_pct": -0.12954420042199377,
+    "rel_error": 0.008123238681708299
+   },
+   "Ours, GPU codec (one-step, measured stream), step 0.5, sinks + token step": {
+    "bits": 3.918946765718006,
+    "nll": 1.2116137742996216,
+    "ppl": 3.3589007889309084,
+    "ppl_change_pct": 0.051320842863278315,
+    "rel_error": 0.0163229858781438
+   },
+   "Ours, GPU codec (one-step, measured stream), step 1.0, sinks + token step": {
+    "bits": 2.9727652413504466,
+    "nll": 1.2135785818099976,
+    "ppl": 3.365506870141382,
+    "ppl_change_pct": 0.24809567851225012,
+    "rel_error": 0.03415912154809529
+   },
+   "Ours, GPU codec (one-step, measured stream), step 2.0, sinks + token step": {
+    "bits": 2.2731250581287203,
+    "nll": 1.1997734308242798,
+    "ppl": 3.3193647717923955,
+    "ppl_change_pct": -1.126335475123219,
+    "rel_error": 0.07961529835887875
+   },
+   "Ours, GPU codec (one-step, measured stream), step 4.0, sinks + token step": {
+    "bits": 2.5229354131789434,
+    "nll": 1.2320185899734497,
+    "ppl": 3.4281425708722635,
+    "ppl_change_pct": 2.113820504531194,
+    "rel_error": 0.15640292139756595
+   }
+  }
+ }
+}
