@@ -441,10 +441,12 @@ assert float(((s0 >> 17).long() == ref).float().mean()) > 0.99, "contexts"
 sz = mixed.TorchSplitZipStyle("cpu")
 sz.calibrate(words.view(torch.bfloat16))
 books = {}
-for rank, product, BM, ours in ((None, "acc", 16, None), (rc, "fused", 16, None), (rc, "acc", 32, None),
-                                (rc, "fused", 16, [False, True, True]), (None, "acc", 16, [True, False, True])):
+for rank, product, BM, ours, layout, chunks in (
+        (None, "acc", 16, None, "tile", 1), (rc, "fused", 16, None, "tile", 2), (rc, "acc", 32, None, "tile", 1),
+        (rc, "fused", 16, [False, True, True], "tile", 1), (None, "acc", 16, [True, False, True], "tile", 1),
+        (None, "acc", 16, None, "row", 1), (rc, "acc", 16, None, "row", 2), (rc, "acc", 16, [True, False, True], "row", 2)):
     codec = szcodec.SplitZipFormatCodec(consts, study.C, study.hd, rank=rank, product=product, tokens_per_program=BM,
-                                        rank_tiles=(16, 16, 32, 4))
+                                        rank_tiles=(16, 16, 32, 4), layout=layout, chunks=chunks)
     if (rank is not None) in books:
         codec.share_books(books[rank is not None])
     else:
@@ -456,9 +458,11 @@ for rank, product, BM, ours in ((None, "acc", 16, None), (rc, "fused", 16, None)
     else:
         stream, starts, enc = codec.encode(words, layer_bits=lb, ours=ours, other=sz)
         dec, bits = codec.decode(stream, starts, T, ours=ours, sz=enc, other=sz), codec.bits(stream, starts, enc, ours)
-    assert torch.equal(dec, words), ("round trip", product, ours, int((dec != words).sum()))
+    assert torch.equal(dec, words), ("round trip", product, ours, layout, chunks, int((dec != words).sum()))
     assert bits == sum(lb), ("layer bits", bits, sum(lb))
-    print("ok", rank is not None, product, BM, ours, bits / (L * T * W))
+    if ours is None:                         # the coding alone, from precomputed products, is the same decode
+        assert torch.equal(codec.decode(stream, starts, T, accs=codec.products(words)), words), "coding alone"
+    print("ok", rank is not None, product, BM, ours, layout, chunks, bits / (L * T * W))
 """
 
 
@@ -473,7 +477,7 @@ class SplitZipFormatTests(unittest.TestCase):
             self.skipTest("Triton and PyTorch are required")
         r = subprocess.run([sys.executable, "-c", SZ_CHECK, str(ROOT)], capture_output=True, text=True, timeout=2400)
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
-        self.assertEqual(r.stdout.count("ok"), 5, r.stdout)
+        self.assertEqual(r.stdout.count("ok"), 8, r.stdout)
 
 
 class MixedTests(unittest.TestCase):

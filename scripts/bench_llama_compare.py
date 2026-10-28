@@ -476,8 +476,9 @@ def stage_szcodec(args, out):
     log(f"szcodec: {study.tests[0].name}, {words.numel() / 1e6:.0f}M values; code books from "
         f"{', '.join(d.name for d in study.train[:2])}; products {args.sz_ranks or ['dense']}, tiles {args.sz_configs}")
     rows = szcodec_rows(consts, study, words, cal, device, log, ranks=[r or None for r in args.sz_ranks],
-                        configs=args.sz_configs, splitzip_source=(args.splitzip_source or (out / "splitzip"))
-                        if device.type == "cuda" else None, counts=args.mix_counts)
+                        configs=args.sz_configs, row_configs=args.sz_row_configs, chunk_counts=args.sz_chunks,
+                        splitzip_source=(args.splitzip_source or (out / "splitzip")) if device.type == "cuda" else None,
+                        counts=args.mix_counts)
     res = {"gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu", "doc": study.tests[0].name,
            "calibration": [d.name for d in study.train[:2]], "rows": rows}
     (out / "szcodec.json").write_text(json.dumps(res, indent=1))
@@ -500,17 +501,34 @@ def szcodec_lines(out):
              f"{', '.join(res['calibration'])}; measured on {res['doc']} on the {res['gpu']}, bit-exact round trip "
              "checked. Reduced rank: the second product runs inside the decoding kernel (tensor cores), so the int32 "
              "products never go through memory. Bits include the 32-bit segment starts and padding.", "",
-             "| Product | Tokens x head per program, warps | Bits per value | Decode | G values/s | Exact |",
-             "| --- | --- | --- | --- | --- | --- |"]
+             "Layouts: tile = a program decodes tokens x 128 lanes at once (prefix sums over the tile); row = token by "
+             "token over the head's 128 lanes, like our rANS kernel (prefix sums over 128 lanes, a running offset). "
+             "Chunks: token chunks decoded on separate CUDA streams.", "",
+             "| Product | Layout | Tokens x head per program, warps | Bits per value | Decode | G values/s | Exact |",
+             "| --- | --- | --- | --- | --- | --- | --- |"]
     for r in rows:
         prod = ("dense (cuBLAS, through memory)" if not r["rank"] else
                 f"rank {r['rank']}, " + ("inside the kernel" if r["product"] == "fused" else "through memory"))
-        tile = f"{r['tokens_per_program']}, {r['warps']}" + (", CUDA graph" if r.get("graph") else "")
+        tile = (f"{r['tokens_per_program']}, {r['warps']}" + (f", {r['chunks']} chunks" if r.get("chunks", 1) > 1 else "")
+                + (", CUDA graph" if r.get("graph") else ""))
+        lay = r.get("layout", "tile")
         if "error" in r:
-            lines.append(f"| {prod} | {tile} | not measured: {r['error'][:120]} | | | |")
+            lines.append(f"| {prod} | {lay} | {tile} | not measured: {r['error'][:120]} | | | |")
         else:
-            lines.append(f"| {prod} | {tile} | {r['stream_bits_per_value']:.3f} | {r['decode_ms']:.2f} ms | "
+            lines.append(f"| {prod} | {lay} | {tile} | {r['stream_bits_per_value']:.3f} | {r['decode_ms']:.2f} ms | "
                          f"{r['decode_gvalues_per_s']:.1f} | {r['bit_exact']} |")
+    parts = [r for r in res["rows"] if r["part"] == "szcodec_parts"]
+    if parts:
+        lines += ["", "Where the decode time goes (the fastest mode of each layout, one chunk; the ablations decode "
+                  "wrong words and only time the kernel):", "",
+                  "| Product | Layout | Whole decode | Products alone | Coding alone | Coding without stream reads | "
+                  "Coding without prefix sums |", "| --- | --- | --- | --- | --- | --- | --- |"]
+        for r in parts:
+            prod = ("dense" if not r["rank"] else f"rank {r['rank']}") + (", second product inside" if r["product"] ==
+                                                                           "fused" else "")
+            lines.append(f"| {prod} | {r['layout']} {r['tokens_per_program']} x {r['warps']} | {r['whole_ms']:.2f} ms | "
+                         f"{r['products_only_ms']:.2f} ms | {r['coding_only_ms']:.2f} ms | "
+                         f"{r['coding_no_reads_ms']:.2f} ms | {r['coding_no_prefix_sums_ms']:.2f} ms |")
     if not ok:
         return lines + [""]
     n = ok[0]["values"]
@@ -1437,8 +1455,12 @@ def parser():
                    help="gpu_speed: steps of the GPU lossy codec timed on the whole test document (empty: skip)")
     p.add_argument("--sz-ranks", default="0,256,512",
                    help="szcodec: products of the SplitZip-format codec (0 = dense, else reduced rank)")
-    p.add_argument("--sz-configs", default="16x4,32x4,32x8,64x8",
-                   help="szcodec: tiles, tokens per program x warps (a program is that many tokens x one head)")
+    p.add_argument("--sz-configs", default="16x2,16x4,32x2,32x4",
+                   help="szcodec, tile layout: tokens per program x warps (a program is that many tokens x one head)")
+    p.add_argument("--sz-row-configs", default="16x1,32x1,64x1,32x2,32x4",
+                   help="szcodec, row layout: tokens per program x warps")
+    p.add_argument("--sz-chunks", default="2,4",
+                   help="szcodec: token chunks on CUDA streams, tried for the fastest of each layout")
     p.add_argument("--format-ranks", default="256",
                    help="format: reduced-rank products to probe besides the dense one (empty: dense only)")
     p.add_argument("--layer-ranks", default="512,384,256",
@@ -1495,6 +1517,8 @@ def main(argv=None):
     args.format_ranks = [int(r) for r in args.format_ranks.split(",") if r]
     args.sz_ranks = [int(r) for r in args.sz_ranks.split(",") if r]
     args.sz_configs = [tuple(int(x) for x in t.split("x")) for t in args.sz_configs.split(",") if t]
+    args.sz_row_configs = [tuple(int(x) for x in t.split("x")) for t in args.sz_row_configs.split(",") if t]
+    args.sz_chunks = [int(c) for c in args.sz_chunks.split(",") if c]
     args.lossy_speed_kappas = [float(k) for k in args.lossy_speed_kappas.split(",") if k]
     args.mix_counts = [int(c) for c in args.mix_counts.split(",") if c]
     if args.splitzip_source is not None and not (args.splitzip_source / "codec_gpu.py").is_file():
