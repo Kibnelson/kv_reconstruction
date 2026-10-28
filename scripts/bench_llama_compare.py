@@ -86,6 +86,10 @@ def memory_note(device=None):
     return note
 
 
+STAGES = ("capture", "lossless", "lossy", "frontier", "gpu_speed", "pool", "report")
+BRANCH = "llama32-3b-lossy-lossless-compare"
+
+
 def environment(args):
     """Versions, device and source commit, recorded with every run."""
     import platform
@@ -95,11 +99,18 @@ def environment(args):
     info = {"python": platform.python_version(), "platform": platform.platform(), "torch": torch.__version__,
             "cuda_runtime": torch.version.cuda, "transformers": transformers.__version__, "numpy": np.__version__,
             "device": args.device}
+    try:
+        import triton
+        info["triton"] = triton.__version__
+    except ImportError:
+        info["triton"] = None
     if str(args.device).startswith("cuda") and torch.cuda.is_available():
         info["gpu"] = torch.cuda.get_device_name(torch.device(args.device))
         info["gpu_memory_bytes"] = torch.cuda.get_device_properties(torch.device(args.device)).total_memory
     try:
         info["git_commit"] = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        info["git_branch"] = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--abbrev-ref", "HEAD"],
+                                            capture_output=True, text=True).stdout.strip()
         info["git_dirty"] = bool(subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain", "--untracked-files=no"],
                                                 capture_output=True, text=True).stdout.strip())
     except OSError:
@@ -821,6 +832,10 @@ def main(argv=None):
     if any(len(t) != 2 for t in args.layer_configs):
         raise SystemExit("--layer-configs takes TBxC items (tokens per program x chunks)")
     stages = [s for s in args.stages.split(",") if s]
+    unknown = [s for s in stages if s not in STAGES]
+    if unknown:
+        raise SystemExit(f"unknown stage(s) {unknown}; this script has {', '.join(STAGES)}. "
+                         f"Check the branch: git rev-parse --abbrev-ref HEAD (expected {BRANCH})")
     out = args.output
     if "capture" in stages:
         if (out / "captures").exists() and any((out / "captures").iterdir()):
@@ -835,7 +850,10 @@ def main(argv=None):
     env = environment(args)
     env["stages"] = stages
     (out / "environment.json").write_text(json.dumps(env, indent=1))
-    log(f"run started: stages {stages}; {env.get('gpu', env['device'])}; commit {env.get('git_commit')}")
+    log(f"run started: stages {stages}; {env.get('gpu', env['device'])}; branch {env.get('git_branch')}, "
+        f"commit {env.get('git_commit')}; torch {env['torch']}, triton {env.get('triton')}")
+    if env.get("git_branch") not in (BRANCH, None, "HEAD"):
+        log(f"WARNING: running from branch {env.get('git_branch')}, not {BRANCH}")
     sharing = gpu_sharing_note(args.device)
     if sharing:
         log(sharing)
