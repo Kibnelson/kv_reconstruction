@@ -176,7 +176,7 @@ def coder_inputs(study, cfg, doc, layers):
     return out
 
 
-def coder_rows(coder_cls, device, data, settings, log=print, max_values=None):
+def coder_rows(coder_cls, device, data, settings, log=print, max_values=None, modes=("exact",)):
     """Encode and decode the concatenated layers with each (values_per_stream, block) setting."""
     w = torch.cat([d[0] for d in data.values()])
     mu = torch.cat([d[1] for d in data.values()])
@@ -186,10 +186,10 @@ def coder_rows(coder_cls, device, data, settings, log=print, max_values=None):
     n = w.numel()
     exact = float(exact_bits(w.to(torch.int32) & 0xFFFF, mu.double(), s.double()).mean())
     rows = []
-    for setting in settings:
+    for mode, setting in [(m, st) for m in modes for st in settings]:
         V, block = setting[0], setting[1]
         warps = setting[2] if len(setting) > 2 else None
-        coder = coder_cls(device, values_per_stream=V, block=block, warps=warps)
+        coder = coder_cls(device, values_per_stream=V, block=block, warps=warps, mode=mode)
         buf, starts, _ = coder.encode(w, mu, s)
         dec = coder.decode(buf, starts, mu, s, n)
         ok = bool(torch.equal(dec, w))
@@ -198,19 +198,19 @@ def coder_rows(coder_cls, device, data, settings, log=print, max_values=None):
         reps = 10 if device.type == "cuda" else 1
         te = timer(lambda: coder.encode(w, mu, s), device, warmup=1 if device.type != "cuda" else 3, reps=reps)
         td = timer(lambda: coder.decode(buf, starts, mu, s, n), device, warmup=1 if device.type != "cuda" else 3, reps=reps)
-        row = {"part": "coder", "values": n, "values_per_stream": V, "block": block, "warps": coder.warps, "bit_exact": ok,
+        row = {"part": "coder", "mode": mode, "values": n, "values_per_stream": V, "block": block, "warps": coder.warps, "bit_exact": ok,
                "stream_bits_per_value": bits, "symbol_bits_per_value": ideal, "exact_model_bits_per_value": exact,
                "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
                "encode_gvalues_per_s": n / te / 1e9, "decode_gvalues_per_s": n / td / 1e9,
                "encode_gb_per_s": 2 * n / te / 1e9, "decode_gb_per_s": 2 * n / td / 1e9}
         rows.append(row)
-        log(f"  coder V={V} block={block} warps={coder.warps}: exact={ok}, {bits:.4f} bits/value (model {exact:.4f}), "
+        log(f"  coder [{mode}] V={V} block={block} warps={coder.warps}: exact={ok}, {bits:.4f} bits/value (model {exact:.4f}), "
             f"encode {row['encode_gb_per_s']:.1f} GB/s, decode {row['decode_gb_per_s']:.1f} GB/s")
         del buf, starts, dec
     return rows
 
 
-def overlap_row(coder_cls, device, data, setting, layer_fn, log=print):
+def overlap_row(coder_cls, device, data, setting, layer_fn, log=print, mode="exact"):
     """Decode on one CUDA stream while the predictor runs on another (as a pipelined decoder would, on different
     token blocks): the predictor runs once per coded layer. Reports each part alone and both together."""
     w = torch.cat([d[0] for d in data.values()])
@@ -218,7 +218,7 @@ def overlap_row(coder_cls, device, data, setting, layer_fn, log=print):
     s = torch.cat([d[2] for d in data.values()])
     n, layers = w.numel(), len(data)
     coder = coder_cls(device, values_per_stream=setting[0], block=setting[1],
-                      warps=setting[2] if len(setting) > 2 else None)
+                      warps=setting[2] if len(setting) > 2 else None, mode=mode)
     buf, starts, _ = coder.encode(w, mu, s)
     s1, s2 = torch.cuda.Stream(device), torch.cuda.Stream(device)
 
@@ -237,7 +237,7 @@ def overlap_row(coder_cls, device, data, setting, layer_fn, log=print):
         cur.wait_stream(s1)
         cur.wait_stream(s2)
     tp, td, tb = timer(predict, device), timer(lambda: coder.decode(buf, starts, mu, s, n), device), timer(both, device)
-    row = {"part": "overlap", "values": n, "setting": list(setting), "predictor_ms": 1e3 * tp, "decode_ms": 1e3 * td,
+    row = {"part": "overlap", "mode": mode, "values": n, "setting": list(setting), "predictor_ms": 1e3 * tp, "decode_ms": 1e3 * td,
            "both_ms": 1e3 * tb, "sequential_gvalues_per_s": n / (tp + td) / 1e9, "overlapped_gvalues_per_s": n / tb / 1e9}
     log(f"  overlap: predictor {1e3 * tp:.2f} ms + decode {1e3 * td:.2f} ms one after the other; together "
         f"{1e3 * tb:.2f} ms -> {row['overlapped_gvalues_per_s']:.1f} G values/s (sequential {row['sequential_gvalues_per_s']:.1f})")

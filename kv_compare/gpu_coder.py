@@ -161,6 +161,19 @@ if triton is not None:
         return tl.where(o > last, 65536, c)
 
     @triton.jit
+    def _first_last(lo, hi):
+        first = _first_ge(lo)
+        last = _first_ge(hi) - 1
+        return first, last, last - first + 1
+
+    @triton.jit
+    def _cu(j, n):
+        """Equal-share cumulative count: ceil(j * 65536 / n), unsigned 32-bit (j <= n <= 65535)."""
+        ju = j.to(tl.uint32)
+        nu = tl.maximum(n, 1).to(tl.uint32)
+        return ((ju << 16) + nu - 1) // nu
+
+    @triton.jit
     def _put(x, cum, f, active, out_ptr, wp):
         """rANS-encode one symbol per active lane; emitted 16-bit words take consecutive positions below wp."""
         fu = f.to(tl.uint32)
@@ -187,7 +200,7 @@ if triton is not None:
 
     @triton.jit
     def _encode_kernel(words_ptr, mu_ptr, s_ptr, out_ptr, start_ptr, cum_ptr, off_ptr, K_ptr,
-                       nvals, S, V, CAP, BLOCK: tl.constexpr):
+                       nvals, S, V, CAP, BLOCK: tl.constexpr, UNIFORM: tl.constexpr):
         pid = tl.program_id(0)
         lane = pid * BLOCK + tl.arange(0, BLOCK)
         x = tl.full([BLOCK], 65536, tl.uint32)
@@ -221,10 +234,15 @@ if triton is not None:
             k = tl.where(esc, K, k)
             cum1 = tl.load(cum_ptr + off + k)
             f1 = tl.load(cum_ptr + off + k + 1) - cum1
-            first, last, n, base, R, width = _slots(lo, hi)
             o = _ord(w)
-            c0 = _cw(o, first, last, base, R)
-            c1 = _cw(o + 1, first, last, base, R)
+            if UNIFORM:                      # every word of the slice gets an equal share of the 65,536 slots
+                first, last, n = _first_last(lo, hi)
+                c0 = _cu(o - first, n).to(tl.int32)
+                c1 = _cu(o - first + 1, n).to(tl.int32)
+            else:                            # shares follow the words' rounding intervals
+                first, last, n, base, R, width = _slots(lo, hi)
+                c0 = _cw(o, first, last, base, R)
+                c1 = _cw(o + 1, first, last, base, R)
             two = valid & (esc | (n > 1))
             cum2 = tl.where(esc, w, c0)
             f2 = tl.where(esc, 1, c1 - c0)
@@ -238,7 +256,7 @@ if triton is not None:
     @triton.jit
     def _decode_kernel(buf_ptr, start_ptr, mu_ptr, s_ptr, words_ptr, cum_ptr, off_ptr, K_ptr, lut_ptr,
                        nvals, S, V, BLOCK: tl.constexpr, LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr,
-                       REFINE: tl.constexpr):
+                       REFINE: tl.constexpr, UNIFORM: tl.constexpr):
         pid = tl.program_id(0)
         lane = pid * BLOCK + tl.arange(0, BLOCK)
         r = tl.arange(0, BLOCK)
@@ -271,38 +289,49 @@ if triton is not None:
             x, rp = _take(x, cum1, f1, valid, buf_ptr, rp)
             esc = k == K
             lo, hi = _bounds(c, tl.where(esc, 0, k), K, mu, s)
-            first, last, n, base, R, width = _slots(lo, hi)
-            slot2 = (x & 0xFFFF).to(tl.int32)
-            # stage 2: estimate the word from the slot, refine it for the one-slot-per-word term, then a binary
-            # search on the cumulative slots (which lanes need it, and how far, varies; the loop runs to the
-            # slowest lane of the program, so a good estimate matters)
-            u = base + slot2.to(tl.float32) * (width * (1.0 / 65536.0))
-            oe = tl.minimum(tl.maximum(_ord(_bf16_word(u)), first), last)
-            inv_r = tl.math.div_rn(width, (65536 - n).to(tl.float32))
-            for _r in tl.static_range(REFINE):
-                u = base + (slot2 - (oe - first)).to(tl.float32) * inv_r
+            if UNIFORM:
+                first, last, n = _first_last(lo, hi)
+                slot2 = (x & 0xFFFF).to(tl.int32)
+                j = ((slot2.to(tl.uint32) * tl.maximum(n, 1).to(tl.uint32)) >> 16).to(tl.int32)   # exact inverse
+                o = tl.where(valid & (~esc) & (n > 1), first + j, first)
+                two = valid & (esc | (n > 1))
+                cu0 = _cu(o - first, n).to(tl.int32)
+                cu1 = _cu(o - first + 1, n).to(tl.int32)
+                cum2 = tl.where(esc, slot2, cu0)
+                f2 = tl.where(esc, 1, cu1 - cu0)
+            else:
+                first, last, n, base, R, width = _slots(lo, hi)
+                slot2 = (x & 0xFFFF).to(tl.int32)
+                # stage 2: estimate the word from the slot, refine it for the one-slot-per-word term, then a binary
+                # search on the cumulative slots (which lanes need it, and how far, varies; the loop runs to the
+                # slowest lane of the program, so a good estimate matters)
+                u = base + slot2.to(tl.float32) * (width * (1.0 / 65536.0))
                 oe = tl.minimum(tl.maximum(_ord(_bf16_word(u)), first), last)
-            ce0 = _cw(oe, first, last, base, R)
-            ce1 = _cw(oe + 1, first, last, base, R)
-            search = valid & (~esc) & (n > 1)
-            below = search & (ce0 > slot2)
-            above = search & (ce1 <= slot2)
-            olo = tl.where(below, first, tl.where(above, oe + 1, oe))
-            ohi = tl.where(below, oe, tl.where(above, last + 1, oe + 1))
-            clo = tl.where(below, 0, tl.where(above, ce1, ce0))              # C(first) = 0
-            chi = tl.where(below, ce0, tl.where(above, 65536, ce1))          # C(last + 1) = 65536
-            while tl.max(ohi - olo, 0) > 1:
-                mid = (olo + ohi) // 2
-                cm = _cw(mid, first, last, base, R)
-                go = cm <= slot2
-                olo = tl.where(go, mid, olo)
-                clo = tl.where(go, cm, clo)
-                ohi = tl.where(go, ohi, mid)
-                chi = tl.where(go, chi, cm)
-            o = tl.where(search, olo, first)
-            two = valid & (esc | (n > 1))
-            cum2 = tl.where(esc, slot2, clo)
-            f2 = tl.where(esc, 1, chi - clo)
+                inv_r = tl.math.div_rn(width, (65536 - n).to(tl.float32))
+                for _r in tl.static_range(REFINE):
+                    u = base + (slot2 - (oe - first)).to(tl.float32) * inv_r
+                    oe = tl.minimum(tl.maximum(_ord(_bf16_word(u)), first), last)
+                ce0 = _cw(oe, first, last, base, R)
+                ce1 = _cw(oe + 1, first, last, base, R)
+                search = valid & (~esc) & (n > 1)
+                below = search & (ce0 > slot2)
+                above = search & (ce1 <= slot2)
+                olo = tl.where(below, first, tl.where(above, oe + 1, oe))
+                ohi = tl.where(below, oe, tl.where(above, last + 1, oe + 1))
+                clo = tl.where(below, 0, tl.where(above, ce1, ce0))              # C(first) = 0
+                chi = tl.where(below, ce0, tl.where(above, 65536, ce1))          # C(last + 1) = 65536
+                while tl.max(ohi - olo, 0) > 1:
+                    mid = (olo + ohi) // 2
+                    cm = _cw(mid, first, last, base, R)
+                    go = cm <= slot2
+                    olo = tl.where(go, mid, olo)
+                    clo = tl.where(go, cm, clo)
+                    ohi = tl.where(go, ohi, mid)
+                    chi = tl.where(go, chi, cm)
+                o = tl.where(search, olo, first)
+                two = valid & (esc | (n > 1))
+                cum2 = tl.where(esc, slot2, clo)
+                f2 = tl.where(esc, 1, chi - clo)
             x, rp = _take(x, cum2, f2, two, buf_ptr, rp)
             w = tl.where(esc, slot2, _word(o))
             tl.store(words_ptr + idx, w.to(tl.int16), mask=valid)
@@ -311,7 +340,7 @@ if triton is not None:
 class SliceCoder:
     """Encode/decode BF16 words given float32 predictions and spreads (all on one device)."""
 
-    def __init__(self, device, values_per_stream=2048, block=128, warps=None, fuse=False):
+    def __init__(self, device, values_per_stream=2048, block=128, warps=None, fuse=False, mode="exact"):
         """block: lanes (streams) per Triton program; warps: warps per program (default one thread per lane;
         fewer warps give each thread several lanes, i.e. independent rANS chains to interleave)."""
         if triton is None:
@@ -319,6 +348,9 @@ class SliceCoder:
         self.device = torch.device(device)
         self.V, self.BLOCK = int(values_per_stream), int(block)
         self.warps = max(1, self.BLOCK // 32) if warps is None else int(warps)
+        if mode not in ("exact", "uniform"):
+            raise ValueError("mode is 'exact' (word shares follow rounding intervals) or 'uniform' (equal shares)")
+        self.mode = mode
         self.cum, self.off, self.K, self.lut = slice_tables(self.device)
         self.opts = {} if fuse else {"enable_fp_fusion": False}
 
@@ -342,7 +374,7 @@ class SliceCoder:
         out = torch.zeros(P * cap, dtype=torch.int16, device=self.device)
         starts = torch.zeros(P, dtype=torch.int32, device=self.device)
         self._launch(_encode_kernel, (P,), w, mu.reshape(-1).contiguous(), s.reshape(-1).contiguous(), out, starts,
-                     self.cum, self.off, self.K, n, S, self.V, cap, BLOCK=self.BLOCK)
+                     self.cum, self.off, self.K, n, S, self.V, cap, BLOCK=self.BLOCK, UNIFORM=self.mode == "uniform")
         return out, starts, n
 
     def decode(self, buf, starts, mu, s, n):
@@ -350,7 +382,7 @@ class SliceCoder:
         words = torch.empty(n, dtype=torch.int16, device=self.device)
         self._launch(_decode_kernel, (P,), buf, starts, mu.reshape(-1).contiguous(), s.reshape(-1).contiguous(),
                      words, self.cum, self.off, self.K, self.lut, n, S, self.V, BLOCK=self.BLOCK,
-                     LUT_SHIFT=16 - LUT_BITS, LUT_W=LUT_N, REFINE=REFINE)
+                     LUT_SHIFT=16 - LUT_BITS, LUT_W=LUT_N, REFINE=REFINE, UNIFORM=self.mode == "uniform")
         return words
 
     def bits(self, starts, n):
@@ -363,7 +395,7 @@ class SliceCoder:
     def ideal_bits(self, words, mu, s):
         """Sum of -log2(f / 65536) over the coder's symbols (no stream overhead), computed in PyTorch with the
         same float32 operations: the size the rANS stream should reach up to its state and rounding overhead."""
-        return float(symbol_costs(words, mu, s, self.cum, self.off, self.K).sum())
+        return float(symbol_costs(words, mu, s, self.cum, self.off, self.K, self.mode).sum())
 
 
 # ---------------------------------------------------------------------------------------------- reference model
@@ -401,7 +433,7 @@ def _bd_t(o):
     return (_word_val_t(_word_t(o - 1)) + _word_val_t(_word_t(o))) * 0.5
 
 
-def symbol_costs(words, mu, s, cum, off, K):
+def symbol_costs(words, mu, s, cum, off, K, mode="exact"):
     """Per-value bits of the value-slice coder (both symbols), PyTorch float32 mirror of the kernels."""
     w = words.reshape(-1).to(torch.int64) & 0xFFFF
     mu, s = _f32(mu.reshape(-1)), _f32(s.reshape(-1))
@@ -442,5 +474,10 @@ def symbol_costs(words, mu, s, cum, off, K):
     def cw(q):
         cc = torch.floor((_bd_t(q) - base) * R).to(torch.int64) + (q - first)
         return torch.where(q > last, torch.full_like(cc, 65536), cc)
-    f2 = torch.where(esc, torch.ones_like(n), torch.where(n > 1, cw(o + 1) - cw(o), torch.full_like(n, 65536)))
+    if mode == "uniform":
+        cu = lambda j: torch.div((j << 16) + n.clamp_min(1) - 1, n.clamp_min(1), rounding_mode="floor")
+        share = cu(o - first + 1) - cu(o - first)
+    else:
+        share = cw(o + 1) - cw(o)
+    f2 = torch.where(esc, torch.ones_like(n), torch.where(n > 1, share, torch.full_like(n, 65536)))
     return 16 - torch.log2(f1.double()) + 16 - torch.log2(f2.double())

@@ -195,14 +195,15 @@ w[:5] = torch.tensor([0x0000, 0x8000, 0x7F80, 0x7FC0, 0xFF80])
 mu[10:20] = 0.0
 s[10:20] = 1e-12
 w = w.to(torch.int16)
-c = SliceCoder("cpu", values_per_stream=16, block=16)
-buf, starts, m = c.encode(w, mu, s)
-dec = c.decode(buf, starts, mu, s, m)
-assert torch.equal(dec, w), "round trip"
-ideal = c.ideal_bits(w, mu, s) / n
-model = float(exact_bits(w.to(torch.int32) & 0xFFFF, mu.double(), s.double()).mean())
-assert abs(ideal - model) < 0.1, (ideal, model)
-print("ok", ideal, model)
+for mode in ("exact", "uniform"):
+    c = SliceCoder("cpu", values_per_stream=16, block=16, mode=mode)
+    buf, starts, m = c.encode(w, mu, s)
+    dec = c.decode(buf, starts, mu, s, m)
+    assert torch.equal(dec, w), ("round trip", mode)
+    ideal = c.ideal_bits(w, mu, s) / n
+    model = float(exact_bits(w.to(torch.int32) & 0xFFFF, mu.double(), s.double()).mean())
+    assert abs(ideal - model) < 0.15, (mode, ideal, model)
+    print("ok", mode, ideal, model)
 """
 
 
