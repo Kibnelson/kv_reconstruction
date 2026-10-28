@@ -1,0 +1,186 @@
+{
+ "gpu": "NVIDIA RTX A4500",
+ "gpu_memory_at_start": "GPU memory free 15.5 of 19.6 GB at start - WARNING: other processes are using this GPU; memory may run out and any timing is not representative (check nvidia-smi)",
+ "doc": "test_text",
+ "tokens": 8192,
+ "layers": 28,
+ "values": 469762048,
+ "free_after_model_bytes": 13383106560,
+ "total_bytes": 20993015808,
+ "prefill_seconds": {
+  "2048": 0.22446080017089845,
+  "8192": 0.9881436157226563
+ },
+ "copies": {
+  "raw BF16": {
+   "h2d_pinned": 0.03921990585327149,
+   "d2h_pinned": 0.03587712097167969,
+   "h2d_pageable": 0.06770047760009766,
+   "d2h_pageable": 0.065748291015625
+  },
+  "SplitZip": {
+   "h2d_pinned": 0.029459743499755858,
+   "d2h_pinned": 0.026790496826171874,
+   "h2d_pageable": 0.046656929016113284,
+   "d2h_pageable": 0.049649856567382813
+  },
+  "ours lossless (uniform)": {
+   "h2d_pinned": 0.022088287353515625,
+   "d2h_pinned": 0.020080608367919923,
+   "h2d_pageable": 0.03557120132446289,
+   "d2h_pageable": 0.03709798431396484
+  },
+  "ours lossless (exact)": {
+   "h2d_pinned": 0.021967199325561522,
+   "d2h_pinned": 0.0199498233795166,
+   "h2d_pageable": 0.03528704071044922,
+   "d2h_pageable": 0.03687433624267578
+  }
+ },
+ "formats_bits": {
+  "raw BF16": 16.0,
+  "SplitZip": 12.020827174186707,
+  "ours lossless (uniform)": 9.00446265084403,
+  "ours lossless (exact)": 8.944680895124163
+ },
+ "lossy": {
+  "Ours, step 0.25": {
+   "bits": 5.174628119067858,
+   "rel_error": 0.004782844848073379,
+   "ppl_change_pct": 0.24984046731848508
+  },
+  "Ours, step 0.5": {
+   "bits": 4.2103031731940765,
+   "rel_error": 0.009463893358383787,
+   "ppl_change_pct": 0.3291648099646549
+  },
+  "Ours, step 1.0": {
+   "bits": 3.3071183481125765,
+   "rel_error": 0.01878718809464577,
+   "ppl_change_pct": 1.2550495778237858
+  },
+  "Ours, step 2.0": {
+   "bits": 2.5641577571409067,
+   "rel_error": 0.037493031165073,
+   "ppl_change_pct": 3.8067722436191387
+  },
+  "Ours, step 4.0": {
+   "bits": 2.1368228175855415,
+   "rel_error": 0.0748851452302163,
+   "ppl_change_pct": 14.504252962116349
+  }
+ },
+ "codec_rows": [
+  {
+   "part": "fused",
+   "tokens_per_program": 32,
+   "rows": 4,
+   "warps": 4,
+   "mode": "uniform",
+   "search": false,
+   "values": 469762048,
+   "layers": 28,
+   "tokens": 8192,
+   "doc": "test_text",
+   "bit_exact": true,
+   "stream_bits_per_value": 9.00446265084403,
+   "exact_model_bits_per_value": 8.910772969594097,
+   "model_ms": 35.1610221862793,
+   "encode_ms": 63.70304107666015,
+   "decode_ms": 58.37516784667969,
+   "encode_gvalues_per_s": 4.751595600017147,
+   "decode_gvalues_per_s": 8.047292458906728
+  },
+  {
+   "part": "fused",
+   "tokens_per_program": 32,
+   "rows": 4,
+   "warps": 4,
+   "mode": "uniform",
+   "search": true,
+   "values": 469762048,
+   "layers": 28,
+   "tokens": 8192,
+   "doc": "test_text",
+   "bit_exact": true,
+   "stream_bits_per_value": 9.00446265084403,
+   "exact_model_bits_per_value": 8.910772969594097,
+   "model_ms": 37.48147201538086,
+   "encode_ms": 65.06905364990234,
+   "decode_ms": 63.38143920898437,
+   "encode_gvalues_per_s": 4.580786348509477,
+   "decode_gvalues_per_s": 7.411665841967988
+  },
+  {
+   "part": "fused",
+   "tokens_per_program": 32,
+   "rows": 4,
+   "warps": 4,
+   "mode": "exact",
+   "search": false,
+   "values": 469762048,
+   "layers": 28,
+   "tokens": 8192,
+   "doc": "test_text",
+   "bit_exact": true,
+   "stream_bits_per_value": 8.944680895124163,
+   "exact_model_bits_per_value": 8.910772969594097,
+   "model_ms": 38.70719909667969,
+   "encode_ms": 55.574527740478516,
+   "decode_ms": 100.14105224609375,
+   "encode_gvalues_per_s": 4.982535468525784,
+   "decode_gvalues_per_s": 4.6910037138972065
+  },
+  {
+   "part": "layerwise",
+   "tokens_per_program": 128,
+   "chunks": 2,
+   "mode": "uniform",
+   "search": true,
+   "values": 469762048,
+   "layers": 28,
+   "tokens": 8192,
+   "doc": "test_text",
+   "bit_exact": true,
+   "stream_bits_per_value": 9.004487718854632,
+   "exact_model_bits_per_value": 8.910772969594097,
+   "encode_ms": 37.1097297668457,
+   "decode_ms": 34.1962890625,
+   "decode_gvalues_per_s": 13.737222981751719
+  },
+  {
+   "part": "layerwise",
+   "tokens_per_program": 128,
+   "chunks": 2,
+   "mode": "uniform",
+   "search": false,
+   "values": 469762048,
+   "layers": 28,
+   "tokens": 8192,
+   "doc": "test_text",
+   "bit_exact": true,
+   "stream_bits_per_value": 9.004487718854632,
+   "exact_model_bits_per_value": 8.910772969594097,
+   "encode_ms": 36.53120040893555,
+   "decode_ms": 34.3006706237793,
+   "decode_gvalues_per_s": 13.695418761705858
+  },
+  {
+   "part": "layerwise",
+   "tokens_per_program": 128,
+   "chunks": 2,
+   "mode": "exact",
+   "search": true,
+   "values": 469762048,
+   "layers": 28,
+   "tokens": 8192,
+   "doc": "test_text",
+   "bit_exact": true,
+   "stream_bits_per_value": 8.944686889648438,
+   "exact_model_bits_per_value": 8.910772969594097,
+   "encode_ms": 40.38230514526367,
+   "decode_ms": 48.456703186035156,
+   "decode_gvalues_per_s": 9.69446984860872
+  }
+ ]
+}
