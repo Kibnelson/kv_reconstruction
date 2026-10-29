@@ -19,7 +19,7 @@ import gc
 
 import torch
 
-from .gpu_speed import timer
+from .gpu_speed import timer as _timer
 
 
 def rope_consts(study, consts, positions):
@@ -43,6 +43,10 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
     L, T, W = words.shape
     n = L * T * W
     k = rope_consts(study, consts, positions)
+    gpu = device.type == "cuda"
+
+    def timer(fn, device, warmup, reps):              # on the CPU (tests only): one run, no warm-up
+        return _timer(fn, device, warmup=warmup if gpu else 0, reps=reps if gpu else 1)
     r = rc["rank"] if rc is not None else rank_tiles[1]
     tiles = rank_tiles if (T % (2 * rank_tiles[0]) == 0 and r % rank_tiles[1] == 0 and W % rank_tiles[2] == 0) \
         else (16, 16, 32, 4)                         # (short cases and small test models)
@@ -95,7 +99,7 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
     def splitzip():
         enc = sz.encode(words.view(torch.bfloat16))
         dec = sz.decode(enc)
-        ok = bool(torch.equal(dec.view(torch.int16), words.reshape(-1)))
+        ok = bool(torch.equal(dec.reshape(-1).view(torch.int16), words.reshape(-1)))
         te = timer(lambda: sz.encode(words.view(torch.bfloat16)), device, warmup=3, reps=10)
         td = timer(lambda: sz.decode(enc), device, warmup=3, reps=10)
         return {"bit_exact": ok, "bits": 8 * enc.compressed_bytes / n, "encode_ms": 1e3 * te, "decode_ms": 1e3 * td}
