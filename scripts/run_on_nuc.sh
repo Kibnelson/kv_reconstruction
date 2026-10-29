@@ -85,9 +85,9 @@ fi
 # stage evalcap: the WikiText-2 raw test split as one text file (joined with blank lines, as AQUA-KV's evaluation
 # reads it), made once with the AQUA-KV environment's datasets library (or this one's, if it has it).
 if [[ ",$STAGES," == *",evalcap,"* || ",$STAGES," == *",aquappl,"* || ",$STAGES," == *",szprotocol,"* \
-      || ",$STAGES," == *",context,"* ]]; then
+      || ",$STAGES," == *",context,"* || ",$STAGES," == *",calcap,"* ]]; then
     WT=$RUN/wikitext2_test.txt
-    if [ ! -s "$WT" ] || [ ! -s "$RUN/wikitext2_test_rows.json" ]; then
+    if [ ! -s "$WT" ] || [ ! -s "$RUN/wikitext2_test_rows.json" ] || [ ! -s "$RUN/wikitext2_train.txt" ]; then
         PY=python
         [ -x "$HOME/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python" ] && \
             PY=$HOME/kv_reconstruction/runs/_llama_official/envs/aqua/bin/python
@@ -102,9 +102,16 @@ open(sys.argv[1], "w", encoding="utf-8").write("\n\n".join(d["text"]))
 import json, os
 open(os.path.join(os.path.dirname(sys.argv[1]), "wikitext2_test_rows.json"), "w").write(json.dumps(d["text"]))
 print(f"wrote {sys.argv[1]} and the test rows: {len(d)} lines")
+try:                                                 # the train split: calibration text (stage calcap)
+    t = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
+except Exception:
+    t = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split="train")
+open(os.path.join(os.path.dirname(sys.argv[1]), "wikitext2_train.txt"), "w", encoding="utf-8").write(
+    "\n\n".join(t["text"]))
+print(f"wrote the train split: {len(t)} lines")
 EOF
     fi
-    EXTRA="--eval-text $WT ${EXTRA:-}"
+    EXTRA="--eval-text $WT --train-text $RUN/wikitext2_train.txt ${EXTRA:-}"
 fi
 # AQUA_OFFICIAL=1: AQUA-KV's own scripts, as its README runs them for unsloth/Llama-3.2-3B, in its environment:
 # WikiText-2 perplexity without quantization, predictors trained on 256 x 8192 RedPajama tokens (2-bit HIGGS grid),

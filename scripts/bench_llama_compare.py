@@ -64,7 +64,18 @@ ROLES = {
     "tables": "code_dataclasses.py.txt", "test_text": "pep-0008.rst", "test_code": "code_argparse.py.txt",
 }
 TRAIN = [f"train{i}" for i in range(6)]
+TABLES = "tables"
 TESTS = ["test_text", "test_code"]
+# calibration sets of our predictor (--train-set): the code / PEP documents (default), WikiText-2 train windows
+# (stage calcap; SplitZip's protocol calibrates on WikiText-2 train too), or both interleaved; the spreads come
+# from the set's own scales document
+TRAIN_SETS = {"code": ([f"train{i}" for i in range(6)], "tables"),
+              "wikitext": ([f"wtrain{i}" for i in range(6)], "wtables"),
+              "mixed": ([d for i in range(6) for d in (f"train{i}", f"wtrain{i}")], "tables")}
+
+
+def set_suffix(args):
+    return "" if args.train_set == "code" else f"_{args.train_set}"
 
 
 LOG_PATH = None
@@ -93,7 +104,7 @@ def memory_note(device=None):
 
 
 STAGES = ("capture", "evalcap", "lossless", "lossy", "frontier", "gpu_speed", "pool", "format", "szcodec", "exans",
-          "transform", "allocate", "aquappl", "szprotocol", "context", "report")
+          "transform", "allocate", "aquappl", "calcap", "szprotocol", "context", "report")
 BRANCH = "llama32-3b-lossy-lossless-compare"
 
 
@@ -233,6 +244,8 @@ def kv_sensitivity(args, out, tokenizer, model, device):
             log(f"aquappl: loss sensitivity kept from {path.name} ({d['tokens']} tokens)")
             return d["fisher"]
     prefills = []
+    if any(n not in ROLES for n in TRAIN):
+        raise SystemExit("the loss sensitivity reads the code calibration texts: run it with --train-set code")
     for name in TRAIN:
         ids = tokenize(tokenizer, Path(args.texts) / ROLES[name], args.tokens)
         prefills += sv.chunks_of(ids, args.fisher_tokens, tokenizer.bos_token_id)
@@ -271,7 +284,7 @@ def stage_aquappl(args, out):
         windows = windows[:args.aqua_windows]
     res.update(protocol=f"aquakv evaluate_perplexity.py: seqlen {args.aqua_seqlen}, chunk 32, prefix 4, recent buffer 128",
                windows=len(windows), text=str(args.eval_text), source="goodevening13/aquakv@e744183")
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, None, log=log)
     consts = fused.prepare(study, log=log) if any(m.startswith("ours") for m in args.aqua_methods) else None
     import re
     todo = [m for m in args.aqua_methods if m not in res["methods"] or m in args.aqua_rerun]
@@ -320,7 +333,7 @@ def stage_transform(args, out):
     estimated from the calibration documents and measured on the test documents, before building it."""
     from kv_compare import transform_gain as tg
     from kv_compare.predict import Study
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, args.max_layers, log=log)
     t0 = time.time()
     res = tg.measure(study, log=log)
     res["seconds"] = time.time() - t0
@@ -352,9 +365,11 @@ def stage_allocate(args, out):
     if res.get("setting") != tag:
         res = {"setting": tag, "runs": {}}
     tokenizer, model = load_model(args.model, args.revision, device)
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, None, log=log)
     consts = fused.prepare(study, log=log)
     names = TRAIN[:tag["windows"]]
+    if any(n not in ROLES for n in names):
+        raise SystemExit("allocate reads the code calibration texts: run it with --train-set code")
     windows = [torch.tensor([tokenize(tokenizer, Path(args.texts) / ROLES[n], args.tokens)]) for n in names]
     grps = al.groups(study.L, study.C, args.alloc_band)
     res.update(groups=[list(g) for g in grps], documents=[ROLES[n] for n in names])
@@ -473,8 +488,9 @@ def stage_context(args, out):
     if args.eval_text is None or not Path(args.eval_text).is_file():
         raise SystemExit("context needs --eval-text (the WikiText-2 raw test split joined with blank lines)")
     device = torch.device(args.device)
-    path = out / "context.json"
+    path = out / f"context{set_suffix(args)}.json"
     res = json.loads(path.read_text()) if path.is_file() and "context" not in args.aqua_rerun else {}
+    res["calibration"] = {"set": args.train_set, "documents": TRAIN, "scales": TABLES}
     res.setdefault("cases", {})
     cases = [(n, 1) for n in args.context_lengths] + \
         [(n, args.context_batch) for n in args.context_lengths if n <= args.context_batch_max and args.context_batch > 1]
@@ -503,7 +519,7 @@ def stage_context(args, out):
         todo = [nm for nm in single if nm not in have]
         if not todo:
             continue
-        est = Study(out / "captures", args.device, TRAIN, "tables", todo, None, log=log)
+        est = Study(out / "captures", args.device, TRAIN, TABLES, todo, None, log=log)
         cfg = CONFIGS[cfg_name]
         if "ATT" in cfg.kinds and any(d.Q is None for d in est.train):
             cfg = CONFIGS["fast_noatt"]
@@ -514,7 +530,7 @@ def stage_context(args, out):
         del est
         gc.collect()
         torch.cuda.empty_cache() if device.type == "cuda" else None
-    study = Study(out / "captures", args.device, TRAIN, "tables", [], None, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, [], None, log=log)
     consts = fused.prepare(study, log=log)
     rc = layerwise.prepare_rank(study, consts, 256, log)
     from kv_compare.grouped import prepare_groups
@@ -591,12 +607,14 @@ def stage_context(args, out):
 LABELS_EXACT = {"prev": "ours, one-step predictor (exact cost)", "fast": "ours, strong predictor (exact cost)"}
 
 
-def frontier_gpu_lines(out):
-    r = json.loads((out / "frontier_gpu.json").read_text())
+def frontier_gpu_lines(out, name="frontier_gpu.json"):
+    r = json.loads((out / name).read_text())
     tests = r["tests"]
     names = {"test_text": "PEP 8", "test_code": "argparse.py"}
     lab = lambda t: names.get(t, "WikiText-2, 8K" if t.startswith("ctx8192") else t)
-    lines = ["## Predictors that fit the GPU codec's layout (exact lossless costs)", "",
+    cal = r.get("calibration", {}).get("set", "code")
+    lines = ["## Predictors that fit the GPU codec's layout (exact lossless costs)" +
+             ("" if cal == "code" else f", calibrated on the {cal} set"), "",
              "Bits per value by exact cost (an ideal coder for each predictor; real streams sit about 0.05 above). "
              "Natural steps are groups in channel order: 2 steps = the keys first, then the values predicted also from "
              "the same layer's decoded keys; 4 = four heads at a time; 16 = head by head. The GPU codec today uses "
@@ -609,9 +627,9 @@ def frontier_gpu_lines(out):
     return lines + [""]
 
 
-def context_lines(out):
+def context_lines(out, name="context.json"):
     from kv_compare.context_sweep import link_ms
-    r = json.loads((out / "context.json").read_text())
+    r = json.loads((out / name).read_text())
     cases = r.get("cases", {})
     if not cases:
         return []
@@ -622,10 +640,13 @@ def context_lines(out):
                 methods.append(row["method"])
     keys = sorted(cases, key=lambda k: (cases[k]["batch"], cases[k]["tokens"]))
     head = [f"{cases[k]['tokens']:,}" + (f" x{cases[k]['batch']}" if cases[k]["batch"] > 1 else "") for k in keys]
-    lines = ["## Lossless across context lengths and batch sizes", "",
+    cal = r.get("calibration", {}).get("set", "code")
+    lines = ["## Lossless across context lengths and batch sizes" +
+             ("" if cal == "code" else f" (our predictor calibrated on the {cal} set)"), "",
              "The KV of consecutive WikiText-2 test text, each request starting with BOS; a batch is coded as one "
              "stream (kv_compare/context_sweep.py). Every entry is a real stream decoded bit-exact on this GPU "
-             "(an entry that is not exact is marked). Columns: tokens per request, x requests.", "",
+             "(an entry that is not exact is marked). Columns: tokens per request, x requests. Calibration of our "
+             f"predictor: {', '.join(r.get('calibration', {}).get('documents', TRAIN_SETS['code'][0]))}.", "",
              "**Bits per value**", "", "| Method | " + " | ".join(head) + " |", "| --- |" + " --- |" * len(keys)]
     ex = r.get("exact_costs", {})
     for label, per in ex.items():
@@ -674,6 +695,36 @@ def context_lines(out):
     return lines
 
 
+def stage_calcap(args, out):
+    """Calibration documents from WikiText-2 train (--train-text): wtrain0-5 (with queries, for the attention
+    input) and wtables (the scales document), 8,192 tokens each, consecutive text, each starting with BOS."""
+    import gc
+    import torch
+    from kv_compare.capture import capture_ids, load_model
+    if args.train_text is None or not Path(args.train_text).is_file():
+        raise SystemExit("calcap needs --train-text (the WikiText-2 raw train split joined with blank lines)")
+    names = [f"wtrain{i}" for i in range(6)] + ["wtables"]
+    need = [n for n in names if not (out / "captures" / f"{n}_K_bits.npy").is_file()]
+    if not need:
+        log("calcap: kept")
+        return
+    device = torch.device(args.device)
+    tokenizer, model = load_model(args.model, args.revision, device)
+    ids = tokenizer(Path(args.train_text).read_text(encoding="utf-8"), add_special_tokens=False)["input_ids"]
+    bos, step = tokenizer.bos_token_id, args.tokens - 1
+    for i, name in enumerate(names):
+        if name not in need:
+            continue
+        if (i + 1) * step > len(ids):
+            raise SystemExit(f"{args.train_text} has {len(ids)} tokens; {(i + 1) * step} needed")
+        capture_ids(model, [bos] + ids[i * step:(i + 1) * step], out / "captures", name, device,
+                    queries=name.startswith("wtrain"))
+        log(f"calcap: captured {name} (WikiText-2 train tokens {i * step}-{(i + 1) * step - 1})")
+    del model
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+
+
 def stage_szprotocol(args, out):
     """Ours on SplitZip's benchmark data (bench_codec_throughput.py, its paper protocol): the first 4 WikiText-2
     test rows of at least 80 characters (whitespace normalised), each prefilled on its own; our lossless bits
@@ -704,7 +755,7 @@ def stage_szprotocol(args, out):
     del model
     gc.collect()
     torch.cuda.empty_cache() if device.type == "cuda" else None
-    study = Study(out / "captures", args.device, TRAIN, "tables", names, None, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, names, None, log=log)
     res = {"prompts": [{"name": n, "tokens": d.tokens, "chars": len(t)} for n, d, t in zip(names, study.tests, texts)],
            "ours": {}}
     for name in args.sz_protocol_configs:
@@ -860,7 +911,7 @@ def stage_lossless(args, out):
     import torch
     from kv_compare.baselines import exans_bits, splitzip_codebook, splitzip_token_bits
     from kv_compare.predict import CONFIGS, LABELS, Study, macs_per_value
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, args.max_layers, log=log)
     L = study.L
     spans = chunk_spans(study.tests[0].tokens)
     result = {"layers": L, "spans": spans, "methods": {}}
@@ -918,7 +969,7 @@ def _stage_lossy(args, out, which):
         P, M, result_file = args.eval_prompt_tokens, args.eval_continuation_tokens, "lossy_eval.json"
     else:
         docs, P, M, result_file = TESTS, args.prompt_tokens, args.continuation_tokens, "lossy.json"
-    study = Study(out / "captures", args.device, TRAIN, "tables", docs, None, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, docs, None, log=log)
     cfg = CONFIGS[args.lossy_config]
     if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
         log(f"{args.lossy_config} needs calibration queries; using fast_noatt")
@@ -1076,18 +1127,19 @@ def stage_frontier(args, out):
     missing = [t for t in tests if not (out / "captures" / f"{t}_K_bits.npy").is_file()]
     if missing:
         raise SystemExit(f"frontier: no captures for {missing} (ctx* windows come from the context stage)")
-    study = Study(out / "captures", args.device, TRAIN, "tables", tests, args.max_layers, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, tests, args.max_layers, log=log)
     with_att = all(d.Q is not None for d in study.train)
     if args.frontier_variants == "gpu":
-        variants, name = gpu_variants(), "frontier_gpu.json"
+        variants, name = gpu_variants(), f"frontier_gpu{set_suffix(args)}.json"
     else:
-        variants, name = default_variants(with_att=with_att, quick=args.frontier_quick), "frontier.json"
+        variants, name = default_variants(with_att=with_att, quick=args.frontier_quick), \
+            f"frontier{set_suffix(args)}.json"
     log(f"frontier: {len(variants)} variants over {study.L} layers on {', '.join(tests)} ({memory_note(args.device)})")
     begin = time.time()
     vs, bits, macs = Frontier(study, variants, log).run()
     rows = summarize(vs, bits, macs, chunk_spans(study.tests[0].tokens))
     res = {"layers": study.L, "seconds": time.time() - begin, "with_attention_input": with_att, "variants": rows,
-           "tests": tests}
+           "tests": tests, "calibration": {"set": args.train_set, "documents": TRAIN, "scales": TABLES}}
     (out / name).write_text(json.dumps(res, indent=1))
     log(f"frontier done in {res['seconds']:.0f} s ({memory_note(args.device)})")
     return res
@@ -1113,7 +1165,7 @@ def stage_exans(args, out):
         log(f"exans: build failed: {exc}")
         (out / "exans.json").write_text(json.dumps({"error": str(exc)[-3000:], "documents": {}}, indent=1))
         return None
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, None, log=log)
     res = {"build": info, "documents": {}}
     for d in study.tests:
         w = torch.stack([d.words(l, device) for l in range(study.L)])
@@ -1139,7 +1191,7 @@ def stage_format(args, out):
     import torch
     from kv_compare import fused, layerwise, szformat
     from kv_compare.predict import Study
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, args.max_layers, log=log)
     consts = fused.prepare(study, log=log)
     res = {"products": {}}
     log("format: dense one-step product")
@@ -1170,7 +1222,7 @@ def stage_szcodec(args, out):
     from kv_compare.gpu_speed import szcodec_rows
     from kv_compare.predict import Study
     device = torch.device(args.device)
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, args.max_layers, log=log)
     consts = fused.prepare(study, log=log)
 
     def w16(d):
@@ -1445,7 +1497,7 @@ def stage_gpu_speed(args, out):
     rows = predictor_rows(Hk, hd, Hq, args.speed_tokens, device, variants, args.speed_formats, log)
     gc.collect()
     torch.cuda.empty_cache() if device.type == "cuda" else None
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, None, log=log)
     cfg = CONFIGS[args.speed_config]
     if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
         cfg = CONFIGS["lite"]
@@ -1481,7 +1533,7 @@ def stage_gpu_speed(args, out):
         del data
         gc.collect()
         torch.cuda.empty_cache()
-        study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+        study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, None, log=log)
         log(f"gpu_speed: fused one-step codec, whole {study.tests[0].name} ({study.L} layers), configs {args.fused_configs}")
         rows += fused_rows(study, device, args.fused_configs, log, modes=args.fused_modes,
                            layer_configs=args.layer_configs, ranks=args.layer_ranks, lossy_kappas=args.lossy_speed_kappas,
@@ -1516,7 +1568,7 @@ def stage_pool(args, out):
     note = gpu_sharing_note(args.device)
     if note and "WARNING" in note:
         log("pool: " + note)
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, TESTS, None, log=log)
     doc = study.tests[0]
     L, W, T = study.L, study.W, doc.tokens
     ids = [int(v) for v in doc.ids[: doc.tokens]]
@@ -2224,10 +2276,12 @@ def stage_report(args, out):
         lines += allocation_lines(out)
     if (out / "transform_gain.json").is_file():
         lines += [""] + transform_lines(out)
-    if (out / "context.json").is_file():
-        lines += [""] + context_lines(out)
-    if (out / "frontier_gpu.json").is_file():
-        lines += [""] + frontier_gpu_lines(out)
+    for name in ("context.json", "context_wikitext.json", "context_mixed.json"):
+        if (out / name).is_file():
+            lines += [""] + context_lines(out, name)
+    for name in ("frontier_gpu.json", "frontier_gpu_wikitext.json", "frontier_gpu_mixed.json"):
+        if (out / name).is_file():
+            lines += [""] + frontier_gpu_lines(out, name)
     lines += szprotocol_lines(out)
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
@@ -2311,6 +2365,11 @@ def parser():
     p.add_argument("--context-lengths", default="512,1024,2048,4096,8192,16384,32768",
                    help="context: tokens per request (batch 1); our codecs code at most --context-stream-tokens "
                         "per stream; 65536 needs more than 20 GB of GPU memory")
+    p.add_argument("--train-set", default="code", choices=tuple(TRAIN_SETS),
+                   help="calibration documents of our predictor: code (the default six), wikitext (WikiText-2 "
+                        "train, stage calcap), mixed (both)")
+    p.add_argument("--train-text", type=Path, default=None,
+                   help="calcap: the WikiText-2 raw train split joined with blank lines (run_on_nuc.sh writes it)")
     p.add_argument("--context-groups", default="2,4,16",
                    help="context: head groups of our grouped predictor to measure (kv_compare.grouped; empty: none)")
     p.add_argument("--context-stream-tokens", type=int, default=8192,
@@ -2401,6 +2460,8 @@ def main(argv=None):
     args.alloc_moves = [float(m) for m in args.alloc_moves.split(",") if m]
     args.context_lengths = [int(n) for n in args.context_lengths.split(",") if n]
     args.context_groups = [int(g) for g in args.context_groups.split(",") if g]
+    global TRAIN, TABLES
+    TRAIN, TABLES = list(TRAIN_SETS[args.train_set][0]), TRAIN_SETS[args.train_set][1]
     if any(n % 128 for n in args.context_lengths):
         raise SystemExit("--context-lengths: multiples of 128 tokens")
     args.sz_protocol_configs = [c for c in args.sz_protocol_configs.split(",") if c]
@@ -2486,6 +2547,8 @@ def main(argv=None):
             stage_allocate(args, out)
         if "aquappl" in stages:
             stage_aquappl(args, out)
+        if "calcap" in stages:
+            stage_calcap(args, out)
         if "szprotocol" in stages:
             stage_szprotocol(args, out)
         if "context" in stages:
