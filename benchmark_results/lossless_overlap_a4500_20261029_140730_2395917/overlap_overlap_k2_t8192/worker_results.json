@@ -1,0 +1,1277 @@
+{
+  "author_timing": {
+    "ast_sha256": "092b2485c9d06b4091488736ae6c50ef84b60fe3c31d924c7e09fd17e08d2729",
+    "extracted_definitions": [
+      "synchronize",
+      "bench"
+    ],
+    "scope": "Only author synchronize/bench definitions; not a full author workload or serving reproduction.",
+    "source": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip/bench_codec_throughput.py",
+    "source_sha256": "7f1936a13ee3b2bbb04a35b71ca14a88bc407fe9b67e2c128d2ec48df2d018e2",
+    "unchanged_ast": true
+  },
+  "cold_state_initialization_wall_ms": 432.9153448343277,
+  "device": "NVIDIA RTX A4500",
+  "gpu_measured": true,
+  "graph_capture_count": 0,
+  "memory_scope": "Isolated samples include Torch baseline/incremental peaks, output and scratch; native allocations outside Torch unmeasured",
+  "packet_immutability": [
+    {
+      "bytes": 696790572,
+      "id": "team_rank256_uniform_test_text_t8192",
+      "sha256": "792c339aba22893457174ccb972d928fee7972a9b5b644ec7fb6ae99b80f12f2",
+      "unchanged": true
+    },
+    {
+      "bytes": 695704204,
+      "id": "team_rank256_uniform_test_code_t8192",
+      "sha256": "fa0c3ce0f9a845636c1e390de983b8d4870d576fd52983d5a27c213c74d262ba",
+      "unchanged": true
+    }
+  ],
+  "raw_packet_immutability": [
+    {
+      "bytes": 939524416,
+      "id": "raw_bf16_k0_test_text_t8192",
+      "sha256": "c5d027b5cd14e9070fa7d7113c4139933d5161f405cdce92d0c3d1f124035217",
+      "unchanged": true
+    },
+    {
+      "bytes": 939524416,
+      "id": "raw_bf16_k0_test_code_t8192",
+      "sha256": "4095cb03de33ef3c1a2d3b2e6b39951e8348e76edd40c4f2a63d1c69285f8c97",
+      "unchanged": true
+    }
+  ],
+  "receiver_sha256": "066abba29a0d7f1cdb3008e16145cff51c78e1e113855e2133075641b7a67ff0",
+  "rows": [
+    {
+      "accounting": {
+        "avoided_fallback_decoded_buffer_bytes": 872415232,
+        "avoided_fallback_gather_bytes": 872415232,
+        "bulk_fallback_output_bytes": 805306368,
+        "bundle_index_bytes": 208,
+        "coder_table_bytes": 57688,
+        "critical_fallback_output_bytes": 67108864,
+        "decoder_workspace_tensor_bytes": 106446848,
+        "execution_plan": {
+          "bulk_fallback_layers": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25
+          ],
+          "bulk_stream_active": true,
+          "bundle_requested": true,
+          "bundled": true,
+          "completion_scope": "All critical, bulk and rANS output writes joined before returning",
+          "critical_fallback_layers": [
+            0,
+            26
+          ],
+          "decoder_context_layers": [],
+          "decoder_skipped_context_layers": [
+            1,
+            27
+          ],
+          "escape_partition_method": "Two class-filtered scans; arbitrary validated escape order",
+          "fallback_scatter_calls": 0,
+          "feature_passes": 2,
+          "mapped_decode_partitions": 2,
+          "mapped_io": true,
+          "mapped_io_active": true,
+          "mapped_kernel_scope": "Local derived kernels; original baseline implementation unchanged",
+          "mapped_splitzip_decode_calls": 1,
+          "mapped_splitzip_encode_calls": 1,
+          "native_splitzip_decode_calls": 0,
+          "native_splitzip_encode_calls": 0,
+          "overlap_decode": true,
+          "overlap_decode_active": true,
+          "required_context": {
+            "encode_product_passes": 2,
+            "feature_layers": [
+              0,
+              26
+            ],
+            "feature_passes": 2,
+            "full_model_feature_passes": 27,
+            "full_model_prior_passes": 27,
+            "full_model_product_passes": 26,
+            "full_model_surprise_passes": 27,
+            "layers": 28,
+            "model_product_layers": [],
+            "model_product_passes": 0,
+            "prior_layers": [],
+            "prior_passes": 0,
+            "prior_reset_layers": [
+              1,
+              27
+            ],
+            "rans_layers": [
+              1,
+              27
+            ],
+            "skipped_feature_layers": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ],
+            "skipped_surprise_layers": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+            ],
+            "surprise_layers": [],
+            "surprise_passes": 0,
+            "unused_feature_storage": "Uninitialized; encoder never reads rows outside feature_layers"
+          },
+          "selective": true,
+          "selective_decode": true,
+          "surprise_passes": 0
+        },
+        "expanded_arena_bytes": 0,
+        "fallback_decoded_buffer_bytes": 0,
+        "fallback_gather_bytes": 0,
+        "fallback_layers": [
+          0,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26
+        ],
+        "mapped_index_bytes": 208,
+        "mapped_output_active": true,
+        "mask": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true
+        ],
+        "mask_transitions": 3,
+        "native_allocation_peaks": "unmeasured; Torch peaks do not cover every native allocation",
+        "native_splitzip_escape_count": 371734,
+        "native_splitzip_payload_bytes": 656913562,
+        "outer_directory_bytes": 72,
+        "output_bytes": 939524096,
+        "output_clone_bytes": 0,
+        "overlap_uses_additional_bf16_buffer": false,
+        "packet_bytes": 696790572,
+        "partition_index_bytes": 234,
+        "payload_bytes": 696788752,
+        "predecessor_fallback_layers": [
+          1,
+          27
+        ],
+        "prior_reset_layers": [
+          1,
+          27
+        ],
+        "rans_directory_bytes": 32772,
+        "rans_final_state_bytes": 2097152,
+        "rans_layers": [
+          1,
+          27
+        ],
+        "rans_payload_bytes": 39842416,
+        "shared_lut_bytes": 784,
+        "shared_predictor_bytes": 153346048
+      },
+      "decode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 187.47717905787744,
+            "mean": 186.81852346984402,
+            "min": 185.01212183670887,
+            "std": 1.027188325483757
+          },
+          "raw_gbs_samples": [
+            187.43771405185862,
+            187.47717905787744,
+            187.0980813284211,
+            185.01212183670887,
+            187.06752107435406
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.00501246027648449,
+            0.005011405125260353,
+            0.005021559223532677,
+            0.005078175887465477,
+            0.005022379569709301
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.005078175887465477,
+            "mean": 0.00502919601649046,
+            "min": 0.005011405125260353,
+            "std": 2.784067670890311e-05
+          },
+          "wall_mean_ms": 5.029196016490459,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 5.269504070281982,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 4815425024,
+              "wall_ms": 5.274169147014618
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 5.25926399230957,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 4815425024,
+              "wall_ms": 5.263131111860275
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 5.350399971008301,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 4815425024,
+              "wall_ms": 5.35600446164608
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 5.253119945526123,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 4815425024,
+              "wall_ms": 5.2582696080207825
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 5.2500481605529785,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 4815425024,
+              "wall_ms": 5.254777148365974
+            }
+          ],
+          "wall_median_ms": 5.263131111860275,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 5.298175811767578,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 4815425024,
+              "wall_ms": 5.3027477115392685
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 5.265664100646973,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 4815425024,
+              "wall_ms": 5.270140245556831
+            }
+          ]
+        }
+      },
+      "decoded_word_sha256": "f992dd546631ff19a89873936461437ca557d0c76c62e1a0749893a57f78a634",
+      "diagnostics": "/home/nelson/kv_reconstruction/runs/lossless_overlap_a4500_20261029_140730_2395917/overlap_overlap_k2_t8192/diagnostics.json",
+      "document": "test_text_t8192",
+      "encode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 76.17162111818931,
+            "mean": 75.98592250764388,
+            "min": 75.8134590835513,
+            "std": 0.1421062427007778
+          },
+          "raw_gbs_samples": [
+            76.17162111818931,
+            75.8134590835513,
+            75.92921037374619,
+            76.08636213014793,
+            75.92895983258467
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.012334306165575981,
+            0.012392576560378074,
+            0.012373684532940387,
+            0.012348127439618111,
+            0.012373725362122058
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.012392576560378074,
+            "mean": 0.012364484012126923,
+            "min": 0.012334306165575981,
+            "std": 2.3116462136878963e-05
+          },
+          "wall_mean_ms": 12.364484012126923,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 12.445023536682129,
+              "incremental_peak_torch_bytes": 3279919616,
+              "peak_torch_bytes": 7155804160,
+              "wall_ms": 12.456975877285004
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 12.386303901672363,
+              "incremental_peak_torch_bytes": 3279919616,
+              "peak_torch_bytes": 7155804160,
+              "wall_ms": 12.397650629281998
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 12.46003246307373,
+              "incremental_peak_torch_bytes": 3279919616,
+              "peak_torch_bytes": 7155804160,
+              "wall_ms": 12.471619993448257
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 12.52950382232666,
+              "incremental_peak_torch_bytes": 3279919616,
+              "peak_torch_bytes": 7155804160,
+              "wall_ms": 12.540264055132866
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 12.495967864990234,
+              "incremental_peak_torch_bytes": 3279919616,
+              "peak_torch_bytes": 7155804160,
+              "wall_ms": 12.506932020187378
+            }
+          ],
+          "wall_median_ms": 12.471619993448257,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 12.412799835205078,
+              "incremental_peak_torch_bytes": 3279919616,
+              "peak_torch_bytes": 7155804160,
+              "wall_ms": 12.423403561115265
+            },
+            {
+              "baseline_torch_bytes": 3875884544,
+              "cuda_interval_ms": 12.45695972442627,
+              "incremental_peak_torch_bytes": 3279919616,
+              "peak_torch_bytes": 7155804160,
+              "wall_ms": 12.470463290810585
+            }
+          ]
+        }
+      },
+      "execution": "direct",
+      "execution_plan": {
+        "bulk_fallback_layers": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25
+        ],
+        "bulk_stream_active": true,
+        "bundle_requested": true,
+        "bundled": true,
+        "completion_scope": "All critical, bulk and rANS output writes joined before returning",
+        "critical_fallback_layers": [
+          0,
+          26
+        ],
+        "decoder_context_layers": [],
+        "decoder_skipped_context_layers": [
+          1,
+          27
+        ],
+        "escape_partition_method": "Two class-filtered scans; arbitrary validated escape order",
+        "fallback_scatter_calls": 0,
+        "feature_passes": 2,
+        "mapped_decode_partitions": 2,
+        "mapped_io": true,
+        "mapped_io_active": true,
+        "mapped_kernel_scope": "Local derived kernels; original baseline implementation unchanged",
+        "mapped_splitzip_decode_calls": 1,
+        "mapped_splitzip_encode_calls": 1,
+        "native_splitzip_decode_calls": 0,
+        "native_splitzip_encode_calls": 0,
+        "overlap_decode": true,
+        "overlap_decode_active": true,
+        "required_context": {
+          "encode_product_passes": 2,
+          "feature_layers": [
+            0,
+            26
+          ],
+          "feature_passes": 2,
+          "full_model_feature_passes": 27,
+          "full_model_prior_passes": 27,
+          "full_model_product_passes": 26,
+          "full_model_surprise_passes": 27,
+          "layers": 28,
+          "model_product_layers": [],
+          "model_product_passes": 0,
+          "prior_layers": [],
+          "prior_passes": 0,
+          "prior_reset_layers": [
+            1,
+            27
+          ],
+          "rans_layers": [
+            1,
+            27
+          ],
+          "skipped_feature_layers": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25
+          ],
+          "skipped_surprise_layers": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26
+          ],
+          "surprise_layers": [],
+          "surprise_passes": 0,
+          "unused_feature_storage": "Uninitialized; encoder never reads rows outside feature_layers"
+        },
+        "selective": true,
+        "selective_decode": true,
+        "surprise_passes": 0
+      },
+      "id": "team_rank256_uniform_test_text_t8192",
+      "method": "overlap_overlap_k2",
+      "original_word_exact": true,
+      "original_word_sha256": "f992dd546631ff19a89873936461437ca557d0c76c62e1a0749893a57f78a634",
+      "packet": "/home/nelson/kv_reconstruction/runs/lossless_overlap_a4500_20261029_140730_2395917/overlap_overlap_k2_t8192/team_rank256_uniform_test_text_t8192_encoded.kvc",
+      "packet_bytes": 696790572,
+      "packet_sha256": "792c339aba22893457174ccb972d928fee7972a9b5b644ec7fb6ae99b80f12f2",
+      "policy_sha256": "ef9b2805eb4017a170184956a2f019ef133207da5d3590cf52e3848ccd2464d4",
+      "rans_fields": {
+        "rans_offsets": {
+          "bytes": 16388,
+          "sha256": "43a47011ec4cf9d43d88db61caa664b456b1a46d99f79fc7d1fd1f4b4494f8da"
+        },
+        "rans_relative": {
+          "bytes": 16384,
+          "sha256": "545e9ffa79f0069ccd8fdb1b1c9d4c417ce122c1d03e8c9d6597102dd646f870"
+        },
+        "rans_words": {
+          "bytes": 39842416,
+          "sha256": "a19eca3f138698749fa9ca3f19fb54d669534eba8843e0997f67a001cb2a25b4"
+        }
+      },
+      "round": "paired",
+      "shape": [
+        28,
+        8192,
+        2048
+      ],
+      "tokens": 8192,
+      "values": 469762048
+    },
+    {
+      "accounting": {
+        "avoided_fallback_decoded_buffer_bytes": 872415232,
+        "avoided_fallback_gather_bytes": 872415232,
+        "bulk_fallback_output_bytes": 805306368,
+        "bundle_index_bytes": 208,
+        "coder_table_bytes": 57688,
+        "critical_fallback_output_bytes": 67108864,
+        "decoder_workspace_tensor_bytes": 106446848,
+        "execution_plan": {
+          "bulk_fallback_layers": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25
+          ],
+          "bulk_stream_active": true,
+          "bundle_requested": true,
+          "bundled": true,
+          "completion_scope": "All critical, bulk and rANS output writes joined before returning",
+          "critical_fallback_layers": [
+            0,
+            26
+          ],
+          "decoder_context_layers": [],
+          "decoder_skipped_context_layers": [
+            1,
+            27
+          ],
+          "escape_partition_method": "Two class-filtered scans; arbitrary validated escape order",
+          "fallback_scatter_calls": 0,
+          "feature_passes": 2,
+          "mapped_decode_partitions": 2,
+          "mapped_io": true,
+          "mapped_io_active": true,
+          "mapped_kernel_scope": "Local derived kernels; original baseline implementation unchanged",
+          "mapped_splitzip_decode_calls": 1,
+          "mapped_splitzip_encode_calls": 1,
+          "native_splitzip_decode_calls": 0,
+          "native_splitzip_encode_calls": 0,
+          "overlap_decode": true,
+          "overlap_decode_active": true,
+          "required_context": {
+            "encode_product_passes": 2,
+            "feature_layers": [
+              0,
+              26
+            ],
+            "feature_passes": 2,
+            "full_model_feature_passes": 27,
+            "full_model_prior_passes": 27,
+            "full_model_product_passes": 26,
+            "full_model_surprise_passes": 27,
+            "layers": 28,
+            "model_product_layers": [],
+            "model_product_passes": 0,
+            "prior_layers": [],
+            "prior_passes": 0,
+            "prior_reset_layers": [
+              1,
+              27
+            ],
+            "rans_layers": [
+              1,
+              27
+            ],
+            "skipped_feature_layers": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ],
+            "skipped_surprise_layers": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+            ],
+            "surprise_layers": [],
+            "surprise_passes": 0,
+            "unused_feature_storage": "Uninitialized; encoder never reads rows outside feature_layers"
+          },
+          "selective": true,
+          "selective_decode": true,
+          "surprise_passes": 0
+        },
+        "expanded_arena_bytes": 0,
+        "fallback_decoded_buffer_bytes": 0,
+        "fallback_gather_bytes": 0,
+        "fallback_layers": [
+          0,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26
+        ],
+        "mapped_index_bytes": 208,
+        "mapped_output_active": true,
+        "mask": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true
+        ],
+        "mask_transitions": 3,
+        "native_allocation_peaks": "unmeasured; Torch peaks do not cover every native allocation",
+        "native_splitzip_escape_count": 395620,
+        "native_splitzip_payload_bytes": 657080764,
+        "outer_directory_bytes": 72,
+        "output_bytes": 939524096,
+        "output_clone_bytes": 0,
+        "overlap_uses_additional_bf16_buffer": false,
+        "packet_bytes": 695704204,
+        "partition_index_bytes": 234,
+        "payload_bytes": 695702384,
+        "predecessor_fallback_layers": [
+          1,
+          27
+        ],
+        "prior_reset_layers": [
+          1,
+          27
+        ],
+        "rans_directory_bytes": 32772,
+        "rans_final_state_bytes": 2097152,
+        "rans_layers": [
+          1,
+          27
+        ],
+        "rans_payload_bytes": 38588848,
+        "shared_lut_bytes": 784,
+        "shared_predictor_bytes": 153346048
+      },
+      "decode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 187.1779075853742,
+            "mean": 186.32450114075885,
+            "min": 185.11763581974446,
+            "std": 0.9238442183506915
+          },
+          "raw_gbs_samples": [
+            186.97207991491607,
+            187.1779075853742,
+            185.11763581974446,
+            185.55836342193714,
+            186.7965189618224
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.005024943277239799,
+            0.0050194176658988,
+            0.005075281411409378,
+            0.0050632268935441975,
+            0.005029665976762771
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.005075281411409378,
+            "mean": 0.0050425070449709895,
+            "min": 0.0050194176658988,
+            "std": 2.5049798481809308e-05
+          },
+          "wall_mean_ms": 5.042507044970989,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 5.391615867614746,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 5511128064,
+              "wall_ms": 5.396068096160889
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 5.4251837730407715,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 5511128064,
+              "wall_ms": 5.431564524769783
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 5.498239994049072,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 5511128064,
+              "wall_ms": 5.504295229911804
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 5.370783805847168,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 5511128064,
+              "wall_ms": 5.375996232032776
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 5.415232181549072,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 5511128064,
+              "wall_ms": 5.419660359621048
+            }
+          ],
+          "wall_median_ms": 5.419660359621048,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 5.383264064788818,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 5511128064,
+              "wall_ms": 5.387438461184502
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 5.363872051239014,
+              "incremental_peak_torch_bytes": 939540480,
+              "peak_torch_bytes": 5511128064,
+              "wall_ms": 5.368590354919434
+            }
+          ]
+        }
+      },
+      "decoded_word_sha256": "b7ca4fc9d6209c2c817fdfb295a53263963456c3bed6e8dbfc1936bdafd6ab28",
+      "document": "test_code_t8192",
+      "encode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 76.05158491000527,
+            "mean": 75.79776041131738,
+            "min": 75.66592879929519,
+            "std": 0.15281918484824203
+          },
+          "raw_gbs_samples": [
+            76.05158491000527,
+            75.72164342498084,
+            75.66592879929519,
+            75.82361932705491,
+            75.72602559525073
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.012353774048388005,
+            0.012407603077590465,
+            0.012416739091277123,
+            0.012390915974974633,
+            0.01240688506513834
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.012416739091277123,
+            "mean": 0.012395183451473713,
+            "min": 0.012353774048388005,
+            "std": 2.494378931796087e-05
+          },
+          "wall_mean_ms": 12.395183451473713,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 12.649279594421387,
+              "incremental_peak_torch_bytes": 3277745664,
+              "peak_torch_bytes": 7849333248,
+              "wall_ms": 12.670572847127914
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 12.619168281555176,
+              "incremental_peak_torch_bytes": 3277745664,
+              "peak_torch_bytes": 7849333248,
+              "wall_ms": 12.639807537198067
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 12.64902400970459,
+              "incremental_peak_torch_bytes": 3277745664,
+              "peak_torch_bytes": 7849333248,
+              "wall_ms": 12.66990415751934
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 12.604928016662598,
+              "incremental_peak_torch_bytes": 3277745664,
+              "peak_torch_bytes": 7849333248,
+              "wall_ms": 12.62674294412136
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 12.781472206115723,
+              "incremental_peak_torch_bytes": 3277745664,
+              "peak_torch_bytes": 7849333248,
+              "wall_ms": 12.80895248055458
+            }
+          ],
+          "wall_median_ms": 12.66990415751934,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 12.589568138122559,
+              "incremental_peak_torch_bytes": 3277745664,
+              "peak_torch_bytes": 7849333248,
+              "wall_ms": 12.60925643146038
+            },
+            {
+              "baseline_torch_bytes": 4571587584,
+              "cuda_interval_ms": 12.623456001281738,
+              "incremental_peak_torch_bytes": 3277745664,
+              "peak_torch_bytes": 7849333248,
+              "wall_ms": 12.642860412597656
+            }
+          ]
+        }
+      },
+      "execution": "direct",
+      "execution_plan": {
+        "bulk_fallback_layers": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25
+        ],
+        "bulk_stream_active": true,
+        "bundle_requested": true,
+        "bundled": true,
+        "completion_scope": "All critical, bulk and rANS output writes joined before returning",
+        "critical_fallback_layers": [
+          0,
+          26
+        ],
+        "decoder_context_layers": [],
+        "decoder_skipped_context_layers": [
+          1,
+          27
+        ],
+        "escape_partition_method": "Two class-filtered scans; arbitrary validated escape order",
+        "fallback_scatter_calls": 0,
+        "feature_passes": 2,
+        "mapped_decode_partitions": 2,
+        "mapped_io": true,
+        "mapped_io_active": true,
+        "mapped_kernel_scope": "Local derived kernels; original baseline implementation unchanged",
+        "mapped_splitzip_decode_calls": 1,
+        "mapped_splitzip_encode_calls": 1,
+        "native_splitzip_decode_calls": 0,
+        "native_splitzip_encode_calls": 0,
+        "overlap_decode": true,
+        "overlap_decode_active": true,
+        "required_context": {
+          "encode_product_passes": 2,
+          "feature_layers": [
+            0,
+            26
+          ],
+          "feature_passes": 2,
+          "full_model_feature_passes": 27,
+          "full_model_prior_passes": 27,
+          "full_model_product_passes": 26,
+          "full_model_surprise_passes": 27,
+          "layers": 28,
+          "model_product_layers": [],
+          "model_product_passes": 0,
+          "prior_layers": [],
+          "prior_passes": 0,
+          "prior_reset_layers": [
+            1,
+            27
+          ],
+          "rans_layers": [
+            1,
+            27
+          ],
+          "skipped_feature_layers": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25
+          ],
+          "skipped_surprise_layers": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26
+          ],
+          "surprise_layers": [],
+          "surprise_passes": 0,
+          "unused_feature_storage": "Uninitialized; encoder never reads rows outside feature_layers"
+        },
+        "selective": true,
+        "selective_decode": true,
+        "surprise_passes": 0
+      },
+      "id": "team_rank256_uniform_test_code_t8192",
+      "method": "overlap_overlap_k2",
+      "original_word_exact": true,
+      "original_word_sha256": "b7ca4fc9d6209c2c817fdfb295a53263963456c3bed6e8dbfc1936bdafd6ab28",
+      "packet": "/home/nelson/kv_reconstruction/runs/lossless_overlap_a4500_20261029_140730_2395917/overlap_overlap_k2_t8192/team_rank256_uniform_test_code_t8192_encoded.kvc",
+      "packet_bytes": 695704204,
+      "packet_sha256": "fa0c3ce0f9a845636c1e390de983b8d4870d576fd52983d5a27c213c74d262ba",
+      "policy_sha256": "ef9b2805eb4017a170184956a2f019ef133207da5d3590cf52e3848ccd2464d4",
+      "rans_fields": {
+        "rans_offsets": {
+          "bytes": 16388,
+          "sha256": "62372cc8b45ac8b50d9d6a654d9d66f933b8c1d68d8f7fcb6a5dec47c77ad389"
+        },
+        "rans_relative": {
+          "bytes": 16384,
+          "sha256": "e7e8c7e723ca0597a0e3ff93bc2a8d2c0182d23788b95fc2a9ca1b817ba3fa99"
+        },
+        "rans_words": {
+          "bytes": 38588848,
+          "sha256": "673a8dc28a3bfbf4c10c600d0c26a470e0222f5ef8391f0a910b4519c9851cee"
+        }
+      },
+      "round": "paired",
+      "shape": [
+        28,
+        8192,
+        2048
+      ],
+      "tokens": 8192,
+      "values": 469762048
+    }
+  ],
+  "runtime_policy": {
+    "cudnn_allow_tf32": true,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false,
+    "deterministic_algorithms_enabled": false,
+    "deterministic_warn_only": false,
+    "effective_uninitialized_fill": false,
+    "fill_uninitialized_memory": true,
+    "float32_matmul_precision": "highest",
+    "matmul_allow_tf32": false
+  },
+  "runtime_policy_after": {
+    "cudnn_allow_tf32": true,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false,
+    "deterministic_algorithms_enabled": false,
+    "deterministic_warn_only": false,
+    "effective_uninitialized_fill": false,
+    "fill_uninitialized_memory": true,
+    "float32_matmul_precision": "highest",
+    "matmul_allow_tf32": false
+  },
+  "scope": "Lossless GPU transfer ablation: decode critical fallback predecessors first, then overlap remaining SplitZip fallback decode with rANS. The reference is unchanged mapped-I/O plus selective-context decoding. Identical original BF16 words, fitted state and frozen TABLES k2/k14 masks; both arms must preserve complete prior bundled packets. No refitting or TEST policy selection. These two documents are reused for development, not independent generalization evidence. Complete GPU calls and actual serialized bytes; serial link calculations are not NIC/SSD, resident P, lossy quality or serving measurements.",
+  "software": {
+    "numpy": "2.3.5",
+    "torch": "2.11.0+cu128",
+    "triton": "3.6.0"
+  },
+  "status": "completed"
+}
