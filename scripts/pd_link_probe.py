@@ -12,6 +12,10 @@ document's KV (Llama-3.2-3B, 8,192 tokens: 896 MiB in BF16) three ways:
 and what that means for one document: raw BF16 (896 MiB), SplitZip (675 MiB), our lossless stream (504 MiB) and a
 2-bit lossy stream (117 MiB), wire time only. Prints `nvidia-smi topo -m` first. Results also go to --output (JSON).
 
+Every GPU's own host legs are measured too, which is all one GPU allows (a one-GPU allocation): device -> pinned
+host memory and back (the PCIe legs a transfer to another machine passes through on each side, before and after
+the network), and the same from pageable memory (what a plain .cpu() / .to(device) does).
+
     python scripts/pd_link_probe.py --output pd_link_probe.json
 """
 from __future__ import annotations
@@ -61,13 +65,32 @@ def main(argv=None):
     n = torch.cuda.device_count()
     names = [torch.cuda.get_device_name(i) for i in range(n)]
     print(f"{n} GPUs: {', '.join(names)}; torch {torch.__version__}, CUDA {torch.version.cuda}")
-    if n < 2:
-        raise SystemExit("needs at least two GPUs")
-    pairs = [tuple(int(x) for x in s.split("-")) for s in a.pairs.split(",") if s] or \
-        [(i, j) for i in range(n) for j in range(n) if i != j]
+    if n < 1:
+        raise SystemExit("no GPU visible")
     nbytes = a.mib << 20
     chunk = a.chunk_mib << 20
-    res = {"gpus": names, "topology": topo, "mib": a.mib, "pairs": []}
+    res = {"gpus": names, "topology": topo, "mib": a.mib, "host_legs": [], "pairs": []}
+    print(f"\n{'GPU':>4} {'to pinned':>12} {'from pinned':>12} {'to pageable':>12} {'from pageable':>14}")
+    for i in range(n):
+        src = torch.empty(nbytes, dtype=torch.uint8, device=f"cuda:{i}").random_(0, 255)
+        pinned = torch.empty(nbytes, dtype=torch.uint8, pin_memory=True)
+        pageable = torch.empty(nbytes, dtype=torch.uint8)
+        row = {"gpu": i, "name": names[i]}
+        for k, fn in (("d2h_pinned", lambda: pinned.copy_(src, non_blocking=True)),
+                      ("h2d_pinned", lambda: src.copy_(pinned, non_blocking=True)),
+                      ("d2h_pageable", lambda: pageable.copy_(src)),
+                      ("h2d_pageable", lambda: src.copy_(pageable))):
+            t = timed(fn, a.reps)
+            row[k] = {"seconds": t, "GB_per_s": nbytes / t / 1e9, "Gb_per_s": 8 * nbytes / t / 1e9}
+        res["host_legs"].append(row)
+        print(f"{i:>4} " + " ".join(f"{row[k]['GB_per_s']:9.1f} GB/s" for k in
+                                     ("d2h_pinned", "h2d_pinned", "d2h_pageable", "h2d_pageable")))
+        del src, pinned, pageable
+        torch.cuda.empty_cache()
+    pairs = [tuple(int(x) for x in s.split("-")) for s in a.pairs.split(",") if s] or \
+        [(i, j) for i in range(n) for j in range(n) if i != j]
+    if not pairs:
+        print("\none GPU: no GPU pairs to measure (allocate two GPUs for the GPU-to-GPU paths)")
     print(f"\n{'pair':>6} {'peer':>5} {'direct':>16} {'host':>16} {'host_pipe':>16}")
     for i, j in pairs:
         src = torch.empty(nbytes, dtype=torch.uint8, device=f"cuda:{i}").random_(0, 255)
@@ -109,9 +132,14 @@ def main(argv=None):
         print(f"{i:>3}->{j:<2} {str(peer):>5} " + " ".join(f"{c:>16}" for c in cells))
         del src, dst, host
         torch.cuda.empty_cache()
-    best = max(max(r["direct"]["GB_per_s"], r["host_pipe"]["GB_per_s"]) for r in res["pairs"])
-    worst = min(max(r["direct"]["GB_per_s"], r["host_pipe"]["GB_per_s"]) for r in res["pairs"])
-    print(f"\nOne 8K document of Llama-3.2-3B KV, wire time at the slowest / fastest measured pair "
+    if res["pairs"]:
+        best = max(max(r["direct"]["GB_per_s"], r["host_pipe"]["GB_per_s"]) for r in res["pairs"])
+        worst = min(max(r["direct"]["GB_per_s"], r["host_pipe"]["GB_per_s"]) for r in res["pairs"])
+        what = "pair"
+    else:                                             # one GPU: the slower pinned leg bounds a transfer through host
+        legs = [min(r["d2h_pinned"]["GB_per_s"], r["h2d_pinned"]["GB_per_s"]) for r in res["host_legs"]]
+        best, worst, what = max(legs), min(legs), "pinned host leg"
+    print(f"\nOne 8K document of Llama-3.2-3B KV, wire time at the slowest / fastest measured {what} "
           f"({worst:.1f} / {best:.1f} GB/s):")
     for k, mib in DOC_MIB.items():
         b = mib * (1 << 20)

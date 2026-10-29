@@ -40,6 +40,11 @@ FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.js
          "groupspeed_mixed.json": "groupspeed_mixed.json", "groupspeed_wikitext.json": "groupspeed_wikitext.json", "frontier_gpu.json": "frontier_gpu.json", "frontier_gpu_wikitext.json": "frontier_gpu_wikitext.json",
          "frontier_gpu_mixed.json": "frontier_gpu_mixed.json",
          "transform_gain.json": "transform_gain.json",
+         "datasets.json": "datasets.json", "datasets_wikitext.json": "datasets_wikitext.json",
+         "datasets_mixed.json": "datasets_mixed.json", "pd_link_probe.json": "pd_link_probe.json",
+         "nvidia_smi.txt": "nvidia_smi.txt", "slurm.json": "slurm.json", "model_resolved.json": "model_resolved.json",
+         "dataset_texts/manifest.json": "dataset_texts_manifest.json",
+         "pip_freeze.txt": "pip_freeze.txt",
          "captures/meta.json": "capture_meta.json"}
 REQUIRED = ("summary.md", "run_args.json", "environment.json", "captures/meta.json")
 
@@ -89,8 +94,24 @@ def check(run):
     if (run / "pool.json").is_file():
         res = json.loads((run / "pool.json").read_text())
         checks.append(f"pool: {len(res.get('codec_rows', []))} codec timings, {res.get('tokens')} tokens")
+    for prefix, title in (("datasets", "## Lossless on SplitZip's datasets"),
+                          ("context", "## Lossless across context lengths")):
+        for f in sorted(run.glob(f"{prefix}*.json")):
+            res = json.loads(f.read_text())
+            if res.get("cases") and title not in summary:
+                raise SystemExit(f"summary.md lacks the section of {f.name}: rerun --stages report")
+            rows = [r for c in res.get("cases", {}).values() for r in c["rows"]]
+            checks.append(f"{f.stem}: {len(res.get('cases', {}))} cases, {len(rows)} rows, "
+                          f"{sum(1 for r in rows if r.get('bit_exact'))} bit-exact")
+    for f in sorted(run.glob("groupspeed*.json")):
+        res = json.loads(f.read_text())
+        checks.append(f"{f.stem}: {sum(len(v) for v in res.get('cases', {}).values())} timings")
+    if (run / "pd_link_probe.json").is_file():
+        res = json.loads((run / "pd_link_probe.json").read_text())
+        checks.append(f"pd_link_probe: {len(res.get('gpus', []))} GPU(s), {len(res.get('pairs', []))} pairs")
     if not checks:
-        raise SystemExit("no lossless.json, lossy.json, frontier.json, gpu_speed.json, pool.json or szcodec.json in the run")
+        raise SystemExit("no lossless.json, lossy.json, frontier.json, gpu_speed.json, pool.json, szcodec.json, "
+                         "datasets*.json, context*.json or groupspeed*.json in the run")
     return checks
 
 

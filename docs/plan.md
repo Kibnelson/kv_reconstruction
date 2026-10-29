@@ -200,8 +200,26 @@ Lossy development pauses: the queued runs finish, but nothing new is built.
 
   Each mode is best in one band of link speeds, so the codec picks its mode from the link.
 - **Next:**
-  - CUDA graphs in the context sweep and the transfer tables.
+  - CUDA graphs in the context sweep and the transfer tables. Done: `context` and `datasets` time our decoders as
+    CUDA graphs too, and the link tables use the faster exact time.
   - (T) the transfer format and a real GPU-to-GPU transfer, once the A5000 link probe is in.
+
+### The baselines' models and datasets on one RTX A5000 ([runbook](a5000_runbook.md))
+
+- **ExANS** names no model or dataset; its blog says only "a real KV snapshot", 256K context, H100.
+- **SplitZip** calibrates its code book on WikiText-2 train. Its Table 4 reports top-16 exponent coverage on
+  WikiText-2 test, HumanEval, GSM8K, MMLU and PTB, for Qwen3-32B, Qwen3-Coder-30B and Llama-3-8B.
+- **On a 24 GB A5000:**
+  - Models: Llama-3-8B (SplitZip's own), Qwen3-8B (the Qwen3 family) and Llama-3.2-3B, all calibrated on WikiText-2
+    train like SplitZip.
+  - New stage `datasets`: the five datasets, 4 x 8K tokens each. It reports every codec bit-exact and timed, our
+    exact costs, and SplitZip's coverage beside its Table 4.
+  - Context sweep: up to 32K tokens, with 8K-chunked prefill for the long captures.
+  - Link probe: this GPU's host legs.
+- **Tools:** `scripts/a5000_setup.sh` (environment) and `scripts/run_a5000.sh` (one model: measure, package, push).
+  All run inside the one-GPU allocation.
+- **Not covered:** Phi-2 (head size 80 with partial RoPE, not handled by our kernels yet), the 30B-80B models,
+  and contexts past 32K.
 
 ## What is next, in order of expected gain (before 29 October)
 

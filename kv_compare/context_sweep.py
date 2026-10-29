@@ -12,6 +12,8 @@ GPU and checked bit for bit, and timed with CUDA events after warm-up:
   ExANS                            the authors' codec (blocks of 499,712 values; a remainder is left out)
 
 Encode times are the sender's whole work from the words (our forward pass for features and priors included).
+With graph=True our decoders are also timed as one CUDA graph replay per stream (decode_ms_graph), which removes
+Python's per-launch cost (about 65 us a launch); SplitZip and ExANS are timed as their authors' code launches them.
 Our codecs code at most `max_stream_tokens` tokens per stream (a long case is several streams, coded and decoded
 one after the other, times added): one stream's worst-case buffer must stay below 2^31 16-bit words.
 """
@@ -40,9 +42,14 @@ GROUP_NAMES = {2: "keys then values", 4: "4 head groups", 8: "8 head groups", 16
 
 
 def measure_case(study, consts, rc, words, positions, device, log=print, books=None, sz=None, exans=None,
-                 rank_tiles=(128, 128, 64, 4), reps=5, max_stream_tokens=8192, grouped=None, only=None):
+                 rank_tiles=(128, 128, 64, 4), reps=5, max_stream_tokens=8192, grouped=None, only=None, graph=False,
+                 baseline_stream_tokens=0):
     """Rows for one case: words int16 [L, T, W] on the device, positions [T]. grouped: {groups: constants of
-    kv_compare.grouped.prepare_groups} for our head-group predictors; only: measure just these methods."""
+    kv_compare.grouped.prepare_groups} for our head-group predictors; only: measure just these methods; graph:
+    time our decoders as CUDA graphs too; baseline_stream_tokens: code SplitZip and ExANS in streams of this many
+    tokens too, like ours (bits and times added; 0: the whole case in one call). Both codecs code independent
+    chunks or blocks, so the streams change their bits by at most the remainder ExANS leaves out; they keep a 32K
+    case of an 8B model within 24 GB."""
     from .fused import FusedOneStep
     from .layerwise import LayerwiseOneStep
     from .szcodec import SplitZipFormatCodec
@@ -81,6 +88,7 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
 
     def ours_layerwise(rank, base=None):
         ok, bits, te_all, td_all = True, 0.0, 0.0, 0.0
+        tg_all, okg, gerr = 0.0, True, None
         for a, b in spans:
             wp, kp = piece(a, b, base)
             Tp = b - a
@@ -108,10 +116,19 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
             te = timer(lambda: codec.encode(wp, xall, prior, out=buf), device, warmup=1, reps=3)
             td = timer(lambda: codec.decode(buf, starts, Tp, out=dec, bufs=bufs), device, warmup=2, reps=reps)
             te_all, td_all = te_all + tm + te, td_all + td
+            if graph and gpu and gerr is None:
+                try:
+                    okp, tgp = graph_decode_ms(codec, buf, starts, Tp, dec, bufs, wp, device, reps)
+                    okg, tg_all = okg and okp, tg_all + tgp
+                except Exception as exc:             # a capture the driver refuses: keep the plain timing
+                    gerr = repr(exc)[:300]
             del codec, xall, prior, buf, starts, bufs, dec, wp, kp
             _free(device)
-        return {"bit_exact": ok, "bits": bits / n, "encode_ms": 1e3 * te_all, "decode_ms": 1e3 * td_all,
-                "streams": len(spans)}
+        out = {"bit_exact": ok, "bits": bits / n, "encode_ms": 1e3 * te_all, "decode_ms": 1e3 * td_all,
+               "streams": len(spans)}
+        if graph and gpu:
+            out.update({"graph_error": gerr} if gerr else {"decode_ms_graph": tg_all, "bit_exact_graph": okg})
+        return out
 
     def ours_format():
         ok, bits, te_all, td_all = True, 0.0, 0.0, 0.0
@@ -134,19 +151,39 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
         return {"bit_exact": ok, "bits": bits / n, "encode_ms": 1e3 * te_all, "decode_ms": 1e3 * td_all,
                 "streams": len(spans), "encoder": "PyTorch packer (not optimised)"}
 
+    bspans = ([(a, min(a + baseline_stream_tokens, T)) for a in range(0, T, baseline_stream_tokens)]
+              if baseline_stream_tokens else [(0, T)])
+
     def splitzip():
-        enc = sz.encode(words.view(torch.bfloat16))
-        dec = sz.decode(enc)
-        ok = bool(torch.equal(dec.reshape(-1).view(torch.int16), words.reshape(-1)))
-        te = timer(lambda: sz.encode(words.view(torch.bfloat16)), device, warmup=3, reps=10)
-        td = timer(lambda: sz.decode(enc), device, warmup=3, reps=10)
-        return {"bit_exact": ok, "bits": 8 * enc.compressed_bytes / n, "encode_ms": 1e3 * te, "decode_ms": 1e3 * td}
+        ok, nbytes, te_all, td_all = True, 0, 0.0, 0.0
+        for a, b in bspans:
+            wp = words if len(bspans) == 1 else words[:, a:b].contiguous()
+            enc = sz.encode(wp.view(torch.bfloat16))
+            dec = sz.decode(enc)
+            ok = ok and bool(torch.equal(dec.reshape(-1).view(torch.int16), wp.reshape(-1)))
+            nbytes += enc.compressed_bytes
+            te_all += timer(lambda: sz.encode(wp.view(torch.bfloat16)), device, warmup=3, reps=10)
+            td_all += timer(lambda: sz.decode(enc), device, warmup=3, reps=10)
+            del enc, dec, wp
+            _free(device)
+        return {"bit_exact": ok, "bits": 8 * nbytes / n, "encode_ms": 1e3 * te_all, "decode_ms": 1e3 * td_all,
+                "streams": len(bspans)}
 
     def exans_run():
         from . import exans_official as ex
-        r = ex.measure(exans, words, log=lambda m: None)
-        return {"bit_exact": r["bit_exact"], "bits": r["bits_per_value"], "encode_ms": r["encode_ms_events"],
-                "decode_ms": r["decode_ms_events"], "values_coded": r["values"]}
+        ok, bits, vals, te_all, td_all = True, 0.0, 0, 0.0, 0.0
+        for a, b in bspans:
+            wp = words if len(bspans) == 1 else words[:, a:b].contiguous()
+            r = ex.measure(exans, wp, log=lambda m: None)
+            ok = ok and r["bit_exact"]
+            bits += r["bits_per_value"] * r["values"]
+            vals += r["values"]
+            te_all += r["encode_ms_events"]
+            td_all += r["decode_ms_events"]
+            del wp
+            _free(device)
+        return {"bit_exact": ok, "bits": bits / vals, "encode_ms": te_all, "decode_ms": td_all, "values_coded": vals,
+                "streams": len(bspans)}
 
     record("ours, per layer, dense", lambda: ours_layerwise(None))
     for g, cg in sorted((grouped or {}).items()):
@@ -160,6 +197,44 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
     if exans is not None:
         record("ExANS (authors' codec)", exans_run)
     return rows
+
+
+def best_decode_ms(row):
+    """The faster exact decode of a row: plain launches, or the CUDA graph replay when that was exact too."""
+    t = row["decode_ms"]
+    if row.get("bit_exact_graph") and row.get("decode_ms_graph") is not None:
+        t = min(t, row["decode_ms_graph"])
+    return t
+
+
+def exponent_hist(words):
+    """Counts of the 256 BF16 exponents of int16 words (any shape), float64, on the words' device."""
+    h = torch.zeros(256, dtype=torch.float64, device=words.device)
+    flat = words.reshape(-1)
+    for a in range(0, flat.numel(), 1 << 27):        # in pieces: no int32 copy of a whole case
+        e = (flat[a:a + (1 << 27)].to(torch.int32) >> 7) & 0xFF
+        h += torch.bincount(e, minlength=256).to(torch.float64)
+    return h
+
+
+def exponent_stats(words, book_words=None, top=(8, 16), book_hist=None):
+    """SplitZip's code-book statistics of BF16 words (int16, any shape): the share of values whose 8-bit exponent
+    is among the `k` most frequent exponents of book_words, or of the counts book_hist (A->B; SplitZip calibrates
+    on WikiText-2 train), and of the words themselves (B->B, the oracle), and the exponent entropy in bits."""
+    hb = exponent_hist(words)
+    ha = book_hist if book_hist is not None else (exponent_hist(book_words) if book_words is not None else None)
+    if ha is not None:
+        ha = ha.to(hb.device)
+    total = hb.sum()
+    p = hb / total
+    out = {"values": int(total.item()),
+           "exponent_entropy_bits": float(-(p[p > 0] * torch.log2(p[p > 0])).sum().item()),
+           "distinct_exponents": int((hb > 0).sum().item())}
+    for k in top:
+        out[f"top{k}_coverage_self"] = float((hb[torch.topk(hb, k).indices].sum() / total).item())
+        if ha is not None:
+            out[f"top{k}_coverage_calibrated"] = float((hb[torch.topk(ha, k).indices].sum() / total).item())
+    return out
 
 
 def link_ms(bits, values, decode_ms, gbps):

@@ -544,7 +544,8 @@ pos = torch.arange(64).repeat(2)
 from kv_compare.grouped import prepare_groups
 gr = prepare_groups(study, consts, [2], log=lambda m: None)
 rows = cs.measure_case(study, consts, rc, words2, pos, torch.device("cpu"), log=lambda m: None, books=books, sz=sz,
-                       reps=1, max_stream_tokens=64, grouped=gr)   # two streams for our codecs, one per request
+                       reps=1, max_stream_tokens=64, grouped=gr,   # two streams for every codec, one per request
+                       baseline_stream_tokens=64)
 for r in rows:
     assert "error" not in r, r
     assert r["bit_exact"], r
@@ -707,6 +708,110 @@ class SensitivityTests(unittest.TestCase):
         self.assertLess(float(torch.log(u.reshape(3, 4, 16)).mean(2).abs().max()), 1e-9)
         u = sv.uniform_scales(sp, 32, clamp=2.0)
         self.assertTrue(float(u.max()) <= 2.0 + 1e-12 and float(u.min()) >= 0.5 - 1e-12)
+
+
+@unittest.skipIf(torch is None, "PyTorch and Transformers are required")
+class NewModelCaptureTests(unittest.TestCase):
+    """What the A5000 runs need beyond Llama-3.2-3B: chunked prefill for 32K captures, Qwen3's queries after q_norm,
+    tokenizers without BOS, meta.json from calcap, SplitZip's exponent coverage."""
+
+    def tiny_qwen(self):
+        from transformers import Qwen3Config, Qwen3ForCausalLM
+        torch.manual_seed(0)
+        cfg = Qwen3Config(vocab_size=97, hidden_size=64, intermediate_size=96, num_hidden_layers=2,
+                          num_attention_heads=4, num_key_value_heads=2, head_dim=16, max_position_embeddings=2048,
+                          rope_theta=1e6, tie_word_embeddings=False)
+        return Qwen3ForCausalLM(cfg).to(torch.float32).eval()
+
+    def test_chunked_prefill_matches_one_pass(self):
+        """The same cache positions, computed in chunks: the words agree up to BF16 rounding of a different order."""
+        from kv_compare.capture import capture_ids
+        from kv_compare.core import words_to_float
+        for model in (tiny_model(), self.tiny_qwen().to(torch.bfloat16)):
+            with tempfile.TemporaryDirectory() as tmp:
+                ids = doc_ids(3, 96)
+                a = capture_ids(model, ids, tmp, "one", torch.device("cpu"), queries=True)
+                b = capture_ids(model, ids, tmp, "chunks", torch.device("cpu"), queries=True, chunk_tokens=32)
+                self.assertNotIn("prefill_chunk_tokens", a)
+                self.assertEqual(b["prefill_chunk_tokens"], 32)
+                for part in ("K", "V", "Q"):
+                    x = np.load(Path(tmp) / f"one_{part}_bits.npy")
+                    y = np.load(Path(tmp) / f"chunks_{part}_bits.npy")
+                    self.assertEqual(x.shape, y.shape)
+                    self.assertEqual(x.shape[1], 96)
+                    xf = words_to_float(torch.from_numpy(x.astype(np.int32)))
+                    yf = words_to_float(torch.from_numpy(y.astype(np.int32)))
+                    rel = float((xf - yf).norm() / xf.norm())
+                    self.assertLess(rel, 0.02, (part, rel))
+                    self.assertTrue(np.array_equal(x[:, :32], y[:, :32]), part)   # the first chunk is one pass
+
+    def test_qwen3_queries_are_taken_after_q_norm(self):
+        from kv_compare.capture import capture_ids, query_module
+        model = self.tiny_qwen().to(torch.bfloat16)
+        attn = model.model.layers[0].self_attn
+        self.assertIs(query_module(attn), attn.q_norm)
+        llama_attn = tiny_model().model.layers[0].self_attn
+        self.assertIs(query_module(llama_attn), llama_attn.q_proj)
+        seen = {}
+
+        def keep(module, inputs, output):
+            seen["q"] = output.detach()[0].reshape(output.shape[1], -1)
+        h = attn.q_norm.register_forward_hook(keep)
+        with tempfile.TemporaryDirectory() as tmp:
+            capture_ids(model, doc_ids(1, 40), tmp, "d", torch.device("cpu"), queries=True)
+            h.remove()
+            q = np.load(Path(tmp) / "d_Q_bits.npy")
+            self.assertEqual(q.shape, (2, 40, 4 * 16))
+            ref = seen["q"].contiguous().view(torch.int16).numpy().view(np.uint16)
+            self.assertTrue(np.array_equal(q[0], ref))
+
+    def test_bos_prefix_and_meta(self):
+        from kv_compare.capture import bos_prefix, ensure_meta
+
+        class Tok:
+            def __init__(self, b):
+                self.bos_token_id = b
+        self.assertEqual(bos_prefix(Tok(128000)), [128000])
+        self.assertEqual(bos_prefix(Tok(None)), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            m = ensure_meta(tmp, self.tiny_qwen(), "tiny-qwen3", None, 64, [{"name": "x"}])
+            self.assertEqual((m["layers"], m["kv_heads"], m["head_dim"], m["query_heads"]), (2, 2, 16, 4))
+            again = ensure_meta(tmp, tiny_model(), "other", None, 1, [])
+            self.assertEqual(again["model"], "tiny-qwen3")          # kept as it was
+
+    def test_exponent_coverage(self):
+        from kv_compare.context_sweep import exponent_stats
+        # exponents 120..135 cover 90% of the values, 100..109 the rest; the book from other words sees only 100..115
+        e = torch.cat([torch.arange(120, 136).repeat(90), torch.arange(100, 110).repeat(16)])
+        sign = torch.randint(0, 2, e.shape)
+        words = ((sign << 15) | (e << 7) | torch.randint(0, 128, e.shape)).to(torch.int32)
+        words = (words - 65536 * (words >= 32768).to(torch.int32)).to(torch.int16)
+        book = ((torch.arange(100, 116).repeat(4) << 7)).to(torch.int16)
+        st = exponent_stats(words, book)
+        self.assertAlmostEqual(st["top16_coverage_self"], 1440 / 1600)
+        self.assertAlmostEqual(st["top16_coverage_calibrated"], 160 / 1600)
+        self.assertEqual(st["distinct_exponents"], 26)
+        self.assertEqual(st["values"], 1600)
+        self.assertGreater(st["exponent_entropy_bits"], 4.0)
+
+
+class FetchTextsTests(unittest.TestCase):
+    def test_renderings(self):
+        """scripts/fetch_eval_texts.py: the plain-text renderings of SplitZip's datasets (no download)."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import fetch_eval_texts as ft
+        self.assertEqual(ft.render("wikitext2", [{"text": " = A = \n"}, {"text": ""}, {"text": " b \n"}]),
+                         " = A = \n\n\n\n\n b \n")
+        self.assertEqual(ft.render("humaneval", [{"prompt": "def f():\n", "canonical_solution": "    return 1\n"}] * 2),
+                         "def f():\n    return 1\n\n\ndef f():\n    return 1\n")
+        self.assertEqual(ft.render("gsm8k", [{"question": "q?", "answer": "a #### 4"}]), "Question: q?\nAnswer: a #### 4")
+        rows = [{"subject": s, "question": f"{s} {i}", "choices": ["w", "x", "y", "z"], "answer": i % 4}
+                for s in ("b_sub", "a_sub") for i in range(2)]
+        m = ft.render("mmlu", rows)
+        order = [line for line in m.split("\n") if line.endswith((" 0", " 1"))]
+        self.assertEqual(order, ["a_sub 0", "b_sub 0", "a_sub 1", "b_sub 1"])      # round-robin over subjects
+        self.assertIn("about a sub.\n\na_sub 0\nA. w\nB. x\nC. y\nD. z\nAnswer: A", m)
+        self.assertIn("Answer: B", m)
 
 
 class PackageTests(unittest.TestCase):
