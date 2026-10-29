@@ -1,0 +1,43 @@
+/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/aquakv/edenn.py:35: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  GRIDS[dim][size] = torch.load(file, map_location='cpu')
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 14.74it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 14.72it/s]
+Traceback (most recent call last):
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/transformers/tokenization_utils_base.py", line 2447, in _from_pretrained
+    tokenizer = cls(*init_inputs, **init_kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/transformers/tokenization_utils.py", line 439, in __init__
+    self._add_tokens(
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/transformers/tokenization_utils.py", line 547, in _add_tokens
+    current_vocab = self.get_vocab().copy()
+                    ^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/transformers/tokenization_utils_base.py", line 1707, in get_vocab
+    raise NotImplementedError()
+NotImplementedError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/train_predictors.py", line 356, in <module>
+    main()
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/train_predictors.py", line 231, in main
+    data = datautils.get_loaders(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/aquakv/datautils.py", line 230, in get_loaders
+    tokenizer = AutoTokenizer.from_pretrained(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/transformers/models/auto/tokenization_auto.py", line 920, in from_pretrained
+    return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/transformers/tokenization_utils_base.py", line 2213, in from_pretrained
+    return cls._from_pretrained(
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/transformers/tokenization_utils_base.py", line 2448, in _from_pretrained
+    except import_protobuf_decode_error():
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/transformers/tokenization_utils_base.py", line 87, in import_protobuf_decode_error
+    raise ImportError(PROTOBUF_IMPORT_ERROR.format(error_message))
+ImportError: 
+ requires the protobuf library but it was not found in your environment. Checkout the instructions on the
+installation page of its repo: https://github.com/protocolbuffers/protobuf/tree/master/python#installation and follow the ones
+that match your environment. Please note that you may need to restart your runtime after installation.
+
