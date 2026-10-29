@@ -3,6 +3,9 @@
 The fixed record of our best results against the baselines, and the order of work to improve them. The numbers
 come from `scripts/scoreboard.py`; `summary.md` opens with the same scoreboard in every run.
 
+The full review of where things stand on 29 October 2026, with every core result, the methods and protocols,
+what failed and the caveats: [milestone_report_2026-10-29.md](milestone_report_2026-10-29.md).
+
 ## How results are locked
 
 1. **The lock run** measures everything once on one commit. It covers every stage except the captures:
