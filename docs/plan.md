@@ -184,8 +184,24 @@ Lossy development pauses: the queued runs finish, but nothing new is built.
   | 100 Gb/s | 1.35x |
   | 200 Gb/s | 1.24x |
   | 400 Gb/s | 0.82x |
-- **Next:** decode speed of the head groups. Head by head is held back by fixed per-step costs. The `groupspeed`
-  stage measures token blocks and chunks; then each group's product moves into the decode kernel.
+- **Decode speed** (`groupspeed`, `8ba678a`):
+  - Below 8K tokens the decode is bound by kernel launches from Python, about 65-70 us each. Replaying it as a
+    CUDA graph removes that cost: 512 tokens, one step: 4.0 -> 2.0 ms; head by head: 42 -> 19 ms.
+  - At 8K the GPU sets the time: 1 step 31 ms, keys then values 42 ms, 4 groups 50 ms, head by head 75-84 ms.
+- **Best mode per link** (mixed calibration, CUDA graphs, against SplitZip):
+
+  | Link | 512 tokens | 2K | 8K | Mode at 8K |
+  | --- | --- | --- | --- | --- |
+  | 1-25 Gb/s | 1.39-1.42x | 1.43-1.44x | 1.45x | head by head |
+  | 50 Gb/s | 1.36x | 1.41x | 1.43x | head by head (8x4) |
+  | 100 Gb/s | 1.31x | 1.33x | 1.35x | keys then values |
+  | 200 Gb/s | 0.89x | 1.18x | 1.24x | rank 256 |
+  | 400 Gb/s | 0.45x | 0.71x | 0.82x | SplitZip format |
+
+  Each mode is best in one band of link speeds, so the codec picks its mode from the link.
+- **Next:**
+  - CUDA graphs in the context sweep and the transfer tables.
+  - (T) the transfer format and a real GPU-to-GPU transfer, once the A5000 link probe is in.
 
 ## What is next, in order of expected gain (before 29 October)
 
