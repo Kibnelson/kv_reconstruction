@@ -36,9 +36,13 @@ def _free(device):
         torch.cuda.empty_cache()
 
 
+GROUP_NAMES = {2: "keys then values", 4: "4 head groups", 8: "8 head groups", 16: "head by head"}
+
+
 def measure_case(study, consts, rc, words, positions, device, log=print, books=None, sz=None, exans=None,
-                 rank_tiles=(128, 128, 64, 4), reps=5, max_stream_tokens=8192):
-    """Rows for one case: words int16 [L, T, W] on the device, positions [T]."""
+                 rank_tiles=(128, 128, 64, 4), reps=5, max_stream_tokens=8192, grouped=None, only=None):
+    """Rows for one case: words int16 [L, T, W] on the device, positions [T]. grouped: {groups: constants of
+    kv_compare.grouped.prepare_groups} for our head-group predictors; only: measure just these methods."""
     from .fused import FusedOneStep
     from .layerwise import LayerwiseOneStep
     from .szcodec import SplitZipFormatCodec
@@ -56,11 +60,14 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
             else (16, 16, 32, 4)                     # (short cases and small test models)
     spans = [(a, min(a + max_stream_tokens, T)) for a in range(0, T, max_stream_tokens)]
 
-    def piece(a, b):
-        return words[:, a:b].contiguous(), dict(k, cos=k["cos"][a:b].contiguous(), sin=k["sin"][a:b].contiguous())
+    def piece(a, b, base=None):
+        kk = k if base is None else dict(base, cos=k["cos"], sin=k["sin"])
+        return words[:, a:b].contiguous(), dict(kk, cos=kk["cos"][a:b].contiguous(), sin=kk["sin"][a:b].contiguous())
     rows = []
 
     def record(method, fn):
+        if only is not None and method not in only:
+            return
         row = {"method": method, "values": n, "tokens": T}
         try:
             row.update(fn())
@@ -72,15 +79,21 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
         rows.append(row)
         _free(device)
 
-    def ours_layerwise(rank):
+    def ours_layerwise(rank, base=None):
         ok, bits, te_all, td_all = True, 0.0, 0.0, 0.0
         for a, b in spans:
-            wp, kp = piece(a, b)
+            wp, kp = piece(a, b, base)
             Tp = b - a
-            codec = LayerwiseOneStep(kp, study.C, study.hd, tokens_per_program=32, mode="uniform", search=True,
-                                     chunks=2, rank=rank, requant="epilogue" if rank else "kernel",
+            ng = int(kp.get("groups", 1))
+            # many head groups: each launch holds one group's heads, so smaller token blocks and more chunks keep
+            # enough programs in flight (a smaller block costs 32 / (layers x block) bits per value of states)
+            TBc, chc = (32, 2) if ng <= 4 else (16, 4)
+            while Tp % (TBc * chc):
+                chc //= 2
+            codec = LayerwiseOneStep(kp, study.C, study.hd, tokens_per_program=TBc, mode="uniform", search=True,
+                                     chunks=chc, rank=rank, requant="epilogue" if rank else "kernel",
                                      rank_tiles=tiles_for(Tp))
-            if rank is None:
+            if rank is None and base is None:
                 fwd = FusedOneStep(kp, study.C, study.hd, tokens_per_program=32, rows=4, warps=4)
                 model = lambda: fwd.model(wp)
             else:
@@ -136,6 +149,8 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
                 "decode_ms": r["decode_ms_events"], "values_coded": r["values"]}
 
     record("ours, per layer, dense", lambda: ours_layerwise(None))
+    for g, cg in sorted((grouped or {}).items()):
+        record(f"ours, per layer, {GROUP_NAMES.get(g, f'{g} head groups')}", lambda cg=cg: ours_layerwise(None, cg))
     if rc is not None:
         record("ours, per layer, rank 256", lambda: ours_layerwise(rc))
         if books is not None:

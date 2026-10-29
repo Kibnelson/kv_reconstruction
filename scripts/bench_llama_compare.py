@@ -517,6 +517,8 @@ def stage_context(args, out):
     study = Study(out / "captures", args.device, TRAIN, "tables", [], None, log=log)
     consts = fused.prepare(study, log=log)
     rc = layerwise.prepare_rank(study, consts, 256, log)
+    from kv_compare.grouped import prepare_groups
+    grouped = prepare_groups(study, consts, args.context_groups, log) if args.context_groups else {}
 
     def w16(d, T=None):                              # int16 words, filled layer by layer (no int32 copy of it all)
         n = d.tokens if T is None else T
@@ -550,9 +552,16 @@ def stage_context(args, out):
     from kv_compare.predict import Doc
     for n, b in cases:
         key = f"{n}x{b}"
-        if key in res["cases"]:
+        want = {f"ours, per layer, {cs.GROUP_NAMES.get(g, f'{g} head groups')}" for g in args.context_groups}
+        if key in res["cases"] and want <= {r["method"] for r in res["cases"][key]["rows"]}:
             log(f"context {key}: kept from context.json")
             continue
+        if key in res["cases"]:                      # only the methods not measured yet
+            log(f"context {key}: adding the head-group codecs")
+            kept = res["cases"][key]["rows"]
+            only = want - {r["method"] for r in kept}
+        else:
+            kept = only = None
         docs = [Doc(out / "captures", nm) for nm in names[(n, b)]]
         if b == 1:
             words = w16(docs[0])
@@ -563,7 +572,10 @@ def stage_context(args, out):
         positions = torch.arange(n, device=device).repeat(b)
         log(f"context {key}: {b} request(s) of {n} tokens, {words.numel() / 1e6:.1f}M values")
         rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans,
-                               max_stream_tokens=args.context_stream_tokens)
+                               max_stream_tokens=args.context_stream_tokens, grouped=grouped, only=only)
+        if kept is not None:
+            have = {r["method"] for r in kept}
+            rows = kept + [r for r in rows if r["method"] not in have]
         res["cases"][key] = {"tokens": n, "batch": b, "values": words.numel(), "rows": rows}
         path.write_text(json.dumps(res, indent=1))
         del words, docs
@@ -2299,6 +2311,8 @@ def parser():
     p.add_argument("--context-lengths", default="512,1024,2048,4096,8192,16384,32768",
                    help="context: tokens per request (batch 1); our codecs code at most --context-stream-tokens "
                         "per stream; 65536 needs more than 20 GB of GPU memory")
+    p.add_argument("--context-groups", default="2,4,16",
+                   help="context: head groups of our grouped predictor to measure (kv_compare.grouped; empty: none)")
     p.add_argument("--context-stream-tokens", type=int, default=8192,
                    help="context: tokens per stream of our codecs (a longer case is several streams)")
     p.add_argument("--context-batch", type=int, default=16, help="context: requests coded together for short ones")
@@ -2386,6 +2400,7 @@ def main(argv=None):
     args.aqua_rerun = [m for m in args.aqua_rerun.split(",") if m]
     args.alloc_moves = [float(m) for m in args.alloc_moves.split(",") if m]
     args.context_lengths = [int(n) for n in args.context_lengths.split(",") if n]
+    args.context_groups = [int(g) for g in args.context_groups.split(",") if g]
     if any(n % 128 for n in args.context_lengths):
         raise SystemExit("--context-lengths: multiples of 128 tokens")
     args.sz_protocol_configs = [c for c in args.sz_protocol_configs.split(",") if c]

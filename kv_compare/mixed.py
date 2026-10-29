@@ -159,7 +159,7 @@ class MixedOneStep(lw.LayerwiseOneStep):
                                  bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer], k["sp"][layer],
                                  k["inv"][layer], k["isx"][layer], k["cos"], k["sin"], bufs["ssum"][(layer + 1) % 2],
                                  bufs["ssum"][layer % 2], bufs["smult"][c * P * self.TB:], t["cumf"], t["lut"],
-                                 t["tail"], c * Tc, T, W, self.G, self.HG, self.prior_scale,
+                                 t["tail"], c * Tc, T, W, self.G, self.HG, 0, self.G, self.prior_scale,
                                  FIRST=layer == first, LAST=layer == last, TB=self.TB, H2=self.hd // 2,
                                  LUT_SHIFT=16 - lw.gc.LUT_BITS, LUT_W=lw.gc.LUT_W, REFINE=lw.gc.REFINE,
                                  UNIFORM=self.mode == "uniform", SEARCH=self.search, FEAT=True, LEAN=False,

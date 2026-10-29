@@ -541,14 +541,16 @@ sz.calibrate(w16(study.train[0]).view(torch.bfloat16))
 # two requests of 64 tokens coded together, positions restarting at 0 (the second request is train1's KV)
 words2 = torch.cat([w16(study.tests[0]), w16(study.train[1])], 1)
 pos = torch.arange(64).repeat(2)
+from kv_compare.grouped import prepare_groups
+gr = prepare_groups(study, consts, [2], log=lambda m: None)
 rows = cs.measure_case(study, consts, rc, words2, pos, torch.device("cpu"), log=lambda m: None, books=books, sz=sz,
-                       reps=1, max_stream_tokens=64)          # two streams for our codecs, one per request
+                       reps=1, max_stream_tokens=64, grouped=gr)   # two streams for our codecs, one per request
 for r in rows:
     assert "error" not in r, r
     assert r["bit_exact"], r
     assert r.get("streams", 2) == 2, r
     print("ok", r["method"], r["bits"])
-assert len(rows) == 4
+assert len(rows) == 5 and rows[1]["method"] == "ours, per layer, keys then values", rows
 assert cs.link_ms(8.0, 1e9, 5.0, 8) == 1000.0 and cs.link_ms(8.0, 1e6, 5.0, 8) == 5.0
 """
 
@@ -564,7 +566,46 @@ class ContextSweepTests(unittest.TestCase):
         r = subprocess.run([sys.executable, "-c", CONTEXT_CHECK, str(ROOT)], capture_output=True, text=True,
                            timeout=3600)
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
-        self.assertEqual(r.stdout.count("ok"), 4, r.stdout)
+        self.assertEqual(r.stdout.count("ok"), 5, r.stdout)
+
+
+GROUPED_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
+from kv_compare import layerwise, grouped
+base = layerwise.LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=16, chunks=2)
+xb, pb = base.model(words)
+buf, starts = base.encode(words, xb, pb)
+one = base.bits(starts, T) / (L * T * W)
+for groups, chunks in ((2, 2), (4, 1), (4, 2)):
+    cg = grouped.prepare_groups(study, consts, groups, log=lambda m: None)
+    codec = layerwise.LayerwiseOneStep(cg, study.C, study.hd, tokens_per_program=16, chunks=chunks)
+    xall, prior = codec.model(words)
+    # the encoder's features are every layer's exact features; its priors follow the grouped prediction
+    pos = torch.arange(T)
+    for l in range(L):
+        x = words_to_float(w32[l])
+        f = fused._feat_ref(x, study.rope, pos, consts["isx"][l])
+        f = torch.where(torch.isnan(f), torch.zeros_like(f), f)
+        assert float((f == xall[l].float()).float().mean()) > 0.999, ("features", groups, l)
+    buf, starts = codec.encode(words, xall, prior)
+    dec = codec.decode(buf, starts, T)
+    assert torch.equal(dec, words), ("round trip", groups, chunks, int((dec != words).sum()))
+    print("ok", groups, chunks, codec.bits(starts, T) / (L * T * W), "one step", one)
+"""
+
+
+class GroupedCodecTests(unittest.TestCase):
+    def test_head_group_codec_round_trip_interpreted(self):
+        """The head-group predictor in the per-layer codec (2 and 4 groups, 1 and 2 token chunks): the decoder,
+        adding each group's within-layer product after the groups before it, reproduces every word, Inf and NaN
+        included."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None or torch is None:
+            self.skipTest("Triton and PyTorch are required")
+        r = subprocess.run([sys.executable, "-c", GROUPED_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=3600)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertEqual(r.stdout.count("ok"), 3, r.stdout)
 
 
 class StreamingProtocolTests(unittest.TestCase):

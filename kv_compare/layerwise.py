@@ -137,17 +137,18 @@ if triton is not None:
     @triton.jit
     def _ldec_kernel(buf_ptr, start_ptr, state_ptr, pos_ptr, out_ptr, acc_ptr, xout_ptr, sa_ptr, b_ptr, sp_ptr,
                      inv_ptr, isx_ptr, cos_ptr, sin_ptr, ssum_in_ptr, ssum_out_ptr, smult_ptr, cumf_ptr, lut_ptr,
-                     tail_ptr, t_base, T, W, G, HG, PRIOR_SCALE,
+                     tail_ptr, t_base, T, W, G, HG, G0, GN, PRIOR_SCALE,
                      FIRST: tl.constexpr, LAST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr,
                      LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr, REFINE: tl.constexpr, UNIFORM: tl.constexpr,
                      SEARCH: tl.constexpr, FEAT: tl.constexpr, LEAN: tl.constexpr, ONES: tl.constexpr):
         """Decode one layer of one token block x head (pointers are the layer's: out_ptr, sa_ptr, ...).
         FEAT: make the next layer's features here (else a separate pass does); LEAN: reload the per-channel
         constants every token instead of keeping them in registers; FIRST: the stream states come from the stream
-        (the first layer this codec decodes); ONES: prior 1 (no previous layer of ours to take surprise from)."""
+        (the first layer this codec decodes); ONES: prior 1 (no previous layer of ours to take surprise from).
+        G0, GN: the heads this launch decodes, G0 .. G0 + GN - 1 (all G at once, or one head group)."""
         pid = tl.program_id(0)
-        g = pid % G
-        blk = pid // G
+        g = G0 + pid % GN
+        blk = pid // GN
         t0 = t_base + blk * TB
         HD: tl.constexpr = 2 * H2
         cc = tl.arange(0, HD)
@@ -432,6 +433,16 @@ class LayerwiseOneStep:
         self.opts = {} if fuse else {"enable_fp_fusion": False}
         self.G, self.HG = self.W // hd, C // hd
         self.prior_scale = 1.0 / (self.W * fu.QS)
+        self.ng = int(consts.get("groups", 1))      # head groups of kv_compare.grouped (1: the one-step predictor)
+        if self.ng > 1:
+            if rank is not None or features != "inline" or split_streams:
+                raise ValueError("head groups need the dense product, inline features and no split streams")
+            if self.G % self.ng:
+                raise ValueError("the head groups must divide the heads")
+            self.GN = self.G // self.ng
+            gw = self.GN * hd                        # lanes per group
+            self.Ag = [None] + [consts["Acq"][:, j * gw:(j + 1) * gw, :j * gw].contiguous()
+                                for j in range(1, self.ng)]   # group j's rows on the groups before it
 
     def _launch(self, kernel, grid, *args, warps=1, **kw):
         try:
@@ -453,7 +464,10 @@ class LayerwiseOneStep:
 
     def model(self, words):
         """Features and priors of the exact words. Dense product: the fused forward pass (the same arithmetic);
-        reduced rank: the features pass, then per layer the products and the decoder's surprise sums."""
+        reduced rank and head groups: the features pass, then per layer the products and the decoder's surprise
+        sums."""
+        if self.ng > 1:
+            return self._model_grouped(words)
         if self.rank is None:
             return fu.FusedOneStep(self.k, self.C, self.hd, tokens_per_program=32, rows=4, warps=4).model(words)
         L, T, W = words.shape
@@ -476,6 +490,34 @@ class LayerwiseOneStep:
                          BLOCK=256, warps=4)
         return xall, prior
 
+    def _model_grouped(self, words):
+        L, T, W = words.shape
+        dev, k = self.device, self.k
+        xall = torch.zeros(L, T, W, dtype=torch.int8, device=dev)
+        prior = torch.ones(L, T, dtype=torch.float32, device=dev)
+        for l in range(L):                           # every layer's features: the same layer's later groups read them
+            self._launch(_lfeat_kernel, (triton.cdiv(T * W, 1024),), words[l], xall[l], k["isx"][l], k["cos"],
+                         k["sin"], 0, T * W, W, self.C, HD=self.hd, BLOCK=1024, warps=4)
+        acc = torch.zeros(T, W, dtype=torch.int32, device=dev)
+        ssum = torch.zeros(self.G, T, dtype=torch.int32, device=dev)
+        for l in range(L - 1):
+            self._acc_full(xall, l, acc)
+            self._launch(_lsurp_kernel, ((T // self.TB) * self.G,), words[l], acc, k["sa"][l], k["b"][l], k["inv"][l],
+                         k["cos"], k["sin"], ssum, T, W, self.G, self.HG, TB=self.TB, H2=self.hd // 2)
+            self._launch(_lprior_kernel, (triton.cdiv(T, 256),), ssum, prior[l + 1], T, self.G, self.prior_scale,
+                         BLOCK=256, warps=4)
+        return xall, prior
+
+    def _acc_full(self, xall, layer, acc):
+        """The encoder's int32 sums of a layer: the previous layer's product, plus (head groups) the whole
+        block-triangular product of the same layer's exact features."""
+        if layer == 0:
+            acc.zero_()
+        else:
+            self._product(xall[layer - 1], layer, acc)
+        if self.ng > 1:
+            acc += int_mm(xall[layer], self.k["Acq"][layer])
+
     def encode(self, words, xall=None, prior=None, out=None, layer_words=None):
         """layer_words: an int64 tensor [L] to receive the 16-bit words each layer adds to the streams (layer 0
         also gets the final states; starts and alignment are left out, see bits)."""
@@ -492,10 +534,7 @@ class LayerwiseOneStep:
         acc = torch.zeros(T, W, dtype=torch.int32, device=dev)
         smult = torch.empty(S * self.TB, dtype=torch.float32, device=dev)
         for layer in reversed(range(L)):
-            if layer == 0:
-                acc.zero_()
-            else:
-                self._product(xall[layer - 1], layer, acc)
+            self._acc_full(xall, layer, acc)
             before = pos.sum(dtype=torch.int64) if layer_words is not None and layer > 0 else None
             self._launch(_lenc_kernel, (S,), words[layer], prior[layer], state, pos, out, starts, acc,
                          k["sa"][layer], k["b"][layer], k["sp"][layer], k["cos"], k["sin"], smult, t["cumf"], t["ko"],
@@ -559,15 +598,22 @@ class LayerwiseOneStep:
                     continue
                 ctx = torch.cuda.stream(streams[c]) if streams else _null()
                 with ctx:
-                    self._launch(_ldec_kernel, (P,), buf, starts, bufs["state"], bufs["pos"], words[layer], acc,
-                                 bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer], k["sp"][layer],
-                                 k["inv"][layer], k["isx"][layer], k["cos"], k["sin"], bufs["ssum"][(layer + 1) % 2],
-                                 bufs["ssum"][layer % 2], bufs["smult"][c * P * self.TB:], t["cumf"], t["lut"],
-                                 t["tail"], c * Tc, T, W, self.G, self.HG, self.prior_scale,
-                                 FIRST=layer == 0, LAST=layer == L - 1, TB=self.TB, H2=self.hd // 2,
-                                 LUT_SHIFT=16 - gc.LUT_BITS, LUT_W=gc.LUT_W, REFINE=gc.REFINE,
-                                 UNIFORM=self.mode == "uniform", SEARCH=self.search,
-                                 FEAT=self.features == "inline", LEAN=self.lean, ONES=layer == 0)
+                    gw = self.GN * self.hd if self.ng > 1 else W
+                    for j in range(self.ng):             # head groups in order (one launch for all heads if 1)
+                        if j > 0:                        # the group's sums from the groups decoded before it
+                            xin = bufs["xbuf"][layer % 2][rows, :j * gw].contiguous()
+                            acc[:, j * gw:(j + 1) * gw] += int_mm(xin, self.Ag[j][layer])
+                        GN = self.GN if self.ng > 1 else self.G
+                        self._launch(_ldec_kernel, ((Tc // self.TB) * GN,), buf, starts, bufs["state"], bufs["pos"],
+                                     words[layer], acc, bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer],
+                                     k["sp"][layer], k["inv"][layer], k["isx"][layer], k["cos"], k["sin"],
+                                     bufs["ssum"][(layer + 1) % 2], bufs["ssum"][layer % 2],
+                                     bufs["smult"][c * P * self.TB:], t["cumf"], t["lut"], t["tail"], c * Tc, T, W,
+                                     self.G, self.HG, j * GN if self.ng > 1 else 0, GN, self.prior_scale,
+                                     FIRST=layer == 0, LAST=layer == L - 1, TB=self.TB, H2=self.hd // 2,
+                                     LUT_SHIFT=16 - gc.LUT_BITS, LUT_W=gc.LUT_W, REFINE=gc.REFINE,
+                                     UNIFORM=self.mode == "uniform", SEARCH=self.search,
+                                     FEAT=self.features == "inline", LEAN=self.lean, ONES=layer == 0)
                     if self.features == "pass" and layer < L - 1:
                         nv = Tc * W
                         self._launch(_lfeat_kernel, (triton.cdiv(nv, 1024),), words[layer], bufs["xbuf"][layer % 2],
