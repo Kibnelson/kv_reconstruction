@@ -167,13 +167,14 @@ AQUA_PAPER = {                     # AQUA-KV paper, Table 1, Llama 3.2 3B (bits 
     "exact": (16.0, 6.98), "aqua2": (2.16, 7.03), "kivi2g128": (2.25, 9.33), "higgs2": (2.02, 7.47)}
 
 
-OURS_METHOD = r"ours([0-9]+(?:\.[0-9]+)?)(t?)([fh]?)"
+OURS_METHOD = r"ours([0-9]+(?:\.[0-9]+)?)(t?)([fhuw]?)"
 
 
 def aqua_method(name, study, fits, consts, sens=None, clamp=16.0):
     """A method of the AQUA-KV-protocol stage by name: exact, higgs<b>, aqua<b>, kivi<b>g<group>,
-    ours<step>[t][f|h] (t: per-token step; f: steps shaped by the loss sensitivity over all lanes, h: within each
-    head; `sens` is the sensitivity [L, W] they need)."""
+    ours<step>[t][f|h|u|w] (t: per-token step; f: steps shaped by the loss sensitivity over all lanes, h: within
+    each head, `sens` is the sensitivity [L, W] they need; u: one absolute step per head, w: one absolute step for
+    all the keys and one for all the values of a layer, AQUA-KV's HIGGS group)."""
     import re
     from kv_compare import streaming as sm
     if ":" in name:                                  # diagnostic: <method>:k or <method>:v (one half compressed)
@@ -196,7 +197,10 @@ def aqua_method(name, study, fits, consts, sens=None, clamp=16.0):
     m = re.fullmatch(OURS_METHOD, name)
     if m:
         scale = None
-        if m[3]:
+        if m[3] in ("u", "w"):
+            from kv_compare import sensitivity as sv
+            scale = sv.uniform_scales(consts["sp"], study.hd if m[3] == "u" else study.C, clamp=clamp)
+        elif m[3]:
             from kv_compare import sensitivity as sv
             if sens is None:
                 raise SystemExit(f"{name}: shaped steps need the sensitivity")
@@ -263,7 +267,7 @@ def stage_aquappl(args, out):
     consts = fused.prepare(study, log=log) if any(m.startswith("ours") for m in args.aqua_methods) else None
     import re
     todo = [m for m in args.aqua_methods if m not in res["methods"] or m in args.aqua_rerun]
-    shaped = any((re.fullmatch(OURS_METHOD, m.split(":")[0]) or [None] * 4)[3] for m in todo)
+    shaped = any((re.fullmatch(OURS_METHOD, m.split(":")[0]) or [None] * 4)[3] in ("f", "h") for m in todo)
     sens = kv_sensitivity(args, out, tokenizer, model, device) if shaped else None
     if sens is not None and consts is not None and (out / "kv_sensitivity.json").is_file():
         from kv_compare import sensitivity as sv
@@ -416,7 +420,8 @@ def aqua_protocol_lines(out):
         if m:
             return (f"Ours, GPU codec, step {m[1]}" + (", token step" if m[2] else "") +
                     {"": "", "f": ", steps shaped by loss sensitivity (all lanes)",
-                     "h": ", steps shaped by loss sensitivity (within each head)"}[m[3]])
+                     "h": ", steps shaped by loss sensitivity (within each head)",
+                     "u": ", one absolute step per head", "w": ", one absolute step per layer's keys / values"}[m[3]])
         return k
     for k, r in ms.items():
         if k == "exact":
@@ -433,7 +438,8 @@ def aqua_protocol_lines(out):
                      f"{r['perplexity_f32']:.3f} | {ch} | "
                      + (f"{paper[0]:.2f} bits, {paper[1]:.2f}" if paper else "-") + " |")
     sens_path = out / "kv_sensitivity.json"
-    if sens_path.is_file() and any(re.fullmatch(OURS_METHOD, k) and re.fullmatch(OURS_METHOD, k)[3] for k in ms):
+    if sens_path.is_file() and any(re.fullmatch(OURS_METHOD, k) and re.fullmatch(OURS_METHOD, k)[3] in ("f", "h")
+                                   for k in ms):
         tail = sensitivity_lines(json.loads(sens_path.read_text()))
     else:
         tail = []
@@ -1897,13 +1903,14 @@ def parser():
                    help="gpu_speed: steps of the GPU lossy codec timed on the whole test document (empty: skip)")
     p.add_argument("--aqua-methods",
                    default="exact,higgs2,kivi2g128,kivi2g32,kivi4g32,aqua2,aqua3,aqua4,ours0.5,ours1,ours2,ours4,"
-                           "ours2t,ours4t,ours1f,ours2f,ours3f,ours4f,ours6f,ours8f,ours2h,ours4h",
-                   help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, ours<step>[t][f|h]; "
+                           "ours2t,ours4t,ours1f,ours2f,ours3f,ours4f,ours6f,ours8f,ours2h,ours4h,ours1u,ours2u,"
+                           "ours3u,ours4u,ours2w,ours4w",
+                   help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, ours<step>[t][f|h|u|w]; "
                         "<method>:k or :v compresses one half only)")
     p.add_argument("--fisher-tokens", type=int, default=2048,
                    help="aquappl, shaped steps (f, h): tokens per prefill of the loss-sensitivity pass")
     p.add_argument("--fisher-clamp", type=float, default=16.0,
-                   help="aquappl, shaped steps: the kappa multipliers are kept within [1/clamp, clamp]")
+                   help="aquappl, shaped and uniform steps: the kappa multipliers are kept within [1/clamp, clamp]")
     p.add_argument("--aqua-windows", type=int, default=0, help="aquappl: only the first N windows (0: all)")
     p.add_argument("--sz-protocol-configs", default="prev,fast",
                    help="szprotocol: our predictors to cost on SplitZip's prompts")

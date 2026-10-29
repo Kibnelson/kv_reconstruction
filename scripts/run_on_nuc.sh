@@ -120,22 +120,34 @@ if [ "${AQUA_OFFICIAL:-0}" = 1 ]; then
     "$AQUA_PY" -c "import google.protobuf, sentencepiece" 2>/dev/null \
         || "$AQUA_PY" -m pip install -q protobuf sentencepiece tiktoken blobfile
     COMMON="--model_name unsloth/Llama-3.2-3B --model_seqlen 8192 --edenn_d 2 --edenn_n 16 --hadamard_groupsize 1024"
+    # their training keeps every sample's activations in RAM (offloaded): inputs and outputs of a layer (3072
+    # channels) and two layers' keys and values (1024 each), BF16, about 168 MB per 8192-token sample (43 GB for
+    # the paper's 256). With less free RAM, fewer samples (a multiple of 32, at least 64), recorded in the results.
+    NS=${AQUA_NSAMPLES:-256}
+    AVAIL_MB=$(awk '/MemAvailable/ {print int($2 / 1024)}' /proc/meminfo)
+    FIT=$(( (AVAIL_MB - 8192) * 100 / 115 / 168 / 32 * 32 ))
+    if [ -z "${AQUA_NSAMPLES:-}" ] && [ "$FIT" -lt "$NS" ]; then
+        NS=$(( FIT < 64 ? 64 : FIT ))
+        echo "AQUA-KV official: $AVAIL_MB MB of RAM available, training on $NS calibration samples instead of 256"
+    fi
     echo "AQUA-KV official: perplexity without quantization ($D/no_quant.log)"
     (cd "$AQUA_SRC" && "$AQUA_PY" evaluate_perplexity.py $COMMON --no_quant) > "$D/no_quant.log" 2>&1 \
         || echo "AQUA-KV no-quant evaluation failed (see $D/no_quant.log)"
     # the calibration samples, drawn by the authors' sampler (togethercomputer/RedPajama-Data-1T-Sample is gone from
     # the Hub; scripts/aqua_calibration_data.py redirects only the download, to a Parquet mirror with the same rows)
+    [ -s "$D/predictors_2bit.pt" ] || rm -f "$D/train_2bit.log" "$D/ppl_2bit.log"     # no stale logs in the results
     if [ ! -s "$D/redpajama_calibration.pt" ]; then
         echo "AQUA-KV official: drawing the RedPajama calibration samples ($D/calibration.log)"
         "$AQUA_PY" scripts/aqua_calibration_data.py --source "$AQUA_SRC" --model unsloth/Llama-3.2-3B \
-            --nsamples ${AQUA_NSAMPLES:-256} --output "$D/redpajama_calibration.pt" > "$D/calibration.log" 2>&1 \
+            --nsamples 256 --output "$D/redpajama_calibration.pt" > "$D/calibration.log" 2>&1 \
             || echo "AQUA-KV calibration data failed (see $D/calibration.log)"
     fi
     if [ ! -s "$D/predictors_2bit.pt" ] && [ -s "$D/redpajama_calibration.pt" ]; then
-        echo "AQUA-KV official: training predictors ($D/train_2bit.log; this can take an hour or more)"
+        echo "AQUA-KV official: training predictors on $NS samples ($D/train_2bit.log; this can take an hour or more)"
         (cd "$AQUA_SRC" && "$AQUA_PY" train_predictors.py $COMMON --predictors_output_path "$D/predictors_2bit.pt" \
-            --dataset "$D/redpajama_calibration.pt" --total_nsamples ${AQUA_NSAMPLES:-256} --valid_nsamples 32 \
-            --offload_activations) > "$D/train_2bit.log" 2>&1 || echo "AQUA-KV training failed (see $D/train_2bit.log)"
+            --dataset "$D/redpajama_calibration.pt" --total_nsamples $NS --valid_nsamples 32 \
+            --offload_activations) > "$D/train_2bit.log" 2>&1 && echo "$NS" > "$D/train_2bit.nsamples" \
+            || echo "AQUA-KV training failed (see $D/train_2bit.log)"
     fi
     if [ -s "$D/predictors_2bit.pt" ]; then
         echo "AQUA-KV official: perplexity with the predictors ($D/ppl_2bit.log)"
@@ -150,6 +162,9 @@ d, res = Path(sys.argv[1]), {}
 for name, label in (("no_quant.log", "no quantization"), ("ppl_2bit.log", "HIGGS 2-bit with trained predictors")):
     p = d / name
     m = re.findall(r"WikiText-2 perplexity: ([0-9.]+)", p.read_text(errors="replace")) if p.is_file() else []
+    ns = d / "train_2bit.nsamples"
+    if m and "2-bit" in label and ns.is_file():
+        label += f" ({ns.read_text().strip()} calibration samples; paper 256)"
     if m:
         res[label] = float(m[-1])
 Path(sys.argv[2]).write_text(json.dumps(res, indent=1))

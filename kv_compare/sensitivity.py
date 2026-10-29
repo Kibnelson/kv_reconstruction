@@ -15,6 +15,16 @@ layers, heads, keys and values) or within each head of each layer ("head": only 
 
 The first `skip` tokens of each prefill (the attention sinks, which the protocols keep exact) are left out of the
 mean.
+
+Measured in AQUA-KV's protocol (8ae8d22), this shaping hurts: at step 2, +10.1% perplexity over all lanes and
++5.9% within heads, against +0.54% unshaped. The gradient of a prefill is a local, first-order measure: it is
+dominated by nearby queries, which in the protocol still read exact values (the recent buffer), and the errors
+there are not small.
+
+Uniform steps (uniform_scales): the same absolute step for every lane of a group (a head, or all the keys or all
+the values of a layer), as a rotation followed by one scale per group gives: the error spread evenly over the
+channels instead of in proportion to each channel's spread. For equally important channels this is the
+minimum-error allocation (reverse water-filling): channels whose spread is below the step get almost no bits.
 """
 from __future__ import annotations
 
@@ -106,6 +116,19 @@ def lane_scales(F, spread, mode="global", hd=128, clamp=16.0):
         logw = (h - h.mean(2, keepdim=True)).reshape(L, W)
     else:
         raise ValueError("mode is 'global' or 'head'")
+    c = math.log(clamp)
+    return torch.exp(logw.clamp(-c, c))
+
+
+def uniform_scales(spread, group, clamp=16.0):
+    """kappa multipliers [L, W] (float64) that give every lane of a group of `group` consecutive lanes the same
+    absolute step: proportional to 1 / spread, geometric mean 1 within the group, clamped to [1 / clamp, clamp]."""
+    sp = torch.as_tensor(spread, dtype=torch.float64).cpu()
+    L, W = sp.shape
+    if W % group:
+        raise ValueError(f"{W} lanes do not split into groups of {group}")
+    logw = -torch.log(sp.clamp_min(1e-30)).reshape(L, W // group, group)
+    logw = (logw - logw.mean(2, keepdim=True)).reshape(L, W)
     c = math.log(clamp)
     return torch.exp(logw.clamp(-c, c))
 

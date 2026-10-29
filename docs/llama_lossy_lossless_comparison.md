@@ -333,6 +333,32 @@ Keys only or values only compressed (the other half exact; bits are for the comp
   cached lane on our calibration documents (`kv_compare/sensitivity.py`), then `ours<step>f` (shaped over all
   lanes, so bits also move between layers, heads, keys and values) and `ours<step>h` (within each head only).
 
+## Results: steps shaped by the loss gradient make it worse (`8ae8d22`)
+
+Each lane's step proportional to 1 / sqrt(its diagonal Fisher information), measured on our calibration documents
+(24 prefills of 2,048 tokens, 20 s), multipliers within [1/16, 16]:
+
+| Step | Unshaped | Shaped over all lanes (`f`) | Shaped within each head (`h`) |
+| --- | --- | --- | --- |
+| 1 | 3.61 bits, -0.03% | 3.70 bits, +4.92% | - |
+| 2 | 2.76 bits, +0.54% | 2.87 bits, +10.10% | 2.81 bits, +5.85% |
+| 4 | 2.17 bits, +11.25% | 2.23 bits, +12.73% | 2.19 bits, +6.46% |
+| 3 / 6 / 8 | - | 2.47 / 1.97 / 1.85 bits: +12.76% / +12.69% / +18.15% | - |
+
+- **Worse at every step.** Bits went up a little and quality fell a lot.
+- **The loss hardly moves from step 3 to step 6** (+12.7%). So it comes from the lanes whose step was made 16x
+  coarser: they are rounded to the prediction at any step. The gradient called those lanes insensitive; in the
+  protocol they are not.
+- **Why the gradient misleads here:** it is first-order and local. In a prefill it is dominated by nearby
+  queries, which in AQUA-KV's protocol still read the exact recent tokens. It also assumes small errors, and
+  these are not.
+- The sensitivity says the early layers matter most (steps x0.5-0.8 there, x1.5-2.8 in layers 16-27); the
+  result says the late layers matter more than that.
+- **Next:** steps that spread the error evenly, as AQUA-KV's rotation does: one absolute step for all channels
+  of a head (`ours<step>u`), or for all keys and all values of a layer (`ours<step>w`, AQUA-KV's HIGGS group of
+  1,024 channels). For equally important channels that is the minimum-error allocation, and it needs no
+  sensitivity estimate.
+
 ## Reference: SmolLM2-135M (same protocol, NumPy implementation)
 
 Lossless, bits per value, averaged over the four reference chunks (all 30 layers):

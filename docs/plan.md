@@ -141,19 +141,24 @@ main lossy comparison.
    on Llama-3.2-3B: 12.05 bits, 313 GB/s decode; ours on its prompts 9.92 bits (one-step) and 8.68 (strong
    predictor). Still to run:
    - AQUA-KV's own training on RedPajama (`AQUA_OFFICIAL=1`). The original sample is gone from the Hub; the
-     script now draws the authors' samples from ll922/RedPajama-Data-1T-Sample-Backup, a Parquet mirror with
-     the original's 930,514 rows, and records the source;
+     script draws the authors' samples from ll922/RedPajama-Data-1T-Sample-Backup, a Parquet mirror with the
+     original's 930,514 rows (loaded in `8ae8d22`). Their sampler's slow-tokenizer call returns False for
+     Llama 3, so the fast tokenizer is used in that case, recorded. Training keeps about 168 MB per sample in
+     RAM; with less free RAM the script trains on fewer samples and says so;
    - LongBench and GSM8K subsets;
    - ExANS's position-aligned batches.
 0b. **Lossy error shaping (first for lossy).** Make our error look like AQUA-KV's: quantize the residual in a
     Hadamard-rotated domain and/or weight each channel's step by its attention sensitivity (query magnitude), and
     keep the entropy coder.
     - Diagnosed (`8f8bfd1`): both halves cost more than AQUA-KV's, values most (see what we learned).
-    - First step, ready to run: the step of each lane proportional to 1 / sqrt(its loss sensitivity), the
-      diagonal Fisher information of the cached KV on our calibration documents (`kv_compare/sensitivity.py`;
-      the GPU codec takes a kappa per lane). Methods `ours<step>f` (over all lanes) and `ours<step>h` (within
-      each head).
-    - Next, if that is not enough: the residual quantized in a Hadamard-rotated domain.
+    - Tried (`8ae8d22`), worse: the step of each lane proportional to 1 / sqrt(its loss sensitivity), the
+      diagonal Fisher information on our calibration documents. Step 2: +10.1% over all lanes, +5.9% within
+      heads, against +0.54% unshaped. The gradient is local and first-order; the lanes it made 16x coarser
+      carry the loss.
+    - Ready to run: one absolute step per head (`ours<step>u`) and per layer's keys / values (`ours<step>w`),
+      the error spread evenly as after AQUA-KV's rotation (the GPU codec takes a kappa per lane).
+    - Next, if that is not enough: the residual quantized in a Hadamard-rotated domain, with a scale per token
+      as AQUA-KV does; or a sensitivity measured in the protocol itself (errors injected into older tokens only).
     - Target, in AQUA-KV's protocol: +1.5% or less at 2.1 bits or less, and +0.1% at 3.0 bits or less.
 1. **A GPU decoder for the 7.87-bit predictor** (layers 0, l−2, l−1, 16 groups, no attention).
    - Gain: 441 MiB per document instead of 504, 13% fewer bytes than our current stream and 35% fewer than

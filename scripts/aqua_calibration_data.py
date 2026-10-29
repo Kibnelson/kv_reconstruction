@@ -11,6 +11,11 @@ with remote code disabled. The source and its row count are recorded next to the
 the same order, the authors' seed draws the same windows. (ZengXiangyu/RedPajama-Data-1T-Sample is not used:
 902,104 rows and 108 GB, so not the same sample.)
 
+The tokenizer: get_loaders asks for the slow tokenizer (use_fast=False). Llama 3 has no SentencePiece model, and
+with their transformers 4.46.3 that call returns False instead of a tokenizer (AttributeError: 'bool' object has
+no attribute 'bos_token_id'). Only then is the call repeated with the fast tokenizer, Llama 3's own BPE (the
+one their perplexity script uses); which one was used is recorded.
+
 Run with the AQUA-KV environment's python:
     $AQUA_PY scripts/aqua_calibration_data.py --source $AQUA_SRC --model unsloth/Llama-3.2-3B --output cal.pt
 """
@@ -40,6 +45,21 @@ def main(argv=None):
     from aquakv import datautils as du
     original = du.load_dataset
     used = {}
+    auto = du.AutoTokenizer
+
+    class Tokenizer:                                 # the authors' AutoTokenizer call, fast only if slow fails
+        @staticmethod
+        def from_pretrained(path, *args, **kw):
+            tok = auto.from_pretrained(path, *args, **kw)
+            if isinstance(tok, bool) or tok is None:
+                print(f"the slow tokenizer of {path} is not available (returned {tok!r}); using the fast one",
+                      flush=True)
+                tok = auto.from_pretrained(path, *args, **dict(kw, use_fast=True))
+                used["tokenizer"] = f"{type(tok).__name__} (fast; the slow tokenizer is not available)"
+            else:
+                used["tokenizer"] = type(tok).__name__
+            return tok
+    du.AutoTokenizer = Tokenizer
 
     def load(path, *args, **kw):
         if path != PAJAMA:

@@ -609,6 +609,12 @@ class SensitivityTests(unittest.TestCase):
         s = sv.lane_scales(F, sp, clamp=4.0)
         self.assertTrue(float(s.max()) <= 4.0 + 1e-12 and float(s.min()) >= 0.25 - 1e-12)
         self.assertEqual(sv.chunks_of([1, 5, 6, 7, 8, 9, 10], 4, 1), [[1, 5, 6, 7], [1, 8, 9, 10]])
+        u = sv.uniform_scales(sp, 16, clamp=1e9)                  # one absolute step per group of 16 lanes
+        st = (u * sp).reshape(3, 4, 16)
+        self.assertTrue(torch.allclose(st, st[..., :1].expand_as(st), rtol=1e-9))
+        self.assertLess(float(torch.log(u.reshape(3, 4, 16)).mean(2).abs().max()), 1e-9)
+        u = sv.uniform_scales(sp, 32, clamp=2.0)
+        self.assertTrue(float(u.max()) <= 2.0 + 1e-12 and float(u.min()) >= 0.5 - 1e-12)
 
 
 class PackageTests(unittest.TestCase):
