@@ -35,6 +35,7 @@ FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.js
          "aqua_official/redpajama_calibration.json": "aqua_official_calibration.json",
          "aqua_official/no_quant.log": "aqua_official_no_quant.log", "aqua_official/train_2bit.log":
          "aqua_official_train_2bit.log", "aqua_official/ppl_2bit.log": "aqua_official_ppl_2bit.log",
+         "kv_sensitivity.json": "kv_sensitivity.json", "kv_sensitivity.pt": "kv_sensitivity.pt",
          "captures/meta.json": "capture_meta.json"}
 REQUIRED = ("summary.md", "run_args.json", "environment.json", "captures/meta.json")
 

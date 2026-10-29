@@ -234,10 +234,12 @@ class Kivi:
 class OursGpu:
     """Our closed-loop GPU codec (kv_compare.lossy_gpu, one-step predictor) on each block: the block's words
     quantized layer by layer (prediction from the block's reconstructed previous layer), coded to a real rANS
-    stream; the RoPE tables start at the block's position. Bits = the stream's."""
+    stream; the RoPE tables start at the block's position. Bits = the stream's. lane_scale: kappa multipliers per
+    lane [L, W] (shaped steps, kv_compare.sensitivity), None for one kappa."""
 
-    def __init__(self, consts, C, hd, kappa, token_step=False):
+    def __init__(self, consts, C, hd, kappa, token_step=False, lane_scale=None):
         self.consts, self.C, self.hd, self.kappa, self.token_step = consts, C, hd, kappa, token_step
+        self.lane_scale = lane_scale
         self.granule = 1
 
     def __call__(self, start, X):
@@ -250,7 +252,7 @@ class OursGpu:
         k = dict(self.consts, cos=self.consts["cos"][start:start + m].contiguous(),
                  sin=self.consts["sin"][start:start + m].contiguous())
         codec = LossyLayerwise(k, self.C, self.hd, self.kappa, tokens_per_program=tb, chunks=1,
-                               token_step=self.token_step)
+                               token_step=self.token_step, lane_scale=self.lane_scale)
         words = to_bf16(X.to(dev, torch.float64)).to(torch.bfloat16).view(torch.int16)
         rec, xall, prior = codec.quantize(words)
         _, starts, _ = codec.encode(words, rec, xall, prior)

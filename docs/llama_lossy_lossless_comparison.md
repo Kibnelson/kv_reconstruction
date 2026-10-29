@@ -292,6 +292,47 @@ With the first 4 tokens exact, our CPU coder matches AQUA-KV 3-bit quality at 2.
 
   For comparison, SplitZip sends 675 MiB in 14.1 ms, and our fewest measured bytes are 504 MiB at 58.6 ms.
 
+## Results: AQUA-KV's own protocol, and which half costs our perplexity (`61d6db1`, `8f8bfd1`)
+
+AQUA-KV's WikiText-2 protocol: 35 windows of 8,192 tokens, the cache compressed while it grows. Our harness
+gives the authors' exact perplexity, 6.9865. Perplexity changes use the float32 loss; one window's KV is 896 MiB
+in BF16.
+
+| Method | Bits per value | One window | Perplexity change |
+| --- | --- | --- | --- |
+| AQUA-KV 2-bit (our re-implementation) | 2.09 | 117 MiB | +1.51% |
+| AQUA-KV 3-bit | 3.05 | 171 MiB | +0.08% |
+| Ours, step 4 | 2.17 | 122 MiB | +11.25% |
+| Ours, step 2 | 2.76 | 154 MiB | +0.54% |
+| Ours, step 1 | 3.61 | 202 MiB | -0.03% |
+| KIVI 2-bit, group 128 | 2.25 | 126 MiB | +11.4% |
+| HIGGS 2-bit, no predictor | 2.02 | 113 MiB | +8.08% |
+
+Keys only or values only compressed (the other half exact; bits are for the compressed half):
+
+| Method | Keys only | Values only | Both | Both, if the halves added up |
+| --- | --- | --- | --- | --- |
+| AQUA-KV 2-bit (2.09 bits) | +1.10% | +0.30% | +1.51% | +1.40% |
+| Ours, step 2 (2.76 bits) | +0.34% | +0.21% | +0.54% | +0.55% |
+| Ours, step 4 (2.16 bits) | +3.13% | +2.29% | +11.25% | +5.50% |
+
+- **Both halves cost us.** At about the same bits, our keys cost 2.8x AQUA-KV's (+3.13% against +1.10%) and
+  our values 7.6x (+2.29% against +0.30%).
+- **At step 4 our two errors compound.** Together they cost twice what they cost apart; AQUA-KV's and ours at
+  step 2 add up. At step 4 the step is about 2.2 standard deviations of the prediction residual, so most values
+  are rounded to the prediction itself. The error is then minus the part of the token the predictor could not
+  foresee, in the keys and the values of the same token alike, and those two errors push the next layers the
+  same way.
+- **The loss is spread over all windows** (the worst three windows hold 16-17% of it), so it is not a few
+  failures.
+- **Per-token step (`t`):** at step 4 it breaks (perplexity 20.7). In this protocol a drifted cache raises the
+  surprise, the step grows with the surprise, and the error feeds itself. It stays off.
+- **What follows:** our step is per channel, proportional to the channel's spread, so every channel gets the same
+  relative error and the same bits. For a fixed rate the loss is smallest with the step proportional to
+  1 / sqrt(the lane's loss sensitivity). The next run measures that: the diagonal Fisher information of every
+  cached lane on our calibration documents (`kv_compare/sensitivity.py`), then `ours<step>f` (shaped over all
+  lanes, so bits also move between layers, heads, keys and values) and `ours<step>h` (within each head only).
+
 ## Reference: SmolLM2-135M (same protocol, NumPy implementation)
 
 Lossless, bits per value, averaged over the four reference chunks (all 30 layers):

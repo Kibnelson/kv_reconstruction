@@ -123,8 +123,8 @@ if [ "${AQUA_OFFICIAL:-0}" = 1 ]; then
     echo "AQUA-KV official: perplexity without quantization ($D/no_quant.log)"
     (cd "$AQUA_SRC" && "$AQUA_PY" evaluate_perplexity.py $COMMON --no_quant) > "$D/no_quant.log" 2>&1 \
         || echo "AQUA-KV no-quant evaluation failed (see $D/no_quant.log)"
-    # the calibration samples, drawn by the authors' sampler (the Hub no longer serves the dataset's loading script
-    # to their datasets version; scripts/aqua_calibration_data.py redirects only the download)
+    # the calibration samples, drawn by the authors' sampler (togethercomputer/RedPajama-Data-1T-Sample is gone from
+    # the Hub; scripts/aqua_calibration_data.py redirects only the download, to a Parquet mirror with the same rows)
     if [ ! -s "$D/redpajama_calibration.pt" ]; then
         echo "AQUA-KV official: drawing the RedPajama calibration samples ($D/calibration.log)"
         "$AQUA_PY" scripts/aqua_calibration_data.py --source "$AQUA_SRC" --model unsloth/Llama-3.2-3B \

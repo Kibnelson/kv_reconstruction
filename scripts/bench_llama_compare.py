@@ -167,13 +167,18 @@ AQUA_PAPER = {                     # AQUA-KV paper, Table 1, Llama 3.2 3B (bits 
     "exact": (16.0, 6.98), "aqua2": (2.16, 7.03), "kivi2g128": (2.25, 9.33), "higgs2": (2.02, 7.47)}
 
 
-def aqua_method(name, study, fits, consts):
+OURS_METHOD = r"ours([0-9]+(?:\.[0-9]+)?)(t?)([fh]?)"
+
+
+def aqua_method(name, study, fits, consts, sens=None, clamp=16.0):
     """A method of the AQUA-KV-protocol stage by name: exact, higgs<b>, aqua<b>, kivi<b>g<group>,
-    ours<step>[t] (t: per-token step)."""
+    ours<step>[t][f|h] (t: per-token step; f: steps shaped by the loss sensitivity over all lanes, h: within each
+    head; `sens` is the sensitivity [L, W] they need)."""
+    import re
     from kv_compare import streaming as sm
     if ":" in name:                                  # diagnostic: <method>:k or <method>:v (one half compressed)
         base, half = name.split(":")
-        return sm.HalfOnly(aqua_method(base, study, fits, consts), half)
+        return sm.HalfOnly(aqua_method(base, study, fits, consts, sens, clamp), half)
     if name == "exact":
         return None
     if name.startswith("higgs"):
@@ -188,10 +193,48 @@ def aqua_method(name, study, fits, consts):
     if name.startswith("kivi"):
         b, g = name[4:].split("g")
         return sm.Kivi(int(b), int(g))
-    if name.startswith("ours"):
-        tok = name.endswith("t")
-        return sm.OursGpu(consts, study.C, study.hd, float(name[4:].rstrip("t")), token_step=tok)
+    m = re.fullmatch(OURS_METHOD, name)
+    if m:
+        scale = None
+        if m[3]:
+            from kv_compare import sensitivity as sv
+            if sens is None:
+                raise SystemExit(f"{name}: shaped steps need the sensitivity")
+            scale = sv.lane_scales(sens, consts["sp"], mode="global" if m[3] == "f" else "head", hd=study.hd,
+                                   clamp=clamp)
+        return sm.OursGpu(consts, study.C, study.hd, float(m[1]), token_step=m[2] == "t", lane_scale=scale)
     raise SystemExit(f"unknown --aqua-methods entry {name!r}")
+
+
+def kv_sensitivity(args, out, tokenizer, model, device):
+    """The loss sensitivity of every KV lane (kv_compare.sensitivity) on our calibration documents (the predictor's
+    training documents, not WikiText-2): prefills of --fisher-tokens tokens, each starting with BOS. Kept in
+    kv_sensitivity.pt; a per-layer summary in kv_sensitivity.json."""
+    import torch
+    from kv_compare import sensitivity as sv
+    from kv_compare import streaming as sm
+    from kv_compare.capture import tokenize
+    path = out / "kv_sensitivity.pt"
+    if path.is_file():
+        d = torch.load(path)
+        if d.get("prefill_tokens") == args.fisher_tokens:
+            log(f"aquappl: loss sensitivity kept from {path.name} ({d['tokens']} tokens)")
+            return d["fisher"]
+    prefills = []
+    for name in TRAIN:
+        ids = tokenize(tokenizer, Path(args.texts) / ROLES[name], args.tokens)
+        prefills += sv.chunks_of(ids, args.fisher_tokens, tokenizer.bos_token_id)
+    log(f"aquappl: loss sensitivity of the KV from {len(prefills)} prefills of {args.fisher_tokens} tokens "
+        f"({', '.join(ROLES[n] for n in TRAIN)})")
+    t0 = time.time()
+    F, n = sv.fisher(model, prefills, device, skip=sm.PREFIX, log=log)
+    torch.save({"fisher": F, "tokens": n, "prefill_tokens": args.fisher_tokens, "documents": TRAIN,
+                "skip": sm.PREFIX}, path)
+    (out / "kv_sensitivity.json").write_text(json.dumps({
+        "tokens": n, "prefills": len(prefills), "prefill_tokens": args.fisher_tokens, "seconds": time.time() - t0,
+        "documents": [ROLES[n_] for n_ in TRAIN], "layers": sv.summary(F)}, indent=1))
+    log(f"aquappl: sensitivity done in {time.time() - t0:.0f} s ({memory_note(args.device)})")
+    return F
 
 
 def stage_aquappl(args, out):
@@ -218,13 +261,23 @@ def stage_aquappl(args, out):
                windows=len(windows), text=str(args.eval_text), source="goodevening13/aquakv@e744183")
     study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
     consts = fused.prepare(study, log=log) if any(m.startswith("ours") for m in args.aqua_methods) else None
+    import re
+    todo = [m for m in args.aqua_methods if m not in res["methods"] or m in args.aqua_rerun]
+    shaped = any((re.fullmatch(OURS_METHOD, m.split(":")[0]) or [None] * 4)[3] for m in todo)
+    sens = kv_sensitivity(args, out, tokenizer, model, device) if shaped else None
+    if sens is not None and consts is not None and (out / "kv_sensitivity.json").is_file():
+        from kv_compare import sensitivity as sv
+        info = json.loads((out / "kv_sensitivity.json").read_text())
+        info.update(clamp=args.fisher_clamp, layers=sv.summary(
+            sens, sv.lane_scales(sens, consts["sp"], mode="global", hd=study.hd, clamp=args.fisher_clamp)))
+        (out / "kv_sensitivity.json").write_text(json.dumps(info, indent=1))
     fits = {}
     log(f"aquappl: {len(windows)} windows of {args.aqua_seqlen} tokens; methods {args.aqua_methods}")
     for name in args.aqua_methods:
         if name in res["methods"] and name not in args.aqua_rerun:
             log(f"aquappl {name}: kept from aqua_protocol.json")
             continue
-        comp = aqua_method(name, study, fits, consts)
+        comp = aqua_method(name, study, fits, consts, sens, args.fisher_clamp)
         t0 = time.time()
         make = None if comp is None else (lambda comp=comp: sm.StreamingCache(comp, study.L, granule=comp.granule))
         r = sm.perplexity(model, windows, device, make, log=log if args.aqua_verbose else None)
@@ -237,7 +290,7 @@ def stage_aquappl(args, out):
             + f" ({r['seconds']:.0f} s; {memory_note(args.device)})")
         gc.collect()
         torch.cuda.empty_cache() if device.type == "cuda" else None
-    del model, study, consts, fits
+    del model, study, consts, fits, sens
     gc.collect()
     torch.cuda.empty_cache() if device.type == "cuda" else None
     return res
@@ -317,6 +370,7 @@ def szprotocol_lines(out):
 
 
 def aqua_protocol_lines(out):
+    import re
     res = json.loads((out / "aqua_protocol.json").read_text())
     ms = res["methods"]
     if "exact" not in ms:
@@ -358,8 +412,11 @@ def aqua_protocol_lines(out):
             return f"KIVI {b}-bit, group {g}"
         if k.startswith("higgs"):
             return f"HIGGS {k[5:]}-bit, no predictor"
-        if k.startswith("ours"):
-            return f"Ours, GPU codec, step {k[4:].rstrip('t')}" + (", token step" if k.endswith("t") else "")
+        m = re.fullmatch(OURS_METHOD, k)
+        if m:
+            return (f"Ours, GPU codec, step {m[1]}" + (", token step" if m[2] else "") +
+                    {"": "", "f": ", steps shaped by loss sensitivity (all lanes)",
+                     "h": ", steps shaped by loss sensitivity (within each head)"}[m[3]])
         return k
     for k, r in ms.items():
         if k == "exact":
@@ -375,11 +432,37 @@ def aqua_protocol_lines(out):
         lines.append(f"| {label(k)} | {b:.3f} | {mib(b):.1f} MiB | {w:.3f} | {mib(w):.1f} MiB | {r['perplexity']:.3f} | "
                      f"{r['perplexity_f32']:.3f} | {ch} | "
                      + (f"{paper[0]:.2f} bits, {paper[1]:.2f}" if paper else "-") + " |")
+    sens_path = out / "kv_sensitivity.json"
+    if sens_path.is_file() and any(re.fullmatch(OURS_METHOD, k) and re.fullmatch(OURS_METHOD, k)[3] for k in ms):
+        tail = sensitivity_lines(json.loads(sens_path.read_text()))
+    else:
+        tail = []
     if off:
         for k, v in off.items():
             lines.append(f"| AQUA-KV, the authors' own scripts ({k}) | - | - | - | - | {v:.3f} | - | - | "
                          + (f"{AQUA_PAPER['aqua2'][0]:.2f} bits, {AQUA_PAPER['aqua2'][1]:.2f}" if "2-bit" in k else
                             f"16 bits, {AQUA_PAPER['exact'][1]:.2f}" if "no quantization" in k else "-") + " |")
+    return lines + [""] + tail
+
+
+def sensitivity_lines(info):
+    """Where the shaped steps put the error: per layer, the keys' and values' loss sensitivity (relative to the
+    mean of all lanes) and the geometric-mean change of their step (all-lanes shaping)."""
+    rows = info["layers"]
+    mean = sum(r["keys"] + r["values"] for r in rows) / (2 * len(rows))
+    lines = ["### Shaped steps: the loss sensitivity of each lane", "",
+             f"Diagonal Fisher information of the cached keys and values (kv_compare/sensitivity.py), from "
+             f"{info['prefills']} prefills of {info['prefill_tokens']} tokens of our calibration documents "
+             f"({info['tokens']:,} tokens, the first 4 of each left out). The step of each lane becomes proportional "
+             "to 1 / sqrt(sensitivity), geometric mean unchanged, multipliers within "
+             f"[1/{info.get('clamp', 16):g}, {info.get('clamp', 16):g}]. Below, the step change is the geometric "
+             "mean over the layer's key or value lanes (all-lanes shaping).", "",
+             "| Layer | Keys, sensitivity (x mean) | Values, sensitivity (x mean) | Keys, step x | Values, step x |",
+             "| --- | --- | --- | --- | --- |"]
+    for r in rows:
+        ks = f"{2 ** r['log2_scale_keys']:.2f}" if "log2_scale_keys" in r else "-"
+        vs = f"{2 ** r['log2_scale_values']:.2f}" if "log2_scale_values" in r else "-"
+        lines.append(f"| {r['layer']} | {r['keys'] / mean:.3g} | {r['values'] / mean:.3g} | {ks} | {vs} |")
     return lines + [""]
 
 
@@ -1813,8 +1896,14 @@ def parser():
     p.add_argument("--lossy-speed-kappas", default="0.25,0.5,1,2,4",
                    help="gpu_speed: steps of the GPU lossy codec timed on the whole test document (empty: skip)")
     p.add_argument("--aqua-methods",
-                   default="exact,higgs2,kivi2g128,kivi2g32,kivi4g32,aqua2,aqua3,aqua4,ours0.5,ours1,ours2,ours4,ours2t,ours4t",
-                   help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, ours<step>[t])")
+                   default="exact,higgs2,kivi2g128,kivi2g32,kivi4g32,aqua2,aqua3,aqua4,ours0.5,ours1,ours2,ours4,"
+                           "ours2t,ours4t,ours1f,ours2f,ours3f,ours4f,ours6f,ours8f,ours2h,ours4h",
+                   help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, ours<step>[t][f|h]; "
+                        "<method>:k or :v compresses one half only)")
+    p.add_argument("--fisher-tokens", type=int, default=2048,
+                   help="aquappl, shaped steps (f, h): tokens per prefill of the loss-sensitivity pass")
+    p.add_argument("--fisher-clamp", type=float, default=16.0,
+                   help="aquappl, shaped steps: the kappa multipliers are kept within [1/clamp, clamp]")
     p.add_argument("--aqua-windows", type=int, default=0, help="aquappl: only the first N windows (0: all)")
     p.add_argument("--sz-protocol-configs", default="prev,fast",
                    help="szprotocol: our predictors to cost on SplitZip's prompts")

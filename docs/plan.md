@@ -54,6 +54,12 @@ What we learned:
   loss is 7x larger. So it is how the error is spread, not its size: our step is per channel, so channels with
   large values, which drive the attention scores, get large errors. AQUA-KV rotates the residual (Hadamard) and
   scales it per token.
+- Keys only or values only (`8f8bfd1`): at about the same bits our keys cost 2.8x AQUA-KV's (+3.13% against
+  +1.10%) and our values 7.6x (+2.29% against +0.30%). At step 4 our two errors compound: together +11.25%,
+  twice the sum apart. At that step most values are rounded to the prediction, so the keys and the values of a
+  token lose the same unforeseen part. At step 2, and for AQUA-KV, the halves add up.
+- The per-token step breaks in this protocol at step 4 (perplexity 20.7): drift raises the surprise, which raises
+  the step. It stays off.
 - The SplitZip-format code books are within 0.03 bits of the best fixed code book. The rANS coder already sits
   at the entropy of these symbols, so fewer lossless bytes need a stronger prediction.
 - At 800 Gb/s no layer of ours beats SplitZip yet.
@@ -134,14 +140,20 @@ main lossy comparison.
    Our harness gives the authors' exact perplexity to five digits (6.9865; paper 6.98). SplitZip's own benchmark
    on Llama-3.2-3B: 12.05 bits, 313 GB/s decode; ours on its prompts 9.92 bits (one-step) and 8.68 (strong
    predictor). Still to run:
-   - AQUA-KV's own training on RedPajama (`AQUA_OFFICIAL=1`), which needed protobuf in its environment, now
-     installed by the script;
+   - AQUA-KV's own training on RedPajama (`AQUA_OFFICIAL=1`). The original sample is gone from the Hub; the
+     script now draws the authors' samples from ll922/RedPajama-Data-1T-Sample-Backup, a Parquet mirror with
+     the original's 930,514 rows, and records the source;
    - LongBench and GSM8K subsets;
    - ExANS's position-aligned batches.
 0b. **Lossy error shaping (first for lossy).** Make our error look like AQUA-KV's: quantize the residual in a
     Hadamard-rotated domain and/or weight each channel's step by its attention sensitivity (query magnitude), and
     keep the entropy coder.
-    - Diagnose first: in AQUA-KV's protocol, ours on keys only and on values only.
+    - Diagnosed (`8f8bfd1`): both halves cost more than AQUA-KV's, values most (see what we learned).
+    - First step, ready to run: the step of each lane proportional to 1 / sqrt(its loss sensitivity), the
+      diagonal Fisher information of the cached KV on our calibration documents (`kv_compare/sensitivity.py`;
+      the GPU codec takes a kappa per lane). Methods `ours<step>f` (over all lanes) and `ours<step>h` (within
+      each head).
+    - Next, if that is not enough: the residual quantized in a Hadamard-rotated domain.
     - Target, in AQUA-KV's protocol: +1.5% or less at 2.1 bits or less, and +0.1% at 3.0 bits or less.
 1. **A GPU decoder for the 7.87-bit predictor** (layers 0, l−2, l−1, 16 groups, no attention).
    - Gain: 441 MiB per document instead of 504, 13% fewer bytes than our current stream and 35% fewer than

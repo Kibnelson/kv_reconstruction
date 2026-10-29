@@ -390,24 +390,28 @@ LOSSY_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
 from kv_compare import lossy_gpu as lg, layerwise
 xs = torch.stack([words_to_float(w32[l]) for l in range(L)])
 rc = layerwise.prepare_rank(study, consts, 32, log=lambda m: None)
-for kappa, chunks, rank, prefix, tstep in ((1.0, 2, None, 0, False), (0.25, 1, rc, 0, False), (2.0, 2, None, 4, True)):
+gen = torch.Generator().manual_seed(5)
+shaped = torch.exp2(torch.empty(tuple(consts["sp"].shape)).uniform_(-4, 4, generator=gen))   # 1/16 .. 16 per lane
+for kappa, chunks, rank, prefix, tstep, lanes in ((1.0, 2, None, 0, False, None), (0.25, 1, rc, 0, False, None),
+                                                  (2.0, 2, None, 4, True, None), (1.0, 2, None, 4, False, shaped),
+                                                  (0.5, 1, rc, 0, True, shaped)):
     codec = lg.LossyLayerwise(consts, study.C, study.hd, kappa, tokens_per_program=16, chunks=chunks, rank=rank,
                               requant="epilogue" if rank else "kernel", rank_tiles=(16, 16, 32, 4), prefix=prefix,
-                              token_step=tstep)
+                              token_step=tstep, lane_scale=lanes)
     rec, xall, prior = codec.quantize(words)
     buf, starts, _ = codec.encode(words, rec, xall, prior)
     dec = codec.decode(buf, starts, T)
     assert torch.equal(dec, rec), ("round trip", kappa, int((dec != rec).sum()))
     r32 = rec.to(torch.int32) & 0xFFFF
     xr = torch.stack([words_to_float(r32[l]) for l in range(L)])
-    step = (kappa * codec.k["sp"]).double()[:, None, :] * (4.0 if tstep else 1.0)    # the multiplier is <= 4
+    step = (codec.lane_kappa().cpu() * codec.k["sp"].double().cpu())[:, None, :] * (4.0 if tstep else 1.0)  # mult <= 4
     bound = 0.5 * step + (xs.abs() + 0.5 * step) * 2.0 ** -8 + 1e-30
     fin = torch.isfinite(xs)
     ok = ((xr - xs).abs() <= bound * 1.0001) | (r32 == w32)
     assert bool(ok[fin].all()), ("error bound", kappa, int((~ok[fin]).sum()))
     assert torch.equal(r32[1, 3, 2:5], w32[1, 3, 2:5]), "Inf and NaN travel exactly"
     assert torch.equal(r32[:, :prefix], w32[:, :prefix]), "the first tokens travel exactly"
-    print("ok", kappa, chunks, rank is not None, prefix, tstep, codec.bits(starts, T) / (L * T * W))
+    print("ok", kappa, chunks, rank is not None, prefix, tstep, lanes is not None, codec.bits(starts, T) / (L * T * W))
 """
 
 
@@ -500,7 +504,8 @@ class MixedTests(unittest.TestCase):
 class LossyGpuTests(unittest.TestCase):
     def test_lossy_gpu_codec_round_trip_interpreted(self):
         """The closed-loop lossy per-layer codec decodes exactly the encoder's reconstruction, within half a step
-        plus BF16 rounding of the input, with Inf and NaN kept exact; dense and reduced-rank products."""
+        plus BF16 rounding of the input, with Inf and NaN kept exact; dense and reduced-rank products; one kappa
+        and shaped steps (kappa per lane)."""
         import importlib.util
         import subprocess
         if importlib.util.find_spec("triton") is None or torch is None:
@@ -508,7 +513,7 @@ class LossyGpuTests(unittest.TestCase):
         r = subprocess.run([sys.executable, "-c", LOSSY_CHECK, str(ROOT)], capture_output=True, text=True,
                            timeout=2400)
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
-        self.assertEqual(r.stdout.count("ok"), 3, r.stdout)
+        self.assertEqual(r.stdout.count("ok"), 5, r.stdout)
 
 
 class StreamingProtocolTests(unittest.TestCase):
@@ -547,6 +552,63 @@ class StreamingProtocolTests(unittest.TestCase):
         grain.granule = 64
         sm.perplexity(model, [ids], "cpu", lambda: sm.StreamingCache(grain, 2, granule=64))
         self.assertTrue(all(m % 64 == 0 for _, m in grain.calls), grain.calls)
+
+
+class SensitivityTests(unittest.TestCase):
+    def test_kv_gradients_and_shaped_steps(self):
+        """The cached-KV gradients match finite differences of the loss (keys after RoPE and values, each lane);
+        the shaped steps give F x step^2 equal on every lane (global) or within each head, geometric mean 1,
+        clamped."""
+        if torch is None:
+            self.skipTest("PyTorch is required")
+        from transformers import LlamaConfig, LlamaForCausalLM
+        from transformers.cache_utils import DynamicCache
+        from kv_compare import sensitivity as sv
+        torch.manual_seed(0)
+        cfg = LlamaConfig(vocab_size=97, hidden_size=64, intermediate_size=128, num_hidden_layers=3,
+                          num_attention_heads=4, num_key_value_heads=2, head_dim=16, max_position_embeddings=256)
+        model = LlamaForCausalLM(cfg).double().eval()
+        ids = torch.randint(3, 97, (40,)).tolist()
+        g, _ = sv.kv_grads(model, ids, torch.device("cpu"))
+        self.assertEqual(tuple(g.shape), (3, 40, 64))
+        C = 32
+
+        class Bump(DynamicCache):
+            def __init__(self, at):
+                super().__init__()
+                self.at = at
+
+            def update(self, k, v, layer_idx, kw=None):
+                l, t, c, eps = self.at
+                if layer_idx == l:
+                    k, v = k.clone(), v.clone()
+                    tgt, cc = (k, c) if c < C else (v, c - C)
+                    tgt[0, cc // 16, t, cc % 16] += eps
+                return super().update(k, v, layer_idx, kw)
+
+        def total(at):
+            x = torch.tensor([ids])
+            with torch.no_grad():
+                out = model(x, use_cache=True, past_key_values=Bump(at))
+            return float(torch.nn.functional.cross_entropy(out.logits[0, :-1], x[0, 1:], reduction="sum"))
+        for l, t, c in ((0, 5, 3), (1, 0, 20), (2, 17, 40), (1, 30, 63)):
+            eps = 1e-3                                   # the model keeps some float32 (RoPE tables): no smaller
+            fd = (total((l, t, c, eps)) - total((l, t, c, -eps))) / (2 * eps)
+            self.assertLessEqual(abs(fd - float(g[l, t, c])), 1e-5 + 0.02 * abs(fd), (l, t, c))
+        F, n = sv.fisher(model, [ids, ids[::-1]], torch.device("cpu"), skip=4)
+        self.assertEqual((tuple(F.shape), n), ((3, 64), 72))
+        sp = torch.rand(3, 64, dtype=torch.float64) + 0.1
+        s = sv.lane_scales(F, sp, mode="global", hd=16, clamp=1e9)
+        w = s * sp * F.sqrt()
+        self.assertTrue(torch.allclose(w, w.flatten()[:1].expand_as(w), rtol=1e-9))
+        self.assertLess(abs(float(torch.log(s).mean())), 1e-9)
+        s = sv.lane_scales(F, sp, mode="head", hd=16, clamp=1e9)
+        hw = (s * sp * F.sqrt()).reshape(3, 4, 16)
+        self.assertTrue(torch.allclose(hw, hw[..., :1].expand_as(hw), rtol=1e-9))
+        self.assertLess(float(torch.log(s.reshape(3, 4, 16)).mean(2).abs().max()), 1e-9)
+        s = sv.lane_scales(F, sp, clamp=4.0)
+        self.assertTrue(float(s.max()) <= 4.0 + 1e-12 and float(s.min()) >= 0.25 - 1e-12)
+        self.assertEqual(sv.chunks_of([1, 5, 6, 7, 8, 9, 10], 4, 1), [[1, 5, 6, 7], [1, 8, 9, 10]])
 
 
 class PackageTests(unittest.TestCase):

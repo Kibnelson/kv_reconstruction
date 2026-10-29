@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """AQUA-KV's RedPajama calibration samples, made by the authors' own sampler, saved for train_predictors.py.
 
-train_predictors.py --dataset pajama loads togethercomputer/RedPajama-Data-1T-Sample through a loading script,
-which the Hub no longer serves to datasets 2.20 ("doesn't exist on the Hub or cannot be accessed"). The authors'
+train_predictors.py --dataset pajama loads togethercomputer/RedPajama-Data-1T-Sample, which has been removed from
+the Hugging Face Hub ("doesn't exist on the Hub or cannot be accessed"; reported since late 2025). The authors'
 get_loaders also accepts a saved file (--dataset <file.pt>, torch.load(name)[:nsamples]), so this script runs
 their sampler unchanged (aquakv/datautils.py get_loaders("pajama", ...): same seed, sample count, length and
-tokenizer) with only the download redirected: first the original loader, then the Hub's Parquet conversion of
-the same dataset (refs/convert/parquet). The conversion can be partial for a dataset this size, so the drawn
-windows may differ from the authors'; the source used is recorded next to the output.
+tokenizer) with only the download redirected: the original repository first, then its Parquet conversion, then
+ll922/RedPajama-Data-1T-Sample-Backup, a Parquet mirror of it (3 GB, 930,514 rows, the original's count), loaded
+with remote code disabled. The source and its row count are recorded next to the output: with the same rows in
+the same order, the authors' seed draws the same windows. (ZengXiangyu/RedPajama-Data-1T-Sample is not used:
+902,104 rows and 108 GB, so not the same sample.)
 
 Run with the AQUA-KV environment's python:
     $AQUA_PY scripts/aqua_calibration_data.py --source $AQUA_SRC --model unsloth/Llama-3.2-3B --output cal.pt
@@ -20,6 +22,8 @@ from pathlib import Path
 import sys
 
 PAJAMA = "togethercomputer/RedPajama-Data-1T-Sample"
+MIRRORS = ("ll922/RedPajama-Data-1T-Sample-Backup",)       # Parquet copy (awslabs/ai-on-eks issue 410)
+ORIGINAL_ROWS = 930_514
 
 
 def main(argv=None):
@@ -41,15 +45,21 @@ def main(argv=None):
         if path != PAJAMA:
             return original(path, *args, **kw)
         errors = []
-        for rev in (None, "refs/convert/parquet"):
+        tries = [(path, None, {}), (path, "refs/convert/parquet", {})] + \
+            [(m, None, {"trust_remote_code": False}) for m in MIRRORS]
+        for repo, rev, extra in tries:
+            name = f"{repo}@{rev or 'main'}"
             try:
-                ds = original(path, *args, **(dict(kw, revision=rev) if rev else kw))
-                used.update(dataset=path, revision=rev or "main (loading script)", rows=len(ds))
-                print(f"RedPajama sample loaded ({used['revision']}): {len(ds)} rows", flush=True)
+                ds = original(repo, *args, **dict(kw, **extra, **({"revision": rev} if rev else {})))
+                if "text" not in ds.column_names:
+                    raise ValueError(f"no text column (columns {ds.column_names})")
+                used.update(dataset=repo, revision=rev or "main", rows=len(ds), columns=ds.column_names,
+                            same_row_count_as_original=len(ds) == ORIGINAL_ROWS)
+                print(f"RedPajama sample loaded from {name}: {len(ds)} rows", flush=True)
                 return ds
             except Exception as exc:              # report every attempt, then give up
-                errors.append(f"{rev or 'main'}: {exc!r}"[:600])
-                print(f"RedPajama sample, {rev or 'main'}: not loaded ({exc!r})"[:800], flush=True)
+                errors.append(f"{name}: {exc!r}"[:600])
+                print(f"RedPajama sample, {name}: not loaded ({exc!r})"[:800], flush=True)
         raise RuntimeError("the RedPajama sample is not accessible: " + " | ".join(errors) +
                            " (if the dataset is gated, log in on this machine with huggingface-cli login)")
     du.load_dataset = load
@@ -58,7 +68,8 @@ def main(argv=None):
     meta = dict(used, nsamples=len(data), seqlen=a.seqlen, seed=a.seed, model=a.model,
                 sampler="aquakv/datautils.py get_loaders('pajama'), unchanged")
     a.output.with_suffix(".json").write_text(json.dumps(meta, indent=1))
-    print(f"wrote {a.output}: {len(data)} samples x {a.seqlen} tokens ({meta['revision']})")
+    print(f"wrote {a.output}: {len(data)} samples x {a.seqlen} tokens ({meta['dataset']}@{meta['revision']}, "
+          f"{meta['rows']} rows)")
 
 
 if __name__ == "__main__":
