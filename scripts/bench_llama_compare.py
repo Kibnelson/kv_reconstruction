@@ -518,9 +518,14 @@ def stage_context(args, out):
     consts = fused.prepare(study, log=log)
     rc = layerwise.prepare_rank(study, consts, 256, log)
 
-    def w16(d, T=None):
-        w = torch.stack([d.words(l, device, rows=T) for l in range(study.L)])
-        return (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
+    def w16(d, T=None):                              # int16 words, filled layer by layer (no int32 copy of it all)
+        n = d.tokens if T is None else T
+        w = torch.empty(study.L, n, study.W, dtype=torch.int16, device=device)
+        for l in range(study.L):
+            x = d.words(l, device, rows=T)
+            w[l] = (x - 65536 * (x >= 32768).to(torch.int32)).to(torch.int16)
+            del x
+        return w
     from kv_compare.szcodec import SplitZipFormatCodec
     cal = [w16(d, d.tokens - d.tokens % 128) for d in study.train[:2]]
     books = SplitZipFormatCodec(consts, study.C, study.hd, rank=rc, product="acc", tokens_per_program=16, warps=1,
@@ -539,6 +544,7 @@ def stage_context(args, out):
             exans = ex.build(out / "exans", args.exans_source, args.cuda_home, log)
         except Exception as exc:
             log(f"context: ExANS not available ({exc!r})")
+    study._f.clear(); study._att.clear(); study._qmap.clear()     # the calibration features prepare() cached
     gc.collect()
     torch.cuda.empty_cache() if device.type == "cuda" else None
     from kv_compare.predict import Doc
@@ -548,7 +554,12 @@ def stage_context(args, out):
             log(f"context {key}: kept from context.json")
             continue
         docs = [Doc(out / "captures", nm) for nm in names[(n, b)]]
-        words = torch.cat([w16(d) for d in docs], 1)
+        if b == 1:
+            words = w16(docs[0])
+        else:
+            words = torch.empty(study.L, n * b, study.W, dtype=torch.int16, device=device)
+            for i, d in enumerate(docs):
+                words[:, i * n:(i + 1) * n] = w16(d)
         positions = torch.arange(n, device=device).repeat(b)
         log(f"context {key}: {b} request(s) of {n} tokens, {words.numel() / 1e6:.1f}M values")
         rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans,
