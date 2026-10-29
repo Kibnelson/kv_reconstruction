@@ -137,7 +137,28 @@ once, then score its continuation. AQUA-KV's protocol is stricter, because every
 that is compressed while it grows. It is also the one with published Llama-3.2-3B numbers, so it becomes the
 main lossy comparison.
 
-## What is next, in order of expected gain
+## Focus from 29 October: lossless, for prefill/decode disaggregation on ordinary machines
+
+Lossless is where we lead. The baselines' papers measure datacenter fabrics on H100/H200: SplitZip uses RDMA at
+up to 800 Gb/s, and ExANS argues from 400 Gb/s. No one has measured the ordinary case: GPUs in one machine over
+PCIe, or machines over 10-100 GbE. The order of work:
+
+1. **Context sweep** (stage `context`): every lossless method from 512 to 16K tokens per request (32K and more on
+   a 24 GB GPU), and 16 requests coded together at short lengths, as SplitZip sweeps them. For each: bits, encode,
+   decode, and transfer time per link.
+2. **(T) A compact KV transfer format, and a real PD transfer** on a 4x RTX A5000 machine.
+   - The format: a header (model, predictor version, mode, layers, token range, per-layer offsets, checksum),
+     then per-layer streams, so the receiver can decode layer l while layer l+1 arrives.
+   - The transfer: prefill on GPU 0, send over PCIe (peer-to-peer and through CPU memory), decode on GPU 1,
+     generate. Time to first token for raw, SplitZip, ExANS and ours.
+   - First, `scripts/pd_link_probe.py` measures the links between the GPUs.
+3. **(P) A GPU-resident pool:** compressed prefixes in a fixed GPU memory budget, evicted least-recently-used.
+   A workload of shared prefixes gives hit rates and time to first token against a raw pool and a SplitZip pool.
+4. **Lossless speed** (200-400 Gb/s) and the GPU decoder for the 7.87-bit predictor.
+
+Lossy development pauses: the queued runs finish, but nothing new is built.
+
+## What is next, in order of expected gain (before 29 October)
 
 0. **Finish the baselines' own evaluations.** Done (`61d6db1`): AQUA-KV's perplexity protocol for every method.
    Our harness gives the authors' exact perplexity to five digits (6.9865; paper 6.98). SplitZip's own benchmark

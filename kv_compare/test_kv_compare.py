@@ -527,6 +527,45 @@ class LossyGpuTests(unittest.TestCase):
         self.assertEqual(r.stdout.count("ok"), 8, r.stdout)
 
 
+CONTEXT_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
+from kv_compare import layerwise, context_sweep as cs, mixed
+from kv_compare.szcodec import SplitZipFormatCodec
+rc = layerwise.prepare_rank(study, consts, 32, log=lambda m: None)
+def w16(d):
+    w = torch.stack([d.words(l, "cpu") for l in range(L)])
+    return (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
+books = SplitZipFormatCodec(consts, study.C, study.hd, rank=rc, product="acc", tokens_per_program=16, warps=1,
+                            rank_tiles=(16, 16, 32, 4), layout="row", chunks=2).calibrate([w16(d) for d in study.train[:2]])
+sz = mixed.TorchSplitZipStyle("cpu")
+sz.calibrate(w16(study.train[0]).view(torch.bfloat16))
+# two requests of 64 tokens coded together, positions restarting at 0 (the second request is train1's KV)
+words2 = torch.cat([w16(study.tests[0]), w16(study.train[1])], 1)
+pos = torch.arange(64).repeat(2)
+rows = cs.measure_case(study, consts, rc, words2, pos, torch.device("cpu"), log=lambda m: None, books=books, sz=sz,
+                       reps=1)
+for r in rows:
+    assert "error" not in r, r
+    assert r["bit_exact"], r
+    print("ok", r["method"], r["bits"])
+assert len(rows) == 4
+assert cs.link_ms(8.0, 1e9, 5.0, 8) == 1000.0 and cs.link_ms(8.0, 1e6, 5.0, 8) == 5.0
+"""
+
+
+class ContextSweepTests(unittest.TestCase):
+    def test_batched_requests_round_trip_interpreted(self):
+        """The context sweep's cases: two requests coded as one stream with positions restarting at 0, every
+        method (our per-layer codec dense and rank-reduced, our SplitZip format, a SplitZip stand-in) bit-exact."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None or torch is None:
+            self.skipTest("Triton and PyTorch are required")
+        r = subprocess.run([sys.executable, "-c", CONTEXT_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=3600)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertEqual(r.stdout.count("ok"), 4, r.stdout)
+
+
 class StreamingProtocolTests(unittest.TestCase):
     def test_streaming_cache_follows_aquakv_buffering(self):
         """AQUA-KV's perplexity protocol harness: compressing with the identity changes nothing; blocks start after

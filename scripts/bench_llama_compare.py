@@ -93,7 +93,7 @@ def memory_note(device=None):
 
 
 STAGES = ("capture", "evalcap", "lossless", "lossy", "frontier", "gpu_speed", "pool", "format", "szcodec", "exans",
-          "transform", "allocate", "aquappl", "szprotocol", "report")
+          "transform", "allocate", "aquappl", "szprotocol", "context", "report")
 BRANCH = "llama32-3b-lossy-lossless-compare"
 
 
@@ -452,6 +452,178 @@ def transform_lines(out):
               f"head, {t['klt_half_high_rate_gain']:.3f} per layer half. These are squared-error estimates: our "
               "error-shaping results show that the error that costs bits least is not always the error the model "
               "minds least.", ""]
+    return lines
+
+
+CONTEXT_LINKS = (1, 10, 25, 100, 200, 400)
+
+
+def stage_context(args, out):
+    """Lossless codecs across context lengths (--context-lengths, batch 1) and batch sizes (--context-batch
+    requests coded together for lengths up to --context-batch-max), as SplitZip's paper sweeps them: the KV of
+    consecutive WikiText-2 test text (each request starts with BOS), every method a real stream decoded bit-exact
+    and timed (kv_compare.context_sweep), plus our exact costs per length. Results in context.json, kept per case
+    (rerun with --aqua-rerun context)."""
+    import gc
+    import torch
+    from kv_compare import context_sweep as cs
+    from kv_compare import fused, layerwise
+    from kv_compare.capture import capture_ids, load_model
+    from kv_compare.predict import CONFIGS, Study
+    if args.eval_text is None or not Path(args.eval_text).is_file():
+        raise SystemExit("context needs --eval-text (the WikiText-2 raw test split joined with blank lines)")
+    device = torch.device(args.device)
+    path = out / "context.json"
+    res = json.loads(path.read_text()) if path.is_file() and "context" not in args.aqua_rerun else {}
+    res.setdefault("cases", {})
+    cases = [(n, 1) for n in args.context_lengths] + \
+        [(n, args.context_batch) for n in args.context_lengths if n <= args.context_batch_max and args.context_batch > 1]
+    names = {}
+    for n, b in cases:
+        names[(n, b)] = [f"ctx{n}_r{i}" for i in range(b)]
+    need = sorted({nm for v in names.values() for nm in v if not (out / "captures" / f"{nm}_K_bits.npy").is_file()})
+    if need:
+        tokenizer, model = load_model(args.model, args.revision, device)
+        ids = tokenizer(Path(args.eval_text).read_text(encoding="utf-8"), add_special_tokens=False)["input_ids"]
+        bos = tokenizer.bos_token_id
+        for nm in need:
+            n, i = int(nm[3:].split("_r")[0]), int(nm.split("_r")[1])
+            step = n - 1
+            if (i + 1) * step > len(ids):
+                raise SystemExit(f"{args.eval_text} has {len(ids)} tokens; {(i + 1) * step} needed for {nm}")
+            capture_ids(model, [bos] + ids[i * step:(i + 1) * step], out / "captures", nm, device)
+            log(f"context: captured {nm} ({n} tokens)")
+        del model
+        gc.collect()
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+    single = [names[(n, 1)][0] for n in args.context_lengths]
+    study = Study(out / "captures", args.device, TRAIN, "tables", single, None, log=log)
+    if "exact_costs" not in res:
+        res["exact_costs"] = {}
+        for cfg_name in ("prev", "fast"):
+            cfg = CONFIGS[cfg_name]
+            if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
+                cfg = CONFIGS["fast_noatt"]
+            per, _ = study.lossless(cfg)
+            res["exact_costs"][LABELS_EXACT[cfg_name]] = {
+                nm: float(v.mean()) for nm, v in per.items()}
+            study._f.clear(); study._att.clear(); study._qmap.clear()
+            path.write_text(json.dumps(res, indent=1))
+            log(f"context: exact costs of {cfg.name} done")
+    consts = fused.prepare(study, log=log)
+    rc = layerwise.prepare_rank(study, consts, 256, log)
+
+    def w16(d, T=None):
+        w = torch.stack([d.words(l, device, rows=T) for l in range(study.L)])
+        return (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
+    from kv_compare.szcodec import SplitZipFormatCodec
+    cal = [w16(d, d.tokens - d.tokens % 128) for d in study.train[:2]]
+    books = SplitZipFormatCodec(consts, study.C, study.hd, rank=rc, product="acc", tokens_per_program=16, warps=1,
+                                rank_tiles=(128, 128, 64, 4), layout="row", chunks=2).calibrate(cal)
+    del cal
+    sz = exans = None
+    if device.type == "cuda":
+        try:
+            from kv_compare.mixed import load_splitzip
+            sz, _ = load_splitzip(args.splitzip_source or (out / "splitzip"), device, log)
+            sz.calibrate(w16(study.train[0]).view(torch.bfloat16))
+        except Exception as exc:
+            log(f"context: SplitZip not available ({exc!r})")
+        try:
+            from kv_compare import exans_official as ex
+            exans = ex.build(out / "exans", args.exans_source, args.cuda_home, log)
+        except Exception as exc:
+            log(f"context: ExANS not available ({exc!r})")
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    from kv_compare.predict import Doc
+    for n, b in cases:
+        key = f"{n}x{b}"
+        if key in res["cases"]:
+            log(f"context {key}: kept from context.json")
+            continue
+        docs = [Doc(out / "captures", nm) for nm in names[(n, b)]]
+        words = torch.cat([w16(d) for d in docs], 1)
+        positions = torch.arange(n, device=device).repeat(b)
+        log(f"context {key}: {b} request(s) of {n} tokens, {words.numel() / 1e6:.1f}M values")
+        rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans)
+        res["cases"][key] = {"tokens": n, "batch": b, "values": words.numel(), "rows": rows}
+        path.write_text(json.dumps(res, indent=1))
+        del words, docs
+        gc.collect()
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+    res["links_gbps"] = list(CONTEXT_LINKS)
+    path.write_text(json.dumps(res, indent=1))
+    del study, consts, rc, books
+    gc.collect()
+    return res
+
+
+LABELS_EXACT = {"prev": "ours, one-step predictor (exact cost)", "fast": "ours, strong predictor (exact cost)"}
+
+
+def context_lines(out):
+    from kv_compare.context_sweep import link_ms
+    r = json.loads((out / "context.json").read_text())
+    cases = r.get("cases", {})
+    if not cases:
+        return []
+    methods = []
+    for c in cases.values():
+        for row in c["rows"]:
+            if row["method"] not in methods:
+                methods.append(row["method"])
+    keys = sorted(cases, key=lambda k: (cases[k]["batch"], cases[k]["tokens"]))
+    head = [f"{cases[k]['tokens']:,}" + (f" x{cases[k]['batch']}" if cases[k]["batch"] > 1 else "") for k in keys]
+    lines = ["## Lossless across context lengths and batch sizes", "",
+             "The KV of consecutive WikiText-2 test text, each request starting with BOS; a batch is coded as one "
+             "stream (kv_compare/context_sweep.py). Every entry is a real stream decoded bit-exact on this GPU "
+             "(an entry that is not exact is marked). Columns: tokens per request, x requests.", "",
+             "**Bits per value**", "", "| Method | " + " | ".join(head) + " |", "| --- |" + " --- |" * len(keys)]
+    ex = r.get("exact_costs", {})
+    for label, per in ex.items():
+        cells = []
+        for k in keys:
+            c = cases[k]
+            v = per.get(f"ctx{c['tokens']}_r0") if c["batch"] == 1 else None
+            cells.append(f"{v:.3f}" if v is not None else "-")
+        lines.append(f"| {label} | " + " | ".join(cells) + " |")
+
+    def cell(k, m, f):
+        row = next((x for x in cases[k]["rows"] if x["method"] == m), None)
+        if row is None or "error" in row:
+            return "-" if row is None else "not measured"
+        return f(row) + ("" if row.get("bit_exact") else " (NOT exact)")
+    for m in methods:
+        lines.append(f"| {m} | " + " | ".join(cell(k, m, lambda x: f"{x['bits']:.3f}") for k in keys) + " |")
+    lines += ["", "**Decode time** (encode in brackets)", "", "| Method | " + " | ".join(head) + " |",
+              "| --- |" + " --- |" * len(keys)]
+    for m in methods:
+        lines.append(f"| {m} | " + " | ".join(
+            cell(k, m, lambda x: f"{x['decode_ms']:.2f} ms ({x['encode_ms']:.0f})") for k in keys) + " |")
+    lines += ["", "**Transfer time per link** (ideal link, decoding overlapped with arrival: the longer of the wire "
+              "time and the decode). Ours = our fastest exact mode at that link; the speed-up is against SplitZip.", ""]
+    for g in r.get("links_gbps", CONTEXT_LINKS):
+        lines += [f"*{g} Gb/s*", "", "| | " + " | ".join(head) + " |", "| --- |" + " --- |" * len(keys)]
+        raw, szr, exr, ours = [], [], [], []
+        for k in keys:
+            c = cases[k]
+            n = c["values"]
+            raw.append(f"{16 * n / (g * 1e9) * 1e3:.1f} ms")
+            ok = [x for x in c["rows"] if x.get("bit_exact") and "error" not in x]
+            t = {x["method"]: link_ms(x["bits"], n, x["decode_ms"], g) for x in ok}
+            s = t.get("SplitZip (authors' codec)")
+            e = t.get("ExANS (authors' codec)")
+            o = [(v, m) for m, v in t.items() if m.startswith("ours")]
+            szr.append("-" if s is None else f"{s:.1f} ms")
+            exr.append("-" if e is None else f"{e:.1f} ms")
+            if o:
+                v, m = min(o)
+                ours.append(f"{v:.1f} ms" + (f" ({s / v:.2f}x)" if s else "") + f", {m.split(', ', 1)[1]}")
+            else:
+                ours.append("-")
+        lines += ["| raw BF16 | " + " | ".join(raw) + " |", "| SplitZip | " + " | ".join(szr) + " |",
+                  "| ExANS | " + " | ".join(exr) + " |", "| ours | " + " | ".join(ours) + " |", ""]
     return lines
 
 
@@ -1994,6 +2166,8 @@ def stage_report(args, out):
         lines += allocation_lines(out)
     if (out / "transform_gain.json").is_file():
         lines += [""] + transform_lines(out)
+    if (out / "context.json").is_file():
+        lines += [""] + context_lines(out)
     lines += szprotocol_lines(out)
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
@@ -2070,6 +2244,10 @@ def parser():
                    help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, "
                         "ours<step>[t][f|h|u|w|a][_r[lam]][c]; "
                         "<method>:k or :v compresses one half only)")
+    p.add_argument("--context-lengths", default="512,1024,2048,4096,8192,16384",
+                   help="context: tokens per request (batch 1); 32768 and more need more GPU memory than 20 GB")
+    p.add_argument("--context-batch", type=int, default=16, help="context: requests coded together for short ones")
+    p.add_argument("--context-batch-max", type=int, default=2048, help="context: the longest request batched")
     p.add_argument("--alloc-kappa", type=float, default=2.0, help="allocate: the base step")
     p.add_argument("--alloc-band", type=int, default=4, help="allocate: layers per group (keys and values apart)")
     p.add_argument("--alloc-moves", default="0.5,2", help="allocate: step multipliers tried on each group")
@@ -2152,6 +2330,9 @@ def main(argv=None):
     args.aqua_methods = [m for m in args.aqua_methods.split(",") if m]
     args.aqua_rerun = [m for m in args.aqua_rerun.split(",") if m]
     args.alloc_moves = [float(m) for m in args.alloc_moves.split(",") if m]
+    args.context_lengths = [int(n) for n in args.context_lengths.split(",") if n]
+    if any(n % 128 for n in args.context_lengths):
+        raise SystemExit("--context-lengths: multiples of 128 tokens")
     args.sz_protocol_configs = [c for c in args.sz_protocol_configs.split(",") if c]
     if any(d not in ("test", "eval") for d in args.lossy_docs):
         raise SystemExit("--lossy-docs takes test, eval or test,eval")
@@ -2237,6 +2418,8 @@ def main(argv=None):
             stage_aquappl(args, out)
         if "szprotocol" in stages:
             stage_szprotocol(args, out)
+        if "context" in stages:
+            stage_context(args, out)
         if "report" in stages:
             stage_report(args, out)
     except BaseException as exc:

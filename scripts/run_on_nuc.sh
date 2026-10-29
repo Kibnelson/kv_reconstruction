@@ -84,7 +84,8 @@ if [ "${CHECKS:-0}" = 1 ]; then
 fi
 # stage evalcap: the WikiText-2 raw test split as one text file (joined with blank lines, as AQUA-KV's evaluation
 # reads it), made once with the AQUA-KV environment's datasets library (or this one's, if it has it).
-if [[ ",$STAGES," == *",evalcap,"* || ",$STAGES," == *",aquappl,"* || ",$STAGES," == *",szprotocol,"* ]]; then
+if [[ ",$STAGES," == *",evalcap,"* || ",$STAGES," == *",aquappl,"* || ",$STAGES," == *",szprotocol,"* \
+      || ",$STAGES," == *",context,"* ]]; then
     WT=$RUN/wikitext2_test.txt
     if [ ! -s "$WT" ] || [ ! -s "$RUN/wikitext2_test_rows.json" ]; then
         PY=python
