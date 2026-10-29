@@ -171,6 +171,9 @@ def aqua_method(name, study, fits, consts):
     """A method of the AQUA-KV-protocol stage by name: exact, higgs<b>, aqua<b>, kivi<b>g<group>,
     ours<step>[t] (t: per-token step)."""
     from kv_compare import streaming as sm
+    if ":" in name:                                  # diagnostic: <method>:k or <method>:v (one half compressed)
+        base, half = name.split(":")
+        return sm.HalfOnly(aqua_method(base, study, fits, consts), half)
     if name == "exact":
         return None
     if name.startswith("higgs"):
@@ -336,6 +339,9 @@ def aqua_protocol_lines(out):
     names = {"exact": "exact BF16 cache", "higgs2": "HIGGS 2-bit, no predictor (gs1024)"}
 
     def label(k):
+        if ":" in k:
+            base, half = k.split(":")
+            return f"{label(base)}, {'keys' if half == 'k' else 'values'} only (diagnostic)"
         if k in names:
             return names[k]
         if k.startswith("aqua"):

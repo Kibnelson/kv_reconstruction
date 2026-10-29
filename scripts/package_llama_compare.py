@@ -31,6 +31,8 @@ FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.js
          "aqua_protocol.json": "aqua_protocol.json", "aqua_official.json": "aqua_official.json",
          "szprotocol.json": "szprotocol.json", "splitzip_protocol_official.json": "splitzip_protocol_official.json",
          "splitzip_protocol_official.log": "splitzip_protocol_official.log",
+         "aqua_official/calibration.log": "aqua_official_calibration.log",
+         "aqua_official/redpajama_calibration.json": "aqua_official_calibration.json",
          "aqua_official/no_quant.log": "aqua_official_no_quant.log", "aqua_official/train_2bit.log":
          "aqua_official_train_2bit.log", "aqua_official/ppl_2bit.log": "aqua_official_ppl_2bit.log",
          "captures/meta.json": "capture_meta.json"}

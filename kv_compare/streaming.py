@@ -257,3 +257,25 @@ class OursGpu:
         bits = float(codec.bits(starts, m))
         out = rec.view(torch.bfloat16).to(torch.float32).to(X.device)
         return out, bits
+
+
+class HalfOnly:
+    """Diagnostic: another compressor applied to the keys only ("k") or the values only ("v"); the other half
+    goes back exact. Which half costs the perplexity. Bits: the wrapped compressor's, for its half only
+    (half of its bits, as both halves are coded alike)."""
+
+    def __init__(self, comp, which):
+        if which not in ("k", "v"):
+            raise ValueError("which is 'k' or 'v'")
+        self.comp, self.which = comp, which
+        self.granule = comp.granule
+
+    def __call__(self, start, X):
+        rec, bits = self.comp(start, X)
+        C = X.shape[2] // 2
+        out = X.clone()
+        if self.which == "k":
+            out[:, :, :C] = rec[:, :, :C]
+        else:
+            out[:, :, C:] = rec[:, :, C:]
+        return out, bits / 2
