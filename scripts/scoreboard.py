@@ -186,7 +186,7 @@ def build(run):
             return 100 * (r["perplexity_f32"] / ex["perplexity_f32"] - 1), 100 * se
         rows = {k: dict(bits=r.get("bits_per_compressed_value", 16.0), ppl=r["perplexity"],
                         ppl_f32=r["perplexity_f32"], change_pct=change(r)[0], se=change(r)[1])
-                for k, r in ms.items() if k != "exact"}
+                for k, r in ms.items() if k != "exact" and ":" not in k}   # not the one-half diagnostics
         seqlen = ap.get("protocol", "seqlen 8192,").split("seqlen ")[-1].split(",")[0]
         cm = _load(run, "captures/meta.json") or _load(run, "capture_meta.json") or {}
         nval = int(seqlen) * cm.get("layers", 0) * 2 * cm.get("kv_heads", 0) * cm.get("head_dim", 0)
