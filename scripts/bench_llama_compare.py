@@ -658,7 +658,8 @@ def groupspeed_lines(out, name):
              ("" if cal == "code" else f" ({cal} calibration)"), "",
              "Real streams of the WikiText-2 windows, decoded bit-exact (bits per value in brackets). Groups 1 is the "
              "one-step predictor. More chunks decode side by side on CUDA streams; smaller token blocks give more "
-             "programs per head group but more stream states (32 / (layers x block) bits per value).", "",
+             "programs per head group but more stream states (32 / (layers x block) bits per value). Graph: the whole "
+             "decode captured once as a CUDA graph and replayed, so no kernel is launched from Python.", "",
              "| Groups | Tokens x chunks | " + " | ".join(f"{int(n):,} tokens" for n in lens) + " |",
              "| --- | --- |" + " --- |" * len(lens)]
     keys = []
@@ -676,7 +677,10 @@ def groupspeed_lines(out, name):
             elif "error" in row:
                 cells.append("not measured")
             else:
-                cells.append(f"{row['decode_ms']:.1f} ms ({row['bits']:.3f})" + ("" if row["bit_exact"] else " NOT exact"))
+                gr = (f" / graph {row['decode_ms_graph']:.1f} ms" + ("" if row.get("bit_exact_graph") else " NOT exact")
+                      if "decode_ms_graph" in row else "")
+                cells.append(f"{row['decode_ms']:.1f} ms{gr} ({row['bits']:.3f})" +
+                             ("" if row["bit_exact"] else " NOT exact"))
         lines.append(f"| {g} | {TB} x {ch} | " + " | ".join(cells) + " |")
     return lines + [""]
 
@@ -2451,7 +2455,7 @@ def parser():
                    help="context: head groups of our grouped predictor to measure (kv_compare.grouped; empty: none)")
     p.add_argument("--groupspeed-lengths", default="512,2048,8192",
                    help="groupspeed: context lengths (captured by the context stage)")
-    p.add_argument("--groupspeed-configs", default="32x2,32x4,32x8,16x4,16x8,8x8,8x16",
+    p.add_argument("--groupspeed-configs", default="32x1,32x2,32x4,16x2,16x4,8x4",
                    help="groupspeed: tokens per program x token chunks")
     p.add_argument("--context-stream-tokens", type=int, default=8192,
                    help="context: tokens per stream of our codecs (a longer case is several streams)")

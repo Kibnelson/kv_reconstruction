@@ -168,7 +168,28 @@ def link_ms(bits, values, decode_ms, gbps):
     return max(wire, decode_ms)
 
 
-def group_config_rows(study, consts, grouped, words, positions, device, configs, log=print, reps=5):
+def graph_decode_ms(codec, buf, starts, T, dec, bufs, words, device, reps=5):
+    """The whole decode captured once as a CUDA graph and replayed (no per-kernel launch cost from Python):
+    (exact after replay, median milliseconds)."""
+    g = torch.cuda.CUDAGraph()
+    cur = torch.cuda.current_stream(device)
+    side = torch.cuda.Stream(device)
+    side.wait_stream(cur)
+    with torch.cuda.stream(side):                    # warm-up outside the capture
+        codec.decode(buf, starts, T, out=dec, bufs=bufs)
+    cur.wait_stream(side)
+    with torch.cuda.graph(g):
+        codec.decode(buf, starts, T, out=dec, bufs=bufs)
+    dec.zero_()
+    g.replay()
+    torch.cuda.synchronize(device)
+    ok = bool(torch.equal(dec, words))
+    td = _timer(g.replay, device, warmup=2, reps=reps)
+    del g
+    return ok, 1e3 * td
+
+
+def group_config_rows(study, consts, grouped, words, positions, device, configs, log=print, reps=5, graph=True):
     """Our per-layer codec with the one-step predictor (groups 1) and each head-group predictor, for every
     (tokens per program, token chunks) in configs: bits and decode time of a real stream, decoded bit-exact. Many
     chunks decode on separate CUDA streams side by side, which keeps the GPU busy while a head group waits for
@@ -200,8 +221,16 @@ def group_config_rows(study, consts, grouped, words, positions, device, configs,
                 td = _timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs), device,
                             warmup=2 if gpu else 0, reps=reps if gpu else 1)
                 row.update(bit_exact=ok, bits=codec.bits(starts, T) / n, decode_ms=1e3 * td)
+                if graph and gpu:
+                    try:
+                        okg, tg = graph_decode_ms(codec, buf, starts, T, dec, bufs, words, device, reps)
+                        row.update(bit_exact_graph=okg, decode_ms_graph=tg)
+                    except Exception as exc:         # a capture the driver refuses: keep the plain timing
+                        row["graph_error"] = repr(exc)[:300]
+                        log(f"    groups {g}, {TB}x{ch}: CUDA graph not measured ({row['graph_error']})")
                 log(f"    groups {g}, {TB} tokens per program, {ch} chunks: exact={ok}, {row['bits']:.3f} bits/value, "
-                    f"decode {1e3 * td:.2f} ms")
+                    f"decode {1e3 * td:.2f} ms" + (f", as a CUDA graph {row['decode_ms_graph']:.2f} ms "
+                                                   f"(exact={row['bit_exact_graph']})" if "decode_ms_graph" in row else ""))
                 del codec, xall, prior, buf, starts, bufs, dec
             except Exception as exc:
                 row["error"] = repr(exc)[:300]
