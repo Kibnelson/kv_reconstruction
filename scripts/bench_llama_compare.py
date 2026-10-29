@@ -2525,6 +2525,8 @@ def main(argv=None):
             stage_capture(args, out)
         if "evalcap" in stages:
             stage_evalcap(args, out)
+        if "calcap" in stages:                       # before every stage that may calibrate on its documents
+            stage_calcap(args, out)
         if "lossless" in stages:
             stage_lossless(args, out)
         if "lossy" in stages:
@@ -2547,8 +2549,6 @@ def main(argv=None):
             stage_allocate(args, out)
         if "aquappl" in stages:
             stage_aquappl(args, out)
-        if "calcap" in stages:
-            stage_calcap(args, out)
         if "szprotocol" in stages:
             stage_szprotocol(args, out)
         if "context" in stages:
