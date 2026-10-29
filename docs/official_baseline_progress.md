@@ -35,12 +35,19 @@ exclude deployment framing/shared calibration. The old `810b516` test instead
 uses structured PEP/CPython KV and framed restore calls. Their latencies must not
 share a speed ranking. An identical structured-KV comparison is still required.
 
-## ExANS: released correctness test is next
+## ExANS: released correctness test completed
+
+Report commit: `7e65a98`. Report directory:
+`benchmark_results/exans_official_preflight_a4500_20261028_213554_2171122/`.
+All eleven packaged artifact digests match, the eight checked source files
+stayed unchanged and all seven commands succeeded. The fresh native test passed
+exact round-trip and overflow checks. GPU performance remains unmeasured by
+this test; it supplies no replacement for the prior matched-adapter latency.
 
 The public release has an author synthetic round-trip/overflow test, not an
 identified real-KV performance harness that reproduces the research post.
-Run the unchanged test from source pin
-`de6c38bcc5438475bd1abf1e9b3d154cef414ef6`:
+The completed run used the unchanged test from source pin
+`de6c38bcc5438475bd1abf1e9b3d154cef414ef6`. Its reproducible command is:
 
 ```bash
 cd ~/kv_reconstruction
@@ -74,11 +81,13 @@ serving geometry and research-post performance reproduction remain unverified.
 
 | Track | State |
 |---|---|
-| Lossless T | SplitZip native completed; ExANS released correctness next; identical structured KV and consistent packet/timing comparison pending |
+| Lossless T | SplitZip native and ExANS released correctness completed; frozen identical-KV full encode/decode timing is next |
 | Lossy quality/T | Official AQUA calibration provenance and complete matching predictors unresolved; our full-protocol quality integration pending |
 | Resident P | Earlier P1 pack/unpack exists; Llama compressed attention and T-to-P conversion remain unmeasured |
 
-Preserve `810b516` as the previous matched-input transfer reference. Do not change
-codec/predictor kernels while completing this baseline audit. See
+Preserve `810b516` as the previous matched-input transfer reference. The next
+[frozen transfer run](frozen_transfer_evaluation.md) reuses its exact words,
+state and codec implementations, with both common author-style batch timing and
+isolated-call latency. Do not change codec/predictor kernels during this audit. See
 [the protocol/T/P plan](nuc_baseline_reproduction_plan.md) for evaluation scopes
 and [the SplitZip runner notes](splitzip_official_native_nuc.md) for its defaults.
