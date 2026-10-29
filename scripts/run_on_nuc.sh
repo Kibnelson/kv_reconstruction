@@ -177,5 +177,14 @@ NAME=llama32_3b_compare_a4500_$(date +%Y%m%d_%H%M)
 python scripts/package_llama_compare.py "$RUN" --destination "benchmark_results/$NAME"
 git add "benchmark_results/$NAME"
 git commit -m "Add Llama-3.2-3B results ($NAME, stages $STAGES)"
+# code may have been pushed to the branch during the run: the results commit only adds its own folder, so put it
+# on top of the branch before pushing (stops, leaving everything committed locally, if that does not apply cleanly)
+git fetch -q origin "$BRANCH"
+if ! git rebase -q "origin/$BRANCH"; then
+    git rebase --abort
+    echo "STOP: the results are committed locally but could not be put on top of origin/$BRANCH; run"
+    echo "      git pull --rebase origin $BRANCH && git push origin HEAD:$BRANCH"
+    exit 1
+fi
 git push origin "HEAD:$BRANCH"
 echo "pushed benchmark_results/$NAME to $BRANCH"
