@@ -1,0 +1,27 @@
+/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/aquakv/edenn.py:35: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  GRIDS[dim][size] = torch.load(file, map_location='cpu')
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 13.49it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 13.47it/s]
+Loading red_pajama from togethercomputer/RedPajama-Data-1T-Sample
+Traceback (most recent call last):
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/train_predictors.py", line 356, in <module>
+    main()
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/train_predictors.py", line 231, in main
+    data = datautils.get_loaders(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/aquakv/datautils.py", line 237, in get_loaders
+    data = get_red_pajama(nsamples, seqlen, tokenizer, eval_mode=eval_mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/sources/aqua/aquakv/datautils.py", line 29, in get_red_pajama
+    traindata = load_dataset("togethercomputer/RedPajama-Data-1T-Sample", split="train")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/datasets/load.py", line 2594, in load_dataset
+    builder_instance = load_dataset_builder(
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/datasets/load.py", line 2266, in load_dataset_builder
+    dataset_module = dataset_module_factory(
+                     ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/datasets/load.py", line 1908, in dataset_module_factory
+    raise e1 from None
+  File "/home/nelson/kv_reconstruction/runs/_llama_official/envs/aqua/lib/python3.12/site-packages/datasets/load.py", line 1858, in dataset_module_factory
+    raise DatasetNotFoundError(f"Dataset '{path}' doesn't exist on the Hub or cannot be accessed.") from e
+datasets.exceptions.DatasetNotFoundError: Dataset 'togethercomputer/RedPajama-Data-1T-Sample' doesn't exist on the Hub or cannot be accessed.
