@@ -81,13 +81,18 @@ serving geometry and research-post performance reproduction remain unverified.
 
 | Track | State |
 |---|---|
-| Lossless T | SplitZip native and ExANS released correctness completed; frozen identical-KV full encode/decode timing is next |
-| Lossy quality/T | Official AQUA calibration provenance and complete matching predictors unresolved; our full-protocol quality integration pending |
+| Lossless T | SplitZip native, ExANS released correctness and frozen identical-KV full encode/decode timing completed (`d0972c3`) |
+| Lossy quality/T | The milestone branch adds a 35-window adapted quality harness; official AQUA calibration/predictors and received-stream/physical-byte integration remain unresolved at the reviewed commit |
 | Resident P | Earlier P1 pack/unpack exists; Llama compressed attention and T-to-P conversion remain unmeasured |
 
-Preserve `810b516` as the previous matched-input transfer reference. The next
+Preserve `810b516` as the previous matched-input transfer reference. The completed
 [frozen transfer run](frozen_transfer_evaluation.md) reuses its exact words,
 state and codec implementations, with both common author-style batch timing and
 isolated-call latency. Do not change codec/predictor kernels during this audit. See
 [the protocol/T/P plan](nuc_baseline_reproduction_plan.md) for evaluation scopes
 and [the SplitZip runner notes](splitzip_official_native_nuc.md) for its defaults.
+
+The [29 October milestone comparison](milestone_comparison_2026-10-29.md)
+compares the other branch's `8a40dd9` report with `d0972c3`. It records the common
+codec foundation, transfer-model differences, native versus complete-byte
+accounting, lossy evaluation qualifications and work worth bringing into T/P.
