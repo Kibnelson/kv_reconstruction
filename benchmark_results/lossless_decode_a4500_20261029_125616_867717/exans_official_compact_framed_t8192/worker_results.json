@@ -1,0 +1,525 @@
+{
+  "author_timing": {
+    "ast_sha256": "092b2485c9d06b4091488736ae6c50ef84b60fe3c31d924c7e09fd17e08d2729",
+    "extracted_definitions": [
+      "synchronize",
+      "bench"
+    ],
+    "scope": "Only author synchronize/bench definitions; not a full author workload or serving reproduction.",
+    "source": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip/bench_codec_throughput.py",
+    "source_sha256": "7f1936a13ee3b2bbb04a35b71ca14a88bc407fe9b67e2c128d2ec48df2d018e2",
+    "unchanged_ast": true
+  },
+  "cold_state_initialization_wall_ms": 2.51174159348011,
+  "device": "NVIDIA RTX A4500",
+  "gpu_measured": true,
+  "graph_capture_count": 0,
+  "memory_scope": "Isolated timed() samples Torch baseline and incremental peaks including output/scratch; native allocations outside Torch remain unmeasured",
+  "packet_immutability": [
+    {
+      "bytes": 638416316,
+      "id": "team_rank256_uniform_test_text_t8192",
+      "sha256": "508da3eb4e04e08ea35a2b300f2cee3155a4b2d2d7209b6f6fa386248ead4f66",
+      "unchanged": true
+    },
+    {
+      "bytes": 639020312,
+      "id": "team_rank256_uniform_test_code_t8192",
+      "sha256": "fae94a4b29fb87bd640ebbe5ceef1b969e7551f35ecda4b5aede08972b137fa7",
+      "unchanged": true
+    }
+  ],
+  "raw_packet_immutability": [
+    {
+      "bytes": 939524416,
+      "id": "raw_bf16_k0_test_text_t8192",
+      "sha256": "c5d027b5cd14e9070fa7d7113c4139933d5161f405cdce92d0c3d1f124035217",
+      "unchanged": true
+    },
+    {
+      "bytes": 939524416,
+      "id": "raw_bf16_k0_test_code_t8192",
+      "sha256": "4095cb03de33ef3c1a2d3b2e6b39951e8348e76edd40c4f2a63d1c69285f8c97",
+      "unchanged": true
+    }
+  ],
+  "receiver_sha256": "fba165602e7297a64a19856b65a6b59d0604a89afc17cd9da4a668d822910227",
+  "rows": [
+    {
+      "accounting": {
+        "block_directory_bytes": 3764,
+        "charged_payload_field_bytes": 638415566,
+        "charged_raw_fallback_bytes": 0,
+        "fitting_blocks": 941,
+        "fixed_records_for_fitting_blocks": 724615168,
+        "framing_and_alignment_bytes": 750,
+        "input_padding_bytes": 933888,
+        "native_allocation_peaks": "unmeasured",
+        "native_record_arena_bytes_at_capacity": 724615168,
+        "native_record_arena_bytes_at_request_size": 724615168,
+        "native_used_record_bytes": 638408034,
+        "packet_bytes": 638416316,
+        "padded_bf16_output_bytes": 940457984,
+        "raw_block_bytes": 999424,
+        "raw_fallback_blocks": 0,
+        "record_bytes": 770048,
+        "record_directory_bytes": 3768,
+        "scope": "Complete compact carrier with actual native prefixes, directories, framing and raw fallback; native fixed-slot arena and BF16 output are additional."
+      },
+      "decode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 41.13873765023445,
+            "mean": 41.09124490052343,
+            "min": 41.04628792525257,
+            "std": 0.03334440591156681
+          },
+          "raw_gbs_samples": [
+            41.04628792525257,
+            41.13873765023445,
+            41.07982540198846,
+            41.09503811086265,
+            41.096335414279
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.02288938034325838,
+            0.02283794179558754,
+            0.022870693504810333,
+            0.022862227149307728,
+            0.022861505448818206
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.02288938034325838,
+            "mean": 0.022864349648356437,
+            "min": 0.02283794179558754,
+            "std": 1.855228667220424e-05
+          },
+          "wall_mean_ms": 22.864349648356438,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 23.09382438659668,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5123062272,
+              "wall_ms": 23.099904879927635
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 23.202016830444336,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5123062272,
+              "wall_ms": 23.20805750787258
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 23.184127807617188,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5123062272,
+              "wall_ms": 23.189712315797806
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 23.135103225708008,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5123062272,
+              "wall_ms": 23.14162813127041
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 23.17296028137207,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5123062272,
+              "wall_ms": 23.178886622190475
+            }
+          ],
+          "wall_median_ms": 23.178886622190475,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 23.331647872924805,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5123062272,
+              "wall_ms": 23.337913677096367
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 23.154495239257812,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5123062272,
+              "wall_ms": 23.16112443804741
+            }
+          ]
+        }
+      },
+      "decoded_word_sha256": "f992dd546631ff19a89873936461437ca557d0c76c62e1a0749893a57f78a634",
+      "diagnostics": "/home/nelson/kv_reconstruction/runs/lossless_decode_a4500_20261029_125616_867717/exans_official_compact_framed_t8192/diagnostics.json",
+      "document": "test_text_t8192",
+      "encode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 4.889321224087399,
+            "mean": 4.871973635087232,
+            "min": 4.849317853934934,
+            "std": 0.019220656425659486
+          },
+          "raw_gbs_samples": [
+            4.889321224087399,
+            4.885783732777046,
+            4.882498528705408,
+            4.852946835931375,
+            4.849317853934934
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.19215839028358458,
+            0.19229752019047738,
+            0.19242690816521646,
+            0.1935986788570881,
+            0.1937435582280159
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.1937435582280159,
+            "mean": 0.19284501114487648,
+            "min": 0.19215839028358458,
+            "std": 0.0007618081344668221
+          },
+          "wall_mean_ms": 192.84501114487648,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 204.4989471435547,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 6573308416,
+              "wall_ms": 204.5096680521965
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 206.3093719482422,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 6573308416,
+              "wall_ms": 206.31902292370796
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 205.70419311523438,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 6573308416,
+              "wall_ms": 205.7180106639862
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 208.3768310546875,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 6573308416,
+              "wall_ms": 208.3867285400629
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 193.4254150390625,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 6573308416,
+              "wall_ms": 193.43803636729717
+            }
+          ],
+          "wall_median_ms": 205.7180106639862,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 192.878662109375,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 6573308416,
+              "wall_ms": 192.88985058665276
+            },
+            {
+              "baseline_torch_bytes": 4182604288,
+              "cuda_interval_ms": 196.7665252685547,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 6573308416,
+              "wall_ms": 196.77661545574665
+            }
+          ]
+        }
+      },
+      "execution": "direct",
+      "id": "team_rank256_uniform_test_text_t8192",
+      "method": "exans_official_compact_framed",
+      "original_word_exact": true,
+      "original_word_sha256": "f992dd546631ff19a89873936461437ca557d0c76c62e1a0749893a57f78a634",
+      "packet": "/home/nelson/kv_reconstruction/runs/lossless_decode_a4500_20261029_125616_867717/exans_official_compact_framed_t8192/team_rank256_uniform_test_text_t8192_encoded.kvc",
+      "packet_bytes": 638416316,
+      "packet_sha256": "508da3eb4e04e08ea35a2b300f2cee3155a4b2d2d7209b6f6fa386248ead4f66",
+      "policy_sha256": "7d2023208c99b30a9c920c2e5be0b62f83d50fe6c0e95f2da7f2bf62b254cce3",
+      "round": "paired",
+      "shape": [
+        28,
+        8192,
+        2048
+      ],
+      "tokens": 8192,
+      "values": 469762048
+    },
+    {
+      "accounting": {
+        "block_directory_bytes": 3764,
+        "charged_payload_field_bytes": 639019562,
+        "charged_raw_fallback_bytes": 0,
+        "fitting_blocks": 941,
+        "fixed_records_for_fitting_blocks": 724615168,
+        "framing_and_alignment_bytes": 750,
+        "input_padding_bytes": 933888,
+        "native_allocation_peaks": "unmeasured",
+        "native_record_arena_bytes_at_capacity": 724615168,
+        "native_record_arena_bytes_at_request_size": 724615168,
+        "native_used_record_bytes": 639012030,
+        "packet_bytes": 639020312,
+        "padded_bf16_output_bytes": 940457984,
+        "raw_block_bytes": 999424,
+        "raw_fallback_blocks": 0,
+        "record_bytes": 770048,
+        "record_directory_bytes": 3768,
+        "scope": "Complete compact carrier with actual native prefixes, directories, framing and raw fallback; native fixed-slot arena and BF16 output are additional."
+      },
+      "decode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 40.5082447916903,
+            "mean": 40.493741468218325,
+            "min": 40.474029041825744,
+            "std": 0.01580466426423322
+          },
+          "raw_gbs_samples": [
+            40.5082447916903,
+            40.47947576754737,
+            40.5015974741351,
+            40.474029041825744,
+            40.50536026589309
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.023193404227495194,
+            0.02320988792926073,
+            0.02319721084088087,
+            0.023213011361658573,
+            0.023195055909454823
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.023213011361658573,
+            "mean": 0.023201714053750037,
+            "min": 0.023193404227495194,
+            "std": 9.056826580419419e-06
+          },
+          "wall_mean_ms": 23.201714053750038,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 23.958656311035156,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5762082816,
+              "wall_ms": 23.967279121279716
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 23.89516830444336,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5762082816,
+              "wall_ms": 23.90380948781967
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 23.906688690185547,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5762082816,
+              "wall_ms": 23.91553856432438
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 23.923263549804688,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5762082816,
+              "wall_ms": 23.933276534080505
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 23.921344757080078,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5762082816,
+              "wall_ms": 23.930223658680916
+            }
+          ],
+          "wall_median_ms": 23.930223658680916,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 23.92470359802246,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5762082816,
+              "wall_ms": 23.93386699259281
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 23.91059112548828,
+              "incremental_peak_torch_bytes": 940457984,
+              "peak_torch_bytes": 5762082816,
+              "wall_ms": 23.918932303786278
+            }
+          ]
+        }
+      },
+      "decoded_word_sha256": "b7ca4fc9d6209c2c817fdfb295a53263963456c3bed6e8dbfc1936bdafd6ab28",
+      "document": "test_code_t8192",
+      "encode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 4.860771763073909,
+            "mean": 4.8564440529228605,
+            "min": 4.851814505158532,
+            "std": 0.0036868507527614155
+          },
+          "raw_gbs_samples": [
+            4.860771763073909,
+            4.8596191741070385,
+            4.855021771939261,
+            4.8549930503355645,
+            4.851814505158532
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.1932870214432478,
+            0.19333286464214325,
+            0.19351593878120185,
+            0.19351708360016345,
+            0.1936438614875078
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.1936438614875078,
+            "mean": 0.19345935399085284,
+            "min": 0.1932870214432478,
+            "std": 0.00014686356331039134
+          },
+          "wall_mean_ms": 193.45935399085283,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 214.67465209960938,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 7212328960,
+              "wall_ms": 214.69058096408844
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 214.491943359375,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 7212328960,
+              "wall_ms": 214.5035844296217
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 193.92601013183594,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 7212328960,
+              "wall_ms": 193.9404532313347
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 214.4219512939453,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 7212328960,
+              "wall_ms": 214.43456411361694
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 214.3441925048828,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 7212328960,
+              "wall_ms": 214.3560964614153
+            }
+          ],
+          "wall_median_ms": 214.43456411361694,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 203.4647979736328,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 7212328960,
+              "wall_ms": 203.47561687231064
+            },
+            {
+              "baseline_torch_bytes": 4821624832,
+              "cuda_interval_ms": 195.95925903320312,
+              "incremental_peak_torch_bytes": 2390704128,
+              "peak_torch_bytes": 7212328960,
+              "wall_ms": 195.9728430956602
+            }
+          ]
+        }
+      },
+      "execution": "direct",
+      "id": "team_rank256_uniform_test_code_t8192",
+      "method": "exans_official_compact_framed",
+      "original_word_exact": true,
+      "original_word_sha256": "b7ca4fc9d6209c2c817fdfb295a53263963456c3bed6e8dbfc1936bdafd6ab28",
+      "packet": "/home/nelson/kv_reconstruction/runs/lossless_decode_a4500_20261029_125616_867717/exans_official_compact_framed_t8192/team_rank256_uniform_test_code_t8192_encoded.kvc",
+      "packet_bytes": 639020312,
+      "packet_sha256": "fae94a4b29fb87bd640ebbe5ceef1b969e7551f35ecda4b5aede08972b137fa7",
+      "policy_sha256": "7d2023208c99b30a9c920c2e5be0b62f83d50fe6c0e95f2da7f2bf62b254cce3",
+      "round": "paired",
+      "shape": [
+        28,
+        8192,
+        2048
+      ],
+      "tokens": 8192,
+      "values": 469762048
+    }
+  ],
+  "runtime_policy": {
+    "cudnn_allow_tf32": true,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false,
+    "deterministic_algorithms_enabled": false,
+    "deterministic_warn_only": false,
+    "effective_uninitialized_fill": false,
+    "fill_uninitialized_memory": true,
+    "float32_matmul_precision": "highest",
+    "matmul_allow_tf32": false
+  },
+  "runtime_policy_after": {
+    "cudnn_allow_tf32": true,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false,
+    "deterministic_algorithms_enabled": false,
+    "deterministic_warn_only": false,
+    "effective_uninitialized_fill": false,
+    "fill_uninitialized_memory": true,
+    "float32_matmul_precision": "highest",
+    "matmul_allow_tf32": false
+  },
+  "scope": "Lossless complete GPU transfer adapters on frozen original Llama words and fitted state. Mixed masks and link policies use TABLES calibration only, not TEST. TABLES also calibrated spreads; it is not an independent validation document. Native source benchmarks and lossy quality remain separate. No P attention, T-to-P, NIC, or SSD measurement.",
+  "software": {
+    "numpy": "2.3.5",
+    "torch": "2.11.0+cu128",
+    "triton": "3.6.0"
+  },
+  "status": "completed"
+}
