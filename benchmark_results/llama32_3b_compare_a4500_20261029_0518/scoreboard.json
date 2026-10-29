@@ -1,0 +1,445 @@
+{
+ "run": "/home/nelson/kv_reconstruction/runs/llama32_3b_compare",
+ "commit": "331155e970aeb39c351c671cbd3e9bbc6c0596f0",
+ "gpu": "NVIDIA RTX A4500",
+ "lossless": {
+  "SplitZip-style (exact cost)": {
+   "bits": 12.020790645054408,
+   "source": "lossless.json"
+  },
+  "ExANS-style (exact cost)": {
+   "bits": 10.721691431272871,
+   "source": "lossless.json"
+  },
+  "fewest bits, any predictor (exact cost)": {
+   "mode": "L0+P2+P+ATT, 16 pivot steps",
+   "bits": 7.753620862960815,
+   "whole": {
+    "test_text": 7.764415740966797,
+    "test_code": 7.47153377532959
+   },
+   "macs_per_value": 13444.5,
+   "source": "frontier.json"
+  },
+  "fewest bits without the attention input (exact cost)": {
+   "mode": "L0+P2+P, 16 pivot steps",
+   "bits": 7.869750738143921,
+   "whole": {
+    "test_text": 7.877074241638184,
+    "test_code": 7.596521854400635
+   },
+   "macs_per_value": 7104.0,
+   "source": "frontier.json"
+  },
+  "fewest bits, real GPU stream (bit-exact)": {
+   "mode": "rANS, fused one-kernel codec",
+   "bits": 8.944680895124163,
+   "decode_ms": 101.19974517822266,
+   "rate": 4.641929158741488,
+   "mixed": false,
+   "source": "gpu_speed.json"
+  },
+  "fewest bits, real GPU stream, decode within 2x our fastest": {
+   "mode": "rANS, per layer, dense",
+   "bits": 9.004487718854632,
+   "decode_ms": 33.29228973388672,
+   "rate": 14.110235485601054,
+   "mixed": false,
+   "source": "gpu_speed.json"
+  },
+  "fastest decode of ours alone (bit-exact)": {
+   "mode": "SplitZip format, rank 256, row",
+   "bits": 10.199291842324394,
+   "decode_ms": 17.16864013671875,
+   "rate": 27.361634017554774,
+   "mixed": false,
+   "source": "szcodec.json"
+  },
+  "SplitZip (authors' codec)": {
+   "bits": 12.048596739768982,
+   "decode_ms": 3.037551999092102,
+   "rate": 154.65152469502013,
+   "source": "official codec, this GPU"
+  },
+  "ExANS (authors' codec)": {
+   "bits": 10.863556199860481,
+   "decode_ms": 17.514096364186624,
+   "rate": 26.82194035203462,
+   "source": "official codec, this GPU"
+  }
+ },
+ "transfer": [
+  {
+   "link_gbps": 1,
+   "splitzip_ms": 5659.97348,
+   "splitzip_mib": 674.721417427063,
+   "exans_ms": 5103.286409009556,
+   "exans_mib": 608.3591471921869,
+   "ours_mode": "rANS, fused one-kernel codec",
+   "ours_ms": 4201.871616,
+   "ours_mib": 500.9021301269531,
+   "ours_vs_splitzip": 1.3470124737861575,
+   "lean_mode": "rANS, fused one-kernel codec",
+   "lean_ms": 4201.871616,
+   "lean_mib": 500.9021301269531
+  },
+  {
+   "link_gbps": 10,
+   "splitzip_ms": 565.997348,
+   "splitzip_mib": 674.721417427063,
+   "exans_ms": 510.32864090095563,
+   "exans_mib": 608.3591471921869,
+   "ours_mode": "rANS, fused one-kernel codec",
+   "ours_ms": 420.1871616,
+   "ours_mib": 500.9021301269531,
+   "ours_vs_splitzip": 1.3470124737861575,
+   "lean_mode": "rANS, fused one-kernel codec",
+   "lean_ms": 420.1871616,
+   "lean_mib": 500.9021301269531
+  },
+  {
+   "link_gbps": 50,
+   "splitzip_ms": 113.1994696,
+   "splitzip_mib": 674.721417427063,
+   "exans_ms": 102.06572818019114,
+   "exans_mib": 608.3591471921869,
+   "ours_mode": "rANS, per layer, dense",
+   "ours_ms": 84.23194624,
+   "ours_mib": 502.06152343749994,
+   "ours_vs_splitzip": 1.3439018644715102,
+   "lean_mode": "rANS, fused one-kernel codec",
+   "lean_ms": 101.19974517822266,
+   "lean_mib": 500.9021301269531
+  },
+  {
+   "link_gbps": 100,
+   "splitzip_ms": 56.5997348,
+   "splitzip_mib": 674.721417427063,
+   "exans_ms": 51.03286409009557,
+   "exans_mib": 608.3591471921869,
+   "ours_mode": "rANS, per layer, dense",
+   "ours_ms": 42.28336256,
+   "ours_mib": 504.0569610595703,
+   "ours_vs_splitzip": 1.33858168729332,
+   "lean_mode": "rANS, per layer, dense",
+   "lean_ms": 43.683841705322266,
+   "lean_mib": 502.06152343749994
+  },
+  {
+   "link_gbps": 200,
+   "splitzip_ms": 28.2998674,
+   "splitzip_mib": 674.721417427063,
+   "exans_ms": 25.516432045047786,
+   "exans_mib": 608.3591471921869,
+   "ours_mode": "rANS + SplitZip, rank 384, 24 layers ours",
+   "ours_ms": 22.670416560000003,
+   "ours_mib": 540.5048503875732,
+   "ours_vs_splitzip": 1.2483170445986722,
+   "lean_mode": "rANS, per layer, rank 512",
+   "lean_ms": 28.1712646484375,
+   "lean_mib": 516.3968658447266
+  },
+  {
+   "link_gbps": 400,
+   "splitzip_ms": 14.1499337,
+   "splitzip_mib": 674.721417427063,
+   "exans_ms": 17.51409636418662,
+   "exans_mib": 608.3591471921869,
+   "ours_mode": "SplitZip format + SplitZip, rank 256, 14 layers ours",
+   "ours_ms": 13.0307181,
+   "ours_mib": 621.3530588150024,
+   "ours_vs_splitzip": 1.0858905542588633,
+   "lean_mode": "SplitZip format + SplitZip, rank 256, 24 layers ours",
+   "lean_ms": 16.205055236816406,
+   "lean_mib": 584.5806760787964
+  },
+  {
+   "link_gbps": 800,
+   "splitzip_ms": 7.07496685,
+   "splitzip_mib": 674.721417427063,
+   "exans_ms": 17.51409636418662,
+   "exans_mib": 608.3591471921869,
+   "ours_mode": "SplitZip itself (no layer of ours helps)",
+   "ours_ms": 7.07496685,
+   "ours_mib": 674.721417427063,
+   "ours_vs_splitzip": 1.0,
+   "lean_mode": "SplitZip format + SplitZip, rank 512, 4 layers ours",
+   "lean_ms": 8.824000358581543,
+   "lean_mib": 657.8918504714966
+  }
+ ],
+ "lossy": {
+  "source": "lossy_eval.json (WikiText-2 windows)",
+  "windows": 8,
+  "targets": [
+   {
+    "baseline": "AQUA-KV, 2-bit",
+    "baseline_bits": 2.1051693870907737,
+    "baseline_change_pct": 0.9184664087435346,
+    "baseline_se": 0.21335580079769975,
+    "limit_pct": 1.1318222095412342,
+    "baseline_decode_ms": 77.88416290283203,
+    "ours_cpu": {
+     "mode": "Ours, step 4.0, sinks + token step",
+     "bits": 1.791055862550773,
+     "ppl_change_pct": 0.7971870042668971,
+     "se": 0.15933710172994736
+    },
+    "ours_gpu": {
+     "mode": "Ours, GPU codec (one-step, measured stream), step 4.0, sinks",
+     "bits": 2.180233183361235,
+     "ppl_change_pct": 1.1091690978152435,
+     "se": 0.10628318155830614,
+     "decode_ms": 26.695903778076172
+    }
+   },
+   {
+    "baseline": "AQUA-KV, 3-bit",
+    "baseline_bits": 3.0681995210193453,
+    "baseline_change_pct": 0.03961811258750281,
+    "baseline_se": 0.07103801652343522,
+    "limit_pct": 0.11065612911093803,
+    "baseline_decode_ms": 77.94483184814453,
+    "ours_cpu": {
+     "mode": "Ours, step 2.0, sinks + token step",
+     "bits": 2.2092396640953904,
+     "ppl_change_pct": 0.04211805858229667,
+     "se": 0.09934904274609394
+    },
+    "ours_gpu": {
+     "mode": "Ours, GPU codec (one-step, measured stream), step 2.0, sinks",
+     "bits": 2.7816583542596724,
+     "ppl_change_pct": 0.03936618351041421,
+     "se": 0.07634117951195082,
+     "decode_ms": 26.695903778076172
+    }
+   },
+   {
+    "baseline": "AQUA-KV, 4-bit",
+    "baseline_bits": 4.031229654947917,
+    "baseline_change_pct": -0.043588314953546536,
+    "baseline_se": 0.059330861714571644,
+    "limit_pct": 0.015742546761025107,
+    "baseline_decode_ms": 78.10253143310547,
+    "ours_cpu": {
+     "mode": "Ours, step 2.0, sinks",
+     "bits": 3.0210126992313064,
+     "ppl_change_pct": -0.06583995834176237,
+     "se": 0.05916395195609804
+    },
+    "ours_gpu": {
+     "mode": "Ours, GPU codec (one-step, measured stream), step 0.5, sinks + token step",
+     "bits": 4.068902061099098,
+     "ppl_change_pct": 0.010715999136667875,
+     "se": 0.051908897951717645,
+     "decode_ms": 26.695903778076172
+    }
+   },
+   {
+    "baseline": "KIVI, 4-bit",
+    "baseline_bits": 5.229166666666667,
+    "baseline_change_pct": 0.07986186348174495,
+    "baseline_se": 0.08902875906521113,
+    "limit_pct": 0.16889062254695608,
+    "baseline_decode_ms": 45.818687438964844,
+    "ours_cpu": {
+     "mode": "Ours, step 2.0, sinks + token step",
+     "bits": 2.2092396640953904,
+     "ppl_change_pct": 0.04211805858229667,
+     "se": 0.09934904274609394
+    },
+    "ours_gpu": {
+     "mode": "Ours, GPU codec (one-step, measured stream), step 2.0, sinks",
+     "bits": 2.7816583542596724,
+     "ppl_change_pct": 0.03936618351041421,
+     "se": 0.07634117951195082,
+     "decode_ms": 26.695903778076172
+    }
+   }
+  ]
+ },
+ "pool": [
+  {
+   "method": "raw BF16",
+   "mib": 896.0,
+   "prefixes_fit": 14,
+   "restore_ms": null
+  },
+  {
+   "method": "SplitZip",
+   "mib": 674.721417427063,
+   "prefixes_fit": 18,
+   "restore_ms": 3.037551999092102
+  },
+  {
+   "method": "ExANS",
+   "mib": 608.3591471921869,
+   "prefixes_fit": 20,
+   "restore_ms": 17.514096364186624
+  },
+  {
+   "method": "ours lossless (rANS, fused one-kernel codec)",
+   "mib": 500.9021301269531,
+   "prefixes_fit": 25,
+   "restore_ms": 101.19974517822266
+  },
+  {
+   "method": "ours lossless (rANS, per layer, dense)",
+   "mib": 504.2513122558594,
+   "prefixes_fit": 25,
+   "restore_ms": 33.29228973388672
+  },
+  {
+   "method": "ours lossless (SplitZip format, rank 256, row)",
+   "mib": 571.160343170166,
+   "prefixes_fit": 22,
+   "restore_ms": 17.16864013671875
+  },
+  {
+   "method": "AQUA-KV, 2-bit",
+   "mib": 117.88948567708333,
+   "prefixes_fit": 108,
+   "restore_ms": 77.88416290283203
+  },
+  {
+   "method": "ours lossy, GPU codec, at AQUA-KV, 2-bit quality",
+   "mib": 122.09305826822916,
+   "prefixes_fit": 104,
+   "restore_ms": 26.695903778076172
+  },
+  {
+   "method": "AQUA-KV, 3-bit",
+   "mib": 171.81917317708334,
+   "prefixes_fit": 74,
+   "restore_ms": 77.94483184814453
+  },
+  {
+   "method": "ours lossy, GPU codec, at AQUA-KV, 3-bit quality",
+   "mib": 155.77286783854166,
+   "prefixes_fit": 81,
+   "restore_ms": 26.695903778076172
+  },
+  {
+   "method": "AQUA-KV, 4-bit",
+   "mib": 225.74886067708334,
+   "prefixes_fit": 56,
+   "restore_ms": 78.10253143310547
+  },
+  {
+   "method": "ours lossy, GPU codec, at AQUA-KV, 4-bit quality",
+   "mib": 227.85851542154947,
+   "prefixes_fit": 55,
+   "restore_ms": 26.695903778076172
+  }
+ ],
+ "aqua_protocol": {
+  "windows": 35,
+  "seqlen": "8192",
+  "values_per_window": 469762048,
+  "exact_ppl": 6.986454579145998,
+  "exact_ppl_f32": 6.982940551652239,
+  "targets": [
+   {
+    "baseline": "higgs2",
+    "baseline_bits": 2.015625,
+    "baseline_ppl": 7.5541585600897045,
+    "baseline_change_pct": 8.084394932592676,
+    "baseline_se": 0.2741538043451951,
+    "ours": {
+     "mode": "ours4h",
+     "bits": 2.185116339077648,
+     "ppl": 7.427088529508096,
+     "ppl_f32": 7.434196939354809,
+     "change_pct": 6.462268787263237,
+     "se": 0.4818132252424662
+    }
+   },
+   {
+    "baseline": "kivi2g128",
+    "baseline_bits": 2.25,
+    "baseline_ppl": 7.7835219501054285,
+    "baseline_change_pct": 11.406054838499792,
+    "baseline_se": 0.7191865090732953,
+    "ours": {
+     "mode": "ours4",
+     "bits": 2.1715393510345313,
+     "ppl": 7.77136969348126,
+     "ppl_f32": 7.768226806042402,
+     "change_pct": 11.245781753137729,
+     "se": 0.9736045476368742
+    }
+   },
+   {
+    "baseline": "kivi2g32",
+    "baseline_bits": 3.0,
+    "baseline_ppl": 7.274499402230307,
+    "baseline_change_pct": 4.1188298496928955,
+    "baseline_se": 0.23255258376607962,
+    "ours": {
+     "mode": "ours2t",
+     "bits": 2.2961346066788058,
+     "ppl": 7.1601203229617925,
+     "ppl_f32": 7.1594078504952705,
+     "change_pct": 2.5271201657484754,
+     "se": 0.19002782837866616
+    }
+   },
+   {
+    "baseline": "kivi4g32",
+    "baseline_bits": 5.0,
+    "baseline_ppl": 6.988014229676222,
+    "baseline_change_pct": 0.07554064189767562,
+    "baseline_se": 0.01160275704768593,
+    "ours": {
+     "mode": "ours1",
+     "bits": 3.6058766074707194,
+     "ppl": 6.983336322300143,
+     "ppl_f32": 6.980706735331649,
+     "change_pct": -0.03198962248162074,
+     "se": 0.028909235221596535
+    }
+   },
+   {
+    "baseline": "aqua2",
+    "baseline_bits": 2.0870535714285716,
+    "baseline_ppl": 7.093307867666543,
+    "baseline_change_pct": 1.5074231329615717,
+    "baseline_se": 0.13087624237816095,
+    "ours": {
+     "mode": "ours2",
+     "bits": 2.756732320028852,
+     "ppl": 7.0224147674577795,
+     "ppl_f32": 7.020891883727433,
+     "change_pct": 0.5434863979504323,
+     "se": 0.05793822927944097
+    }
+   },
+   {
+    "baseline": "aqua3",
+    "baseline_bits": 3.0513392857142856,
+    "baseline_ppl": 6.991134575339803,
+    "baseline_change_pct": 0.08388729593695743,
+    "baseline_se": 0.054626547071182446,
+    "ours": {
+     "mode": "ours1",
+     "bits": 3.6058766074707194,
+     "ppl": 6.983336322300143,
+     "ppl_f32": 6.980706735331649,
+     "change_pct": -0.03198962248162074,
+     "se": 0.028909235221596535
+    }
+   },
+   {
+    "baseline": "aqua4",
+    "baseline_bits": 4.015625,
+    "baseline_ppl": 6.983336322300143,
+    "baseline_change_pct": -0.08517673181038798,
+    "baseline_se": 0.03399588032533316
+   }
+  ],
+  "authors_scripts": {
+   "no quantization": 6.986454579145998
+  }
+ },
+ "pool_recompute_ms": 992.1063842773438
+}
