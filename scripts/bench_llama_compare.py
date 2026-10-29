@@ -568,6 +568,24 @@ def stage_context(args, out):
 LABELS_EXACT = {"prev": "ours, one-step predictor (exact cost)", "fast": "ours, strong predictor (exact cost)"}
 
 
+def frontier_gpu_lines(out):
+    r = json.loads((out / "frontier_gpu.json").read_text())
+    tests = r["tests"]
+    names = {"test_text": "PEP 8", "test_code": "argparse.py"}
+    lab = lambda t: names.get(t, "WikiText-2, 8K" if t.startswith("ctx8192") else t)
+    lines = ["## Predictors that fit the GPU codec's layout (exact lossless costs)", "",
+             "Bits per value by exact cost (an ideal coder for each predictor; real streams sit about 0.05 above). "
+             "Natural steps are groups in channel order: 2 steps = the keys first, then the values predicted also from "
+             "the same layer's decoded keys; 4 = four heads at a time; 16 = head by head. The GPU codec today uses "
+             "P, 1 step. Multiply-adds per value set the product time.", "",
+             "| Predictor | Multiply-adds per value | " + " | ".join(lab(t) for t in tests) + " |",
+             "| --- | --- |" + " --- |" * len(tests)]
+    for v in r["variants"]:
+        lines.append(f"| {v['label']} | {v['macs_per_value']:,.0f} | " +
+                     " | ".join(f"{v['whole'][t]:.3f}" for t in tests) + " |")
+    return lines + [""]
+
+
 def context_lines(out):
     from kv_compare.context_sweep import link_ms
     r = json.loads((out / "context.json").read_text())
@@ -1026,17 +1044,28 @@ def _stage_lossy(args, out, which):
 
 
 def stage_frontier(args, out):
-    from kv_compare.frontier import Frontier, default_variants, summarize
+    """Exact lossless costs of predictor variants (kv_compare.frontier). --frontier-variants all: the full grid
+    (frontier.json); gpu: the predictors whose groups follow the GPU codec's head layout (frontier_gpu.json), on
+    --frontier-tests (our test documents, plus e.g. ctx8192_r0, the WikiText-2 window of the context stage)."""
+    from kv_compare.frontier import Frontier, default_variants, gpu_variants, summarize
     from kv_compare.predict import Study
-    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    tests = [t for t in args.frontier_tests.split(",") if t] or TESTS
+    missing = [t for t in tests if not (out / "captures" / f"{t}_K_bits.npy").is_file()]
+    if missing:
+        raise SystemExit(f"frontier: no captures for {missing} (ctx* windows come from the context stage)")
+    study = Study(out / "captures", args.device, TRAIN, "tables", tests, args.max_layers, log=log)
     with_att = all(d.Q is not None for d in study.train)
-    variants = default_variants(with_att=with_att, quick=args.frontier_quick)
-    log(f"frontier: {len(variants)} variants over {study.L} layers ({memory_note(args.device)})")
+    if args.frontier_variants == "gpu":
+        variants, name = gpu_variants(), "frontier_gpu.json"
+    else:
+        variants, name = default_variants(with_att=with_att, quick=args.frontier_quick), "frontier.json"
+    log(f"frontier: {len(variants)} variants over {study.L} layers on {', '.join(tests)} ({memory_note(args.device)})")
     begin = time.time()
     vs, bits, macs = Frontier(study, variants, log).run()
     rows = summarize(vs, bits, macs, chunk_spans(study.tests[0].tokens))
-    res = {"layers": study.L, "seconds": time.time() - begin, "with_attention_input": with_att, "variants": rows}
-    (out / "frontier.json").write_text(json.dumps(res, indent=1))
+    res = {"layers": study.L, "seconds": time.time() - begin, "with_attention_input": with_att, "variants": rows,
+           "tests": tests}
+    (out / name).write_text(json.dumps(res, indent=1))
     log(f"frontier done in {res['seconds']:.0f} s ({memory_note(args.device)})")
     return res
 
@@ -2174,6 +2203,8 @@ def stage_report(args, out):
         lines += [""] + transform_lines(out)
     if (out / "context.json").is_file():
         lines += [""] + context_lines(out)
+    if (out / "frontier_gpu.json").is_file():
+        lines += [""] + frontier_gpu_lines(out)
     lines += szprotocol_lines(out)
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
@@ -2211,6 +2242,10 @@ def parser():
     p.add_argument("--lossy-methods", default="ours,aqua,kivi,fp8,gpu",
                    help="lossy stage: methods to (re)run; a subset is merged into the existing lossy.json")
     p.add_argument("--frontier-quick", action="store_true", help="frontier stage: a smaller grid of variants")
+    p.add_argument("--frontier-variants", default="all", choices=("all", "gpu"),
+                   help="frontier: the full grid, or the predictors that fit the GPU codec's head layout")
+    p.add_argument("--frontier-tests", default="",
+                   help="frontier: test documents (default: ours; add ctx8192_r0 for WikiText-2)")
     p.add_argument("--speed-tokens", type=int, default=8192, help="gpu_speed: tokens per timed layer")
     p.add_argument("--speed-formats", default="fp32,bf16,int8x16,int8x8,int8x8s")
     p.add_argument("--speed-config", default="lite", help="gpu_speed: configuration whose predictions feed the coder")

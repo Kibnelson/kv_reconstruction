@@ -94,6 +94,18 @@ def default_variants(with_att=True, quick=False):
     return out
 
 
+def gpu_variants():
+    """Predictors whose groups follow the GPU codec's layout (heads), next to the one it uses now: "natural" steps
+    are groups in channel order, so 2 steps = the keys, then the values predicted also from the decoded keys of the
+    same layer; 4 steps = four heads at a time; 16 steps = head by head. The pivoted 16-step predictors are the
+    best of their inputs, for reference."""
+    V = []
+    for kinds in (("P",), ("L0", "P2", "P")):
+        V += [Variant(kinds, st, "natural") for st in (1, 2, 4, 16)]
+        V.append(Variant(kinds, 16, "pivot"))
+    return V
+
+
 def _round_sym(M, bits, dim):
     q = 2 ** (bits - 1) - 1
     sc = M.abs().amax(dim, keepdim=True).clamp_min(1e-30) / q
