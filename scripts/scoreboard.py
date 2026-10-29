@@ -188,7 +188,10 @@ def build(run):
                         ppl_f32=r["perplexity_f32"], change_pct=change(r)[0], se=change(r)[1])
                 for k, r in ms.items() if k != "exact"}
         seqlen = ap.get("protocol", "seqlen 8192,").split("seqlen ")[-1].split(",")[0]
-        sb["aqua_protocol"] = {"windows": ap["windows"], "seqlen": seqlen, "exact_ppl": ex["perplexity"],
+        cm = _load(run, "captures/meta.json") or _load(run, "capture_meta.json") or {}
+        nval = int(seqlen) * cm.get("layers", 0) * 2 * cm.get("kv_heads", 0) * cm.get("head_dim", 0)
+        sb["aqua_protocol"] = {"windows": ap["windows"], "seqlen": seqlen, "values_per_window": nval,
+                               "exact_ppl": ex["perplexity"],
                                "exact_ppl_f32": ex["perplexity_f32"], "targets": []}
         for base in [k for k in rows if not k.startswith("ours")]:
             b = rows[base]
@@ -297,12 +300,14 @@ def markdown(sb, locked=None):
                   f"exact cache {ap['exact_ppl']:.3f}, paper 6.98; the change uses a float32 loss; ours = fewest bits "
                   "per compressed value with a change at most the baseline's plus one standard error):", "",
                   "| Baseline | Its bits, perplexity, change | Ours, GPU codec |", "| --- | --- | --- |"]
+        nv = ap.get("values_per_window") or 0
+        mb = lambda bits: f", {bits * nv / 8 / 2 ** 20:.0f} MiB per window" if nv else ""
         for t in ap["targets"]:
             o = old.get(t["baseline"], {}).get("ours", {}).get("bits")
             e = t.get("ours")
-            lines.append(f"| {t['baseline']} | {t['baseline_bits']:.3f} bits, {t['baseline_ppl']:.3f}, "
-                         f"{t['baseline_change_pct']:+.2f}% ± {t['baseline_se']:.2f} | " +
-                         (f"{e['bits']:.3f} bits, {e['ppl']:.3f}, {e['change_pct']:+.2f}% ({e['mode']})" if e else
+            lines.append(f"| {t['baseline']} | {t['baseline_bits']:.3f} bits{mb(t['baseline_bits'])}, "
+                         f"{t['baseline_ppl']:.3f}, {t['baseline_change_pct']:+.2f}% ± {t['baseline_se']:.2f} | " +
+                         (f"{e['bits']:.3f} bits{mb(e['bits'])}, {e['ppl']:.3f}, {e['change_pct']:+.2f}% ({e['mode']})" if e else
                           "none at this quality") + (f" (locked {o:.3f})" if o is not None and locked else "") + " |")
         for k, v in (ap.get("authors_scripts") or {}).items():
             lines.append(f"| AQUA-KV, the authors' own scripts: {k} | perplexity {v:.3f} | - |")

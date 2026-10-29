@@ -326,6 +326,10 @@ def aqua_protocol_lines(out):
     off = None
     if (out / "aqua_official.json").is_file():
         off = json.loads((out / "aqua_official.json").read_text())
+    meta = json.loads((out / "captures" / "meta.json").read_text())
+    seqlen = int(res["protocol"].split("seqlen ")[1].split(",")[0])
+    nval = seqlen * meta["layers"] * 2 * meta["kv_heads"] * meta["head_dim"]
+    mib = lambda bits: bits * nval / 8 / 2 ** 20
     lines = ["## AQUA-KV's protocol: WikiText-2 perplexity with a streaming compressed cache", "",
              f"The authors' evaluation ({res['source']}, evaluate_perplexity.py) for every method, in one harness "
              f"(kv_compare/streaming.py): the whole WikiText-2 test split in {res['protocol'].split('seqlen ')[1].split(',')[0]}-token windows "
@@ -333,9 +337,12 @@ def aqua_protocol_lines(out):
              "(at least 128 before a block is compressed) in BF16, every older token compressed and read back. "
              "Perplexity with the authors' BF16 loss (comparable to the paper) and with a float32 loss from the "
              "same logits (resolves small gaps; the change is per window, mean +- standard error). Bits per value: "
-             "over the compressed values (as the papers count) and for the whole cache at the end of each window.", "",
-             "| Method | Bits per compressed value | Bits, whole cache | Perplexity (BF16 loss) | Perplexity (float32) | "
-             "Change vs exact | Paper (Llama 3.2 3B, Table 1) |", "| --- | --- | --- | --- | --- | --- | --- |"]
+             "over the compressed values (as the papers count) and for the whole cache at the end of each window. "
+             f"Size: one window's KV ({seqlen:,} tokens, {nval / 1e6:.0f}M values; {mib(16):.0f} MiB in BF16) at "
+             "those rates.", "",
+             "| Method | Bits per compressed value | Size of a window | Bits, whole cache | Size, whole cache | "
+             "Perplexity (BF16 loss) | Perplexity (float32) | Change vs exact | Paper (Llama 3.2 3B, Table 1) |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     names = {"exact": "exact BF16 cache", "higgs2": "HIGGS 2-bit, no predictor (gs1024)"}
 
     def label(k):
@@ -362,14 +369,15 @@ def aqua_protocol_lines(out):
             m = sum(d) / len(d)
             se = (sum((x - m) ** 2 for x in d) / (len(d) - 1)) ** 0.5 / len(d) ** 0.5 if len(d) > 1 else 0.0
             ch = f"{100 * (r['perplexity_f32'] / ex['perplexity_f32'] - 1):+.2f}% ({100 * m:+.2f}% +- {100 * se:.2f})"
-        bits = f"{r['bits_per_compressed_value']:.3f}" if "bits_per_compressed_value" in r else "16"
-        whole = f"{r['bits_per_value_whole_cache']:.3f}" if "bits_per_value_whole_cache" in r else "16"
+        b = r.get("bits_per_compressed_value", 16.0)
+        w = r.get("bits_per_value_whole_cache", 16.0)
         paper = AQUA_PAPER.get(k)
-        lines.append(f"| {label(k)} | {bits} | {whole} | {r['perplexity']:.3f} | {r['perplexity_f32']:.3f} | {ch} | "
+        lines.append(f"| {label(k)} | {b:.3f} | {mib(b):.1f} MiB | {w:.3f} | {mib(w):.1f} MiB | {r['perplexity']:.3f} | "
+                     f"{r['perplexity_f32']:.3f} | {ch} | "
                      + (f"{paper[0]:.2f} bits, {paper[1]:.2f}" if paper else "-") + " |")
     if off:
         for k, v in off.items():
-            lines.append(f"| AQUA-KV, the authors' own scripts ({k}) | - | - | {v:.3f} | - | - | "
+            lines.append(f"| AQUA-KV, the authors' own scripts ({k}) | - | - | - | - | {v:.3f} | - | - | "
                          + (f"{AQUA_PAPER['aqua2'][0]:.2f} bits, {AQUA_PAPER['aqua2'][1]:.2f}" if "2-bit" in k else
                             f"16 bits, {AQUA_PAPER['exact'][1]:.2f}" if "no quantization" in k else "-") + " |")
     return lines + [""]
