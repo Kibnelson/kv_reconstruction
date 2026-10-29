@@ -542,10 +542,11 @@ sz.calibrate(w16(study.train[0]).view(torch.bfloat16))
 words2 = torch.cat([w16(study.tests[0]), w16(study.train[1])], 1)
 pos = torch.arange(64).repeat(2)
 rows = cs.measure_case(study, consts, rc, words2, pos, torch.device("cpu"), log=lambda m: None, books=books, sz=sz,
-                       reps=1)
+                       reps=1, max_stream_tokens=64)          # two streams for our codecs, one per request
 for r in rows:
     assert "error" not in r, r
     assert r["bit_exact"], r
+    assert r.get("streams", 2) == 2, r
     print("ok", r["method"], r["bits"])
 assert len(rows) == 4
 assert cs.link_ms(8.0, 1e9, 5.0, 8) == 1000.0 and cs.link_ms(8.0, 1e6, 5.0, 8) == 5.0

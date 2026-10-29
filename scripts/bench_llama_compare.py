@@ -497,19 +497,24 @@ def stage_context(args, out):
         gc.collect()
         torch.cuda.empty_cache() if device.type == "cuda" else None
     single = [names[(n, 1)][0] for n in args.context_lengths]
-    study = Study(out / "captures", args.device, TRAIN, "tables", single, None, log=log)
-    if "exact_costs" not in res:
-        res["exact_costs"] = {}
-        for cfg_name in ("prev", "fast"):
-            cfg = CONFIGS[cfg_name]
-            if "ATT" in cfg.kinds and any(d.Q is None for d in study.train):
-                cfg = CONFIGS["fast_noatt"]
-            per, _ = study.lossless(cfg)
-            res["exact_costs"][LABELS_EXACT[cfg_name]] = {
-                nm: float(v.mean()) for nm, v in per.items()}
-            study._f.clear(); study._att.clear(); study._qmap.clear()
-            path.write_text(json.dumps(res, indent=1))
-            log(f"context: exact costs of {cfg.name} done")
+    res.setdefault("exact_costs", {})
+    for cfg_name in ("prev", "fast"):
+        have = res["exact_costs"].setdefault(LABELS_EXACT[cfg_name], {})
+        todo = [nm for nm in single if nm not in have]
+        if not todo:
+            continue
+        est = Study(out / "captures", args.device, TRAIN, "tables", todo, None, log=log)
+        cfg = CONFIGS[cfg_name]
+        if "ATT" in cfg.kinds and any(d.Q is None for d in est.train):
+            cfg = CONFIGS["fast_noatt"]
+        per, _ = est.lossless(cfg)
+        have.update({nm: float(v.mean()) for nm, v in per.items()})
+        path.write_text(json.dumps(res, indent=1))
+        log(f"context: exact costs of {cfg.name} done for {', '.join(todo)}")
+        del est
+        gc.collect()
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+    study = Study(out / "captures", args.device, TRAIN, "tables", [], None, log=log)
     consts = fused.prepare(study, log=log)
     rc = layerwise.prepare_rank(study, consts, 256, log)
 
@@ -546,7 +551,8 @@ def stage_context(args, out):
         words = torch.cat([w16(d) for d in docs], 1)
         positions = torch.arange(n, device=device).repeat(b)
         log(f"context {key}: {b} request(s) of {n} tokens, {words.numel() / 1e6:.1f}M values")
-        rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans)
+        rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans,
+                               max_stream_tokens=args.context_stream_tokens)
         res["cases"][key] = {"tokens": n, "batch": b, "values": words.numel(), "rows": rows}
         path.write_text(json.dumps(res, indent=1))
         del words, docs
@@ -2244,8 +2250,11 @@ def parser():
                    help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, "
                         "ours<step>[t][f|h|u|w|a][_r[lam]][c]; "
                         "<method>:k or :v compresses one half only)")
-    p.add_argument("--context-lengths", default="512,1024,2048,4096,8192,16384",
-                   help="context: tokens per request (batch 1); 32768 and more need more GPU memory than 20 GB")
+    p.add_argument("--context-lengths", default="512,1024,2048,4096,8192,16384,32768",
+                   help="context: tokens per request (batch 1); our codecs code at most --context-stream-tokens "
+                        "per stream; 65536 needs more than 20 GB of GPU memory")
+    p.add_argument("--context-stream-tokens", type=int, default=8192,
+                   help="context: tokens per stream of our codecs (a longer case is several streams)")
     p.add_argument("--context-batch", type=int, default=16, help="context: requests coded together for short ones")
     p.add_argument("--context-batch-max", type=int, default=2048, help="context: the longest request batched")
     p.add_argument("--alloc-kappa", type=float, default=2.0, help="allocate: the base step")

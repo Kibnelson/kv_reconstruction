@@ -445,7 +445,11 @@ class LayerwiseOneStep:
             raise ValueError("tokens must be a multiple of tokens_per_program x chunks")
         if T > self.k["cos"].shape[0]:
             raise ValueError("more tokens than the RoPE tables cover")
-        return (T // self.TB) * self.G, self.hd * (2 * self.L * self.TB + 2) + 8
+        S, cap = (T // self.TB) * self.G, self.hd * (2 * self.L * self.TB + 2) + 8
+        if (S + 1) * cap >= 2 ** 31:                 # stream positions are 32-bit word offsets
+            raise ValueError(f"{T} tokens need a {(S + 1) * cap / 2 ** 30:.1f} G-word stream buffer, over 2^31 words: "
+                             f"code at most {(2 ** 31 // cap - 1) // self.G * self.TB} tokens per stream")
+        return S, cap
 
     def model(self, words):
         """Features and priors of the exact words. Dense product: the fused forward pass (the same arithmetic);
