@@ -115,6 +115,10 @@ if [ "${AQUA_OFFICIAL:-0}" = 1 ]; then
     D=$RUN/aqua_official
     mkdir -p "$D"
     export HF_DATASETS_TRUST_REMOTE_CODE=1
+    # their training loads the slow tokenizer, which needs protobuf (not in their requirements.txt): tokenizer
+    # support only, the authors' torch / transformers / datasets versions stay as they are
+    "$AQUA_PY" -c "import google.protobuf, sentencepiece" 2>/dev/null \
+        || "$AQUA_PY" -m pip install -q protobuf sentencepiece tiktoken blobfile
     COMMON="--model_name unsloth/Llama-3.2-3B --model_seqlen 8192 --edenn_d 2 --edenn_n 16 --hadamard_groupsize 1024"
     echo "AQUA-KV official: perplexity without quantization ($D/no_quant.log)"
     (cd "$AQUA_SRC" && "$AQUA_PY" evaluate_perplexity.py $COMMON --no_quant) > "$D/no_quant.log" 2>&1 \

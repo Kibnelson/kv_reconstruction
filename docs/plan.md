@@ -37,12 +37,23 @@ each, 470M values per document.
 | Transfer, 200 Gb/s | 1.25x | |
 | Transfer, 400 Gb/s | 1.09x (format + SplitZip mix) | |
 | Transfer, 800 Gb/s | 1.00x (SplitZip itself) | |
-| Lossy at AQUA-KV 3-bit quality (WikiText-2, +0.04%) | 2.21 bits (CPU coder); 2.78 bits (GPU codec) | AQUA-KV 3.07 bits |
-| Lossy at AQUA-KV 2-bit quality (+0.92%) | 1.79 bits (CPU coder); 2.18 bits (GPU codec) | AQUA-KV 2.11 bits |
+| Lossy, our transfer test, at AQUA-KV 3-bit quality (WikiText-2 windows, +0.04%) | 2.21 bits (CPU coder); 2.78 bits (GPU codec) | AQUA-KV 3.07 bits |
+| Lossy, our transfer test, at AQUA-KV 2-bit quality (+0.92%) | 1.79 bits (CPU coder); 2.18 bits (GPU codec) | AQUA-KV 2.11 bits |
+| **Lossy, AQUA-KV's own protocol** (GPU codec) | 2.76 bits at +0.54%; 3.61 bits at -0.03% | AQUA-KV 2.09 bits at +1.51%, 3.05 bits at +0.08% |
 | Lossy decode, one document | 27 ms (GPU codec) | AQUA-KV 78 ms, KIVI 46 ms |
 | Pool, cached 8K prefixes in free GPU memory | 25 lossless (504 MiB, 33 ms back); 81 lossy at AQUA-3-bit quality | SplitZip 18, AQUA-KV 3-bit 74 |
 
 What we learned:
+- **In AQUA-KV's own evaluation, AQUA-KV beats our GPU lossy codec at 2-3 bits per value.** There every token is
+  scored against a cache compressed while it grows. AQUA-KV needs 2.09 bits for +1.5% perplexity; our codec needs
+  2.76 bits for +0.5%, and at 2.17 bits it loses 11%. Near-lossless we are about even (3.61 bits at -0.03%,
+  AQUA-KV 4-bit 4.02 bits at -0.09%). We beat KIVI everywhere (KIVI 4-bit needs 5.0 bits for +0.08%) and HIGGS
+  alone (2.02 bits, +8.1%). Our earlier "AQUA-KV 3-bit quality at 2.2 bits" holds only in our own transfer test,
+  with the CPU coder.
+- Our codec's error at 2.2 bits (12.9% of the KV) is about AQUA-KV's at 2.1 bits (11.6%), yet its perplexity
+  loss is 7x larger. So it is how the error is spread, not its size: our step is per channel, so channels with
+  large values, which drive the attention scores, get large errors. AQUA-KV rotates the residual (Hadamard) and
+  scales it per token.
 - The SplitZip-format code books are within 0.03 bits of the best fixed code book. The rANS coder already sits
   at the entropy of these symbols, so fewer lossless bytes need a stronger prediction.
 - At 800 Gb/s no layer of ours beats SplitZip yet.
@@ -119,17 +130,28 @@ main lossy comparison.
 
 ## What is next, in order of expected gain
 
-0. **Run the baselines' own evaluations** (above): stage `aquappl` and `AQUA_OFFICIAL=1` first; then SplitZip's script on Llama-3.2-3B, and LongBench and GSM8K subsets.
+0. **Finish the baselines' own evaluations.** Done (`61d6db1`): AQUA-KV's perplexity protocol for every method.
+   Our harness gives the authors' exact perplexity to five digits (6.9865; paper 6.98). SplitZip's own benchmark
+   on Llama-3.2-3B: 12.05 bits, 313 GB/s decode; ours on its prompts 9.92 bits (one-step) and 8.68 (strong
+   predictor). Still to run:
+   - AQUA-KV's own training on RedPajama (`AQUA_OFFICIAL=1`), which needed protobuf in its environment, now
+     installed by the script;
+   - LongBench and GSM8K subsets;
+   - ExANS's position-aligned batches.
+0b. **Lossy error shaping (first for lossy).** Make our error look like AQUA-KV's: quantize the residual in a
+    Hadamard-rotated domain and/or weight each channel's step by its attention sensitivity (query magnitude), and
+    keep the entropy coder.
+    - Diagnose first: in AQUA-KV's protocol, ours on keys only and on values only.
+    - Target, in AQUA-KV's protocol: +1.5% or less at 2.1 bits or less, and +0.1% at 3.0 bits or less.
 1. **A GPU decoder for the 7.87-bit predictor** (layers 0, l−2, l−1, 16 groups, no attention).
    - Gain: 441 MiB per document instead of 504, 13% fewer bytes than our current stream and 35% fewer than
      SplitZip.
    - Products alone measure 53 ms per document, so the expected decode is 55-70 ms. That wins up to 100 Gb/s, at
      about 1.5x SplitZip where the link sets the time, and enlarges the pool by 14%.
    - Target: a bit-exact stream at 7.9-8.0 bits, decoding in 70 ms or less.
-2. **The same predictor in the lossy GPU codec.**
-   - At AQUA-KV 3-bit quality our CPU coder needs 2.21 bits and the GPU codec 2.78. Most of the gap is the
-     predictor.
-   - Target: 2.3 bits or less at +0.05% on WikiText-2, decoding in 40 ms or less.
+2. **The same predictor in the lossy GPU codec**, after error shaping.
+   - In our transfer test, at AQUA-KV 3-bit quality, our CPU coder needs 2.21 bits and the GPU codec 2.78.
+   - Target: judged in AQUA-KV's protocol, decoding in 40 ms or less.
    - Also fix the GPU per-token step: it helps the CPU coder but not yet the GPU codec (2.32 bits, +0.57%).
 3. **400-800 Gb/s.** The SplitZip-format decode takes 17 ms: 7 ms of products and 12 ms of coding.
    - It must reach 12 ms or less to beat SplitZip alone at 400 Gb/s.
@@ -137,8 +159,11 @@ main lossy comparison.
      value in the context and word rebuild; the first product's requantization fused into its epilogue output
      layout.
    - 800 Gb/s needs about 4x faster decoding and is not a near-term target.
-4. **Baseline fidelity.** One deviation remains: AQUA-KV is calibrated on our calibration documents, not on the
-   256 x 8192 RedPajama tokens of the authors' README. Rerun it with their calibration data.
+4. **Baseline fidelity.**
+   - Our AQUA-KV re-implementation is calibrated on our documents. In the protocol it gives 7.09 at 2.09 bits
+     (paper: 7.03 at 2.16); the authors' own training run will settle that row.
+   - Our KIVI is stronger than the paper's (2-bit, group 128: 7.78 against 9.33), so it is not handicapped.
+   - HIGGS alone: 7.55 against the paper's 7.47.
 5. **Deployment pieces.**
    - (T) A compact transfer header: model, predictor version, mode, layer and token ranges. The receiver needs
      the predictor's coefficients, about 117 MB per model for one-step (8-bit), shipped once.
