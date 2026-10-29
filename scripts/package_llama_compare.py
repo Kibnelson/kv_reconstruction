@@ -36,7 +36,8 @@ FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.js
          "aqua_official/no_quant.log": "aqua_official_no_quant.log", "aqua_official/train_2bit.log":
          "aqua_official_train_2bit.log", "aqua_official/ppl_2bit.log": "aqua_official_ppl_2bit.log",
          "kv_sensitivity.json": "kv_sensitivity.json", "allocation.json": "allocation.json", "context.json": "context.json", "context_wikitext.json": "context_wikitext.json",
-         "context_mixed.json": "context_mixed.json", "frontier_gpu.json": "frontier_gpu.json", "frontier_gpu_wikitext.json": "frontier_gpu_wikitext.json",
+         "context_mixed.json": "context_mixed.json", "groupspeed.json": "groupspeed.json",
+         "groupspeed_mixed.json": "groupspeed_mixed.json", "groupspeed_wikitext.json": "groupspeed_wikitext.json", "frontier_gpu.json": "frontier_gpu.json", "frontier_gpu_wikitext.json": "frontier_gpu_wikitext.json",
          "frontier_gpu_mixed.json": "frontier_gpu_mixed.json",
          "transform_gain.json": "transform_gain.json",
          "captures/meta.json": "capture_meta.json"}

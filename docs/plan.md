@@ -158,6 +158,35 @@ PCIe, or machines over 10-100 GbE. The order of work:
 
 Lossy development pauses: the queued runs finish, but nothing new is built.
 
+### Progress on lossless (29 October, runs `9de9185`, `26d7b4b`, `a82e4b4`)
+
+- **Context sweep:** 512 to 32K tokens and batches of 16, every method decoded bit-exact.
+  - Up to 100 Gb/s we win from 1K tokens up.
+  - Single requests under 2K tokens pay a fixed decode cost of about 3-4 ms; batching removes it.
+- **Head-group decoder:** keys then values, 4 head groups, or head by head (`kv_compare/grouped.py`).
+- **Calibration on code plus WikiText-2 train** (`--train-set mixed`): prose gains 0.5-0.6 bits; code moves by
+  0.01-0.1 bits.
+- **WikiText-2 test, 8K tokens, real streams:**
+
+  | Mode | Bits | Decode |
+  | --- | --- | --- |
+  | 1 step | 9.03 | 31 ms |
+  | keys then values | 8.70 | 42 ms |
+  | 4 head groups | 8.48 | 53 ms |
+  | head by head | 8.35 | 114 ms |
+
+  SplitZip: 12.05 bits, 3 ms. The strong predictor's exact cost on prose is 7.83 bits.
+- **Against SplitZip, the best mode per link (8K tokens):**
+
+  | Link | Speed-up |
+  | --- | --- |
+  | 1-25 Gb/s | 1.44x |
+  | 100 Gb/s | 1.35x |
+  | 200 Gb/s | 1.24x |
+  | 400 Gb/s | 0.82x |
+- **Next:** decode speed of the head groups. Head by head is held back by fixed per-step costs. The `groupspeed`
+  stage measures token blocks and chunks; then each group's product moves into the decode kernel.
+
 ## What is next, in order of expected gain (before 29 October)
 
 0. **Finish the baselines' own evaluations.** Done (`61d6db1`): AQUA-KV's perplexity protocol for every method.

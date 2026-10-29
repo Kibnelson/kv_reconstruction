@@ -104,7 +104,7 @@ def memory_note(device=None):
 
 
 STAGES = ("capture", "evalcap", "lossless", "lossy", "frontier", "gpu_speed", "pool", "format", "szcodec", "exans",
-          "transform", "allocate", "aquappl", "calcap", "szprotocol", "context", "report")
+          "transform", "allocate", "aquappl", "calcap", "szprotocol", "context", "groupspeed", "report")
 BRANCH = "llama32-3b-lossy-lossless-compare"
 
 
@@ -605,6 +605,80 @@ def stage_context(args, out):
 
 
 LABELS_EXACT = {"prev": "ours, one-step predictor (exact cost)", "fast": "ours, strong predictor (exact cost)"}
+
+
+def stage_groupspeed(args, out):
+    """Decode speed of the head-group codecs against tokens per program and token chunks (kv_compare.context_sweep
+    group_config_rows), on the context stage's WikiText-2 windows (--groupspeed-lengths): which setting hides the
+    groups' wait. Needs the context stage's captures. Results in groupspeed<set>.json."""
+    import gc
+    import torch
+    from kv_compare import context_sweep as cs
+    from kv_compare import fused
+    from kv_compare.grouped import prepare_groups
+    from kv_compare.predict import Doc, Study
+    device = torch.device(args.device)
+    study = Study(out / "captures", args.device, TRAIN, TABLES, [], None, log=log)
+    consts = fused.prepare(study, log=log)
+    grouped = prepare_groups(study, consts, args.context_groups, log) if args.context_groups else {}
+    study._f.clear(); study._att.clear(); study._qmap.clear()
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    res = {"calibration": {"set": args.train_set, "documents": TRAIN, "scales": TABLES},
+           "configs": [list(c) for c in args.groupspeed_configs], "cases": {}}
+    path = out / f"groupspeed{set_suffix(args)}.json"
+    for n in args.groupspeed_lengths:
+        name = f"ctx{n}_r0"
+        if not (out / "captures" / f"{name}_K_bits.npy").is_file():
+            log(f"groupspeed: no capture {name} (run the context stage first)")
+            continue
+        d = Doc(out / "captures", name)
+        words = torch.empty(study.L, n, study.W, dtype=torch.int16, device=device)
+        for l in range(study.L):
+            x = d.words(l, device)
+            words[l] = (x - 65536 * (x >= 32768).to(torch.int32)).to(torch.int16)
+        log(f"groupspeed: {n} tokens")
+        res["cases"][str(n)] = cs.group_config_rows(study, consts, grouped, words, torch.arange(n, device=device),
+                                                    device, args.groupspeed_configs, log)
+        path.write_text(json.dumps(res, indent=1))
+        del words
+        gc.collect()
+        torch.cuda.empty_cache() if device.type == "cuda" else None
+    return res
+
+
+def groupspeed_lines(out, name):
+    r = json.loads((out / name).read_text())
+    cases = r.get("cases", {})
+    if not cases:
+        return []
+    lens = sorted(cases, key=int)
+    cal = r.get("calibration", {}).get("set", "code")
+    lines = ["## Head-group codecs: decode time against tokens per program and token chunks" +
+             ("" if cal == "code" else f" ({cal} calibration)"), "",
+             "Real streams of the WikiText-2 windows, decoded bit-exact (bits per value in brackets). Groups 1 is the "
+             "one-step predictor. More chunks decode side by side on CUDA streams; smaller token blocks give more "
+             "programs per head group but more stream states (32 / (layers x block) bits per value).", "",
+             "| Groups | Tokens x chunks | " + " | ".join(f"{int(n):,} tokens" for n in lens) + " |",
+             "| --- | --- |" + " --- |" * len(lens)]
+    keys = []
+    for n in lens:
+        for row in cases[n]:
+            k = (row["groups"], row["tokens_per_program"], row["chunks"])
+            if k not in keys:
+                keys.append(k)
+    for g, TB, ch in keys:
+        cells = []
+        for n in lens:
+            row = next((x for x in cases[n] if (x["groups"], x["tokens_per_program"], x["chunks"]) == (g, TB, ch)), None)
+            if row is None:
+                cells.append("-")
+            elif "error" in row:
+                cells.append("not measured")
+            else:
+                cells.append(f"{row['decode_ms']:.1f} ms ({row['bits']:.3f})" + ("" if row["bit_exact"] else " NOT exact"))
+        lines.append(f"| {g} | {TB} x {ch} | " + " | ".join(cells) + " |")
+    return lines + [""]
 
 
 def frontier_gpu_lines(out, name="frontier_gpu.json"):
@@ -2279,6 +2353,9 @@ def stage_report(args, out):
     for name in ("context.json", "context_wikitext.json", "context_mixed.json"):
         if (out / name).is_file():
             lines += [""] + context_lines(out, name)
+    for name in ("groupspeed.json", "groupspeed_wikitext.json", "groupspeed_mixed.json"):
+        if (out / name).is_file():
+            lines += [""] + groupspeed_lines(out, name)
     for name in ("frontier_gpu.json", "frontier_gpu_wikitext.json", "frontier_gpu_mixed.json"):
         if (out / name).is_file():
             lines += [""] + frontier_gpu_lines(out, name)
@@ -2372,6 +2449,10 @@ def parser():
                    help="calcap: the WikiText-2 raw train split joined with blank lines (run_on_nuc.sh writes it)")
     p.add_argument("--context-groups", default="2,4,16",
                    help="context: head groups of our grouped predictor to measure (kv_compare.grouped; empty: none)")
+    p.add_argument("--groupspeed-lengths", default="512,2048,8192",
+                   help="groupspeed: context lengths (captured by the context stage)")
+    p.add_argument("--groupspeed-configs", default="32x2,32x4,32x8,16x4,16x8,8x8,8x16",
+                   help="groupspeed: tokens per program x token chunks")
     p.add_argument("--context-stream-tokens", type=int, default=8192,
                    help="context: tokens per stream of our codecs (a longer case is several streams)")
     p.add_argument("--context-batch", type=int, default=16, help="context: requests coded together for short ones")
@@ -2460,6 +2541,8 @@ def main(argv=None):
     args.alloc_moves = [float(m) for m in args.alloc_moves.split(",") if m]
     args.context_lengths = [int(n) for n in args.context_lengths.split(",") if n]
     args.context_groups = [int(g) for g in args.context_groups.split(",") if g]
+    args.groupspeed_lengths = [int(n) for n in args.groupspeed_lengths.split(",") if n]
+    args.groupspeed_configs = [tuple(int(v) for v in c.split("x")) for c in args.groupspeed_configs.split(",") if c]
     global TRAIN, TABLES
     TRAIN, TABLES = list(TRAIN_SETS[args.train_set][0]), TRAIN_SETS[args.train_set][1]
     if any(n % 128 for n in args.context_lengths):
@@ -2553,6 +2636,8 @@ def main(argv=None):
             stage_szprotocol(args, out)
         if "context" in stages:
             stage_context(args, out)
+        if "groupspeed" in stages:
+            stage_groupspeed(args, out)
         if "report" in stages:
             stage_report(args, out)
     except BaseException as exc:

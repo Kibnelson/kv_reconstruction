@@ -166,3 +166,46 @@ def link_ms(bits, values, decode_ms, gbps):
     """Transfer time on an ideal link with decoding overlapped with arrival: the longer of the two."""
     wire = bits * values / (gbps * 1e9) * 1e3
     return max(wire, decode_ms)
+
+
+def group_config_rows(study, consts, grouped, words, positions, device, configs, log=print, reps=5):
+    """Our per-layer codec with the one-step predictor (groups 1) and each head-group predictor, for every
+    (tokens per program, token chunks) in configs: bits and decode time of a real stream, decoded bit-exact. Many
+    chunks decode on separate CUDA streams side by side, which keeps the GPU busy while a head group waits for
+    the groups before it."""
+    from .fused import FusedOneStep
+    from .layerwise import LayerwiseOneStep
+    L, T, W = words.shape
+    n = L * T * W
+    gpu = device.type == "cuda"
+    rows = []
+    for g, base in [(1, consts)] + sorted(grouped.items()):
+        k = rope_consts(study, base, positions)
+        for TB, ch in configs:
+            row = {"groups": g, "tokens_per_program": TB, "chunks": ch, "tokens": T, "values": n}
+            if T % (TB * ch):
+                continue
+            try:
+                codec = LayerwiseOneStep(k, study.C, study.hd, tokens_per_program=TB, mode="uniform", search=True,
+                                         chunks=ch)
+                if g == 1:
+                    fwd = FusedOneStep(k, study.C, study.hd, tokens_per_program=32, rows=4, warps=4)
+                    xall, prior = fwd.model(words)
+                else:
+                    xall, prior = codec.model(words)
+                buf, starts = codec.encode(words, xall, prior)
+                bufs = codec.buffers(T)
+                dec = codec.decode(buf, starts, T, bufs=bufs)
+                ok = bool(torch.equal(dec, words))
+                td = _timer(lambda: codec.decode(buf, starts, T, out=dec, bufs=bufs), device,
+                            warmup=2 if gpu else 0, reps=reps if gpu else 1)
+                row.update(bit_exact=ok, bits=codec.bits(starts, T) / n, decode_ms=1e3 * td)
+                log(f"    groups {g}, {TB} tokens per program, {ch} chunks: exact={ok}, {row['bits']:.3f} bits/value, "
+                    f"decode {1e3 * td:.2f} ms")
+                del codec, xall, prior, buf, starts, bufs, dec
+            except Exception as exc:
+                row["error"] = repr(exc)[:300]
+                log(f"    groups {g}, {TB}x{ch}: not measured ({row['error']})")
+            rows.append(row)
+            _free(device)
+    return rows
