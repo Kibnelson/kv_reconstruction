@@ -17,6 +17,14 @@ Shaped steps (lane_scale): kappa may differ per lane (layer x channel), kappa_c 
 where the model is least sensitive to it (kv_compare.sensitivity). The table class then follows each lane's
 r = kappa_c / multiplier, so the coder's model stays matched.
 
+Rate-aware rounding (rdo = lam > 0): the encoder moves k one lattice step toward the prediction when the squared
+error it adds, in step^2 units, is below lam x the bits it saves (from the coder's own table); the decoder is
+unchanged, and the error bound becomes 1.5 steps. lam = 1 / (12 x 2 ln 2) ~ 0.06 is the slope of a uniform
+quantizer's error against its rate.
+Centre-of-mass reconstruction (centroid=True): a value with k != 0 is rebuilt at the centre of mass of its cell
+under the coder's logistic model, not at the cell's middle (a per-class table for |k| = 1, 2, >= 3): the same bits,
+less error; the error bound grows by at most half a step.
+
 Encoder: a forward pass quantizes layer by layer (reconstruction, its features and priors), then a reverse pass codes
 the symbols (rANS is last-in first-out).
 """
@@ -88,6 +96,31 @@ def lattice_tables(device):
             "lut": as_t(np.asarray(luts, dtype=np.int64)), "info": info}
 
 
+def centroid_table(device):
+    """Per class c and |k| = 0, 1, 2, >= 3: how far (in steps) the centre of mass of lattice cell k lies from the
+    cell's middle, toward the prediction, under the standard logistic in units of the spread (cell k spans
+    [(k - 1/2) r, (k + 1/2) r]). [LCLASSES * 4] float32; entry 0 of each class is 0."""
+    def tail(t):                                         # integral of t p(t) up to t, for t >= 0 (exact, no cancellation)
+        return -t / (1.0 + math.exp(t)) - math.log1p(math.exp(-t))
+
+    def upper(t):                                        # 1 - sigmoid(t)
+        return 1.0 / (1.0 + math.exp(t))
+    out = []
+    for c in range(LCLASSES):
+        r = class_r(c)
+        row = [0.0]
+        for k in (1, 2, 3):
+            a, b = (k - 0.5) * r, (k + 0.5) * r
+            mass = upper(a) - upper(b)
+            if not mass > 1e-300:
+                row.append(0.5 - 1.0 / (r * 1.0) if r > 2 else 0.0)
+                continue
+            mean = (tail(b) - tail(a)) / mass
+            row.append(min(max(k - mean / r, 0.0), 0.5))
+        out.append(row)
+    return torch.tensor(out, dtype=torch.float32, device=device).reshape(-1)
+
+
 def symbol_bits(tables, k, c):
     """Ideal bits (-log2 of the table frequencies) of lattice indices k (int64 tensor) in classes c (Python mirror
     of the coder's symbol mapping; escapes cost 16 + the escape symbol)."""
@@ -136,6 +169,31 @@ if triton is not None:
         return k, sym, j, esc
 
     @triton.jit
+    def _rdo(v, mu, istep, k, sym, j, esc, G, lm, offf, cumf_ptr, LAM):
+        """Rate-aware rounding: k one lattice step toward the prediction when the squared error it adds (in step^2
+        units) is below LAM x the bits it saves under the coder's table; escapes and k = 0 stay as they are."""
+        t = (v - mu) * istep
+        kz = tl.where(k > 0, k - 1, k + 1)
+        h = (1 << lm) >> 1
+        gz = (kz + h) >> lm
+        jz = (kz + h) & ((1 << lm) - 1)
+        symz = gz + G
+        ok = (~esc) & (k != 0)
+        f0 = (tl.load(cumf_ptr + offf + sym) & 0xFFFF).to(tl.float32)
+        fz = (tl.load(cumf_ptr + offf + tl.where(ok, symz, sym)) & 0xFFFF).to(tl.float32)
+        saved = tl.log2(fz) - tl.log2(f0)
+        added = (t - kz.to(tl.float32)) * (t - kz.to(tl.float32)) - (t - k.to(tl.float32)) * (t - k.to(tl.float32))
+        take = ok & (added < LAM * saved)
+        return tl.where(take, kz, k), tl.where(take, symz, sym), tl.where(take, jz, j)
+
+    @triton.jit
+    def _recon_c(mu, k, step, cen_ptr, c):
+        """Centre-of-mass reconstruction of lattice index k (class c's table)."""
+        d = tl.load(cen_ptr + c * 4 + tl.minimum(tl.abs(k), 3))
+        kk = k.to(tl.float32) - tl.where(k > 0, d, -d)
+        return gc._bf16_word(mu + kk * step)
+
+    @triton.jit
     def _token_step(step0, istep0, mult, KAPPA, TOKSTEP: tl.constexpr):
         """The step, its reciprocal and the table class for one token: kappa x spread (class from kappa / the
         multiplier) or, with TOKSTEP, kappa x spread x multiplier (then the class is kappa's for every token)."""
@@ -169,9 +227,10 @@ if triton is not None:
 
     @triton.jit
     def _lyq_kernel(words_ptr, out_ptr, acc_ptr, xout_ptr, sa_ptr, b_ptr, sp_ptr, inv_ptr, isx_ptr, cos_ptr, sin_ptr,
-                    ssum_in_ptr, ssum_out_ptr, smult_ptr, lut_ptr, kap_ptr, KAPPA, T, W, G, HG, PRIOR_SCALE,
-                    FIRST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr, LUT_W: tl.constexpr,
-                    PREFIX: tl.constexpr, TOKSTEP: tl.constexpr, LANES: tl.constexpr):
+                    ssum_in_ptr, ssum_out_ptr, smult_ptr, lut_ptr, kap_ptr, cumf_ptr, cen_ptr, KAPPA, LAM, T, W, G,
+                    HG, PRIOR_SCALE, FIRST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr, LUT_W: tl.constexpr,
+                    PREFIX: tl.constexpr, TOKSTEP: tl.constexpr, LANES: tl.constexpr, RDO: tl.constexpr,
+                    CEN: tl.constexpr):
         """Encoder's forward pass for one layer of one token block x head: quantize, reconstruct, surprise sums and
         the next layer's features from the reconstruction."""
         pid = tl.program_id(0)
@@ -211,8 +270,14 @@ if triton is not None:
             lm = gp >> 16
             w = tl.load(words_ptr + t * W + own).to(tl.int32) & 0xFFFF
             k, sym, j, esc = _lattice(gc._word_val(w), mu, istep, w, Gs, lm)
+            if RDO:
+                offf = tl.load(lut_ptr + c * LUT_W + LUT_N) >> 10
+                k, sym, j = _rdo(gc._word_val(w), mu, istep, k, sym, j, esc, Gs, lm, offf, cumf_ptr, LAM)
             esc = esc | (t < PREFIX)
-            wq = tl.where(esc, w, _recon(mu, k, step))
+            if CEN:
+                wq = tl.where(esc, w, _recon_c(mu, k, step, cen_ptr, c))
+            else:
+                wq = tl.where(esc, w, _recon(mu, k, step))
             tl.store(out_ptr + t * W + own, wq.to(tl.int16))
             v = gc._word_val(wq)
             tl.store(ssum_out_ptr + g * T + t, tl.sum(fu._sq(v, mu, invl), 0))
@@ -222,9 +287,9 @@ if triton is not None:
 
     @triton.jit
     def _lyenc_kernel(words_ptr, prior_ptr, state_ptr, pos_ptr, out_ptr, start_ptr, acc_ptr, sa_ptr, b_ptr, sp_ptr,
-                      cos_ptr, sin_ptr, smult_ptr, cumf_ptr, lut_ptr, kap_ptr, KAPPA, T, W, G, HG,
+                      cos_ptr, sin_ptr, smult_ptr, cumf_ptr, lut_ptr, kap_ptr, KAPPA, LAM, T, W, G, HG,
                       FLUSH: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr, LUT_W: tl.constexpr,
-                      PREFIX: tl.constexpr, TOKSTEP: tl.constexpr, LANES: tl.constexpr):
+                      PREFIX: tl.constexpr, TOKSTEP: tl.constexpr, LANES: tl.constexpr, RDO: tl.constexpr):
         """Encode one layer of one token block x head, tokens in reverse (layers are launched last first)."""
         pid = tl.program_id(0)
         g = pid % G
@@ -272,6 +337,8 @@ if triton is not None:
             lm = gp >> 16
             w = tl.load(words_ptr + t * W + own).to(tl.int32) & 0xFFFF
             k, sym, j, esc = _lattice(gc._word_val(w), mu, istep, w, Gs, lm)
+            if RDO:                                      # the quantize pass's decision, made again bit for bit
+                k, sym, j = _rdo(gc._word_val(w), mu, istep, k, sym, j, esc, Gs, lm, offf, cumf_ptr, LAM)
             forced = t < PREFIX                          # the first tokens: their exact word, no symbol
             esc = esc | forced
             p = tl.load(cumf_ptr + offf + sym)
@@ -294,10 +361,10 @@ if triton is not None:
     @triton.jit
     def _lydec_kernel(buf_ptr, start_ptr, state_ptr, pos_ptr, out_ptr, acc_ptr, xout_ptr, sa_ptr, b_ptr, sp_ptr,
                       inv_ptr, isx_ptr, cos_ptr, sin_ptr, ssum_in_ptr, ssum_out_ptr, smult_ptr, cumf_ptr, lut_ptr,
-                      kap_ptr, KAPPA, t_base, T, W, G, HG, PRIOR_SCALE,
+                      kap_ptr, cen_ptr, KAPPA, t_base, T, W, G, HG, PRIOR_SCALE,
                       FIRST: tl.constexpr, LAST: tl.constexpr, TB: tl.constexpr, H2: tl.constexpr,
                       LUT_SHIFT: tl.constexpr, LUT_W: tl.constexpr, PREFIX: tl.constexpr, TOKSTEP: tl.constexpr,
-                      LANES: tl.constexpr):
+                      LANES: tl.constexpr, CEN: tl.constexpr):
         """Decode one layer of one token block x head: symbol (coarse table + binary search), the cell inside it,
         the reconstruction, surprise sums and the next layer's features."""
         pid = tl.program_id(0)
@@ -371,7 +438,10 @@ if triton is not None:
             x, rp = gc._take(x, cum2, f2, two, buf_ptr, rp, 0)
             gsym = sym - Gs
             k = tl.where(lm > 0, gsym * (1 << lm) - ((1 << lm) >> 1) + j, gsym)
-            w = tl.where(esc, slot2, _recon(mu, k, step))
+            if CEN:
+                w = tl.where(esc, slot2, _recon_c(mu, k, step, cen_ptr, c))
+            else:
+                w = tl.where(esc, slot2, _recon(mu, k, step))
             tl.store(out_ptr + t * W + own, w.to(tl.int16))
             v = gc._word_val(w)
             tl.store(ssum_out_ptr + g * T + t, tl.sum(fu._sq(v, mu, invl), 0))
@@ -388,15 +458,18 @@ class LossyLayerwise(lw.LayerwiseOneStep):
 
     def __init__(self, consts, C, hd, kappa, tokens_per_program=64, chunks=2, rank=None, requant="kernel",
                  rank_tiles=(64, 128, 64, 4), product="cublas", fuse=False, prefix=0, token_step=False,
-                 lane_scale=None):
+                 lane_scale=None, rdo=0.0, centroid=False):
         """prefix: the first tokens travel exact (the attention sinks); token_step: step = kappa x spread x the
         token's adaptive multiplier (a coarser step where the model expects a larger error); lane_scale: [L, W]
-        multipliers of kappa per lane (shaped steps), None for one kappa everywhere."""
+        multipliers of kappa per lane (shaped steps), None for one kappa everywhere; rdo: lam of the rate-aware
+        rounding (0: off); centroid: centre-of-mass reconstruction."""
         super().__init__(consts, C, hd, tokens_per_program=tokens_per_program, mode="uniform", search=True,
                          chunks=chunks, fuse=fuse, product=product, rank=rank, requant=requant, rank_tiles=rank_tiles)
         self.kappa = float(kappa)
         self.prefix, self.token_step = int(prefix), bool(token_step)
         self.lt = lattice_tables(self.device)
+        self.rdo, self.centroid = float(rdo), bool(centroid)
+        self.cen = centroid_table(self.device)
         self.lanes = lane_scale is not None
         if self.lanes:
             sc = torch.as_tensor(lane_scale, dtype=torch.float64)
@@ -434,9 +507,9 @@ class LossyLayerwise(lw.LayerwiseOneStep):
             self._launch(_lyq_kernel, ((T // self.TB) * self.G,), words[layer], rec[layer], acc, xall[layer],
                          k["sa"][layer], k["b"][layer], k["sp"][layer], k["inv"][layer], k["isx"][layer], k["cos"],
                          k["sin"], ssum[(layer + 1) % 2], ssum[layer % 2], smult, self.lt["lut"], self.kap[layer],
-                         self.kappa, T, W, self.G, self.HG, self.prior_scale, FIRST=layer == 0, TB=self.TB,
-                         H2=self.hd // 2, LUT_W=LUT_W, PREFIX=self.prefix, TOKSTEP=self.token_step,
-                         LANES=self.lanes)
+                         self.lt["cumf"], self.cen, self.kappa, self.rdo, T, W, self.G, self.HG, self.prior_scale,
+                         FIRST=layer == 0, TB=self.TB, H2=self.hd // 2, LUT_W=LUT_W, PREFIX=self.prefix,
+                         TOKSTEP=self.token_step, LANES=self.lanes, RDO=self.rdo > 0, CEN=self.centroid)
         return rec, xall, prior
 
     def encode(self, words, rec=None, xall=None, prior=None, out=None, layer_words=None):
@@ -461,9 +534,9 @@ class LossyLayerwise(lw.LayerwiseOneStep):
             before = pos.sum(dtype=torch.int64) if layer_words is not None and layer > 0 else None
             self._launch(_lyenc_kernel, (S,), words[layer], prior[layer], state, pos, out, starts, acc,
                          k["sa"][layer], k["b"][layer], k["sp"][layer], k["cos"], k["sin"], smult, self.lt["cumf"],
-                         self.lt["lut"], self.kap[layer], self.kappa, T, W, self.G, self.HG, FLUSH=layer == 0,
-                         TB=self.TB, H2=self.hd // 2, LUT_W=LUT_W, PREFIX=self.prefix, TOKSTEP=self.token_step,
-                         LANES=self.lanes)
+                         self.lt["lut"], self.kap[layer], self.kappa, self.rdo, T, W, self.G, self.HG,
+                         FLUSH=layer == 0, TB=self.TB, H2=self.hd // 2, LUT_W=LUT_W, PREFIX=self.prefix,
+                         TOKSTEP=self.token_step, LANES=self.lanes, RDO=self.rdo > 0)
             if before is not None:
                 layer_words[layer] = before - pos.sum(dtype=torch.int64)
         if layer_words is not None:
@@ -495,10 +568,10 @@ class LossyLayerwise(lw.LayerwiseOneStep):
                                  bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer], k["sp"][layer],
                                  k["inv"][layer], k["isx"][layer], k["cos"], k["sin"], bufs["ssum"][(layer + 1) % 2],
                                  bufs["ssum"][layer % 2], bufs["smult"][c * P * self.TB:], self.lt["cumf"],
-                                 self.lt["lut"], self.kap[layer], self.kappa, c * Tc, T, W, self.G, self.HG,
-                                 self.prior_scale, FIRST=layer == 0, LAST=layer == L - 1, TB=self.TB,
+                                 self.lt["lut"], self.kap[layer], self.cen, self.kappa, c * Tc, T, W, self.G,
+                                 self.HG, self.prior_scale, FIRST=layer == 0, LAST=layer == L - 1, TB=self.TB,
                                  H2=self.hd // 2, LUT_SHIFT=16 - LUT_BITS, LUT_W=LUT_W, PREFIX=self.prefix,
-                                 TOKSTEP=self.token_step, LANES=self.lanes)
+                                 TOKSTEP=self.token_step, LANES=self.lanes, CEN=self.centroid)
         for s in streams or []:
             cur.wait_stream(s)
         return words

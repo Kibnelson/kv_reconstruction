@@ -93,7 +93,7 @@ def memory_note(device=None):
 
 
 STAGES = ("capture", "evalcap", "lossless", "lossy", "frontier", "gpu_speed", "pool", "format", "szcodec", "exans",
-          "aquappl", "szprotocol", "report")
+          "transform", "allocate", "aquappl", "szprotocol", "report")
 BRANCH = "llama32-3b-lossy-lossless-compare"
 
 
@@ -167,19 +167,21 @@ AQUA_PAPER = {                     # AQUA-KV paper, Table 1, Llama 3.2 3B (bits 
     "exact": (16.0, 6.98), "aqua2": (2.16, 7.03), "kivi2g128": (2.25, 9.33), "higgs2": (2.02, 7.47)}
 
 
-OURS_METHOD = r"ours([0-9]+(?:\.[0-9]+)?)(t?)([fhuw]?)"
+OURS_METHOD = r"ours([0-9]+(?:\.[0-9]+)?)(t?)([fhuwa]?)(?:_(r[0-9.]*)?(c?))?"
+RDO_DEFAULT = 1 / (24 * math.log(2))      # a uniform quantizer's error-to-rate slope, in step^2 per bit
 
 
-def aqua_method(name, study, fits, consts, sens=None, clamp=16.0):
+def aqua_method(name, study, fits, consts, sens=None, clamp=16.0, alloc=None):
     """A method of the AQUA-KV-protocol stage by name: exact, higgs<b>, aqua<b>, kivi<b>g<group>,
     ours<step>[t][f|h|u|w] (t: per-token step; f: steps shaped by the loss sensitivity over all lanes, h: within
     each head, `sens` is the sensitivity [L, W] they need; u: one absolute step per head, w: one absolute step for
-    all the keys and one for all the values of a layer, AQUA-KV's HIGGS group)."""
+    all the keys and one for all the values of a layer, AQUA-KV's HIGGS group; a: the step multipliers of the
+    measured allocation, `alloc` [L, W]; then _r[lam] rate-aware rounding, _c centre-of-mass reconstruction)."""
     import re
     from kv_compare import streaming as sm
     if ":" in name:                                  # diagnostic: <method>:k or <method>:v (one half compressed)
         base, half = name.split(":")
-        return sm.HalfOnly(aqua_method(base, study, fits, consts, sens, clamp), half)
+        return sm.HalfOnly(aqua_method(base, study, fits, consts, sens, clamp, alloc), half)
     if name == "exact":
         return None
     if name.startswith("higgs"):
@@ -197,7 +199,11 @@ def aqua_method(name, study, fits, consts, sens=None, clamp=16.0):
     m = re.fullmatch(OURS_METHOD, name)
     if m:
         scale = None
-        if m[3] in ("u", "w"):
+        if m[3] == "a":
+            if alloc is None:
+                raise SystemExit(f"{name}: the measured allocation is missing (run the allocate stage first)")
+            scale = alloc
+        elif m[3] in ("u", "w"):
             from kv_compare import sensitivity as sv
             scale = sv.uniform_scales(consts["sp"], study.hd if m[3] == "u" else study.C, clamp=clamp)
         elif m[3]:
@@ -206,7 +212,9 @@ def aqua_method(name, study, fits, consts, sens=None, clamp=16.0):
                 raise SystemExit(f"{name}: shaped steps need the sensitivity")
             scale = sv.lane_scales(sens, consts["sp"], mode="global" if m[3] == "f" else "head", hd=study.hd,
                                    clamp=clamp)
-        return sm.OursGpu(consts, study.C, study.hd, float(m[1]), token_step=m[2] == "t", lane_scale=scale)
+        rdo = 0.0 if not m[4] else (float(m[4][1:]) if len(m[4]) > 1 else RDO_DEFAULT)
+        return sm.OursGpu(consts, study.C, study.hd, float(m[1]), token_step=m[2] == "t", lane_scale=scale,
+                          rdo=rdo, centroid=m[5] == "c")
     raise SystemExit(f"unknown --aqua-methods entry {name!r}")
 
 
@@ -269,6 +277,13 @@ def stage_aquappl(args, out):
     todo = [m for m in args.aqua_methods if m not in res["methods"] or m in args.aqua_rerun]
     shaped = any((re.fullmatch(OURS_METHOD, m.split(":")[0]) or [None] * 4)[3] in ("f", "h") for m in todo)
     sens = kv_sensitivity(args, out, tokenizer, model, device) if shaped else None
+    alloc = None
+    if any((re.fullmatch(OURS_METHOD, m.split(":")[0]) or [None] * 4)[3] == "a" for m in todo):
+        from kv_compare import allocation as al
+        if not (out / "allocation.json").is_file():
+            raise SystemExit("ours<step>a needs allocation.json: run the allocate stage first")
+        a = json.loads((out / "allocation.json").read_text())
+        alloc = al.lane_scale(study.L, study.C, [tuple(g) for g in a["groups"]], a["choice"]["multipliers"])
     if sens is not None and consts is not None and (out / "kv_sensitivity.json").is_file():
         from kv_compare import sensitivity as sv
         info = json.loads((out / "kv_sensitivity.json").read_text())
@@ -281,7 +296,7 @@ def stage_aquappl(args, out):
         if name in res["methods"] and name not in args.aqua_rerun:
             log(f"aquappl {name}: kept from aqua_protocol.json")
             continue
-        comp = aqua_method(name, study, fits, consts, sens, args.fisher_clamp)
+        comp = aqua_method(name, study, fits, consts, sens, args.fisher_clamp, alloc)
         t0 = time.time()
         make = None if comp is None else (lambda comp=comp: sm.StreamingCache(comp, study.L, granule=comp.granule))
         r = sm.perplexity(model, windows, device, make, log=log if args.aqua_verbose else None)
@@ -298,6 +313,146 @@ def stage_aquappl(args, out):
     gc.collect()
     torch.cuda.empty_cache() if device.type == "cuda" else None
     return res
+
+
+def stage_transform(args, out):
+    """How many bits a learned per-head transform of the prediction error could save (kv_compare.transform_gain),
+    estimated from the calibration documents and measured on the test documents, before building it."""
+    from kv_compare import transform_gain as tg
+    from kv_compare.predict import Study
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, args.max_layers, log=log)
+    t0 = time.time()
+    res = tg.measure(study, log=log)
+    res["seconds"] = time.time() - t0
+    (out / "transform_gain.json").write_text(json.dumps(res, indent=1))
+    t = res["total"]
+    log(f"transform: at 2 bits per value now, the same error needs {t['R2']['water_all_lanes']:.3f} bits with the "
+        f"bits moved between lanes, {t['R2']['klt_head_water_all_lanes']:.3f} with a learned per-head transform too "
+        f"({res['seconds']:.0f} s)")
+    return res
+
+
+def stage_allocate(args, out):
+    """Bit allocation measured in AQUA-KV's streaming protocol on our calibration documents (kv_compare.allocation):
+    a base run at --alloc-kappa, then every group (--alloc-band layers x keys or values) with its step times each
+    of --alloc-moves; the change in loss and bits of each, then one move per group chosen for the fewest bits at
+    no more loss. Kept per run in allocation.json (rerun with --aqua-rerun allocate)."""
+    import gc
+    import torch
+    from kv_compare import allocation as al
+    from kv_compare import fused
+    from kv_compare import streaming as sm
+    from kv_compare.capture import load_model, tokenize
+    from kv_compare.predict import Study
+    device = torch.device(args.device)
+    path = out / "allocation.json"
+    tag = {"kappa": args.alloc_kappa, "band": args.alloc_band, "moves": args.alloc_moves,
+           "windows": args.alloc_windows or len(TRAIN), "tokens": args.tokens}
+    res = json.loads(path.read_text()) if path.is_file() and "allocate" not in args.aqua_rerun else {}
+    if res.get("setting") != tag:
+        res = {"setting": tag, "runs": {}}
+    tokenizer, model = load_model(args.model, args.revision, device)
+    study = Study(out / "captures", args.device, TRAIN, "tables", TESTS, None, log=log)
+    consts = fused.prepare(study, log=log)
+    names = TRAIN[:tag["windows"]]
+    windows = [torch.tensor([tokenize(tokenizer, Path(args.texts) / ROLES[n], args.tokens)]) for n in names]
+    grps = al.groups(study.L, study.C, args.alloc_band)
+    res.update(groups=[list(g) for g in grps], documents=[ROLES[n] for n in names])
+    log(f"allocate: {len(grps)} groups x moves {args.alloc_moves} at step {args.alloc_kappa}, on "
+        f"{len(windows)} windows of {args.tokens} tokens of our calibration documents")
+
+    def run(key, mults):
+        if key in res["runs"]:
+            return res["runs"][key]
+        scale = al.lane_scale(study.L, study.C, grps, mults)
+        comp = sm.OursGpu(consts, study.C, study.hd, args.alloc_kappa, lane_scale=scale)
+        t0 = time.time()
+        r = sm.perplexity(model, windows, device, lambda: sm.StreamingCache(comp, study.L, granule=comp.granule))
+        row = {"loss": sum(r["nll_sums_f32"]) / r["tokens"], "bits": r["bits_per_compressed_value"],
+               "seconds": time.time() - t0}
+        res["runs"][key] = row
+        path.write_text(json.dumps(res, indent=1))
+        base = res["runs"].get("base")
+        log(f"allocate {key}: {row['bits']:.3f} bits, loss {row['loss']:.5f} nats per token" +
+            (f" ({al.change_pct(row['loss'] - base['loss']):+.3f}% perplexity, {row['bits'] - base['bits']:+.3f} bits)"
+             if base and key != "base" else "") + f" ({row['seconds']:.0f} s)")
+        gc.collect()
+        return row
+    base = run("base", [1.0] * len(grps))
+    measured = []
+    for i, g in enumerate(grps):
+        per = {}
+        for m in args.alloc_moves:
+            mults = [1.0] * len(grps)
+            mults[i] = m
+            per[m] = run(f"{g[0]} x{m:g}", mults)
+        measured.append(per)
+    mults, dl, db, lam = al.choose(base, measured, args.alloc_moves)
+    res["choice"] = {"multipliers": mults, "predicted_loss_change_pct": al.change_pct(dl),
+                     "predicted_bits_change": db, "lambda": lam}
+    path.write_text(json.dumps(res, indent=1))
+    log("allocate: chosen " + ", ".join(f"{g[0]} x{m:g}" for g, m in zip(grps, mults) if m != 1.0) +
+        f"; predicted {db:+.3f} bits per value at {al.change_pct(dl):+.3f}% perplexity on the calibration text")
+    del model, study, consts
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    return res
+
+
+def allocation_lines(out):
+    from kv_compare import allocation as al
+    a = json.loads((out / "allocation.json").read_text())
+    if "choice" not in a:
+        return []
+    st, runs, base = a["setting"], a["runs"], a["runs"]["base"]
+    moves = st["moves"]
+    lines = ["### Measured bit allocation (our calibration text, AQUA-KV's streaming protocol)", "",
+             f"Base: our GPU codec at step {st['kappa']:g} everywhere, {base['bits']:.3f} bits per compressed value, "
+             f"on {len(a['documents'])} windows of {st['tokens']:,} tokens of our calibration documents (not "
+             "WikiText-2). Each group's step times each move, one group at a time: the change in perplexity "
+             "(float32 loss) and in bits per compressed value. Chosen: one move per group for the fewest bits at "
+             "no more loss, assuming the groups add up.", "",
+             "| Group | " + " | ".join(f"x{m:g}: perplexity, bits" for m in moves) + " | Chosen |",
+             "| --- | " + " | ".join("---" for _ in moves) + " | --- |"]
+    for g, m_ch in zip(a["groups"], a["choice"]["multipliers"]):
+        cells = []
+        for m in moves:
+            r = runs.get(f"{g[0]} x{m:g}")
+            cells.append("-" if r is None else
+                         f"{al.change_pct(r['loss'] - base['loss']):+.3f}%, {r['bits'] - base['bits']:+.3f}")
+        lines.append(f"| {g[0]} | " + " | ".join(cells) + f" | x{m_ch:g} |")
+    c = a["choice"]
+    lines += ["", f"Predicted on the calibration text: {c['predicted_bits_change']:+.3f} bits per value at "
+              f"{c['predicted_loss_change_pct']:+.3f}% perplexity. In AQUA-KV's WikiText-2 protocol it runs as "
+              "ours<step>a.", ""]
+    return lines
+
+
+def transform_lines(out):
+    r = json.loads((out / "transform_gain.json").read_text())
+    t = r["total"]
+    lines = ["## A learned transform of the prediction error: how much could it save? (estimate)", "",
+             "The one-step predictor's error per head (128 channels) and per layer half (1,024), its eigenbasis "
+             "learned on our calibration documents and measured on the test documents. Gaussian rate-distortion "
+             "estimates at the same total error as our current shape (the step proportional to each channel's "
+             "spread) has at 2 and 3 bits per value; they rank the options, real codes sit about 0.25 bits above.",
+             "", "| Option | At 2 bits now | At 3 bits now |", "| --- | --- | --- |"]
+    rows = [("now: step proportional to each channel's spread", "now"),
+            ("bits moved between the channels of each head", "water_within_head"),
+            ("bits moved within each layer", "water_within_layer"),
+            ("bits moved between all lanes", "water_all_lanes"),
+            ("learned per-head transform, bits moved within each head", "klt_head_water_within_head"),
+            ("learned per-head transform, bits moved within each layer", "klt_head_water_within_layer"),
+            ("learned per-half transform (1,024 channels), within each layer", "klt_half_water_within_layer"),
+            ("learned per-head transform, bits moved between all lanes", "klt_head_water_all_lanes"),
+            ("learned per-half transform, bits moved between all lanes", "klt_half_water_all_lanes")]
+    for label, key in rows:
+        lines.append(f"| {label} | {t['R2'][key]:.3f} | {t['R3'][key]:.3f} |")
+    lines += ["", f"High-rate gain of the transform alone: {t['klt_head_high_rate_gain']:.3f} bits per value per "
+              f"head, {t['klt_half_high_rate_gain']:.3f} per layer half. These are squared-error estimates: our "
+              "error-shaping results show that the error that costs bits least is not always the error the model "
+              "minds least.", ""]
+    return lines
 
 
 def stage_szprotocol(args, out):
@@ -421,7 +576,10 @@ def aqua_protocol_lines(out):
             return (f"Ours, GPU codec, step {m[1]}" + (", token step" if m[2] else "") +
                     {"": "", "f": ", steps shaped by loss sensitivity (all lanes)",
                      "h": ", steps shaped by loss sensitivity (within each head)",
-                     "u": ", one absolute step per head", "w": ", one absolute step per layer's keys / values"}[m[3]])
+                     "u": ", one absolute step per head", "w": ", one absolute step per layer's keys / values",
+                     "a": ", measured bit allocation"}[m[3]] +
+                    (", rate-aware rounding" + (f" (lambda {m[4][1:]})" if m[4] and len(m[4]) > 1 else "")
+                     if m[4] else "") + (", centre-of-mass reconstruction" if m[5] else ""))
         return k
     for k, r in ms.items():
         if k == "exact":
@@ -1832,6 +1990,10 @@ def stage_report(args, out):
         lines += [""] + eval_lines(out)
     if (out / "aqua_protocol.json").is_file():
         lines += [""] + aqua_protocol_lines(out)
+    if (out / "allocation.json").is_file():
+        lines += allocation_lines(out)
+    if (out / "transform_gain.json").is_file():
+        lines += [""] + transform_lines(out)
     lines += szprotocol_lines(out)
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
@@ -1904,9 +2066,15 @@ def parser():
     p.add_argument("--aqua-methods",
                    default="exact,higgs2,kivi2g128,kivi2g32,kivi4g32,aqua2,aqua3,aqua4,ours0.5,ours1,ours2,ours4,"
                            "ours2t,ours4t,ours1f,ours2f,ours3f,ours4f,ours6f,ours8f,ours2h,ours4h,ours1u,ours2u,"
-                           "ours3u,ours4u,ours2w,ours4w",
-                   help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, ours<step>[t][f|h|u|w]; "
+                           "ours3u,ours4u,ours2w,ours4w,ours2a,ours3a,ours4a,ours2_r,ours2_c,ours2_rc,ours4_rc",
+                   help="aquappl: methods (exact, higgs<b>, aqua<b>, kivi<b>g<group>, "
+                        "ours<step>[t][f|h|u|w|a][_r[lam]][c]; "
                         "<method>:k or :v compresses one half only)")
+    p.add_argument("--alloc-kappa", type=float, default=2.0, help="allocate: the base step")
+    p.add_argument("--alloc-band", type=int, default=4, help="allocate: layers per group (keys and values apart)")
+    p.add_argument("--alloc-moves", default="0.5,2", help="allocate: step multipliers tried on each group")
+    p.add_argument("--alloc-windows", type=int, default=0,
+                   help="allocate: calibration documents used as windows (0: all six)")
     p.add_argument("--fisher-tokens", type=int, default=2048,
                    help="aquappl, shaped steps (f, h): tokens per prefill of the loss-sensitivity pass")
     p.add_argument("--fisher-clamp", type=float, default=16.0,
@@ -1983,6 +2151,7 @@ def main(argv=None):
     args.lossy_docs = [d for d in args.lossy_docs.split(",") if d]
     args.aqua_methods = [m for m in args.aqua_methods.split(",") if m]
     args.aqua_rerun = [m for m in args.aqua_rerun.split(",") if m]
+    args.alloc_moves = [float(m) for m in args.alloc_moves.split(",") if m]
     args.sz_protocol_configs = [c for c in args.sz_protocol_configs.split(",") if c]
     if any(d not in ("test", "eval") for d in args.lossy_docs):
         raise SystemExit("--lossy-docs takes test, eval or test,eval")
@@ -2060,6 +2229,10 @@ def main(argv=None):
             stage_szcodec(args, out)
         if "exans" in stages:
             stage_exans(args, out)
+        if "transform" in stages:
+            stage_transform(args, out)
+        if "allocate" in stages:
+            stage_allocate(args, out)
         if "aquappl" in stages:
             stage_aquappl(args, out)
         if "szprotocol" in stages:

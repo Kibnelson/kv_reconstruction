@@ -237,9 +237,9 @@ class OursGpu:
     stream; the RoPE tables start at the block's position. Bits = the stream's. lane_scale: kappa multipliers per
     lane [L, W] (shaped steps, kv_compare.sensitivity), None for one kappa."""
 
-    def __init__(self, consts, C, hd, kappa, token_step=False, lane_scale=None):
+    def __init__(self, consts, C, hd, kappa, token_step=False, lane_scale=None, rdo=0.0, centroid=False):
         self.consts, self.C, self.hd, self.kappa, self.token_step = consts, C, hd, kappa, token_step
-        self.lane_scale = lane_scale
+        self.lane_scale, self.rdo, self.centroid = lane_scale, rdo, centroid
         self.granule = 1
 
     def __call__(self, start, X):
@@ -252,7 +252,8 @@ class OursGpu:
         k = dict(self.consts, cos=self.consts["cos"][start:start + m].contiguous(),
                  sin=self.consts["sin"][start:start + m].contiguous())
         codec = LossyLayerwise(k, self.C, self.hd, self.kappa, tokens_per_program=tb, chunks=1,
-                               token_step=self.token_step, lane_scale=self.lane_scale)
+                               token_step=self.token_step, lane_scale=self.lane_scale, rdo=self.rdo,
+                               centroid=self.centroid)
         words = to_bf16(X.to(dev, torch.float64)).to(torch.bfloat16).view(torch.int16)
         rec, xall, prior = codec.quantize(words)
         _, starts, _ = codec.encode(words, rec, xall, prior)

@@ -160,8 +160,16 @@ main lossy comparison.
       carry the loss.
     - Ready to run: one absolute step per head (`ours<step>u`) and per layer's keys / values (`ours<step>w`),
       the error spread evenly as after AQUA-KV's rotation (the GPU codec takes a kappa per lane).
-    - Next, if that is not enough: the residual quantized in a Hadamard-rotated domain, with a scale per token
-      as AQUA-KV does; or a sensitivity measured in the protocol itself (errors injected into older tokens only).
+    - Ready to run, our own ways to fewer bits (not AQUA-KV's rotation and grid):
+      - a bit allocation measured in the protocol itself, on our calibration text (stage `allocate`, methods
+        `ours<step>a`);
+      - rate-aware rounding in the encoder (`_r`, decoder unchanged);
+      - centre-of-mass reconstruction (`_c`);
+      - an estimate of what a transform learned from our data could save (stage `transform`).
+    - Later: the strong predictor in the lossy GPU codec; fitting the predictor on the receiver's reconstructions;
+      keeping the most-attended tokens exact; low-rank KV.
+    - For prefill/decode disaggregation the matching lossy test is our transfer test (the prompt compressed once),
+      where we are ahead; AQUA-KV's protocol is the in-memory use.
     - Target, in AQUA-KV's protocol: +1.5% or less at 2.1 bits or less, and +0.1% at 3.0 bits or less.
 1. **A GPU decoder for the 7.87-bit predictor** (layers 0, l−2, l−1, 16 groups, no attention).
    - Gain: 441 MiB per document instead of 504, 13% fewer bytes than our current stream and 35% fewer than

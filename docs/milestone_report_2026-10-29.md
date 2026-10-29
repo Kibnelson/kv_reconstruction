@@ -159,6 +159,23 @@ and ran ours in it too.
 - HIGGS alone gives 7.554 (paper 7.47).
 - KIVI 2-bit, group 128, gives 7.784, much better than the paper's 9.33. So our KIVI is not handicapped.
 
+### Hardware and link speeds in each paper
+
+| | SplitZip | ExANS | AQUA-KV | KIVI | This study |
+| --- | --- | --- | --- | --- | --- |
+| GPU | H200 server (two Xeon 8468) | H100 | A100 for speed (8B on one, 70B on two); accuracy GPU not named | A100 80 GB for speed and memory | RTX A4500 20 GB, every method |
+| Models | Llama-3-8B, Qwen3-30B-A3B, Qwen3-32B | not named | Llama 3.2 3B, 3.1 8B / 70B; Qwen 2.5 | Llama-2 7B / 13B, Falcon-7B, Mistral-7B, Llama-3-8B-Instruct, LongChat-7B | Llama-3.2-3B |
+| Context | 512 to 131K tokens | a 256K snapshot | 8K (WikiText-2), up to 128K (LongBench) | 4K-8K (LongBench), about 30K (needle) | 8K |
+| Measured | codec GB/s; real KV transfer with Mooncake over RDMA (ConnectX-7; RoCE 4x200G, 700 Gb/s effective); SGLang time to first token | codec GB/s and ratio only | quality; tokens per second | quality; memory; throughput | everything on one GPU; transfers modelled |
+| Link speeds discussed | 400 and 800 Gb/s Ethernet (about 50 and 100 GB/s); its codec hides below 463 GB/s | 400 Gb/s InfiniBand (about 50 GB/s) | none: in-memory compression, no transfer | none | 1-800 Gb/s |
+| Headline | 1.32x transfer, 1.30x time to first token against uncompressed; 613 / 2,182 GB/s on the H200 | 1.51x; 391 / 638 GB/s on the H100 | 2.16 bits, perplexity 7.03 | 2-bit KV | sections 5-6 |
+
+- **Datacenter fabrics only.** The two lossless papers target datacenter fabrics (400-800 Gb/s) on H100/H200-class
+  GPUs. The two lossy papers compress the cache in GPU memory and do not transfer it.
+- **GPU-dependent speeds.** On our A4500, ExANS decodes at 54 GB/s, against 638 GB/s on their H100. SplitZip
+  decodes at 309 GB/s, against 2,182 GB/s on their H200. Bits per value do not depend on the GPU, but every speed
+  and every 400-800 Gb/s conclusion does.
+
 ## 5. Lossless results
 
 ### 5.1 Size and speed of every real stream (one document, bit-exact)
@@ -299,6 +316,12 @@ contribute:
 
 The keys/values test below shows the compounding directly at step 4.
 
+**Which test fits which use.**
+- **Prefill/decode disaggregation:** the prompt's KV is computed exactly on the prefill GPU and sent once. The
+  decode GPU generates from it and computes every new token's KV itself. That is our transfer test, where we are
+  ahead of AQUA-KV.
+- **Memory pools, or a cache compressed while decoding:** that is AQUA-KV's protocol, where it is ahead.
+
 ### 6.4 Which half costs us (keys only or values only compressed, the other half exact)
 
 | Method | Keys only | Values only | Both | Both, if the halves added up |
@@ -437,7 +460,9 @@ Each lane's step was made proportional to 1 / sqrt(its diagonal Fisher informati
 - **AQUA-KV is our re-implementation,** calibrated on our documents, until the authors' trained run lands. Checked
   against their functions (3.3).
 - **Different hardware and model from the papers.** SplitZip's paper uses an H200 and Qwen3-32B; ExANS's an H100 at
-  256K context. Ours is an A4500 with Llama-3.2-3B, an 8K context.
+  256K context. Ours is an A4500 with Llama-3.2-3B, an 8K context. The baselines' codecs run on our GPU, so the
+  comparison here is like for like, but their speeds here are 5-12 times below their papers', and so would ours
+  be against an H100. Results at 400-800 Gb/s hold only for this GPU class.
 - **Modelled transfers.** Times are max(wire, decode) on an ideal link; there is no real network or serving
   integration.
 - **Exact costs, not streams,** for the strongest lossless predictors (7.75-7.87 bits) and for the lossy CPU coder.

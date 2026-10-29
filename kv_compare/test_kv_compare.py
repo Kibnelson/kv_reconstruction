@@ -392,12 +392,15 @@ xs = torch.stack([words_to_float(w32[l]) for l in range(L)])
 rc = layerwise.prepare_rank(study, consts, 32, log=lambda m: None)
 gen = torch.Generator().manual_seed(5)
 shaped = torch.exp2(torch.empty(tuple(consts["sp"].shape)).uniform_(-4, 4, generator=gen))   # 1/16 .. 16 per lane
-for kappa, chunks, rank, prefix, tstep, lanes in ((1.0, 2, None, 0, False, None), (0.25, 1, rc, 0, False, None),
-                                                  (2.0, 2, None, 4, True, None), (1.0, 2, None, 4, False, shaped),
-                                                  (0.5, 1, rc, 0, True, shaped)):
+plain_bits = {}
+for kappa, chunks, rank, prefix, tstep, lanes, rdo, cen in (
+        (1.0, 2, None, 0, False, None, 0.0, False), (0.25, 1, rc, 0, False, None, 0.0, False),
+        (2.0, 2, None, 4, True, None, 0.0, False), (1.0, 2, None, 4, False, shaped, 0.0, False),
+        (0.5, 1, rc, 0, True, shaped, 0.0, False), (1.0, 2, None, 0, False, None, 0.25, False),
+        (1.0, 2, None, 0, False, None, 0.0, True), (2.0, 1, rc, 4, False, shaped, 0.12, True)):
     codec = lg.LossyLayerwise(consts, study.C, study.hd, kappa, tokens_per_program=16, chunks=chunks, rank=rank,
                               requant="epilogue" if rank else "kernel", rank_tiles=(16, 16, 32, 4), prefix=prefix,
-                              token_step=tstep, lane_scale=lanes)
+                              token_step=tstep, lane_scale=lanes, rdo=rdo, centroid=cen)
     rec, xall, prior = codec.quantize(words)
     buf, starts, _ = codec.encode(words, rec, xall, prior)
     dec = codec.decode(buf, starts, T)
@@ -405,13 +408,20 @@ for kappa, chunks, rank, prefix, tstep, lanes in ((1.0, 2, None, 0, False, None)
     r32 = rec.to(torch.int32) & 0xFFFF
     xr = torch.stack([words_to_float(r32[l]) for l in range(L)])
     step = (codec.lane_kappa().cpu() * codec.k["sp"].double().cpu())[:, None, :] * (4.0 if tstep else 1.0)  # mult <= 4
-    bound = 0.5 * step + (xs.abs() + 0.5 * step) * 2.0 ** -8 + 1e-30
+    half = 0.5 + (1.0 if rdo else 0.0) + (0.5 if cen else 0.0)       # rate-aware rounding: 1.5 steps; centroid: +0.5
+    bound = half * step + (xs.abs() + half * step) * 2.0 ** -8 + 1e-30
     fin = torch.isfinite(xs)
     ok = ((xr - xs).abs() <= bound * 1.0001) | (r32 == w32)
     assert bool(ok[fin].all()), ("error bound", kappa, int((~ok[fin]).sum()))
     assert torch.equal(r32[1, 3, 2:5], w32[1, 3, 2:5]), "Inf and NaN travel exactly"
     assert torch.equal(r32[:, :prefix], w32[:, :prefix]), "the first tokens travel exactly"
-    print("ok", kappa, chunks, rank is not None, prefix, tstep, lanes is not None, codec.bits(starts, T) / (L * T * W))
+    bits = codec.bits(starts, T) / (L * T * W)
+    key = (kappa, chunks, rank is None, prefix, tstep, lanes is None)
+    if not rdo and not cen:
+        plain_bits[key] = bits
+    elif rdo and not cen and key in plain_bits:
+        assert bits <= plain_bits[key] + 1e-9, ("rate-aware rounding saves bits", bits, plain_bits[key])
+    print("ok", kappa, chunks, rank is not None, prefix, tstep, lanes is not None, rdo, cen, bits)
 """
 
 
@@ -505,15 +515,16 @@ class LossyGpuTests(unittest.TestCase):
     def test_lossy_gpu_codec_round_trip_interpreted(self):
         """The closed-loop lossy per-layer codec decodes exactly the encoder's reconstruction, within half a step
         plus BF16 rounding of the input, with Inf and NaN kept exact; dense and reduced-rank products; one kappa
-        and shaped steps (kappa per lane)."""
+        and shaped steps (kappa per lane); rate-aware rounding (fewer bits, within 1.5 steps) and centre-of-mass
+        reconstruction."""
         import importlib.util
         import subprocess
         if importlib.util.find_spec("triton") is None or torch is None:
             self.skipTest("Triton and PyTorch are required")
         r = subprocess.run([sys.executable, "-c", LOSSY_CHECK, str(ROOT)], capture_output=True, text=True,
-                           timeout=2400)
+                           timeout=3600)
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
-        self.assertEqual(r.stdout.count("ok"), 5, r.stdout)
+        self.assertEqual(r.stdout.count("ok"), 8, r.stdout)
 
 
 class StreamingProtocolTests(unittest.TestCase):
