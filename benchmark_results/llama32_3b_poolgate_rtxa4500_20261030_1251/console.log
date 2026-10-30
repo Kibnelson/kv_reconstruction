@@ -1,0 +1,104 @@
+/home/nelson/kv_llama32/scripts/bench_pool_gate.py:93: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:208.)
+  return torch.from_numpy(w).to(device).view(torch.bfloat16).view(T, H, D)
+/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+  warn_once(FP_FUSION_DEFAULT_WARNING)
+12:47:39 attn 1x2048 layer 0: pool 57.3 us, dense same arithmetic 61.4 us, SDPA 43.9 us (on the cache view 50.1), FlashInfer 44.0 us, identical=True, 12.82 bits allocated
+12:47:39 attn 1x2048 layer 9: pool 56.1 us, dense same arithmetic 60.4 us, SDPA 42.0 us (on the cache view 48.6), FlashInfer 44.0 us, identical=True, 12.82 bits allocated
+12:47:39 attn 1x2048 layer 18: pool 55.3 us, dense same arithmetic 60.4 us, SDPA 42.1 us (on the cache view 49.1), FlashInfer 44.0 us, identical=True, 12.82 bits allocated
+12:47:39 attn 1x2048 layer 27: pool 55.3 us, dense same arithmetic 60.4 us, SDPA 42.0 us (on the cache view 49.0), FlashInfer 43.0 us, identical=True, 12.82 bits allocated
+12:47:42 attn 16x2048 layer 0: pool 389.1 us, dense same arithmetic 367.1 us, SDPA 325.6 us (on the cache view 337.9), FlashInfer 276.5 us, identical=True, 12.82 bits allocated
+12:47:42 attn 16x2048 layer 9: pool 389.0 us, dense same arithmetic 365.6 us, SDPA 325.6 us (on the cache view 334.8), FlashInfer 273.4 us, identical=True, 12.82 bits allocated
+12:47:42 attn 16x2048 layer 18: pool 388.1 us, dense same arithmetic 364.5 us, SDPA 325.4 us (on the cache view 337.9), FlashInfer 273.4 us, identical=True, 12.82 bits allocated
+12:47:42 attn 16x2048 layer 27: pool 389.1 us, dense same arithmetic 364.5 us, SDPA 325.6 us (on the cache view 334.9), FlashInfer 274.4 us, identical=True, 12.82 bits allocated
+12:47:43 attn 32x2048 layer 0: pool 742.4 us, dense same arithmetic 956.8 us, SDPA 527.4 us (on the cache view 547.8), FlashInfer 492.5 us, identical=True, 12.82 bits allocated
+12:47:43 attn 32x2048 layer 9: pool 744.4 us, dense same arithmetic 692.7 us, SDPA 527.3 us (on the cache view 551.3), FlashInfer 499.7 us, identical=True, 12.82 bits allocated
+12:47:43 attn 32x2048 layer 18: pool 745.3 us, dense same arithmetic 952.7 us, SDPA 527.7 us (on the cache view 553.3), FlashInfer 500.7 us, identical=True, 12.82 bits allocated
+12:47:43 attn 32x2048 layer 27: pool 744.4 us, dense same arithmetic 693.1 us, SDPA 527.4 us (on the cache view 551.4), FlashInfer 500.8 us, identical=True, 12.82 bits allocated
+12:47:44 attn 1x8192 layer 0: pool 126.0 us, dense same arithmetic 118.8 us, SDPA 85.9 us (on the cache view 95.2), FlashInfer 87.8 us, identical=True, 12.72 bits allocated
+12:47:44 attn 1x8192 layer 9: pool 127.0 us, dense same arithmetic 153.6 us, SDPA 86.0 us (on the cache view 95.1), FlashInfer 87.0 us, identical=True, 12.72 bits allocated
+12:47:44 attn 1x8192 layer 18: pool 126.4 us, dense same arithmetic 152.6 us, SDPA 85.8 us (on the cache view 92.2), FlashInfer 87.0 us, identical=True, 12.72 bits allocated
+12:47:44 attn 1x8192 layer 27: pool 127.0 us, dense same arithmetic 118.8 us, SDPA 86.0 us (on the cache view 93.2), FlashInfer 87.0 us, identical=True, 12.72 bits allocated
+12:47:44 attn 4x8192 layer 0: pool 391.2 us, dense same arithmetic 365.6 us, SDPA 253.3 us (on the cache view 263.2), FlashInfer 256.0 us, identical=True, 12.72 bits allocated
+12:47:44 attn 4x8192 layer 9: pool 390.1 us, dense same arithmetic 365.6 us, SDPA 254.0 us (on the cache view 262.6), FlashInfer 255.0 us, identical=True, 12.72 bits allocated
+12:47:44 attn 4x8192 layer 18: pool 389.6 us, dense same arithmetic 364.5 us, SDPA 254.3 us (on the cache view 261.9), FlashInfer 255.9 us, identical=True, 12.72 bits allocated
+12:47:45 attn 4x8192 layer 27: pool 389.6 us, dense same arithmetic 494.6 us, SDPA 253.0 us (on the cache view 261.1), FlashInfer 255.9 us, identical=True, 12.72 bits allocated
+12:47:45 attn 8x8192 layer 0: pool 744.4 us, dense same arithmetic 954.4 us, SDPA 491.5 us (on the cache view 499.7), FlashInfer 479.2 us, identical=True, 12.72 bits allocated
+12:47:45 attn 8x8192 layer 9: pool 743.4 us, dense same arithmetic 953.3 us, SDPA 491.5 us (on the cache view 499.7), FlashInfer 479.2 us, identical=True, 12.72 bits allocated
+12:47:45 attn 8x8192 layer 18: pool 742.4 us, dense same arithmetic 692.2 us, SDPA 492.0 us (on the cache view 499.7), FlashInfer 479.0 us, identical=True, 12.72 bits allocated
+12:47:45 attn 8x8192 layer 27: pool 743.4 us, dense same arithmetic 953.3 us, SDPA 491.9 us (on the cache view 498.6), FlashInfer 479.2 us, identical=True, 12.72 bits allocated
+12:47:45 attn 1x32768: no capture of 32768 tokens; skipped
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 154.00it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+12:47:54 e2e identity: {'tokens_equal': True, 'logits_bit_identical': True, 'batch': 2, 'prompt': 1024, 'generated': 32}
+12:48:10 e2e prompt 2048: {"backend": "bf16 + SDPA", "batch": 49, "kv_mib_per_sequence": 238.0, "ms_per_step": 41.67545498825434, "decode_tokens_per_s": 1175.752010717339, "prefill_s": 10.804723501205444, "pool_grows": 0}
+12:48:33 e2e prompt 2048: {"backend": "pool (exactkv)", "batch": 62, "kv_mib_per_sequence": 190.53125, "ms_per_step": 70.54990670812411, "decode_tokens_per_s": 878.8105171634542, "prefill_s": 14.015782594680786, "pool_grows": 0}
+12:48:50 e2e prompt 2048: {"backend": "bf16 + FlashInfer", "batch": 49, "kv_mib_per_sequence": 238.0, "ms_per_step": 38.99186427198996, "decode_tokens_per_s": 1256.6724088440021, "prefill_s": 11.122565984725952, "pool_grows": 0}
+12:49:08 e2e prompt 2048: {"backend": "pool (exactkv)", "batch": 49, "kv_mib_per_sequence": 190.53125, "ms_per_step": 46.1415437262828, "decode_tokens_per_s": 1061.949732125867, "prefill_s": 11.347134113311768, "pool_grows": 0}
+12:49:26 e2e prompt 8192: {"backend": "bf16 + SDPA", "batch": 12, "kv_mib_per_sequence": 910.0, "ms_per_step": 41.553335865651526, "decode_tokens_per_s": 288.78547895162706, "prefill_s": 12.0661039352417, "pool_grows": 0}
+12:49:27 e2e prompt 8192: pool (exactkv) out of memory at batch 16
+12:49:50 e2e prompt 8192: {"backend": "pool (exactkv)", "batch": 15, "kv_mib_per_sequence": 723.5703125, "ms_per_step": 57.85913542499693, "decode_tokens_per_s": 259.2503308219075, "prefill_s": 15.224789381027222, "pool_grows": 0}
+12:50:07 e2e prompt 8192: {"backend": "bf16 + FlashInfer", "batch": 12, "kv_mib_per_sequence": 910.0, "ms_per_step": 34.83476976710042, "decode_tokens_per_s": 344.48340207872883, "prefill_s": 12.182419776916504, "pool_grows": 0}
+12:50:26 e2e prompt 8192: {"backend": "pool (exactkv)", "batch": 12, "kv_mib_per_sequence": 723.5703125, "ms_per_step": 46.540951165627305, "decode_tokens_per_s": 257.83744636621367, "prefill_s": 12.269635200500488, "pool_grows": 0}
+12:50:26 install: no ctx8192_r0; using ds_gsm8k_r0
+12:50:52   fused one-step predictor prepared for 28 layers
+12:50:56 install ours, layer by layer into the pool (two-layer ring): 46.8 ms, peak +777 MiB (pool 712, transient 64), exact=True
+12:50:56 install ours, whole cache decoded, then the pool: 45.6 ms, peak +1609 MiB (pool 712, transient 896), exact=True
+12:50:58 install SplitZip, whole cache decoded, then the pool: 53.7 ms, peak +1609 MiB (pool 712, transient 896), exact=True
+12:50:59 install raw BF16 received whole, then the pool: 42.3 ms, peak +1609 MiB (pool 712, transient 896), exact=True
+# The P gate on NVIDIA RTX A4500: unsloth/Llama-3.2-3B
+
+P = exact KV kept compressed in decode-GPU memory, decoded in registers by attention. The pool is exactkv (the published P; its dense kernel performs the same arithmetic). See scripts/bench_pool_gate.py.
+
+## Decode attention: the pool against production dense kernels, on identical KV
+
+Per decode step = the mean per layer x 28 layers. The production dense kernels are PyTorch SDPA (contiguous [B, H, T, D], and on the engine's cache view) and FlashInfer (exactkv's own baseline; when installed). The pool's bit-identity is checked against exactkv's dense kernel with the same arithmetic, which is a reference, not a production kernel (it assembles BF16 from bytes). Bits per value of the pool: allocated (directory and raw-row reserve) / used.
+
+| Batch x context | Pool | SDPA | SDPA, cache view | FlashInfer | Pool vs fastest dense | Same-arithmetic reference | Bit-identical | Bits allocated / used |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 x 2,048 | 1.57 ms | 1.19 ms | 1.38 ms | 1.23 ms | 0.76x | 1.70 ms | yes | 12.82 / 12.58 |
+| 16 x 2,048 | 10.89 ms | 9.12 ms | 9.42 ms | 7.68 ms | 0.71x | 10.23 ms | yes | 12.82 / 12.58 |
+| 32 x 2,048 | 20.84 ms | 14.77 ms | 15.43 ms | 13.96 ms | 0.67x | 23.07 ms | yes | 12.82 / 12.58 |
+| 1 x 8,192 | 3.54 ms | 2.41 ms | 2.63 ms | 2.44 ms | 0.68x | 3.81 ms | yes | 12.72 / 12.58 |
+| 4 x 8,192 | 10.92 ms | 7.10 ms | 7.34 ms | 7.16 ms | 0.65x | 11.13 ms | yes | 12.72 / 12.58 |
+| 8 x 8,192 | 20.82 ms | 13.77 ms | 13.98 ms | 13.42 ms | 0.64x | 24.87 ms | yes | 12.72 / 12.58 |
+
+Pool vs fastest dense above 1 means the pool is faster.
+
+## Generation: BF16 cache vs pool (same engine and weights)
+
+Greedy check, batch 2, 1024-token prompts, 32 tokens: tokens equal True, logits bit-identical True.
+
+| Prompt | Backend | Batch | KV per sequence | ms per step | Decode tokens/s |
+| --- | --- | --- | --- | --- | --- |
+| 2,048 + 128 | bf16 + SDPA | 49 | 238 MiB | 41.68 | 1176 |
+| 2,048 + 128 | pool (exactkv) | 62 | 191 MiB | 70.55 | 879 |
+| 2,048 + 128 | bf16 + FlashInfer | 49 | 238 MiB | 38.99 | 1257 |
+| 2,048 + 128 | pool (exactkv) (at the dense batch) | 49 | 191 MiB | 46.14 | 1062 |
+| 8,192 + 128 | bf16 + SDPA | 12 | 910 MiB | 41.55 | 289 |
+| 8,192 + 128 | pool (exactkv) | 15 | 724 MiB | 57.86 | 259 |
+| 8,192 + 128 | bf16 + FlashInfer | 12 | 910 MiB | 34.83 | 344 |
+| 8,192 + 128 | pool (exactkv) (at the dense batch) | 12 | 724 MiB | 46.54 | 258 |
+
+Each backend runs at the largest batch the same KV budget fits, then the pool at the dense batch (the same work). Same engine for all (exactkv's plain Python loop, no CUDA graphs); only the cache and the decode-attention kernel differ.
+
+## T -> P installation: ds_gsm8k_r0 (8,192 tokens, 28 layers, 896 MiB in BF16)
+
+| Path | Wire bits/value | Install time | Peak extra memory | of which transient | Pool | Pool exact |
+| --- | --- | --- | --- | --- | --- | --- |
+| ours, layer by layer into the pool (two-layer ring) | 9.28 | 47 ms | 777 MiB | 64 MiB | 712 MiB | True |
+| ours, whole cache decoded, then the pool | 9.28 | 46 ms | 1609 MiB | 896 MiB | 712 MiB | True |
+| SplitZip, whole cache decoded, then the pool | 12.06 | 54 ms | 1609 MiB | 896 MiB | 712 MiB | True |
+| raw BF16 received whole, then the pool | 16.00 | 42 ms | 1609 MiB | 896 MiB | 712 MiB | True |
+
+**Time until the pool is ready, per link** (the wire and the installation in sequence; a chunked protocol would overlap them):
+
+| Link | ours (layer by layer) | ours | SplitZip | raw BF16 received whole |
+| --- | --- | --- | --- | --- |
+| 1 Gb/s | 4408 ms | 4407 ms | 5717 ms | 7559 ms |
+| 10 Gb/s | 483 ms | 482 ms | 620 ms | 794 ms |
+| 25 Gb/s | 221 ms | 220 ms | 280 ms | 343 ms |
+| 50 Gb/s | 134 ms | 133 ms | 167 ms | 193 ms |
+| 100 Gb/s | 90 ms | 89 ms | 110 ms | 117 ms |
+| 200 Gb/s | 69 ms | 67 ms | 82 ms | 80 ms |
+| 400 Gb/s | 58 ms | 57 ms | 68 ms | 61 ms |
+
