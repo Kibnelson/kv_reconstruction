@@ -1,0 +1,57 @@
+{
+  "actual_cuda_tests_pending": 3,
+  "corrected_before_publication": "Initial copied helper namespace mismatch was caught by packet integration, fixed, and the full codec cohort reran successfully; initial log retained.",
+  "expected_nuc": {
+    "candidate_reference_packet_groups": 16,
+    "fresh_receivers": 26,
+    "own_rows_with_original_wire": 24,
+    "rows": 52,
+    "workers": 26
+  },
+  "gpu_executed": false,
+  "gpu_performance_measured": false,
+  "independent_reviews": {
+    "completed_schedule_integrity": true,
+    "inverse_core_and_controller": true,
+    "runner_protocol": true
+  },
+  "offline_compilation": {
+    "gpu_executed": false,
+    "log": "compile.log",
+    "production_pointer_types": true,
+    "receipt": "offline_compile.json",
+    "script": "offline_compile.py",
+    "target": "cuda sm86 warp32",
+    "variants_passed": 8
+  },
+  "scope": "CPU semantic/protocol tests and offline SM86 compilation only; three actual CUDA gates required on NUC",
+  "status": "completed",
+  "syntax": {
+    "bash_syntax": true,
+    "offline_helper_parsed": true,
+    "python_source_files_parsed": 6
+  },
+  "tests": {
+    "codec": {
+      "command": "python -m unittest tests.test_standalone_inverse_codec.ContractTests tests.test_standalone_inverse_codec.InterpreterTests -v",
+      "log": "codec.log",
+      "passed": 2,
+      "seconds": 82.922,
+      "triton_interpret": true
+    },
+    "core": {
+      "checked_cdf_slots": 655360,
+      "log": "core.log",
+      "passed": 4,
+      "seconds": 0.397
+    },
+    "protocol": {
+      "command": "python -m unittest tests.test_standalone_inverse -v",
+      "log": "protocol.log",
+      "passed": 14,
+      "seconds": 3.157
+    }
+  },
+  "total_cpu_passes": 20,
+  "unchanged_existing_tracked_files": true
+}

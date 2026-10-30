@@ -1,0 +1,13 @@
+Offline compiler correctness check only; no GPU execution or performance measurement.
+Command: PYTHONPATH=<existing CPU/Triton validation dependencies>:<repo> OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python /workspace/scratch/cf461553fac4/inverse_offline_compile.py
+Triton: 3.6.0
+Explicit target: GPUTarget(backend='cuda', arch=86, warp_size=32)
+{"algorithm": "masked", "compiled": true, "compiler_wall_seconds": 1.1028179910063045, "num_warps": 1, "ptx_bytes": 106464, "ptx_sha256": "f8b3db4f341a8c2e92139d9b73427a4ebb90068b45eea019f5c5c3509e2b6abf", "shared_bytes": 0, "sparse_pointer_type": "*i32", "variant": "first"}
+{"algorithm": "masked", "compiled": true, "compiler_wall_seconds": 0.6008040179949603, "num_warps": 1, "ptx_bytes": 108224, "ptx_sha256": "3a56b8433b1951587bfbd2f3f8ccf10d013d61a3c4d3ecf1c9627dba522bca13", "shared_bytes": 0, "sparse_pointer_type": "*i32", "variant": "middle"}
+{"algorithm": "masked", "compiled": true, "compiler_wall_seconds": 0.6087719529969036, "num_warps": 1, "ptx_bytes": 107659, "ptx_sha256": "71d1ea95465da012468a20cdf1cfbbfe7df565cbde9e4417dfee5b154b305877", "shared_bytes": 0, "sparse_pointer_type": "*i32", "variant": "last"}
+{"algorithm": "masked", "compiled": true, "compiler_wall_seconds": 1.0861184829991544, "num_warps": 1, "ptx_bytes": 166310, "ptx_sha256": "2bb29d5d4a84221dc103b7baea12cec35e648ea7e4db470508b5a0343189d333", "shared_bytes": 0, "sparse_pointer_type": "*i32", "variant": "exact_middle"}
+{"algorithm": "packed", "compiled": true, "compiler_wall_seconds": 0.0017120420015999116, "num_warps": 1, "ptx_bytes": 105115, "ptx_sha256": "4517b9bcc001cde6fa1189c1d1f03f76adf47ac7b7cd7367d720c4100f0f6f05", "shared_bytes": 0, "sparse_pointer_type": "*u16", "variant": "first"}
+{"algorithm": "packed", "compiled": true, "compiler_wall_seconds": 0.001247957996383775, "num_warps": 1, "ptx_bytes": 106862, "ptx_sha256": "83a49ea18db51e78bb11fd08a56dc9bd08311d09c9dd55caa345b5bd2b17a4c3", "shared_bytes": 0, "sparse_pointer_type": "*u16", "variant": "middle"}
+{"algorithm": "packed", "compiled": true, "compiler_wall_seconds": 0.0012157470046076924, "num_warps": 1, "ptx_bytes": 106294, "ptx_sha256": "fb9fbdc0a2a4b1d17ed67425f15bb1c8aa0766cdced1f36853f702d416370b99", "shared_bytes": 0, "sparse_pointer_type": "*u16", "variant": "last"}
+{"algorithm": "packed", "compiled": true, "compiler_wall_seconds": 0.0011309289984637871, "num_warps": 1, "ptx_bytes": 158275, "ptx_sha256": "afa5ff14a4cd5dfd423c1f52187832c449e1f5e3517a43d42a8b593a1c9a0715", "shared_bytes": 0, "sparse_pointer_type": "*u16", "variant": "exact_middle"}
+PASS: compiled all eight real decoder variants. Compile wall times are not GPU timings.

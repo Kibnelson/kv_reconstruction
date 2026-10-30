@@ -1,0 +1,47 @@
+test_inverse_mode_tables_and_original_sender_identity (tests.test_standalone_inverse_codec.ContractTests.test_inverse_mode_tables_and_original_sender_identity) ... ok
+test_both_inverse_modes_preserve_complete_wire_and_original_words (tests.test_standalone_inverse_codec.InterpreterTests.test_both_inverse_modes_preserve_complete_wire_and_original_words) ... ERROR
+
+======================================================================
+ERROR: test_both_inverse_modes_preserve_complete_wire_and_original_words (tests.test_standalone_inverse_codec.InterpreterTests.test_both_inverse_modes_preserve_complete_wire_and_original_words)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/cf461553fac4/compact_test_deps/triton/runtime/interpreter.py", line 1357, in __call__
+    self.fn(**args)
+  File "/workspace/scratch/cf461553fac4/kv_verified_review/kv_compare/standalone_inverse_core.py", line 307, in _core_ldec_kernel
+    x, rp, w = gc._dec_value_core(x, rp, mu, s, valid, buf_ptr, cumf_ptr, lut_ptr, tail_ptr, coarse_ptr, sparse_ptr, LUT_SHIFT, LUT_W,
+           ^^^^^^^^^^^^^^^^^^
+AttributeError: module 'kv_compare.team_onestep.gpu_coder' has no attribute '_dec_value_core'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/scratch/cf461553fac4/kv_verified_review/tests/test_standalone_inverse_codec.py", line 70, in test_both_inverse_modes_preserve_complete_wire_and_original_words
+    held = codec.decode(packet)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/cf461553fac4/kv_verified_review/kv_compare/standalone_schedule_codec.py", line 135, in decode
+    output = super().decode(packet)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/cf461553fac4/kv_verified_review/kv_compare/team_lookup.py", line 168, in decode
+    self.native.decode(packet.payload, self.starts, self.shape[1],
+  File "/workspace/scratch/cf461553fac4/kv_verified_review/kv_compare/team_onestep/layerwise.py", line 558, in decode
+    self._launch(_ldec_kernel, (P,), buf, starts, bufs["state"], bufs["pos"], words[layer], acc,
+  File "/workspace/scratch/cf461553fac4/kv_verified_review/kv_compare/standalone_inverse_codec.py", line 43, in _launch_core
+    return self._original_launch(core._core_ldec_kernel, grid, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/cf461553fac4/kv_verified_review/kv_compare/team_onestep/layerwise.py", line 438, in _launch
+    return kernel[grid](*args, **kw, num_warps=warps, **self.opts)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/cf461553fac4/compact_test_deps/triton/runtime/jit.py", line 370, in <lambda>
+    return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/cf461553fac4/compact_test_deps/triton/runtime/interpreter.py", line 1470, in run
+    return GridExecutor(fn, self.arg_names, grid, self.pre_run_hooks)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/cf461553fac4/compact_test_deps/triton/runtime/interpreter.py", line 1361, in __call__
+    raise InterpreterError(repr(e)) from e
+triton.runtime.errors.InterpreterError: AttributeError("module 'kv_compare.team_onestep.gpu_coder' has no attribute '_dec_value_core'")
+
+----------------------------------------------------------------------
+Ran 2 tests in 17.586s
+
+FAILED (errors=1)
