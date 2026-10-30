@@ -1,0 +1,973 @@
+{
+  "additional_shared_device_bytes_expected": 45568,
+  "author_timing": {
+    "ast_sha256": "092b2485c9d06b4091488736ae6c50ef84b60fe3c31d924c7e09fd17e08d2729",
+    "extracted_definitions": [
+      "synchronize",
+      "bench"
+    ],
+    "scope": "Only author synchronize/bench definitions; not a full author workload or serving reproduction.",
+    "source": "/home/nelson/kv_reconstruction/runs/_llama_official/sources/splitzip/bench_codec_throughput.py",
+    "source_sha256": "7f1936a13ee3b2bbb04a35b71ca14a88bc407fe9b67e2c128d2ec48df2d018e2",
+    "unchanged_ast": true
+  },
+  "codec_provenance": {
+    "arm": "rank256_uniform",
+    "kind": "standalone_prefix",
+    "manifest_sha256": "11392c5a0a9b67caf5d549e6956e7340b95e47fdc6a54f2fd75c11cdb0830d0c",
+    "prefix_mode": "warp",
+    "state": "/home/nelson/kv_reconstruction/runs/team_packet_a4500_20261028_122017_2834427/team_state",
+    "state_sha256": "9057ebeb8dc596b584f1d273c3fe0e9c35abe7e08af0d7b3a0d03b9401daa670"
+  },
+  "cold_state_initialization_wall_ms": 950.5330827087164,
+  "device": "NVIDIA RTX A4500",
+  "frozen_packet_immutability": [
+    {
+      "bytes": 35161200,
+      "id": "team_rank256_uniform_test_text_t512",
+      "sha256": "90c1375e1ccec670d3548641cd99ab6250a458b34106890fd5c740f6b40d2263",
+      "unchanged": true
+    },
+    {
+      "bytes": 34606128,
+      "id": "team_rank256_uniform_test_code_t512",
+      "sha256": "07d4e9bfbeff391e9523e21cc514eea6a4e07bd202a6a2a56a0d37379294da05",
+      "unchanged": true
+    }
+  ],
+  "gpu_measured": true,
+  "graph_capture_count": 1,
+  "graph_setup": {
+    "graph_capture_count": 1,
+    "wall_ms": 64.58767503499985
+  },
+  "memory_scope": "Torch incremental API peaks include output/scratch; candidate predictor state unchanged; inverse tables charged separately; native allocations outside Torch unmeasured",
+  "method": "prefix_warp_rank256_uniform",
+  "packet_immutability": [
+    {
+      "bytes": 35161200,
+      "id": "team_rank256_uniform_test_text_t512",
+      "sha256": "90c1375e1ccec670d3548641cd99ab6250a458b34106890fd5c740f6b40d2263",
+      "unchanged": true
+    },
+    {
+      "bytes": 34606128,
+      "id": "team_rank256_uniform_test_code_t512",
+      "sha256": "07d4e9bfbeff391e9523e21cc514eea6a4e07bd202a6a2a56a0d37379294da05",
+      "unchanged": true
+    }
+  ],
+  "profiles": [],
+  "raw_packet_immutability": [
+    {
+      "bytes": 58720573,
+      "id": "raw_bf16_k0_test_text_t512",
+      "sha256": "2f42ef47a9849bc98fbc0f0ca93fa015547fe32096e58f2a658afdeb0c3cacde",
+      "unchanged": true
+    },
+    {
+      "bytes": 58720573,
+      "id": "raw_bf16_k0_test_code_t512",
+      "sha256": "0f43ef06c8b4f8a48e147ba971ddfe9905b6ada2d635c563dba19921a36afabd",
+      "unchanged": true
+    }
+  ],
+  "receiver_sha256": "9fcb2a1e6f4ca9b13cf247a07c135681bbe983a1095268f40dec17048f6da8c9",
+  "round": "paired",
+  "rows": [
+    {
+      "accounting": {
+        "additional_shared_device_bytes": 45568,
+        "arena_bytes": 0,
+        "avoided_expanded_arena_bytes": 117575680,
+        "borrowed_payload": false,
+        "coder_table_bytes": 103256,
+        "compact_payload_bytes": 35157424,
+        "compact_staging_bytes": 35157424,
+        "decode_storage": "stable compact staging; cloned graph output",
+        "decoder_accumulator_buffers": 2,
+        "decoder_accumulator_bytes": 4194304,
+        "decoder_chunks": null,
+        "decoder_kernel": "_prefix_ldec_kernel",
+        "decoder_mode": "graph",
+        "decoder_partition_fallback": "forbidden",
+        "decoder_prefix_algorithm": "warp_ballot_popcount",
+        "decoder_product": "cublas",
+        "decoder_rank_scratch_bytes": 131072,
+        "decoder_workspace_scope": "Tensor totals are charged; native stream/cuBLAS allocations outside Torch are unmeasured",
+        "decoder_workspace_tensor_bytes": 6652928,
+        "directory_bytes": 3080,
+        "directory_staging_bytes": 3080,
+        "effective_decoder_chunks": 2,
+        "encoder_accumulator_buffers": 2,
+        "encoder_accumulator_bytes": 8388608,
+        "encoder_additional_accumulator_bytes": 4194304,
+        "encoder_execution": "reverse rolling products",
+        "encoder_feature_buffer_count": 1,
+        "encoder_feature_bytes": 1048576,
+        "encoder_prediction_products_per_call": 27,
+        "encoder_prior_bytes": 2048,
+        "encoder_product": "cublas",
+        "encoder_rank_scratch_bytes": 131072,
+        "encoder_scratch_lifetime": "fresh per encode call; no retained device tensors",
+        "encoder_surprise_bytes": 32768,
+        "fallback_codec": null,
+        "feature_reuse": true,
+        "full_inverse_shared_bytes": 0,
+        "header_checksum_bytes": 696,
+        "inverse_algorithm": "packed_cutoff_sparse",
+        "inverse_checked_slots": 655360,
+        "inverse_coarse_sha256": "9c0da092eab8bbd5174f67958c0e5b23f570e48f0ec7b05af7d3127899ff457b",
+        "inverse_mode": "packed",
+        "inverse_proof_verified": true,
+        "inverse_reference_sha256": "57fe89079d5c16db0db1435a9f11ee0176de20e0b6a5983c901c3a56548f2862",
+        "inverse_sparse_sha256": "14ca1143c60167ef044ae95037dcf394ab7072578efea706c466ffcfbd0cf8d3",
+        "lookup": false,
+        "native_starts_bytes": 1024,
+        "native_used_stream_bytes": 35158448,
+        "original_coder_table_bytes": 57688,
+        "output_allocation_bytes_per_call": 58720256,
+        "output_bytes": 58720256,
+        "output_clone_bytes_per_call": 58720256,
+        "packet_bytes": 35161200,
+        "persistent_output_bytes": 58720256,
+        "prefix_additional_shared_device_bytes": 0,
+        "prefix_geometry": 128,
+        "prefix_mode": "warp",
+        "prefix_production_layout_count": 6,
+        "prefix_production_layouts": [
+          {
+            "ballots": 8,
+            "compiled_hash": "11131260c71100d375c5d9e8730f7b5459d0a417f6d2a7e8a849305e8b055279",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "c4aeafbed0f3e5aad3fc2a822a0331956d8564a3cab78869cd6af2d35eccc393",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "4be4e4bb2b1a7c733b0c1c2beda0c0642acfcf05afdbec4e4489d64b724ae360",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "11131260c71100d375c5d9e8730f7b5459d0a417f6d2a7e8a849305e8b055279",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "c4aeafbed0f3e5aad3fc2a822a0331956d8564a3cab78869cd6af2d35eccc393",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "4be4e4bb2b1a7c733b0c1c2beda0c0642acfcf05afdbec4e4489d64b724ae360",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "bdd1cab104072a45a3afd357a0e54d3ebe3bab97718302ad825ef95d28678485",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "8d35df63500b7eb1160c0d6eb3dd56179a933e64bd78c312c27dab5b321b4f7f",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "d2136df3b995cd7f6cc521b13896b2de40a88d3a43a5fc0797344a196a733bb1",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "bdd1cab104072a45a3afd357a0e54d3ebe3bab97718302ad825ef95d28678485",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "8d35df63500b7eb1160c0d6eb3dd56179a933e64bd78c312c27dab5b321b4f7f",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "d2136df3b995cd7f6cc521b13896b2de40a88d3a43a5fc0797344a196a733bb1",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "66a6c7c20e24e226395b8c44b084fe17a68887c2e37cb682386ed08d86ba733a",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "d16b61471e65c2beadeab094d18dea1a697bbdc9f244911ae3a5d8cb9f37ba90",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "bdad52b3e9df7d6810fb7b4d6562d38529911a5465d76058ce17f59385d8fbc4",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "66a6c7c20e24e226395b8c44b084fe17a68887c2e37cb682386ed08d86ba733a",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "d16b61471e65c2beadeab094d18dea1a697bbdc9f244911ae3a5d8cb9f37ba90",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "bdad52b3e9df7d6810fb7b4d6562d38529911a5465d76058ce17f59385d8fbc4",
+            "verified": true
+          }
+        ],
+        "prefix_proof": {
+          "additional_shared_device_bytes": 0,
+          "channels": 128,
+          "format": "standalone_prefix_warp_v1",
+          "gpu_execution_verified": false,
+          "host_fullrow_masks_checked": 1568,
+          "host_halfwarp_masks_checked": 131072,
+          "host_prefix_sha256": "f1150ddb48dd0da97fbba6ec68fdf16a788ced28f8f58858e2bdf5f227bbdc23",
+          "lanes_per_warp": 32,
+          "logical_groups": 4,
+          "required_cuda_capability": [
+            8,
+            6
+          ],
+          "required_segment": 0,
+          "required_triton": "3.6.0",
+          "scope": "CPU algebra proof only; not exhaustive over all 128-bit masks and not CUDA layout proof",
+          "verified": true,
+          "warps": 1
+        },
+        "prefix_proof_verified": true,
+        "prefix_runtime_proof": {
+          "additional_shared_device_bytes": 0,
+          "all_channel_positions_compared": 602112,
+          "capability": [
+            8,
+            6
+          ],
+          "changing_steps": 3,
+          "compiler_layout": {
+            "ballots": 4,
+            "compiled_hash": "b767d0fe2629fbce24ed4fb5b1fb19447baad65259feaaeb3049d2d3d0f09467",
+            "layouts": [
+              "#ttg.linear<{register = [], lane = [[1], [2], [4], [8], [16]], warp = [], block = []}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 1,
+            "ptx_sha256": "85a047ee5eaf7aeb7223449a02cc9b23a75e38413dbd8267bbc61e267cfe1948",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "d367d517b7c18065cd2d9bd11debffa47284e3f05ff3002ff20efc2f1d975d25",
+            "verified": true
+          },
+          "device": "cuda:0",
+          "device_name": "NVIDIA RTX A4500",
+          "gpu_execution_verified": true,
+          "mask_rows": 1568,
+          "output_sha256": "6caf1c4bbddaedf35984bbc96c7ec9f529cdac172810a731c84ea6d7a2701b5d",
+          "prefix_calls": 4704,
+          "scope": "Actual CUDA structured/random prefix algebra and compiled probe layout; production layout separately checked before launch",
+          "triton": "3.6.0",
+          "verified": true
+        },
+        "prefix_runtime_verified": true,
+        "prefix_warps": 1,
+        "reference_rank_encoder_prediction_products_per_call": 53,
+        "rolling_encoder": true,
+        "shared_predictor_bytes": 153346048,
+        "sparse_inverse_coarse_bytes": 40960,
+        "sparse_inverse_exception_bytes": 4608,
+        "sparse_inverse_shared_bytes": 45568,
+        "standalone_all_layers": true,
+        "unchanged_encoder_header_chunks": 2,
+        "unchanged_encoder_header_product": "cublas"
+      },
+      "complete_bpv": 9.580666678292411,
+      "decode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 14.584486078772347,
+            "mean": 14.080433324030528,
+            "min": 13.209662360878706,
+            "std": 0.563803687114532
+          },
+          "raw_gbs_samples": [
+            13.209662360878706,
+            13.840464348817395,
+            14.290055621214167,
+            14.584486078772347,
+            14.477498210470024
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.0044452503323554994,
+            0.0042426507174968715,
+            0.004109169170260429,
+            0.004026213586330414,
+            0.004055967070162297
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.0044452503323554994,
+            "mean": 0.004175850175321102,
+            "min": 0.004026213586330414,
+            "std": 0.0001719361663149449
+          },
+          "wall_mean_ms": 4.175850175321102,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.636096000671387,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 694522368,
+              "wall_ms": 5.639428272843361
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 4.524032115936279,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 694522368,
+              "wall_ms": 4.527082666754723
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 4.545536041259766,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 694522368,
+              "wall_ms": 4.548618569970131
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.634047985076904,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 694522368,
+              "wall_ms": 5.638556554913521
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.554175853729248,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 694522368,
+              "wall_ms": 5.5583156645298
+            }
+          ],
+          "wall_median_ms": 5.5583156645298,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 4.142079830169678,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 694522368,
+              "wall_ms": 4.144864156842232
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.140480041503906,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 694522368,
+              "wall_ms": 5.1435865461826324
+            }
+          ]
+        }
+      },
+      "decoded_word_sha256": "63f7f46151acd50b6813cc54e515842016e072f0fdf851dcb51d5fde8b1547d0",
+      "document": "test_text_t512",
+      "encode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 11.450221363843426,
+            "mean": 11.406417617506323,
+            "min": 11.322177709645741,
+            "std": 0.0540026244723976
+          },
+          "raw_gbs_samples": [
+            11.322177709645741,
+            11.450221363843426,
+            11.382554173557496,
+            11.441148112112588,
+            11.435986728372361
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.005186304040253162,
+            0.005128307491540909,
+            0.005158794336020947,
+            0.005132374428212643,
+            0.0051346908137202265
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.005186304040253162,
+            "mean": 0.005148094221949577,
+            "min": 0.005128307491540909,
+            "std": 2.44579262382003e-05
+          },
+          "wall_mean_ms": 5.148094221949577,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.569375991821289,
+              "incremental_peak_torch_bytes": 153231872,
+              "peak_torch_bytes": 789033984,
+              "wall_ms": 5.580320954322815
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.5595197677612305,
+              "incremental_peak_torch_bytes": 153231872,
+              "peak_torch_bytes": 789033984,
+              "wall_ms": 5.570350214838982
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.6302080154418945,
+              "incremental_peak_torch_bytes": 153231872,
+              "peak_torch_bytes": 789033984,
+              "wall_ms": 5.641406401991844
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.62175989151001,
+              "incremental_peak_torch_bytes": 153231872,
+              "peak_torch_bytes": 789033984,
+              "wall_ms": 5.638154223561287
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.5866241455078125,
+              "incremental_peak_torch_bytes": 153231872,
+              "peak_torch_bytes": 789033984,
+              "wall_ms": 5.59704564511776
+            }
+          ],
+          "wall_median_ms": 5.59704564511776,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.631999969482422,
+              "incremental_peak_torch_bytes": 153231872,
+              "peak_torch_bytes": 789033984,
+              "wall_ms": 5.650099366903305
+            },
+            {
+              "baseline_torch_bytes": 635802112,
+              "cuda_interval_ms": 5.626944065093994,
+              "incremental_peak_torch_bytes": 153231872,
+              "peak_torch_bytes": 789033984,
+              "wall_ms": 5.638636648654938
+            }
+          ]
+        }
+      },
+      "encode_packet_matches_frozen": true,
+      "encode_packet_sha256": "90c1375e1ccec670d3548641cd99ab6250a458b34106890fd5c740f6b40d2263",
+      "execution": "compact_search",
+      "expected_sha": "63f7f46151acd50b6813cc54e515842016e072f0fdf851dcb51d5fde8b1547d0",
+      "frozen_packet_bytes": 35161200,
+      "frozen_packet_sha256": "90c1375e1ccec670d3548641cd99ab6250a458b34106890fd5c740f6b40d2263",
+      "id": "team_rank256_uniform_test_text_t512",
+      "method": "prefix_warp_rank256_uniform",
+      "original_exact": true,
+      "original_word_exact": true,
+      "original_word_sha256": "63f7f46151acd50b6813cc54e515842016e072f0fdf851dcb51d5fde8b1547d0",
+      "packet": "/home/nelson/kv_reconstruction/runs/standalone_prefix_a4500_20261030_111710_165740/prefix_warp_rank256_uniform_t512/team_rank256_uniform_test_text_t512_encoded.kvc",
+      "packet_bytes": 35161200,
+      "packet_sha256": "90c1375e1ccec670d3548641cd99ab6250a458b34106890fd5c740f6b40d2263",
+      "round": "paired",
+      "shape": [
+        28,
+        512,
+        2048
+      ],
+      "state_sha256": "9057ebeb8dc596b584f1d273c3fe0e9c35abe7e08af0d7b3a0d03b9401daa670",
+      "status": "verified",
+      "tokens": 512,
+      "values": 29360128,
+      "warm_prefix_layouts_unchanged": {
+        "after": {
+          "count": 6,
+          "sha256": "e5e156ce844852d8fc52543d9d3e826f29cd2c05d3f68bd05ea46df59bc8c0e9"
+        },
+        "before": {
+          "count": 6,
+          "sha256": "e5e156ce844852d8fc52543d9d3e826f29cd2c05d3f68bd05ea46df59bc8c0e9"
+        },
+        "verified": true
+      }
+    },
+    {
+      "accounting": {
+        "additional_shared_device_bytes": 45568,
+        "arena_bytes": 0,
+        "avoided_expanded_arena_bytes": 117575680,
+        "borrowed_payload": false,
+        "coder_table_bytes": 103256,
+        "compact_payload_bytes": 34602352,
+        "compact_staging_bytes": 35157424,
+        "decode_storage": "stable compact staging; cloned graph output",
+        "decoder_accumulator_buffers": 2,
+        "decoder_accumulator_bytes": 4194304,
+        "decoder_chunks": null,
+        "decoder_kernel": "_prefix_ldec_kernel",
+        "decoder_mode": "graph",
+        "decoder_partition_fallback": "forbidden",
+        "decoder_prefix_algorithm": "warp_ballot_popcount",
+        "decoder_product": "cublas",
+        "decoder_rank_scratch_bytes": 131072,
+        "decoder_workspace_scope": "Tensor totals are charged; native stream/cuBLAS allocations outside Torch are unmeasured",
+        "decoder_workspace_tensor_bytes": 6652928,
+        "directory_bytes": 3080,
+        "directory_staging_bytes": 3080,
+        "effective_decoder_chunks": 2,
+        "encoder_accumulator_buffers": 2,
+        "encoder_accumulator_bytes": 8388608,
+        "encoder_additional_accumulator_bytes": 4194304,
+        "encoder_execution": "reverse rolling products",
+        "encoder_feature_buffer_count": 1,
+        "encoder_feature_bytes": 1048576,
+        "encoder_prediction_products_per_call": 27,
+        "encoder_prior_bytes": 2048,
+        "encoder_product": "cublas",
+        "encoder_rank_scratch_bytes": 131072,
+        "encoder_scratch_lifetime": "fresh per encode call; no retained device tensors",
+        "encoder_surprise_bytes": 32768,
+        "fallback_codec": null,
+        "feature_reuse": true,
+        "full_inverse_shared_bytes": 0,
+        "header_checksum_bytes": 696,
+        "inverse_algorithm": "packed_cutoff_sparse",
+        "inverse_checked_slots": 655360,
+        "inverse_coarse_sha256": "9c0da092eab8bbd5174f67958c0e5b23f570e48f0ec7b05af7d3127899ff457b",
+        "inverse_mode": "packed",
+        "inverse_proof_verified": true,
+        "inverse_reference_sha256": "57fe89079d5c16db0db1435a9f11ee0176de20e0b6a5983c901c3a56548f2862",
+        "inverse_sparse_sha256": "14ca1143c60167ef044ae95037dcf394ab7072578efea706c466ffcfbd0cf8d3",
+        "lookup": false,
+        "native_starts_bytes": 1024,
+        "native_used_stream_bytes": 34603376,
+        "original_coder_table_bytes": 57688,
+        "output_allocation_bytes_per_call": 58720256,
+        "output_bytes": 58720256,
+        "output_clone_bytes_per_call": 58720256,
+        "packet_bytes": 34606128,
+        "persistent_output_bytes": 58720256,
+        "prefix_additional_shared_device_bytes": 0,
+        "prefix_geometry": 128,
+        "prefix_mode": "warp",
+        "prefix_production_layout_count": 6,
+        "prefix_production_layouts": [
+          {
+            "ballots": 8,
+            "compiled_hash": "11131260c71100d375c5d9e8730f7b5459d0a417f6d2a7e8a849305e8b055279",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "c4aeafbed0f3e5aad3fc2a822a0331956d8564a3cab78869cd6af2d35eccc393",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "4be4e4bb2b1a7c733b0c1c2beda0c0642acfcf05afdbec4e4489d64b724ae360",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "11131260c71100d375c5d9e8730f7b5459d0a417f6d2a7e8a849305e8b055279",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "c4aeafbed0f3e5aad3fc2a822a0331956d8564a3cab78869cd6af2d35eccc393",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "4be4e4bb2b1a7c733b0c1c2beda0c0642acfcf05afdbec4e4489d64b724ae360",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "bdd1cab104072a45a3afd357a0e54d3ebe3bab97718302ad825ef95d28678485",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "8d35df63500b7eb1160c0d6eb3dd56179a933e64bd78c312c27dab5b321b4f7f",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "d2136df3b995cd7f6cc521b13896b2de40a88d3a43a5fc0797344a196a733bb1",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "bdd1cab104072a45a3afd357a0e54d3ebe3bab97718302ad825ef95d28678485",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "8d35df63500b7eb1160c0d6eb3dd56179a933e64bd78c312c27dab5b321b4f7f",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "d2136df3b995cd7f6cc521b13896b2de40a88d3a43a5fc0797344a196a733bb1",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "66a6c7c20e24e226395b8c44b084fe17a68887c2e37cb682386ed08d86ba733a",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "d16b61471e65c2beadeab094d18dea1a697bbdc9f244911ae3a5d8cb9f37ba90",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "bdad52b3e9df7d6810fb7b4d6562d38529911a5465d76058ce17f59385d8fbc4",
+            "verified": true
+          },
+          {
+            "ballots": 8,
+            "compiled_hash": "66a6c7c20e24e226395b8c44b084fe17a68887c2e37cb682386ed08d86ba733a",
+            "layouts": [
+              "#ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 2,
+            "ptx_sha256": "d16b61471e65c2beadeab094d18dea1a697bbdc9f244911ae3a5d8cb9f37ba90",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "bdad52b3e9df7d6810fb7b4d6562d38529911a5465d76058ce17f59385d8fbc4",
+            "verified": true
+          }
+        ],
+        "prefix_proof": {
+          "additional_shared_device_bytes": 0,
+          "channels": 128,
+          "format": "standalone_prefix_warp_v1",
+          "gpu_execution_verified": false,
+          "host_fullrow_masks_checked": 1568,
+          "host_halfwarp_masks_checked": 131072,
+          "host_prefix_sha256": "f1150ddb48dd0da97fbba6ec68fdf16a788ced28f8f58858e2bdf5f227bbdc23",
+          "lanes_per_warp": 32,
+          "logical_groups": 4,
+          "required_cuda_capability": [
+            8,
+            6
+          ],
+          "required_segment": 0,
+          "required_triton": "3.6.0",
+          "scope": "CPU algebra proof only; not exhaustive over all 128-bit masks and not CUDA layout proof",
+          "verified": true,
+          "warps": 1
+        },
+        "prefix_proof_verified": true,
+        "prefix_runtime_proof": {
+          "additional_shared_device_bytes": 0,
+          "all_channel_positions_compared": 602112,
+          "capability": [
+            8,
+            6
+          ],
+          "changing_steps": 3,
+          "compiler_layout": {
+            "ballots": 4,
+            "compiled_hash": "b767d0fe2629fbce24ed4fb5b1fb19447baad65259feaaeb3049d2d3d0f09467",
+            "layouts": [
+              "#ttg.linear<{register = [], lane = [[1], [2], [4], [8], [16]], warp = [], block = []}>"
+            ],
+            "pack": 1,
+            "prefix_call_sites": 1,
+            "ptx_sha256": "85a047ee5eaf7aeb7223449a02cc9b23a75e38413dbd8267bbc61e267cfe1948",
+            "pure": false,
+            "target": "cuda sm86 warp32",
+            "ttgir_sha256": "d367d517b7c18065cd2d9bd11debffa47284e3f05ff3002ff20efc2f1d975d25",
+            "verified": true
+          },
+          "device": "cuda:0",
+          "device_name": "NVIDIA RTX A4500",
+          "gpu_execution_verified": true,
+          "mask_rows": 1568,
+          "output_sha256": "6caf1c4bbddaedf35984bbc96c7ec9f529cdac172810a731c84ea6d7a2701b5d",
+          "prefix_calls": 4704,
+          "scope": "Actual CUDA structured/random prefix algebra and compiled probe layout; production layout separately checked before launch",
+          "triton": "3.6.0",
+          "verified": true
+        },
+        "prefix_runtime_verified": true,
+        "prefix_warps": 1,
+        "reference_rank_encoder_prediction_products_per_call": 53,
+        "rolling_encoder": true,
+        "shared_predictor_bytes": 153346048,
+        "sparse_inverse_coarse_bytes": 40960,
+        "sparse_inverse_exception_bytes": 4608,
+        "sparse_inverse_shared_bytes": 45568,
+        "standalone_all_layers": true,
+        "unchanged_encoder_header_chunks": 2,
+        "unchanged_encoder_header_product": "cublas"
+      },
+      "complete_bpv": 9.429421561104911,
+      "decode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 14.5780101463025,
+            "mean": 14.106396837684365,
+            "min": 13.365858368320417,
+            "std": 0.5472962288732693
+          },
+          "raw_gbs_samples": [
+            13.365858368320417,
+            13.691203172184563,
+            14.550733440343661,
+            14.346179061270682,
+            14.5780101463025
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.004393302276730538,
+            0.004288903996348381,
+            0.004035553000867367,
+            0.0040930937603116035,
+            0.004028002135455609
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.004393302276730538,
+            "mean": 0.004167771033942699,
+            "min": 0.004028002135455609,
+            "std": 0.00016441653240031935
+          },
+          "wall_mean_ms": 4.167771033942699,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.128191947937012,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 729124864,
+              "wall_ms": 5.131244659423828
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.000192165374756,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 729124864,
+              "wall_ms": 5.004001781344414
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.119999885559082,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 729124864,
+              "wall_ms": 5.12293353676796
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.666816234588623,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 729124864,
+              "wall_ms": 5.670661106705666
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.618688106536865,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 729124864,
+              "wall_ms": 5.622580647468567
+            }
+          ],
+          "wall_median_ms": 5.131244659423828,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.204991817474365,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 729124864,
+              "wall_ms": 5.209444090723991
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 4.929535865783691,
+              "incremental_peak_torch_bytes": 58720256,
+              "peak_torch_bytes": 729124864,
+              "wall_ms": 4.932530224323273
+            }
+          ]
+        }
+      },
+      "decoded_word_sha256": "188717d6361374d897326795e1973a7c32c5966203f553ad06a05a304dd9fa30",
+      "document": "test_code_t512",
+      "encode": {
+        "batched": {
+          "iters": 50,
+          "raw_gbs": {
+            "max": 11.43225339882427,
+            "mean": 11.403512695613998,
+            "min": 11.324178939339273,
+            "std": 0.04490743110308329
+          },
+          "raw_gbs_samples": [
+            11.324178939339273,
+            11.43225339882427,
+            11.420317662883981,
+            11.413565237518688,
+            11.427248239503774
+          ],
+          "repeats": 5,
+          "samples_seconds": [
+            0.005185387507081032,
+            0.005136367604136467,
+            0.005141735784709453,
+            0.005144777707755566,
+            0.005138617344200611
+          ],
+          "scope": "Unchanged author bench body; whole API calls between synchronizations; five per-call batch averages.",
+          "seconds": {
+            "max": 0.005185387507081032,
+            "mean": 0.005149377189576626,
+            "min": 0.005136367604136467,
+            "std": 2.0379602878705724e-05
+          },
+          "wall_mean_ms": 5.149377189576626,
+          "warmup": 10
+        },
+        "isolated": {
+          "samples": [
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.5764479637146,
+              "incremental_peak_torch_bytes": 152182784,
+              "peak_torch_bytes": 822587392,
+              "wall_ms": 5.586441606283188
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.62278413772583,
+              "incremental_peak_torch_bytes": 152182784,
+              "peak_torch_bytes": 822587392,
+              "wall_ms": 5.634378641843796
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.6031999588012695,
+              "incremental_peak_torch_bytes": 152182784,
+              "peak_torch_bytes": 822587392,
+              "wall_ms": 5.613001063466072
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.582848072052002,
+              "incremental_peak_torch_bytes": 152182784,
+              "peak_torch_bytes": 822587392,
+              "wall_ms": 5.594553425908089
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.63097620010376,
+              "incremental_peak_torch_bytes": 152182784,
+              "peak_torch_bytes": 822587392,
+              "wall_ms": 5.64240850508213
+            }
+          ],
+          "wall_median_ms": 5.613001063466072,
+          "warmup_samples": [
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.627200126647949,
+              "incremental_peak_torch_bytes": 152182784,
+              "peak_torch_bytes": 822587392,
+              "wall_ms": 5.644064396619797
+            },
+            {
+              "baseline_torch_bytes": 670404608,
+              "cuda_interval_ms": 5.549344062805176,
+              "incremental_peak_torch_bytes": 152182784,
+              "peak_torch_bytes": 822587392,
+              "wall_ms": 5.560256540775299
+            }
+          ]
+        }
+      },
+      "encode_packet_matches_frozen": true,
+      "encode_packet_sha256": "07d4e9bfbeff391e9523e21cc514eea6a4e07bd202a6a2a56a0d37379294da05",
+      "execution": "compact_search",
+      "expected_sha": "188717d6361374d897326795e1973a7c32c5966203f553ad06a05a304dd9fa30",
+      "frozen_packet_bytes": 34606128,
+      "frozen_packet_sha256": "07d4e9bfbeff391e9523e21cc514eea6a4e07bd202a6a2a56a0d37379294da05",
+      "id": "team_rank256_uniform_test_code_t512",
+      "method": "prefix_warp_rank256_uniform",
+      "original_exact": true,
+      "original_word_exact": true,
+      "original_word_sha256": "188717d6361374d897326795e1973a7c32c5966203f553ad06a05a304dd9fa30",
+      "packet": "/home/nelson/kv_reconstruction/runs/standalone_prefix_a4500_20261030_111710_165740/prefix_warp_rank256_uniform_t512/team_rank256_uniform_test_code_t512_encoded.kvc",
+      "packet_bytes": 34606128,
+      "packet_sha256": "07d4e9bfbeff391e9523e21cc514eea6a4e07bd202a6a2a56a0d37379294da05",
+      "round": "paired",
+      "shape": [
+        28,
+        512,
+        2048
+      ],
+      "state_sha256": "9057ebeb8dc596b584f1d273c3fe0e9c35abe7e08af0d7b3a0d03b9401daa670",
+      "status": "verified",
+      "tokens": 512,
+      "values": 29360128,
+      "warm_prefix_layouts_unchanged": {
+        "after": {
+          "count": 6,
+          "sha256": "e5e156ce844852d8fc52543d9d3e826f29cd2c05d3f68bd05ea46df59bc8c0e9"
+        },
+        "before": {
+          "count": 6,
+          "sha256": "e5e156ce844852d8fc52543d9d3e826f29cd2c05d3f68bd05ea46df59bc8c0e9"
+        },
+        "verified": true
+      }
+    }
+  ],
+  "runtime_policy": {
+    "cudnn_allow_tf32": true,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false,
+    "deterministic_algorithms_enabled": false,
+    "deterministic_warn_only": false,
+    "effective_uninitialized_fill": false,
+    "fill_uninitialized_memory": true,
+    "float32_matmul_precision": "highest",
+    "matmul_allow_tf32": false
+  },
+  "runtime_policy_after": {
+    "cudnn_allow_tf32": true,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false,
+    "deterministic_algorithms_enabled": false,
+    "deterministic_warn_only": false,
+    "effective_uninitialized_fill": false,
+    "fill_uninitialized_memory": true,
+    "float32_matmul_precision": "highest",
+    "matmul_allow_tf32": false
+  },
+  "scope": "Standalone lossless GPU transfer codec: all 28 layers use our Dense or Rank256 predictor/rANS. The current single-feature rolling encoder and two-chunk packed-inverse decoder are the reference. The candidate changes only exact renormalization-word prefix compaction to warp ballot/popcount. Original complete packets, fitted coefficients, probabilities, rANS state updates and BF16 words stay fixed. Both modes retain the same 45,568 shared inverse-table bytes; prefix compaction adds no device tables. SplitZip and ExANS remain separate unchanged controls, not candidate components. 512-token graph execution and 8K borrowed-input direct execution are retained. The two documents are reused engineering evidence, not independent generalization. Link costs are calculated, not NIC/SSD, resident P or serving measurements.",
+  "software": {
+    "numpy": "2.3.5",
+    "torch": "2.11.0+cu128",
+    "triton": "3.6.0"
+  },
+  "status": "completed",
+  "tokens": 512
+}
