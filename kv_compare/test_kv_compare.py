@@ -909,6 +909,43 @@ class MoreBaselinesTests(unittest.TestCase):
         self.assertEqual([r["method"] for r in merged], ["a", "b", "c", "d", "e"])
         self.assertTrue(merged[1]["bit_exact"])
 
+    def test_a_codec_that_crashed_the_process_is_recorded_and_skipped(self):
+        import tempfile
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import bench_llama_compare as b
+        out = Path(tempfile.mkdtemp())
+        (out / "crash_marker.json").write_text(json.dumps({"case": "context:8192x1", "method": "nvCOMP LZ4"}))
+        res = {}
+        self.assertEqual(b.crashed_codecs(out, res, "datasets"), {})          # another stage's marker stays
+        self.assertTrue((out / "crash_marker.json").exists())
+        self.assertEqual(b.crashed_codecs(out, res, "context"), {"8192x1": ["nvCOMP LZ4"]})
+        self.assertFalse((out / "crash_marker.json").exists())
+        rows = b.crash_rows(["nvCOMP LZ4"])
+        self.assertEqual(b.measured(rows), {"nvCOMP LZ4"})
+        # measure_case writes the marker while a codec runs and removes it after
+        from kv_compare import context_sweep as cs
+        seen = {}
+
+        class Probe:
+            def measure(self, words, spans, device, timer):
+                seen["marker"] = json.loads((out / "m.json").read_text())
+                return {"bit_exact": True, "bits": 12.0, "encode_ms": 1.0, "decode_ms": 1.0}
+
+        class Study:
+            C, hd, W = 8, 4, 16
+        st = Study()
+        st.rope = type("R", (), {"tables": staticmethod(lambda p: (torch.ones(len(p), 2), torch.zeros(len(p), 2)))})()
+        cs.CRASH_MARKER, cs.CURRENT_CASE = out / "m.json", "datasets:gsm8k"
+        try:
+            cs.measure_case(st, {"cos": torch.ones(16, 2), "sin": torch.zeros(16, 2)}, None,
+                            torch.zeros(1, 16, 16, dtype=torch.int16), torch.arange(16), torch.device("cpu"),
+                            log=lambda m: None, only={"IBP (authors' codec), host to GPU"}, extras={"ibp": Probe()})
+        finally:
+            cs.CRASH_MARKER = cs.CURRENT_CASE = None
+        self.assertEqual(seen["marker"]["method"], "IBP (authors' codec), host to GPU")
+        self.assertEqual(seen["marker"]["case"], "datasets:gsm8k")
+        self.assertFalse((out / "m.json").exists())
+
     def test_measure_case_rows_and_report(self):
         import tempfile
         from kv_compare import context_sweep as cs

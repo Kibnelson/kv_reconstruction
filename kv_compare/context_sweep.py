@@ -39,6 +39,23 @@ def _free(device):
 
 
 GROUP_NAMES = {2: "keys then values", 4: "4 head groups", 8: "8 head groups", 16: "head by head"}
+# A codec's native code can take the whole process down (no Python exception). The caller sets CRASH_MARKER (a
+# file) and CURRENT_CASE; each measurement writes the marker before it starts and removes it after, so a rerun
+# knows which codec crashed in which case and records it instead of crashing again.
+CRASH_MARKER = None
+CURRENT_CASE = None
+
+
+def _mark(method):
+    if CRASH_MARKER is not None:
+        import json
+        import time
+        CRASH_MARKER.write_text(json.dumps({"case": CURRENT_CASE, "method": method, "time": time.time()}))
+
+
+def _unmark():
+    if CRASH_MARKER is not None and CRASH_MARKER.exists():
+        CRASH_MARKER.unlink()
 
 
 def measure_case(study, consts, rc, words, positions, device, log=print, books=None, sz=None, exans=None,
@@ -77,6 +94,7 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
         if only is not None and method not in only:
             return
         row = {"method": method, "values": n, "tokens": T}
+        _mark(method)
         try:
             row.update(fn())
             if row.get("computed"):
@@ -87,6 +105,7 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
         except Exception as exc:                     # out of memory at long contexts, a shape a kernel refuses
             row["error"] = repr(exc)[:300]
             log(f"    {method}: not measured ({row['error']})")
+        _unmark()
         rows.append(row)
         _free(device)
 

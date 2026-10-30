@@ -45,6 +45,7 @@ FILES = {"summary.md": "summary.md", "lossless.json": "lossless.json", "lossy.js
          "nvidia_smi.txt": "nvidia_smi.txt", "slurm.json": "slurm.json", "model_resolved.json": "model_resolved.json",
          "dataset_texts/manifest.json": "dataset_texts_manifest.json",
          "pip_freeze.txt": "pip_freeze.txt",
+         "faulthandler.log": "faulthandler.log", "crash_marker.json": "crash_marker.json",
          "fp8pred.json": "fp8pred.json", "fp8pred_wikitext.json": "fp8pred_wikitext.json",
          "fp8pred_mixed.json": "fp8pred_mixed.json",
          "captures/meta.json": "capture_meta.json"}

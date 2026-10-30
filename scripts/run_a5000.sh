@@ -139,9 +139,18 @@ ARGS=(--device cuda --model "$MODEL_ID" --revision "$REVISION" --output "$RUN"
 [ -s "$KV_HOME/cuda_home" ] && ARGS+=(--cuda-home "$(cat "$KV_HOME/cuda_home")")
 echo "== bench_llama_compare.py, stages $STAGES (log: $RUN/console.log)"
 set +e
-# shellcheck disable=SC2086
-python -u scripts/bench_llama_compare.py "${ARGS[@]}" --stages "$STAGES" ${EXTRA:-} 2>&1 | tee -a "$RUN/console.log"
-STATUS=${PIPESTATUS[0]}
+for ATTEMPT in 1 2 3 4; do
+    # shellcheck disable=SC2086
+    python -u scripts/bench_llama_compare.py "${ARGS[@]}" --stages "$STAGES" ${EXTRA:-} 2>&1 | tee -a "$RUN/console.log"
+    STATUS=${PIPESTATUS[0]}
+    echo "== bench_llama_compare.py exit $STATUS (attempt $ATTEMPT)" | tee -a "$RUN/console.log"
+    # a codec's native code took the process down: the marker names it; the next attempt records it and goes on
+    if [ "$STATUS" != 0 ] && [ -s "$RUN/crash_marker.json" ]; then
+        echo "== crashed in $(cat "$RUN/crash_marker.json"); resuming without that codec" | tee -a "$RUN/console.log"
+        continue
+    fi
+    break
+done
 set -e
 if [ "${SMOKE:-0}" = 1 ]; then
     echo "== smoke run finished (exit $STATUS); nothing committed. The table to check:"

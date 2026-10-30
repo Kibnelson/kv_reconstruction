@@ -527,19 +527,22 @@ def stage_context(args, out):
     exact_costs(args, out, res, path, single, device)
     study, consts, rc, grouped, books, sz, exans, w16, extras = lossless_codecs(args, out, device, "context")
     bounds = "bounds" in args.extra_baselines
+    crashed = crashed_codecs(out, res, "context")
     from kv_compare.predict import Doc
     for n, b in cases:
         key = f"{n}x{b}"
         want = wanted_methods(args, rc, books, sz, exans, extras, bounds)
-        if key in res["cases"] and want <= measured(res["cases"][key]["rows"]):
+        bad = set(crashed.get(key, []))
+        if key in res["cases"] and want <= measured(res["cases"][key]["rows"]) | bad:
             log(f"context {key}: kept from context.json")
             continue
         if key in res["cases"]:                      # only the methods not measured (or not exact) yet
             kept = res["cases"][key]["rows"]
-            only = want - measured(kept)
+            only = want - measured(kept) - bad
             log(f"context {key}: measuring " + ", ".join(sorted(only)))
         else:
-            kept = only = None
+            kept = None
+            only = (want - bad) if bad else None
         docs = [Doc(out / "captures", nm) for nm in names[(n, b)]]
         if b == 1:
             words = w16(docs[0])
@@ -549,10 +552,12 @@ def stage_context(args, out):
                 words[:, i * n:(i + 1) * n] = w16(d)
         positions = torch.arange(n, device=device).repeat(b)
         log(f"context {key}: {b} request(s) of {n} tokens, {words.numel() / 1e6:.1f}M values")
+        cs.CURRENT_CASE = f"context:{key}"
         rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans,
                                max_stream_tokens=args.context_stream_tokens, grouped=grouped, only=only,
                                graph=args.graph_decode,
                                baseline_stream_tokens=args.baseline_stream_tokens, extras=extras, bounds=bounds)
+        rows += crash_rows(sorted(bad))
         if kept is not None:
             rows = merge_rows(kept, rows)
         res["cases"][key] = {"tokens": n, "batch": b, "values": words.numel(), "rows": rows}
@@ -641,8 +646,36 @@ def wanted_methods(args, rc, books, sz, exans, extras, bounds):
 
 
 def measured(rows):
-    """Methods of rows that need no new measurement: no error, and a bit-exact round trip (or a computed bound)."""
-    return {r["method"] for r in rows if "error" not in r and (r.get("computed") or r.get("bit_exact"))}
+    """Methods of rows that need no new measurement: no error, and a bit-exact round trip (or a computed bound);
+    or a codec that crashed the process in this case (not tried again)."""
+    return {r["method"] for r in rows if r.get("crashed") or
+            ("error" not in r and (r.get("computed") or r.get("bit_exact")))}
+
+
+def crashed_codecs(out, res, stage):
+    """{case: [methods]} that crashed the process in this stage, taking a crash marker left by an earlier run
+    (kv_compare.context_sweep.CRASH_MARKER) into res["crashed"]; a marker of another stage stays for that stage."""
+    reg = res.setdefault("crashed", {})
+    m = out / "crash_marker.json"
+    if m.is_file():
+        try:
+            d = json.loads(m.read_text())
+        except ValueError:
+            d = {}
+        case = str(d.get("case") or "")
+        if case.startswith(stage + ":"):
+            meth = reg.setdefault(case[len(stage) + 1:], [])
+            if d.get("method") and d["method"] not in meth:
+                meth.append(d["method"])
+                log(f"{stage}: {d['method']} crashed the process in case {case[len(stage) + 1:]} in an earlier run; "
+                    "recorded, not tried again")
+            m.unlink()
+    return reg
+
+
+def crash_rows(methods):
+    return [{"method": m, "crashed": True,
+             "error": "crashed the process (native code; see faulthandler.log); not tried again"} for m in methods]
 
 
 def merge_rows(kept, new):
@@ -824,6 +857,7 @@ def stage_datasets(args, out):
     res["splitzip_calibration"] = sz_name
     study, consts, rc, grouped, books, sz, exans, w16, extras = lossless_codecs(args, out, device, "datasets", sz_doc)
     bounds = "bounds" in args.extra_baselines
+    crashed = crashed_codecs(out, res, "datasets")
     book_words = w16(sz_doc)
     book_hist = cs.exponent_hist(book_words)
     del book_words
@@ -831,10 +865,11 @@ def stage_datasets(args, out):
         if not ws:
             continue
         want = wanted_methods(args, rc, books, sz, exans, extras, bounds)
+        bad = set(crashed.get(name, []))
         case = res["cases"].get(name)
-        only = None
+        only = (want - bad) if bad else None
         if case and case.get("windows") == ws:
-            have = measured(case["rows"])
+            have = measured(case["rows"]) | bad
             if want <= have:
                 log(f"datasets {name}: kept from {path.name}")
                 continue
@@ -850,11 +885,13 @@ def stage_datasets(args, out):
         log(f"    SplitZip code book: top-16 coverage {100 * cov['top16_coverage_calibrated']:.2f}% (calibrated on "
             f"{sz_name}), {100 * cov['top16_coverage_self']:.2f}% (own), exponent entropy "
             f"{cov['exponent_entropy_bits']:.3f} bits")
+        cs.CURRENT_CASE = f"datasets:{name}"
         rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans,
                                max_stream_tokens=args.context_stream_tokens, grouped=grouped, graph=args.graph_decode,
                                baseline_stream_tokens=args.baseline_stream_tokens, extras=extras, bounds=bounds,
                                only=only)
-        if only is not None:
+        rows += crash_rows(sorted(bad))
+        if case and case.get("windows") == ws:
             rows = merge_rows(case["rows"], rows)
         res["cases"][name] = {"dataset": DATASETS.get(name, name), "tokens": n, "batch": len(wds), "windows": ws,
                               "values": words.numel(), "coverage": cov, "rows": rows}
@@ -3134,6 +3171,10 @@ def main(argv=None):
     out.mkdir(parents=True, exist_ok=True)
     global LOG_PATH
     LOG_PATH = out / "run.log"
+    import faulthandler                               # a native crash leaves its Python stack here
+    faulthandler.enable(file=open(out / "faulthandler.log", "a"), all_threads=True)
+    from kv_compare import context_sweep as _cs
+    _cs.CRASH_MARKER = out / "crash_marker.json"
     started = time.time()
     (out / "run_args.json").write_text(json.dumps({k: str(v) for k, v in vars(args).items()}, indent=1))
     env = environment(args)
