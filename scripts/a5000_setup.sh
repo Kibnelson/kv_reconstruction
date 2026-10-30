@@ -65,8 +65,11 @@ fi
 source "$KV_HOME/venv/bin/activate"
 python -m pip install -q --upgrade pip
 python -m pip install -q -r requirements-cuda.txt
-python -m pip install -q pyarrow cmake ninja packaging nvidia-libnvcomp-cu12 nvidia-nvcomp-cu12
-python - <<'EOF'
+# nvCOMP 5.x: ExANS (openlake de6c38b) calls nvcompBatchedANS*GetTempSizeAsync, which nvCOMP 6.0 renamed; the
+# Python package pins the native library to its own version, so both stay on 5.3.0.16
+python -m pip install -q pyarrow cmake ninja packaging nvidia-libnvcomp-cu12==5.3.0.16 nvidia-nvcomp-cu12==5.3.0.16
+# Triton compiles only functions defined in a file: the check runs from one
+cat > "$KV_HOME/tmp/triton_check.py" <<'EOF'
 import torch, triton, transformers
 print(f"== torch {torch.__version__} (CUDA {torch.version.cuda}), triton {triton.__version__}, transformers {transformers.__version__}")
 assert torch.cuda.is_available(), "torch sees no GPU"
@@ -83,6 +86,7 @@ _add[(4,)](a, b, 1000, B=256)
 assert torch.equal(b, a + 1), "Triton kernel gave a wrong result"
 print("   a Triton kernel compiled and ran")
 EOF
+python "$KV_HOME/tmp/triton_check.py"
 python -m pip freeze > "$KV_HOME/pip_freeze.txt"
 
 echo "== the authors' codecs at the pinned commits"

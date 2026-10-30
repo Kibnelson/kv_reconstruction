@@ -121,19 +121,31 @@ class Nvcomp:
     def measure(self, alg, words, spans, timer):
         codec = self.codecs[alg]
         ok, nbytes, te, td = True, 0, 0.0, 0.0
+        diag = None
         for a, b in spans:
             raw = words[:, a:b].contiguous().view(torch.uint8).reshape(-1)
             arr = self.nv.as_array(raw, cuda_stream=self.stream.cuda_stream)
             enc = codec.encode(arr)
             dec = codec.decode(enc)
-            back = torch.from_dlpack(dec).reshape(-1)
-            ok = ok and back.numel() == raw.numel() and bool(torch.equal(back.view(torch.uint8), raw))
-            nbytes += int(enc.buffer_size)
+            # the decoded array keeps the codec's element type (2 bytes for Cascaded and Bitcomp): compare bytes
+            t = torch.from_dlpack(dec)
+            back = t.contiguous().reshape(-1).view(torch.uint8)
+            same = back.numel() == raw.numel() and bool(torch.equal(back, raw))
+            if not same and diag is None:              # what differed, for the report
+                n = min(back.numel(), raw.numel())
+                diag = {"decoded_dtype": str(t.dtype), "decoded_bytes": back.numel(), "raw_bytes": raw.numel(),
+                        "differing_bytes_in_common_prefix": int((back[:n] != raw[:n]).sum())}
+            ok = ok and same
+            size = getattr(enc, "buffer_size", None)
+            nbytes += int(size if size is not None else enc.size * enc.item_size)
             te += timer(lambda: codec.encode(arr))
             td += timer(lambda: codec.decode(enc))
             del raw, arr, enc, dec, back
-        return {"bit_exact": ok, "bits": 8 * nbytes / (words.numel()), "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
-                "streams": len(spans), "nvcomp": self.version}
+        out = {"bit_exact": ok, "bits": 8 * nbytes / (words.numel()), "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
+               "streams": len(spans), "nvcomp": self.version}
+        if diag:
+            out["mismatch"] = diag
+        return out
 
 
 # ----------------------------------------------------------------------------------------------------------- AdaCode

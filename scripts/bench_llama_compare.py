@@ -530,15 +530,14 @@ def stage_context(args, out):
     from kv_compare.predict import Doc
     for n, b in cases:
         key = f"{n}x{b}"
-        want = {f"ours, per layer, {cs.GROUP_NAMES.get(g, f'{g} head groups')}" for g in args.context_groups}
-        want |= set(cs.extra_method_names(extras, bounds))
-        if key in res["cases"] and want <= {r["method"] for r in res["cases"][key]["rows"]}:
+        want = wanted_methods(args, rc, books, sz, exans, extras, bounds)
+        if key in res["cases"] and want <= measured(res["cases"][key]["rows"]):
             log(f"context {key}: kept from context.json")
             continue
-        if key in res["cases"]:                      # only the methods not measured yet
-            log(f"context {key}: adding " + ", ".join(sorted(want - {r["method"] for r in res["cases"][key]["rows"]})))
+        if key in res["cases"]:                      # only the methods not measured (or not exact) yet
             kept = res["cases"][key]["rows"]
-            only = want - {r["method"] for r in kept}
+            only = want - measured(kept)
+            log(f"context {key}: measuring " + ", ".join(sorted(only)))
         else:
             kept = only = None
         docs = [Doc(out / "captures", nm) for nm in names[(n, b)]]
@@ -555,8 +554,7 @@ def stage_context(args, out):
                                graph=args.graph_decode,
                                baseline_stream_tokens=args.baseline_stream_tokens, extras=extras, bounds=bounds)
         if kept is not None:
-            have = {r["method"] for r in kept}
-            rows = kept + [r for r in rows if r["method"] not in have]
+            rows = merge_rows(kept, rows)
         res["cases"][key] = {"tokens": n, "batch": b, "values": words.numel(), "rows": rows}
         path.write_text(json.dumps(res, indent=1))
         del words, docs
@@ -623,6 +621,36 @@ def lossless_codecs(args, out, device, stage, sz_doc=None):
     gc.collect()
     torch.cuda.empty_cache() if device.type == "cuda" else None
     return study, consts, rc, grouped, books, sz, exans, w16, extras
+
+
+def wanted_methods(args, rc, books, sz, exans, extras, bounds):
+    """Every row name measure_case gives with these codecs (a kept case lacking one, or holding it as an error or
+    an inexact round trip, has it measured again)."""
+    from kv_compare import context_sweep as cs
+    names = ["ours, per layer, dense"]
+    names += [f"ours, per layer, {cs.GROUP_NAMES.get(g, f'{g} head groups')}" for g in args.context_groups]
+    if rc is not None:
+        names.append("ours, per layer, rank 256")
+        if books is not None:
+            names.append("ours, SplitZip format, rank 256")
+    if sz is not None:
+        names.append("SplitZip (authors' codec)")
+    if exans is not None:
+        names.append("ExANS (authors' codec)")
+    return set(names) | set(cs.extra_method_names(extras, bounds))
+
+
+def measured(rows):
+    """Methods of rows that need no new measurement: no error, and a bit-exact round trip (or a computed bound)."""
+    return {r["method"] for r in rows if "error" not in r and (r.get("computed") or r.get("bit_exact"))}
+
+
+def merge_rows(kept, new):
+    """kept rows with the new measurements in their place (and new methods after them)."""
+    m = {r["method"]: r for r in kept}
+    for r in new:
+        m[r["method"]] = r
+    return list(m.values())
 
 
 def need_calibration(out):
@@ -802,17 +830,16 @@ def stage_datasets(args, out):
     for name, ws in windows.items():
         if not ws:
             continue
-        want = {f"ours, per layer, {cs.GROUP_NAMES.get(g, f'{g} head groups')}" for g in args.context_groups}
-        want |= set(cs.extra_method_names(extras, bounds))
+        want = wanted_methods(args, rc, books, sz, exans, extras, bounds)
         case = res["cases"].get(name)
         only = None
         if case and case.get("windows") == ws:
-            have = {r["method"] for r in case["rows"]}
+            have = measured(case["rows"])
             if want <= have:
                 log(f"datasets {name}: kept from {path.name}")
                 continue
             only = want - have
-            log(f"datasets {name}: adding " + ", ".join(sorted(only)))
+            log(f"datasets {name}: measuring " + ", ".join(sorted(only)))
         wds = [Doc(out / "captures", w) for w in ws]
         words = torch.empty(study.L, n * len(wds), study.W, dtype=torch.int16, device=device)
         for i, d in enumerate(wds):
@@ -828,7 +855,7 @@ def stage_datasets(args, out):
                                baseline_stream_tokens=args.baseline_stream_tokens, extras=extras, bounds=bounds,
                                only=only)
         if only is not None:
-            rows = case["rows"] + [r for r in rows if r["method"] not in {x["method"] for x in case["rows"]}]
+            rows = merge_rows(case["rows"], rows)
         res["cases"][name] = {"dataset": DATASETS.get(name, name), "tokens": n, "batch": len(wds), "windows": ws,
                               "values": words.numel(), "coverage": cov, "rows": rows}
         path.write_text(json.dumps(res, indent=1))
@@ -919,7 +946,10 @@ def dataset_lines(out, name="datasets.json"):
                 cells.append("-")
                 continue
             v, m = min(o)
-            cells.append(f"{v:.1f} ms" + (f" ({s / v:.2f}x)" if s else "") + f", {m.split(', ', 1)[1]}")
+            bo = best_other(t)
+            cells.append(f"{v:.1f} ms" + (f" ({s / v:.2f}x)" if s else "") + f", {m.split(', ', 1)[1]}"
+                         + (f"; {bo[0] / v:.2f}x the best other, {short_name(bo[1])}" if bo and bo[1] !=
+                            "SplitZip (authors' codec)" else ""))
         lines.append(f"| {g} Gb/s | " + " | ".join(cells) + " |")
     lines.append("")
     return lines
@@ -1145,6 +1175,16 @@ def frontier_gpu_lines(out, name="frontier_gpu.json"):
     return lines + [""]
 
 
+def best_other(times):
+    """(time, method) of the fastest exact codec that is not ours at a link, from {method: time}; None if none."""
+    other = [(v, m) for m, v in times.items() if not m.startswith("ours")]
+    return min(other) if other else None
+
+
+def short_name(method):
+    return method.replace(" (authors' codec)", "").replace(", host to GPU", "")
+
+
 def graph_note(row):
     """' [graph 1.23 ms]' when the decode was also timed as an exact CUDA graph; ' [raw copy 0.9 ms]' for a decode
     that includes a host-to-GPU copy (IBP)."""
@@ -1210,7 +1250,7 @@ def context_lines(out, name="context.json"):
               "fastest exact mode at that link; the speed-up is against SplitZip.", ""]
     for g in r.get("links_gbps", CONTEXT_LINKS):
         lines += [f"*{g} Gb/s*", "", "| | " + " | ".join(head) + " |", "| --- |" + " --- |" * len(keys)]
-        raw, szr, exr, ours = [], [], [], []
+        raw, szr, exr, bor, ours = [], [], [], [], []
         for k in keys:
             c = cases[k]
             n = c["values"]
@@ -1222,13 +1262,17 @@ def context_lines(out, name="context.json"):
             o = [(v, m) for m, v in t.items() if m.startswith("ours")]
             szr.append("-" if s is None else f"{s:.1f} ms")
             exr.append("-" if e is None else f"{e:.1f} ms")
+            bo = best_other(t)
+            bor.append("-" if bo is None else f"{bo[0]:.1f} ms, {short_name(bo[1])}")
             if o:
                 v, m = min(o)
-                ours.append(f"{v:.1f} ms" + (f" ({s / v:.2f}x)" if s else "") + f", {m.split(', ', 1)[1]}")
+                ours.append(f"{v:.1f} ms" + (f" ({s / v:.2f}x)" if s else "") + f", {m.split(', ', 1)[1]}"
+                            + (f"; {bo[0] / v:.2f}x the best other" if bo else ""))
             else:
                 ours.append("-")
         lines += ["| raw BF16 | " + " | ".join(raw) + " |", "| SplitZip | " + " | ".join(szr) + " |",
-                  "| ExANS | " + " | ".join(exr) + " |", "| ours | " + " | ".join(ours) + " |", ""]
+                  "| ExANS | " + " | ".join(exr) + " |", "| best other codec | " + " | ".join(bor) + " |",
+                  "| ours | " + " | ".join(ours) + " |", ""]
     return lines
 
 

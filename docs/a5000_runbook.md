@@ -94,6 +94,10 @@ SMOKE=1 MODEL=llama32_3b bash scripts/run_a5000.sh
 NUC
 ```
 
+Pasted inside `bash <<'NUC' ... NUC`, a failed setup stops the block before the smoke test. Pasted line by line,
+join them with `&&` for the same effect. A rerun of the smoke test keeps what it measured and measures again only
+what failed or was not exact.
+
 Success markers: `SETUP DONE`, then `SMOKE OK: every codec measured`. A note that IBP was not measured is
 allowed: its build is optional. The whole block takes about 30-45 minutes, mostly the first downloads.
 

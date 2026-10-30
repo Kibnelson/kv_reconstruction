@@ -869,6 +869,16 @@ class MoreBaselinesTests(unittest.TestCase):
         self.assertEqual(r["streams"], 2)
         self.assertAlmostEqual(r["bits"], 8 + r["code_bits"][0], places=6)
 
+    def test_resume_measures_failed_and_inexact_rows_again(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import bench_llama_compare as b
+        kept = [{"method": "a", "bit_exact": True}, {"method": "b", "bit_exact": False},
+                {"method": "c", "error": "OOM"}, {"method": "d", "computed": True}]
+        self.assertEqual(b.measured(kept), {"a", "d"})
+        merged = b.merge_rows(kept, [{"method": "b", "bit_exact": True}, {"method": "e", "bit_exact": True}])
+        self.assertEqual([r["method"] for r in merged], ["a", "b", "c", "d", "e"])
+        self.assertTrue(merged[1]["bit_exact"])
+
     def test_measure_case_rows_and_report(self):
         import tempfile
         from kv_compare import context_sweep as cs
