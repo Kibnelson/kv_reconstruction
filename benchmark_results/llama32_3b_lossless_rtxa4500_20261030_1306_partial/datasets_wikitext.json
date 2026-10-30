@@ -1,0 +1,313 @@
+{
+ "calibration": {
+  "set": "wikitext",
+  "documents": [
+   "wtrain0",
+   "wtrain1",
+   "wtrain2",
+   "wtrain3",
+   "wtrain4",
+   "wtrain5"
+  ],
+  "scales": "wtables"
+ },
+ "cases": {
+  "wikitext2": {
+   "dataset": "WikiText-2 test",
+   "tokens": 8192,
+   "batch": 4,
+   "windows": [
+    "ds_wikitext2_r0",
+    "ds_wikitext2_r1",
+    "ds_wikitext2_r2",
+    "ds_wikitext2_r3"
+   ],
+   "values": 1879048192,
+   "coverage": {
+    "values": 1879048192,
+    "exponent_entropy_bits": 3.107545223327378,
+    "distinct_exponents": 36,
+    "top8_coverage_self": 0.9455826825329235,
+    "top8_coverage_calibrated": 0.9455826825329235,
+    "top16_coverage_self": 0.9991038537451199,
+    "top16_coverage_calibrated": 0.9991038537451199
+   },
+   "rows": [
+    {
+     "method": "ours, per layer, dense",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 8.971522603716169,
+     "encode_ms": 284.31834030151373,
+     "decode_ms": 124.30118370056154,
+     "streams": 4,
+     "decode_ms_graph": 124.18150329589844,
+     "bit_exact_graph": true
+    },
+    {
+     "method": "ours, per layer, keys then values",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 8.632898807525635,
+     "encode_ms": 416.77987670898443,
+     "decode_ms": 167.52605056762692,
+     "streams": 4,
+     "decode_ms_graph": 167.88370895385742,
+     "bit_exact_graph": true
+    },
+    {
+     "method": "ours, per layer, 4 head groups",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 8.408136435917445,
+     "encode_ms": 420.30550765991217,
+     "decode_ms": 211.67692947387695,
+     "streams": 4,
+     "decode_ms_graph": 209.77356719970703,
+     "bit_exact_graph": true
+    },
+    {
+     "method": "ours, per layer, head by head",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 8.27902112688337,
+     "encode_ms": 422.3198776245117,
+     "decode_ms": 452.51686859130865,
+     "streams": 4,
+     "decode_ms_graph": 331.7406005859375,
+     "bit_exact_graph": true
+    },
+    {
+     "method": "ours, per layer, rank 256",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 9.338789463043213,
+     "encode_ms": 161.3708801269531,
+     "decode_ms": 91.3571834564209,
+     "streams": 4,
+     "decode_ms_graph": 91.1602897644043,
+     "bit_exact_graph": true
+    },
+    {
+     "method": "ours, SplitZip format, rank 256",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 10.122001596859523,
+     "encode_ms": 4032.484436035156,
+     "decode_ms": 70.76425552368164,
+     "streams": 4,
+     "encoder": "PyTorch packer (not optimised)"
+    },
+    {
+     "method": "SplitZip (authors' codec)",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 12.050184190273285,
+     "encode_ms": 31.693471908569332,
+     "decode_ms": 12.16761612892151,
+     "streams": 4
+    },
+    {
+     "method": "ExANS (authors' codec)",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 10.872303825727023,
+     "encode_ms": 703.2628479003906,
+     "decode_ms": 70.55228805541992,
+     "values_coded": 1878917120,
+     "streams": 4
+    },
+    {
+     "method": "nvCOMP LZ4",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 16.01338999611991,
+     "encode_ms": 1514.4528503417969,
+     "decode_ms": 32.64892768859863,
+     "streams": 4,
+     "nvcomp": "5.3.0"
+    },
+    {
+     "method": "nvCOMP Cascaded",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 16.005860873631068,
+     "encode_ms": 171.20095825195312,
+     "decode_ms": 26.706847667694092,
+     "streams": 4,
+     "nvcomp": "5.3.0"
+    },
+    {
+     "method": "nvCOMP ANS",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 13.078026013714927,
+     "encode_ms": 46.68259143829345,
+     "decode_ms": 20.485312461853027,
+     "streams": 4,
+     "nvcomp": "5.3.0"
+    },
+    {
+     "method": "nvCOMP Zstd",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 12.898472824266978,
+     "encode_ms": 2465.2779541015625,
+     "decode_ms": 258.9316482543946,
+     "streams": 4,
+     "nvcomp": "5.3.0"
+    },
+    {
+     "method": "AdaCode (authors' codec)",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 11.369774963174548,
+     "encode_ms": 84.46668815612793,
+     "decode_ms": 12.148415803909302,
+     "streams": 4,
+     "code_bits": [
+      3
+     ],
+     "launches": 224
+    },
+    {
+     "method": "AdaCode, code from the coded KV (authors' codec)",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 11.36965872134481,
+     "encode_ms": 84.14147377014162,
+     "decode_ms": 12.155904054641724,
+     "streams": 4,
+     "code_bits": [
+      3
+     ],
+     "launches": 224
+    },
+    {
+     "method": "exactkv (authors' codec)",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bit_exact": true,
+     "bits": 12.57489994594029,
+     "encode_ms": 21.581120014190674,
+     "decode_ms": 83.2000961303711,
+     "streams": 4,
+     "launches": 224
+    },
+    {
+     "method": "exponent coders' floor: 8 + Huffman(exponent), DFloat11 / ZipNN format",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bits": 10.728837177689586,
+     "computed": true,
+     "streams": 4
+    },
+    {
+     "method": "exponent coders' floor: 8 + exponent entropy",
+     "values": 1879048192,
+     "tokens": 32768,
+     "bits": 10.690550427124911,
+     "computed": true,
+     "streams": 4
+    },
+    {
+     "method": "nvCOMP Bitcomp",
+     "crashed": true,
+     "error": "crashed the process (native code; see faulthandler.log); not tried again"
+    }
+   ]
+  }
+ },
+ "sources": {
+  "wikitext2": {
+   "text": "/home/nelson/kv_a5000/runs/dataset_texts/wikitext2.txt",
+   "tokens": 289076,
+   "sha256": "696cca6b65a171b0a358a4be6732cdfdf2dd6164a32e20fd70e3c13fc4dfae83"
+  },
+  "humaneval": {
+   "text": "/home/nelson/kv_a5000/runs/dataset_texts/humaneval.txt",
+   "tokens": 30264,
+   "sha256": "53783eb18d78036790af21f0604b4068a6728941c48127a22709391009c2ba72"
+  },
+  "gsm8k": {
+   "text": "/home/nelson/kv_a5000/runs/dataset_texts/gsm8k.txt",
+   "tokens": 219562,
+   "sha256": "7728a27f120a2623adb95f94e2edfd1ec24701fd226619b8305ac60f495b503b"
+  },
+  "mmlu": {
+   "text": "/home/nelson/kv_a5000/runs/dataset_texts/mmlu.txt",
+   "tokens": 1655744,
+   "sha256": "7be79c19c1b158ef413d5d62ef00e51ba1865846266858426b6516d35e0f6055"
+  },
+  "ptb": {
+   "text": "/home/nelson/kv_a5000/runs/dataset_texts/ptb.txt",
+   "tokens": 95068,
+   "sha256": "900cfc61a7a63afcd086c5e1cce90554764eae65cb2ca9f5d4cac47be5f0f394"
+  }
+ },
+ "exact_costs": {
+  "ours, one-step predictor (exact cost)": {
+   "ds_wikitext2_r0": 8.879940250949577,
+   "ds_wikitext2_r1": 8.835825287399608,
+   "ds_wikitext2_r2": 8.88086709925197,
+   "ds_wikitext2_r3": 8.881325752294023,
+   "ds_humaneval_r0": 9.557202766771303,
+   "ds_humaneval_r1": 9.509535903623695,
+   "ds_humaneval_r2": 9.537975726009952,
+   "ds_gsm8k_r0": 9.186639090628512,
+   "ds_gsm8k_r1": 9.180026029282654,
+   "ds_gsm8k_r2": 9.175018098328973,
+   "ds_gsm8k_r3": 9.176313670020166,
+   "ds_mmlu_r0": 9.231469589086993,
+   "ds_mmlu_r1": 9.185230008013184,
+   "ds_mmlu_r2": 9.21423302393392,
+   "ds_mmlu_r3": 9.20168770198858,
+   "ds_ptb_r0": 9.13209185938861,
+   "ds_ptb_r1": 9.131690443887342,
+   "ds_ptb_r2": 9.151895705646567,
+   "ds_ptb_r3": 9.1463324621075
+  },
+  "ours, strong predictor (exact cost)": {
+   "ds_wikitext2_r0": 7.8034976165740435,
+   "ds_wikitext2_r1": 7.728710047651,
+   "ds_wikitext2_r2": 7.8168891597631225,
+   "ds_wikitext2_r3": 7.8240859346601335,
+   "ds_humaneval_r0": 8.58283597754424,
+   "ds_humaneval_r1": 8.544765830288966,
+   "ds_humaneval_r2": 8.563471487690625,
+   "ds_gsm8k_r0": 8.208275119290226,
+   "ds_gsm8k_r1": 8.200824429877253,
+   "ds_gsm8k_r2": 8.19609069590992,
+   "ds_gsm8k_r3": 8.197485234005788,
+   "ds_mmlu_r0": 8.25989545823877,
+   "ds_mmlu_r1": 8.207963300699934,
+   "ds_mmlu_r2": 8.24453080923676,
+   "ds_mmlu_r3": 8.227213064477066,
+   "ds_ptb_r0": 8.16323035322117,
+   "ds_ptb_r1": 8.161104078050545,
+   "ds_ptb_r2": 8.184717253602615,
+   "ds_ptb_r3": 8.173307413700126
+  }
+ },
+ "exact_cost_errors": {},
+ "splitzip_calibration": "wtrain0",
+ "crashed": {
+  "wikitext2": [
+   "nvCOMP Bitcomp"
+  ]
+ }
+}

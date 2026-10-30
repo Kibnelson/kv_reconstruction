@@ -1,0 +1,424 @@
+	[4mGPU0	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	0-31	0		N/A
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+
+1 GPUs: NVIDIA RTX A4500; torch 2.11.0+cu128, CUDA 12.8
+
+ GPU    to pinned  from pinned  to pageable  from pageable
+   0      26.4 GB/s      24.0 GB/s      14.2 GB/s      15.0 GB/s
+
+one GPU: no GPU pairs to measure (allocate two GPUs for the GPU-to-GPU paths)
+
+  pair  peer           direct             host        host_pipe
+
+One 8K document of Llama-3.2-3B KV, wire time at the slowest / fastest measured pinned host leg (24.0 / 24.0 GB/s):
+  raw BF16                           896 MiB     39.2 ms /    39.2 ms
+  SplitZip                           675 MiB     29.5 ms /    29.5 ms
+  ours lossless                      504 MiB     22.0 ms /    22.0 ms
+  ours / AQUA-KV lossy, ~2 bits      117 MiB      5.1 ms /     5.1 ms
+wrote /home/nelson/kv_a5000/runs/llama32_3b/pd_link_probe.json
+12:28:02 run started: stages ['calcap', 'datasets', 'context', 'fp8pred', 'groupspeed', 'report']; NVIDIA RTX A4500; branch llama32-3b-lossy-lossless-compare, commit 30a9b409091cb0f2304b9c0cb388de40c34765ed; torch 2.11.0+cu128, triton 3.6.0
+12:28:03 GPU memory free 19.2 of 19.6 GB at start
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 197.25it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (2436213 > 131072). Running this sequence through the model will result in indexing errors
+12:28:22 calcap: captured wtrain0 (WikiText-2 train tokens 0-8190)
+12:28:30 calcap: captured wtrain1 (WikiText-2 train tokens 8191-16381)
+12:28:37 calcap: captured wtrain2 (WikiText-2 train tokens 16382-24572)
+12:28:44 calcap: captured wtrain3 (WikiText-2 train tokens 24573-32763)
+12:28:54 calcap: captured wtrain4 (WikiText-2 train tokens 32764-40954)
+12:29:04 calcap: captured wtrain5 (WikiText-2 train tokens 40955-49145)
+12:29:07 calcap: captured wtables (WikiText-2 train tokens 49146-57336)
+12:29:07 calcap: unsloth/Llama-3.2-3B (28 layers, 8 KV heads x 128, 24 query heads)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 173.28it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+12:29:12 datasets: captured ds_wikitext2_r0 (WikiText-2 test tokens 0-8190)
+12:29:15 datasets: captured ds_wikitext2_r1 (WikiText-2 test tokens 8191-16381)
+12:29:18 datasets: captured ds_wikitext2_r2 (WikiText-2 test tokens 16382-24572)
+12:29:21 datasets: captured ds_wikitext2_r3 (WikiText-2 test tokens 24573-32763)
+12:29:24 datasets: captured ds_humaneval_r0 (HumanEval tokens 0-8190)
+12:29:26 datasets: captured ds_humaneval_r1 (HumanEval tokens 8191-16381)
+12:29:29 datasets: captured ds_humaneval_r2 (HumanEval tokens 16382-24572)
+12:29:29 datasets: humaneval has 30264 tokens, not enough for window 3 of 8192; skipped
+12:29:32 datasets: captured ds_gsm8k_r0 (GSM8K test tokens 0-8190)
+12:29:35 datasets: captured ds_gsm8k_r1 (GSM8K test tokens 8191-16381)
+12:29:38 datasets: captured ds_gsm8k_r2 (GSM8K test tokens 16382-24572)
+12:29:41 datasets: captured ds_gsm8k_r3 (GSM8K test tokens 24573-32763)
+12:29:47 datasets: captured ds_mmlu_r0 (MMLU test tokens 0-8190)
+12:29:50 datasets: captured ds_mmlu_r1 (MMLU test tokens 8191-16381)
+12:29:53 datasets: captured ds_mmlu_r2 (MMLU test tokens 16382-24572)
+12:29:56 datasets: captured ds_mmlu_r3 (MMLU test tokens 24573-32763)
+12:29:59 datasets: captured ds_ptb_r0 (PTB test tokens 0-8190)
+12:30:02 datasets: captured ds_ptb_r1 (PTB test tokens 8191-16381)
+12:30:04 datasets: captured ds_ptb_r2 (PTB test tokens 16382-24572)
+12:30:07 datasets: captured ds_ptb_r3 (PTB test tokens 24573-32763)
+12:30:09   prev: layer 0 done
+12:30:11   prev: layer 1 done
+12:30:13   prev: layer 2 done
+12:30:16   prev: layer 3 done
+12:30:18   prev: layer 4 done
+12:30:20   prev: layer 5 done
+12:30:22   prev: layer 6 done
+12:30:23   prev: layer 7 done
+12:30:25   prev: layer 8 done
+12:30:27   prev: layer 9 done
+12:30:29   prev: layer 10 done
+12:30:31   prev: layer 11 done
+12:30:33   prev: layer 12 done
+12:30:35   prev: layer 13 done
+12:30:37   prev: layer 14 done
+12:30:39   prev: layer 15 done
+12:30:41   prev: layer 16 done
+12:30:43   prev: layer 17 done
+12:30:45   prev: layer 18 done
+12:30:46   prev: layer 19 done
+12:30:48   prev: layer 20 done
+12:30:50   prev: layer 21 done
+12:30:52   prev: layer 22 done
+12:30:54   prev: layer 23 done
+12:30:56   prev: layer 24 done
+12:30:58   prev: layer 25 done
+12:31:00   prev: layer 26 done
+12:31:02   prev: layer 27 done
+12:31:02 exact costs of prev done for ds_wikitext2_r0, ds_wikitext2_r1, ds_wikitext2_r2, ds_wikitext2_r3, ds_humaneval_r0, ds_humaneval_r1, ds_humaneval_r2, ds_gsm8k_r0, ds_gsm8k_r1, ds_gsm8k_r2, ds_gsm8k_r3, ds_mmlu_r0, ds_mmlu_r1, ds_mmlu_r2, ds_mmlu_r3, ds_ptb_r0, ds_ptb_r1, ds_ptb_r2, ds_ptb_r3
+12:31:06   fast: layer 0 done
+12:31:17   fast: layer 1 done
+12:31:32   fast: layer 2 done
+12:31:47   fast: layer 3 done
+12:32:02   fast: layer 4 done
+12:32:17   fast: layer 5 done
+12:32:32   fast: layer 6 done
+12:32:47   fast: layer 7 done
+12:33:02   fast: layer 8 done
+12:33:17   fast: layer 9 done
+12:33:32   fast: layer 10 done
+12:33:47   fast: layer 11 done
+12:34:03   fast: layer 12 done
+12:34:18   fast: layer 13 done
+12:34:33   fast: layer 14 done
+12:34:48   fast: layer 15 done
+12:35:02   fast: layer 16 done
+12:35:17   fast: layer 17 done
+12:35:32   fast: layer 18 done
+12:35:47   fast: layer 19 done
+12:36:02   fast: layer 20 done
+12:36:18   fast: layer 21 done
+12:36:33   fast: layer 22 done
+12:36:48   fast: layer 23 done
+12:37:03   fast: layer 24 done
+12:37:19   fast: layer 25 done
+12:37:34   fast: layer 26 done
+12:37:49   fast: layer 27 done
+12:37:49 exact costs of fast done for ds_wikitext2_r0, ds_wikitext2_r1, ds_wikitext2_r2, ds_wikitext2_r3, ds_humaneval_r0, ds_humaneval_r1, ds_humaneval_r2, ds_gsm8k_r0, ds_gsm8k_r1, ds_gsm8k_r2, ds_gsm8k_r3, ds_mmlu_r0, ds_mmlu_r1, ds_mmlu_r2, ds_mmlu_r3, ds_ptb_r0, ds_ptb_r1, ds_ptb_r2, ds_ptb_r3
+12:38:15   fused one-step predictor prepared for 28 layers
+12:38:45   reduced-rank one-step predictor (rank 256) prepared for 28 layers
+12:39:19   head-group predictor (2 groups of 8 heads) prepared for 28 layers
+12:39:31   head-group predictor (4 groups of 4 heads) prepared for 28 layers
+12:39:42   head-group predictor (16 groups of 1 heads) prepared for 28 layers
+12:39:46   extra baseline ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+12:39:46   $ cmake -S /home/nelson/kv_a5000/runs/llama32_3b/exans/src -B /home/nelson/kv_a5000/runs/llama32_3b/exans/build -DOPENLAKE_EXPANS_BUILD=ON -DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DNVCOMP_ROOT=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp -Dnvcomp_DIR=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp/lib64/cmake/nvcomp -DCUDAToolkit_ROOT=/home/nelson/kv_reconstruction/runs/_matched_baselines/cuda12_8/toolkit -DCMAKE_BUILD_TYPE=Release
+12:39:48   $ cmake --build /home/nelson/kv_a5000/runs/llama32_3b/exans/build --target openlake_expans openlake_expans_test -j 4
+12:39:51   $ /home/nelson/kv_a5000/runs/llama32_3b/exans/build/openlake_expans_test
+12:39:51   the authors' ExANS test passed
+12:39:55 datasets wikitext2: 4 window(s) of 8192 tokens, 1879.0M values
+12:39:56     SplitZip code book: top-16 coverage 99.91% (calibrated on wtrain0), 99.91% (own), exponent entropy 3.108 bits
+12:40:00     ours, per layer, dense: exact=True, 8.972 bits/value, encode 286.0 ms, decode 123.66 ms
+12:40:06     ours, per layer, keys then values: exact=True, 8.633 bits/value, encode 420.7 ms, decode 167.57 ms
+12:40:13     ours, per layer, 4 head groups: exact=True, 8.408 bits/value, encode 425.3 ms, decode 210.07 ms
+12:40:23     ours, per layer, head by head: exact=True, 8.279 bits/value, encode 426.2 ms, decode 427.91 ms
+12:40:27     ours, per layer, rank 256: exact=True, 9.339 bits/value, encode 165.4 ms, decode 91.18 ms
+12:40:36     ours, SplitZip format, rank 256: exact=True, 10.122 bits/value, encode 4004.1 ms, decode 70.86 ms
+12:40:38     SplitZip (authors' codec): exact=True, 12.050 bits/value, encode 27.2 ms, decode 12.16 ms
+12:40:44     ExANS (authors' codec): exact=True, 10.872 bits/value, encode 702.7 ms, decode 70.49 ms
+12:40:55 run started: stages ['report']; NVIDIA RTX A4500; branch llama32-3b-lossy-lossless-compare, commit 30a9b409091cb0f2304b9c0cb388de40c34765ed; torch 2.11.0+cu128, triton 3.6.0
+12:40:55 GPU memory free 19.2 of 19.6 GB at start
+# KV transfer codecs on unsloth/Llama-3.2-3B
+
+Captures: 7 documents x 8192 tokens; 28 layers, 8 KV heads x 128; torch 2.11.0+cu128, transformers 4.57.6.
+
+
+
+## Links measured on this machine (scripts/pd_link_probe.py)
+
+1 GPU(s): NVIDIA RTX A4500; 896 MiB per copy (one 8K Llama-3.2-3B document).
+
+| GPU | to pinned host | from pinned host | to pageable host | from pageable host |
+| --- | --- | --- | --- | --- |
+| 0 | 26.4 GB/s (211 Gb/s) | 24.0 GB/s (192 Gb/s) | 14.2 GB/s (114 Gb/s) | 15.0 GB/s (120 Gb/s) |
+
+One GPU allocated: no GPU-to-GPU pair measured. A transfer to another machine passes through the host legs above on both sides, so the slower pinned leg bounds any network link faster than it.
+
+12:40:55 run finished in 2 s
+12:40:55 share it: python scripts/package_llama_compare.py /home/nelson/kv_a5000/runs/llama32_3b --destination benchmark_results/<name>
+	[4mGPU0	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	0-31	0		N/A
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+
+1 GPUs: NVIDIA RTX A4500; torch 2.15.0+cu132, CUDA 13.2
+
+ GPU    to pinned  from pinned  to pageable  from pageable
+   0      26.4 GB/s      24.0 GB/s      14.2 GB/s      14.9 GB/s
+
+one GPU: no GPU pairs to measure (allocate two GPUs for the GPU-to-GPU paths)
+
+  pair  peer           direct             host        host_pipe
+
+One 8K document of Llama-3.2-3B KV, wire time at the slowest / fastest measured pinned host leg (24.0 / 24.0 GB/s):
+  raw BF16                           896 MiB     39.2 ms /    39.2 ms
+  SplitZip                           675 MiB     29.5 ms /    29.5 ms
+  ours lossless                      504 MiB     22.0 ms /    22.0 ms
+  ours / AQUA-KV lossy, ~2 bits      117 MiB      5.1 ms /     5.1 ms
+wrote /home/nelson/kv_a5000/runs/llama32_3b/pd_link_probe.json
+12:52:38 run started: stages ['calcap', 'datasets', 'context', 'fp8pred', 'groupspeed', 'report']; NVIDIA RTX A4500; branch llama32-3b-lossy-lossless-compare, commit 9f9bbb4929356683c8f8fb7b6f1f45a69734488a; torch 2.15.0+cu132, triton 3.9.0
+12:52:38 GPU memory free 19.2 of 19.6 GB at start
+12:52:38 calcap: kept
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 106.04it/s]
+12:52:41 datasets: humaneval has 30264 tokens, not enough for window 3 of 8192; skipped
+12:53:05   fused one-step predictor prepared for 28 layers
+12:53:35   reduced-rank one-step predictor (rank 256) prepared for 28 layers
+12:54:09   head-group predictor (2 groups of 8 heads) prepared for 28 layers
+12:54:20   head-group predictor (4 groups of 4 heads) prepared for 28 layers
+12:54:31   head-group predictor (16 groups of 1 heads) prepared for 28 layers
+12:54:38   extra baseline ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+12:54:38   $ cmake -S /home/nelson/kv_a5000/runs/llama32_3b/exans/src -B /home/nelson/kv_a5000/runs/llama32_3b/exans/build -DOPENLAKE_EXPANS_BUILD=ON -DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DNVCOMP_ROOT=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp -Dnvcomp_DIR=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp/lib64/cmake/nvcomp -DCUDAToolkit_ROOT=/home/nelson/kv_reconstruction/runs/_matched_baselines/cuda12_8/toolkit -DCMAKE_BUILD_TYPE=Release
+12:54:38   $ cmake --build /home/nelson/kv_a5000/runs/llama32_3b/exans/build --target openlake_expans openlake_expans_test -j 4
+12:54:40   $ /home/nelson/kv_a5000/runs/llama32_3b/exans/build/openlake_expans_test
+12:54:40   the authors' ExANS test passed
+12:54:44 datasets wikitext2: 4 window(s) of 8192 tokens, 1879.0M values
+12:54:44     SplitZip code book: top-16 coverage 99.91% (calibrated on wtrain0), 99.91% (own), exponent entropy 3.108 bits
+12:54:48     ours, per layer, dense: exact=True, 8.972 bits/value, encode 285.5 ms, decode 124.31 ms
+12:54:57     ours, per layer, keys then values: exact=True, 8.633 bits/value, encode 417.8 ms, decode 168.22 ms
+12:55:04     ours, per layer, 4 head groups: exact=True, 8.408 bits/value, encode 422.4 ms, decode 213.40 ms
+12:55:19     ours, per layer, head by head: exact=True, 8.279 bits/value, encode 423.0 ms, decode 454.18 ms
+12:55:22     ours, per layer, rank 256: exact=True, 9.339 bits/value, encode 161.4 ms, decode 91.70 ms
+12:55:33     ours, SplitZip format, rank 256: exact=True, 10.122 bits/value, encode 4011.3 ms, decode 68.88 ms
+/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+  warn_once(FP_FUSION_DEFAULT_WARNING)
+12:55:34     SplitZip (authors' codec): exact=True, 12.050 bits/value, encode 31.7 ms, decode 12.16 ms
+12:55:40     ExANS (authors' codec): exact=True, 10.872 bits/value, encode 704.0 ms, decode 70.81 ms
+== bench_llama_compare.py exit 139 (attempt 1)
+== crashed in {"case": "datasets:wikitext2", "method": "nvCOMP LZ4", "time": 1793390140.8978007}; resuming without that codec
+12:55:54 run started: stages ['calcap', 'datasets', 'context', 'fp8pred', 'groupspeed', 'report']; NVIDIA RTX A4500; branch llama32-3b-lossy-lossless-compare, commit 9f9bbb4929356683c8f8fb7b6f1f45a69734488a; torch 2.15.0+cu132, triton 3.9.0
+12:55:54 GPU memory free 19.2 of 19.6 GB at start
+12:55:54 calcap: kept
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 100.37it/s]
+12:55:57 datasets: humaneval has 30264 tokens, not enough for window 3 of 8192; skipped
+12:56:23   fused one-step predictor prepared for 28 layers
+12:56:53   reduced-rank one-step predictor (rank 256) prepared for 28 layers
+12:57:28   head-group predictor (2 groups of 8 heads) prepared for 28 layers
+12:57:39   head-group predictor (4 groups of 4 heads) prepared for 28 layers
+12:57:50   head-group predictor (16 groups of 1 heads) prepared for 28 layers
+12:57:53   extra baseline ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+12:57:53   $ cmake -S /home/nelson/kv_a5000/runs/llama32_3b/exans/src -B /home/nelson/kv_a5000/runs/llama32_3b/exans/build -DOPENLAKE_EXPANS_BUILD=ON -DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DNVCOMP_ROOT=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp -Dnvcomp_DIR=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp/lib64/cmake/nvcomp -DCUDAToolkit_ROOT=/home/nelson/kv_reconstruction/runs/_matched_baselines/cuda12_8/toolkit -DCMAKE_BUILD_TYPE=Release
+12:57:53   $ cmake --build /home/nelson/kv_a5000/runs/llama32_3b/exans/build --target openlake_expans openlake_expans_test -j 4
+12:57:55   $ /home/nelson/kv_a5000/runs/llama32_3b/exans/build/openlake_expans_test
+12:57:56   the authors' ExANS test passed
+12:57:56 datasets: nvCOMP LZ4 crashed the process in case wikitext2 in an earlier run; recorded, not tried again
+12:58:00 datasets wikitext2: 4 window(s) of 8192 tokens, 1879.0M values
+12:58:00     SplitZip code book: top-16 coverage 99.91% (calibrated on wtrain0), 99.91% (own), exponent entropy 3.108 bits
+12:58:05     ours, per layer, dense: exact=True, 8.972 bits/value, encode 282.7 ms, decode 124.32 ms
+12:58:11     ours, per layer, keys then values: exact=True, 8.633 bits/value, encode 418.0 ms, decode 168.02 ms
+12:58:18     ours, per layer, 4 head groups: exact=True, 8.408 bits/value, encode 421.6 ms, decode 212.83 ms
+12:58:28     ours, per layer, head by head: exact=True, 8.279 bits/value, encode 423.4 ms, decode 467.30 ms
+12:58:32     ours, per layer, rank 256: exact=True, 9.339 bits/value, encode 162.1 ms, decode 91.95 ms
+12:58:41     ours, SplitZip format, rank 256: exact=True, 10.122 bits/value, encode 4016.5 ms, decode 70.86 ms
+/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+  warn_once(FP_FUSION_DEFAULT_WARNING)
+12:58:43     SplitZip (authors' codec): exact=True, 12.050 bits/value, encode 31.9 ms, decode 12.17 ms
+12:58:49     ExANS (authors' codec): exact=True, 10.872 bits/value, encode 704.2 ms, decode 70.68 ms
+12:58:52     nvCOMP Cascaded: exact=True, 16.006 bits/value, encode 172.9 ms, decode 26.88 ms
+== bench_llama_compare.py exit 139 (attempt 2)
+== crashed in {"case": "datasets:wikitext2", "method": "nvCOMP Bitcomp", "time": 1793390332.5759854}; resuming without that codec
+12:58:56 run started: stages ['calcap', 'datasets', 'context', 'fp8pred', 'groupspeed', 'report']; NVIDIA RTX A4500; branch llama32-3b-lossy-lossless-compare, commit 9f9bbb4929356683c8f8fb7b6f1f45a69734488a; torch 2.15.0+cu132, triton 3.9.0
+12:58:56 GPU memory free 19.2 of 19.6 GB at start
+12:58:56 calcap: kept
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 188.28it/s]
+12:58:59 datasets: humaneval has 30264 tokens, not enough for window 3 of 8192; skipped
+12:59:25   fused one-step predictor prepared for 28 layers
+12:59:54   reduced-rank one-step predictor (rank 256) prepared for 28 layers
+13:00:29   head-group predictor (2 groups of 8 heads) prepared for 28 layers
+13:00:40   head-group predictor (4 groups of 4 heads) prepared for 28 layers
+13:00:51   head-group predictor (16 groups of 1 heads) prepared for 28 layers
+13:00:55   extra baseline ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+13:00:55   $ cmake -S /home/nelson/kv_a5000/runs/llama32_3b/exans/src -B /home/nelson/kv_a5000/runs/llama32_3b/exans/build -DOPENLAKE_EXPANS_BUILD=ON -DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DNVCOMP_ROOT=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp -Dnvcomp_DIR=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp/lib64/cmake/nvcomp -DCUDAToolkit_ROOT=/home/nelson/kv_reconstruction/runs/_matched_baselines/cuda12_8/toolkit -DCMAKE_BUILD_TYPE=Release
+13:00:56   $ cmake --build /home/nelson/kv_a5000/runs/llama32_3b/exans/build --target openlake_expans openlake_expans_test -j 4
+13:00:58   $ /home/nelson/kv_a5000/runs/llama32_3b/exans/build/openlake_expans_test
+13:00:58   the authors' ExANS test passed
+13:00:58 datasets: nvCOMP Bitcomp crashed the process in case wikitext2 in an earlier run; recorded, not tried again
+13:01:01 datasets wikitext2: 4 window(s) of 8192 tokens, 1879.0M values
+13:01:02     SplitZip code book: top-16 coverage 99.91% (calibrated on wtrain0), 99.91% (own), exponent entropy 3.108 bits
+13:01:06     ours, per layer, dense: exact=True, 8.972 bits/value, encode 284.3 ms, decode 124.30 ms
+13:01:12     ours, per layer, keys then values: exact=True, 8.633 bits/value, encode 416.8 ms, decode 167.53 ms
+13:01:19     ours, per layer, 4 head groups: exact=True, 8.408 bits/value, encode 420.3 ms, decode 211.68 ms
+13:01:30     ours, per layer, head by head: exact=True, 8.279 bits/value, encode 422.3 ms, decode 452.52 ms
+13:01:33     ours, per layer, rank 256: exact=True, 9.339 bits/value, encode 161.4 ms, decode 91.36 ms
+13:01:43     ours, SplitZip format, rank 256: exact=True, 10.122 bits/value, encode 4032.5 ms, decode 70.76 ms
+/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+  warn_once(FP_FUSION_DEFAULT_WARNING)
+13:01:44     SplitZip (authors' codec): exact=True, 12.050 bits/value, encode 31.7 ms, decode 12.17 ms
+13:01:50     ExANS (authors' codec): exact=True, 10.872 bits/value, encode 703.3 ms, decode 70.55 ms
+13:02:04     nvCOMP LZ4: exact=True, 16.013 bits/value, encode 1514.5 ms, decode 32.65 ms
+13:02:07     nvCOMP Cascaded: exact=True, 16.006 bits/value, encode 171.2 ms, decode 26.71 ms
+13:02:09     nvCOMP ANS: exact=True, 13.078 bits/value, encode 46.7 ms, decode 20.49 ms
+13:02:33     nvCOMP Zstd: exact=True, 12.898 bits/value, encode 2465.3 ms, decode 258.93 ms
+13:02:35     AdaCode (authors' codec): exact=True, 11.370 bits/value, encode 84.5 ms, decode 12.15 ms
+13:02:36     AdaCode, code from the coded KV (authors' codec): exact=True, 11.370 bits/value, encode 84.1 ms, decode 12.16 ms
+13:02:38     exactkv (authors' codec): exact=True, 12.575 bits/value, encode 21.6 ms, decode 83.20 ms
+13:02:38     exponent coders' floor: 8 + Huffman(exponent), DFloat11 / ZipNN format: 10.729 bits/value (computed)
+13:02:38     exponent coders' floor: 8 + exponent entropy: 10.691 bits/value (computed)
+13:02:41 datasets humaneval: 3 window(s) of 8192 tokens, 1409.3M values
+13:02:41     SplitZip code book: top-16 coverage 99.90% (calibrated on wtrain0), 99.90% (own), exponent entropy 3.120 bits
+13:02:45     ours, per layer, dense: exact=True, 9.557 bits/value, encode 218.5 ms, decode 96.24 ms
+13:02:49     ours, per layer, keys then values: exact=True, 9.285 bits/value, encode 318.4 ms, decode 129.00 ms
+13:02:55     ours, per layer, 4 head groups: exact=True, 9.096 bits/value, encode 319.5 ms, decode 163.38 ms
+13:03:03     ours, per layer, head by head: exact=True, 8.989 bits/value, encode 319.1 ms, decode 340.14 ms
+13:03:05     ours, per layer, rank 256: exact=True, 9.811 bits/value, encode 122.3 ms, decode 71.00 ms
+13:03:12     ours, SplitZip format, rank 256: exact=True, 10.574 bits/value, encode 3014.3 ms, decode 54.24 ms
+13:03:14     SplitZip (authors' codec): exact=True, 12.054 bits/value, encode 23.9 ms, decode 9.14 ms
+13:03:18     ExANS (authors' codec): exact=True, 10.873 bits/value, encode 528.7 ms, decode 53.14 ms
+== bench_llama_compare.py exit 139 (attempt 3)
+== crashed in {"case": "datasets:humaneval", "method": "nvCOMP LZ4", "time": 1793390598.8668308}; resuming without that codec
+13:03:25 run started: stages ['calcap', 'datasets', 'context', 'fp8pred', 'groupspeed', 'report']; NVIDIA RTX A4500; branch llama32-3b-lossy-lossless-compare, commit 9f9bbb4929356683c8f8fb7b6f1f45a69734488a; torch 2.15.0+cu132, triton 3.9.0
+13:03:25 GPU memory free 19.2 of 19.6 GB at start
+13:03:25 calcap: kept
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 204.05it/s]
+13:03:28 datasets: humaneval has 30264 tokens, not enough for window 3 of 8192; skipped
+13:03:54   fused one-step predictor prepared for 28 layers
+13:04:24   reduced-rank one-step predictor (rank 256) prepared for 28 layers
+13:04:59   head-group predictor (2 groups of 8 heads) prepared for 28 layers
+13:05:10   head-group predictor (4 groups of 4 heads) prepared for 28 layers
+13:05:21   head-group predictor (16 groups of 1 heads) prepared for 28 layers
+13:05:25   extra baseline ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+13:05:25   $ cmake -S /home/nelson/kv_a5000/runs/llama32_3b/exans/src -B /home/nelson/kv_a5000/runs/llama32_3b/exans/build -DOPENLAKE_EXPANS_BUILD=ON -DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DNVCOMP_ROOT=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp -Dnvcomp_DIR=/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/nvidia/libnvcomp/lib64/cmake/nvcomp -DCUDAToolkit_ROOT=/home/nelson/kv_reconstruction/runs/_matched_baselines/cuda12_8/toolkit -DCMAKE_BUILD_TYPE=Release
+13:05:25   $ cmake --build /home/nelson/kv_a5000/runs/llama32_3b/exans/build --target openlake_expans openlake_expans_test -j 4
+13:05:27   $ /home/nelson/kv_a5000/runs/llama32_3b/exans/build/openlake_expans_test
+13:05:27   the authors' ExANS test passed
+13:05:28 datasets: nvCOMP LZ4 crashed the process in case humaneval in an earlier run; recorded, not tried again
+13:05:29 datasets wikitext2: kept from datasets_wikitext.json
+13:05:30 datasets humaneval: 3 window(s) of 8192 tokens, 1409.3M values
+13:05:30     SplitZip code book: top-16 coverage 99.90% (calibrated on wtrain0), 99.90% (own), exponent entropy 3.120 bits
+13:05:34     ours, per layer, dense: exact=True, 9.557 bits/value, encode 213.7 ms, decode 93.71 ms
+13:05:38     ours, per layer, keys then values: exact=True, 9.285 bits/value, encode 311.8 ms, decode 126.74 ms
+13:05:44     ours, per layer, 4 head groups: exact=True, 9.096 bits/value, encode 314.7 ms, decode 160.11 ms
+13:05:51     ours, per layer, head by head: exact=True, 8.989 bits/value, encode 315.2 ms, decode 335.97 ms
+13:05:54     ours, per layer, rank 256: exact=True, 9.811 bits/value, encode 120.0 ms, decode 69.72 ms
+13:06:01     ours, SplitZip format, rank 256: exact=True, 10.574 bits/value, encode 3004.0 ms, decode 53.41 ms
+/home/nelson/kv_a5000/venv/lib/python3.12/site-packages/triton/knobs.py:504: UserWarning: TRITON_DEFAULT_FP_FUSION is unset: defaulting to FP fusion ENABLED for backward compatibility in Triton 3.9. The default will change to DISABLED in Triton 3.10; set TRITON_DEFAULT_FP_FUSION=1 to keep fusion enabled or =0 to adopt the new default early and silence this warning.
+  warn_once(FP_FUSION_DEFAULT_WARNING)
+13:06:02     SplitZip (authors' codec): exact=True, 12.054 bits/value, encode 23.7 ms, decode 9.14 ms
+13:06:07     ExANS (authors' codec): exact=True, 10.873 bits/value, encode 524.7 ms, decode 52.79 ms
+13:06:09     nvCOMP Cascaded: exact=True, 16.006 bits/value, encode 127.9 ms, decode 20.14 ms
+== bench_llama_compare.py exit 139 (attempt 4)
+== crashed in {"case": "datasets:humaneval", "method": "nvCOMP Bitcomp", "time": 1793390769.8717952}; resuming without that codec
+13:06:13 run started: stages ['report']; NVIDIA RTX A4500; branch llama32-3b-lossy-lossless-compare, commit 9f9bbb4929356683c8f8fb7b6f1f45a69734488a; torch 2.15.0+cu132, triton 3.9.0
+13:06:13 GPU memory free 19.2 of 19.6 GB at start
+# KV transfer codecs on unsloth/Llama-3.2-3B
+
+Captures: 7 documents x 8192 tokens; 28 layers, 8 KV heads x 128; torch 2.11.0+cu128, transformers 4.57.6.
+
+
+## Lossless on SplitZip's datasets (our predictor calibrated on the wikitext set)
+
+Per dataset: up to 4 windows of 8,192 consecutive tokens of its text (scripts/fetch_eval_texts.py; the windows of each dataset are in the code-book table), coded as one case, one stream per window; every entry a real stream decoded bit-exact on this GPU. SplitZip's code book (and the authors' codec) calibrated on the KV of wtrain0 (WikiText-2 train, the paper's protocol); our predictor on wtrain0, wtrain1, wtrain2, wtrain3, wtrain4, wtrain5.
+
+**Bits per value**
+
+| Method | WikiText-2 test |
+| --- | --- |
+| ours, one-step predictor (exact cost) | 8.869 |
+| ours, strong predictor (exact cost) | 7.793 |
+| ours, per layer, dense | 8.972 |
+| ours, per layer, keys then values | 8.633 |
+| ours, per layer, 4 head groups | 8.408 |
+| ours, per layer, head by head | 8.279 |
+| ours, per layer, rank 256 | 9.339 |
+| ours, SplitZip format, rank 256 | 10.122 |
+| SplitZip (authors' codec) | 12.050 |
+| ExANS (authors' codec) | 10.872 |
+| nvCOMP LZ4 | 16.013 |
+| nvCOMP Cascaded | 16.006 |
+| nvCOMP ANS | 13.078 |
+| nvCOMP Zstd | 12.898 |
+| AdaCode (authors' codec) | 11.370 |
+| AdaCode, code from the coded KV (authors' codec) | 11.370 |
+| exactkv (authors' codec) | 12.575 |
+| exponent coders' floor: 8 + Huffman(exponent), DFloat11 / ZipNN format | 10.729 (computed) |
+| exponent coders' floor: 8 + exponent entropy | 10.691 (computed) |
+| nvCOMP Bitcomp | not measured |
+
+**Decode time** (encode in brackets; [graph]: our decode as one CUDA graph replay)
+
+| Method | WikiText-2 test |
+| --- | --- |
+| ours, per layer, dense | 124.30 ms (284) [graph 124.18] |
+| ours, per layer, keys then values | 167.53 ms (417) [graph 167.88] |
+| ours, per layer, 4 head groups | 211.68 ms (420) [graph 209.77] |
+| ours, per layer, head by head | 452.52 ms (422) [graph 331.74] |
+| ours, per layer, rank 256 | 91.36 ms (161) [graph 91.16] |
+| ours, SplitZip format, rank 256 | 70.76 ms (4032) |
+| SplitZip (authors' codec) | 12.17 ms (32) |
+| ExANS (authors' codec) | 70.55 ms (703) |
+| nvCOMP LZ4 | 32.65 ms (1514) |
+| nvCOMP Cascaded | 26.71 ms (171) |
+| nvCOMP ANS | 20.49 ms (47) |
+| nvCOMP Zstd | 258.93 ms (2465) |
+| AdaCode (authors' codec) | 12.15 ms (84) |
+| AdaCode, code from the coded KV (authors' codec) | 12.16 ms (84) |
+| exactkv (authors' codec) | 83.20 ms (22) |
+| exponent coders' floor: 8 + Huffman(exponent), DFloat11 / ZipNN format | - |
+| exponent coders' floor: 8 + exponent entropy | - |
+| nvCOMP Bitcomp | not measured |
+
+**SplitZip's code book on each dataset** (its Table 4 reports the top-16 coverage A->B)
+
+| | WikiText-2 test |
+| --- | --- |
+| windows x tokens | 4 x 8,192 |
+| top-16 coverage, WikiText-2 train book (A->B) | 99.91% |
+| top-16 coverage, own book (B->B) | 99.91% |
+| top-8 coverage, WikiText-2 train book | 94.56% |
+| exponent entropy (bits) | 3.11 |
+| SplitZip paper, top-16 A->B, Llama-3-8B (same family; not this model) | 99.85% |
+
+**Transfer time per link** (all windows of a dataset; the longer of the wire time and the decode; ours = our fastest exact mode at that link, the speed-up against SplitZip)
+
+| Link | WikiText-2 test |
+| --- | --- |
+| 1 Gb/s | 15556.7 ms (1.46x), per layer, head by head; 1.31x the best other, ExANS |
+| 10 Gb/s | 1555.7 ms (1.46x), per layer, head by head; 1.31x the best other, ExANS |
+| 25 Gb/s | 622.3 ms (1.46x), per layer, head by head; 1.31x the best other, ExANS |
+| 50 Gb/s | 316.0 ms (1.43x), per layer, 4 head groups; 1.29x the best other, ExANS |
+| 100 Gb/s | 167.5 ms (1.35x), per layer, keys then values; 1.22x the best other, ExANS |
+| 200 Gb/s | 91.2 ms (1.24x), per layer, rank 256; 1.12x the best other, ExANS |
+| 400 Gb/s | 70.8 ms (0.80x), SplitZip format, rank 256; 0.75x the best other, AdaCode, code from the coded KV |
+
+
+## Links measured on this machine (scripts/pd_link_probe.py)
+
+1 GPU(s): NVIDIA RTX A4500; 896 MiB per copy (one 8K Llama-3.2-3B document).
+
+| GPU | to pinned host | from pinned host | to pageable host | from pageable host |
+| --- | --- | --- | --- | --- |
+| 0 | 26.4 GB/s (211 Gb/s) | 24.0 GB/s (192 Gb/s) | 14.2 GB/s (113 Gb/s) | 14.9 GB/s (119 Gb/s) |
+
+One GPU allocated: no GPU-to-GPU pair measured. A transfer to another machine passes through the host legs above on both sides, so the slower pinned leg bounds any network link faster than it.
+
+13:06:13 run finished in 1 s
+13:06:13 share it: python scripts/package_llama_compare.py /home/nelson/kv_a5000/runs/llama32_3b --destination benchmark_results/<name>
