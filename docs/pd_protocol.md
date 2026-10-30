@@ -108,9 +108,10 @@ A5000
 ```
 
 Defaults run every stage: check, sweep, colocated, multiturn, report.
-- The full sweep is 8 links × 7 codecs × 5 rates of 64 prompts: several hours. For a first pass, set
-  `LINKS=3,10,25,100,400 RATES=0.5,1,inf`.
-- A rerun continues a run folder: runs already measured are kept.
+- The default sweep is 5 links (3, 10, 25, 100, 400 Gb/s) × 7 codecs × 4 rates (0.5, 1, 2 req/s and all at once)
+  of 48 prompts: about 3.5 hours.
+- Each run folder is new (dated). To add links (`LINKS=5,40,200`) or rates later, start another run with only those
+  settings.
 - Results are pushed to `benchmark_results/llama32_3b_pdvllm_rtxa5000x4_<date>`:
   - `summary.md` and `results.json`;
   - every `vllm bench` result;

@@ -66,9 +66,9 @@ if [ "${SMOKE:-0}" = 1 ]; then
     STAGES=${STAGES:-check,sweep,report}
 fi
 CODECS=${CODECS:-raw,splitzip,adacode,ours-hbh,ours-kv,ours-dense,ours-rank256}
-LINKS=${LINKS:-3,5,10,25,40,100,200,400}
-RATES=${RATES:-0.25,0.5,1,2,inf}
-NUM_PROMPTS=${NUM_PROMPTS:-64}
+LINKS=${LINKS:-3,10,25,100,400}                  # about 3.5 h with the defaults below; add 5,40,200 in a rerun
+RATES=${RATES:-0.5,1,2,inf}
+NUM_PROMPTS=${NUM_PROMPTS:-48}
 PROMPT_TOKENS=${PROMPT_TOKENS:-2048,8192}
 OUTPUT_LEN=${OUTPUT_LEN:-128}
 STAGES=${STAGES:-check,sweep,colocated,multiturn,report}
