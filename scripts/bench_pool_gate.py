@@ -94,6 +94,30 @@ def layer_kv(doc, layer, T, H, D, device):
     return get(doc.K), get(doc.V)
 
 
+def sdpa_attn(q, kc, vc):
+    """Dense decode attention with PyTorch SDPA (its fused flash / memory-efficient kernels) over the engine's BF16
+    cache, read in place: [B, TS, H, D] viewed as [B, H, T, D] without a copy. q [B, Hq, D] -> [B, Hq, D]."""
+    T = kc.T
+    k = kc.buf[:, :T].transpose(1, 2)
+    v = vc.buf[:, :T].transpose(1, 2)
+    return torch.nn.functional.scaled_dot_product_attention(q.unsqueeze(2), k, v, enable_gqa=True).squeeze(2)
+
+
+def flashinfer_baseline(a, log_errors=True):
+    """exactkv's own speed baseline (bench/baselines.FlashInferBF16: FlashInfer's BF16 paged decode, tensor cores),
+    or None when flashinfer is not installed (pip install flashinfer-python in the environment)."""
+    try:
+        bench = Path(a.exactkv_source) / "bench"
+        if str(bench) not in sys.path:
+            sys.path.insert(0, str(bench))
+        from baselines import FlashInferBF16
+        return FlashInferBF16()
+    except Exception as exc:
+        if log_errors:
+            log(f"FlashInfer not available ({repr(exc)[:160]}); its rows are left out")
+        return None
+
+
 # ------------------------------------------------------------------------------------------------------------ attn
 def stage_attn(a, run, meta, res):
     from kv_compare.predict import Doc
@@ -104,6 +128,7 @@ def stage_attn(a, run, meta, res):
     rows = res.setdefault("attn", [])
     done = {(r["batch"], r["tokens"], r["layer"]) for r in rows}
     dev = torch.device("cuda")
+    fi = flashinfer_baseline(a)
     for B, T in a.attn_configs:
         # B distinct documents of at least T tokens (the context sweep's first, then any capture), repeated if fewer
         # evaluation documents first (the context sweep's own length, then the datasets), calibration ones last
@@ -139,16 +164,34 @@ def stage_attn(a, run, meta, res):
                 d_s = float((sdpa().squeeze(2).float() - orf.float()).abs().max())
             except Exception as exc:                 # an SDPA without GQA support
                 t_s, d_s = None, repr(exc)[:200]
+            # SDPA as the engine runs it: the cache [B, T, H, D] read in place through a transposed view
+            kv_view = type("C", (), {"buf": k, "T": T})(), type("C", (), {"buf": v, "T": T})()
+            try:
+                t_sv = timer(lambda: sdpa_attn(q, *kv_view))
+            except Exception as exc:
+                t_sv = None
+                log(f"attn: SDPA on the cache view failed ({repr(exc)[:160]})")
+            t_fi = None
+            if fi is not None:
+                try:
+                    fi.plan(B, T, T, Hq, H, D)
+                    t_fi = timer(lambda: fi.w.run(q, (fi.paged(k), fi.paged(v))))
+                except Exception as exc:
+                    log(f"attn: FlashInfer failed ({repr(exc)[:160]})")
             used = sum(sum(t.numel() * t.element_size() for t in (c.sm, c.code, c.base, c.rowmask, c.rowoff))
                        + int(c.cnt.item()) * D * 2 for c in (kc, vc))
             row = {"batch": B, "tokens": T, "layer": l, "documents": sorted(set(names)), "num_warps": nw,
                    "bit_identical": same, "pool_us": 1e6 * t_c, "dense_same_arithmetic_us": 1e6 * t_r,
                    "sdpa_us": None if t_s is None else 1e6 * t_s, "sdpa_max_abs_diff": d_s,
+                   "sdpa_cache_view_us": None if t_sv is None else 1e6 * t_sv,
+                   "flashinfer_us": None if t_fi is None else 1e6 * t_fi,
                    "bits_allocated": (kc.nbytes() + vc.nbytes()) * 8 / (2 * k.numel()),
                    "bits_used": used * 8 / (2 * k.numel())}
             rows.append(row)
-            log(f"attn {B}x{T} layer {l}: pool {row['pool_us']:.1f} us, dense {row['dense_same_arithmetic_us']:.1f} us"
-                f", SDPA {row['sdpa_us'] if t_s is None else round(row['sdpa_us'], 1)} us, identical={same}, "
+            f1 = lambda v: "-" if v is None else f"{v:.1f}"
+            log(f"attn {B}x{T} layer {l}: pool {row['pool_us']:.1f} us, dense same arithmetic "
+                f"{row['dense_same_arithmetic_us']:.1f} us, SDPA {f1(row['sdpa_us'])} us (on the cache view "
+                f"{f1(row['sdpa_cache_view_us'])}), FlashInfer {f1(row['flashinfer_us'])} us, identical={same}, "
                 f"{row['bits_allocated']:.2f} bits allocated")
             del k, v, kc, vc, q, kh, vh, qh, oc, orf
             torch.cuda.empty_cache()
@@ -202,14 +245,24 @@ def stage_e2e(a, run, meta, res):
         torch.cuda.empty_cache()
         budget = torch.cuda.mem_get_info()[0] - a.headroom_gib * 2 ** 30
         ps = {n: per_seq(n) for n in ("bf16", "exactkv")}
+        fi = flashinfer_baseline(a, log_errors=False)
+        arms = {"bf16 + SDPA": ("bf16", lambda B: exactkv.Engine(model, B, TM, backend="bf16", attn=sdpa_attn)),
+                "pool (exactkv)": ("exactkv", lambda B: exactkv.Engine(model, B, TM, backend="exactkv"))}
+        if fi is not None:
+            arms["bf16 + FlashInfer"] = ("bf16", lambda B: fi.engine(model, B, TM))
+        if a.e2e_reference:
+            arms["bf16, same-arithmetic reference kernel"] = ("bf16", lambda B: exactkv.Engine(model, B, TM,
+                                                                                           backend="bf16"))
         bmax = {n: max(1, int(budget // ps[n])) for n in ps}
 
-        def run_one(name, B):
+        def run_one(arm, B):
+            kind, make = arms[arm]
+            name = arm
             while B > 0:
                 eng = None
                 try:
                     ids = prompts(B, PL)
-                    eng = exactkv.Engine(model, B, TM, backend=name)
+                    eng = make(B)
                     torch.cuda.synchronize()
                     t0 = time.time()
                     t = eng.prefill(ids)
@@ -219,7 +272,7 @@ def stage_e2e(a, run, meta, res):
                         t = eng.step(t).argmax(-1)
                     torch.cuda.synchronize()
                     t2 = time.time()
-                    r = {"backend": name, "batch": B, "kv_mib_per_sequence": ps[name] / 2 ** 20,
+                    r = {"backend": name, "batch": B, "kv_mib_per_sequence": ps[kind] / 2 ** 20,
                          "ms_per_step": (t2 - t1) / (a.e2e_gen - 1) * 1e3,
                          "decode_tokens_per_s": B * (a.e2e_gen - 1) / (t2 - t1), "prefill_s": t1 - t0,
                          "pool_grows": getattr(eng, "grows", 0)}
@@ -233,9 +286,15 @@ def stage_e2e(a, run, meta, res):
                     gc.collect()
                     torch.cuda.empty_cache()
             return None
-        rows = [run_one("bf16", bmax["bf16"]), run_one("exactkv", bmax["exactkv"])]
-        if rows[0]:
-            rows.append(run_one("exactkv", rows[0]["batch"]))
+        rows = []
+        for arm, (kind, _) in arms.items():
+            rows.append(run_one(arm, bmax[kind]))     # each at the largest batch the budget fits
+        dense = next((r for r in rows if r and r["backend"] == "bf16 + SDPA"), None)
+        if dense:                                     # the pool at the dense batch: the same work
+            r = run_one("pool (exactkv)", dense["batch"])
+            if r:
+                r["note"] = "at the dense batch"
+            rows.append(r)
         e2e[key] = {"prompt": PL, "generated": a.e2e_gen, "kv_budget_gib": budget / 2 ** 30,
                     "kv_bytes_per_sequence": ps, "rows": rows}
         save(a, res)
@@ -384,21 +443,32 @@ def report(a, run, meta, res):
     rows = res.get("attn", [])
     if rows:
         L = meta["layers"]
-        lines += ["## Decode attention: pool vs dense on identical KV", "",
-                  f"Per decode step = the mean per layer x {L} layers. Bits per value of the pool include its "
-                  "directory and raw-row reserve (allocated) or only the rows used.", "",
-                  "| Batch x context | Pool, per step | Dense, same arithmetic | PyTorch SDPA (dense) | Pool vs dense | "
-                  "Bit-identical | Bits allocated / used |", "| --- | --- | --- | --- | --- | --- | --- |"]
+        lines += ["## Decode attention: the pool against production dense kernels, on identical KV", "",
+                  f"Per decode step = the mean per layer x {L} layers. The production dense kernels are PyTorch SDPA "
+                  "(contiguous [B, H, T, D], and on the engine's cache view) and FlashInfer (exactkv's own baseline; "
+                  "when installed). The pool's bit-identity is checked against exactkv's dense kernel with the same "
+                  "arithmetic, which is a reference, not a production kernel (it assembles BF16 from bytes). Bits "
+                  "per value of the pool: allocated (directory and raw-row reserve) / used.", "",
+                  "| Batch x context | Pool | SDPA | SDPA, cache view | FlashInfer | Pool vs fastest dense | "
+                  "Same-arithmetic reference | Bit-identical | Bits allocated / used |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
         for (B, T) in sorted({(r["batch"], r["tokens"]) for r in rows}, key=lambda x: (x[1], x[0])):
             rr = [r for r in rows if r["batch"] == B and r["tokens"] == T]
             m = lambda k: sum(r[k] for r in rr) / len(rr)
-            sd = [r["sdpa_us"] for r in rr if r["sdpa_us"] is not None]
-            lines.append(f"| {B} x {T:,} | {m('pool_us') * L / 1e3:.2f} ms | {m('dense_same_arithmetic_us') * L / 1e3:.2f} ms | "
-                         + (f"{sum(sd) / len(sd) * L / 1e3:.2f} ms" if sd else "-")
-                         + f" | {m('dense_same_arithmetic_us') / m('pool_us'):.2f}x | "
+
+            def mo(k):
+                v = [r.get(k) for r in rr if r.get(k) is not None]
+                return sum(v) / len(v) * L / 1e3 if len(v) == len(rr) else None
+            dense = [v for v in (mo("sdpa_us"), mo("sdpa_cache_view_us"), mo("flashinfer_us")) if v is not None]
+            pool = m("pool_us") * L / 1e3
+            ms = lambda v: "-" if v is None else f"{v:.2f} ms"
+            lines.append(f"| {B} x {T:,} | {pool:.2f} ms | {ms(mo('sdpa_us'))} | {ms(mo('sdpa_cache_view_us'))} | "
+                         f"{ms(mo('flashinfer_us'))} | "
+                         + (f"{min(dense) / pool:.2f}x" if dense else "-")
+                         + f" | {m('dense_same_arithmetic_us') * L / 1e3:.2f} ms | "
                          f"{'yes' if all(r['bit_identical'] for r in rr) else 'NO'} | "
                          f"{m('bits_allocated'):.2f} / {m('bits_used'):.2f} |")
-        lines.append("")
+        lines += ["", "Pool vs fastest dense above 1 means the pool is faster.", ""]
     e2e = res.get("e2e", {})
     if e2e:
         lines += ["## Generation: BF16 cache vs pool (same engine and weights)", ""]
@@ -413,10 +483,12 @@ def report(a, run, meta, res):
                 continue
             for r in v["rows"]:
                 if r:
-                    lines.append(f"| {v['prompt']:,} + {v['generated']} | {r['backend']} | {r['batch']} | "
+                    lines.append(f"| {v['prompt']:,} + {v['generated']} | {r['backend']}"
+                                 + (f" ({r['note']})" if r.get("note") else "") + f" | {r['batch']} | "
                                  f"{r['kv_mib_per_sequence']:.0f} MiB | {r['ms_per_step']:.2f} | {r['decode_tokens_per_s']:.0f} |")
-        lines += ["", "Each backend runs at the largest batch the same KV budget fits, then the pool at the BF16 batch "
-                  "(same work). The engine is exactkv's plain Python loop (no CUDA graphs) for both.", ""]
+        lines += ["", "Each backend runs at the largest batch the same KV budget fits, then the pool at the dense batch "
+                  "(the same work). Same engine for all (exactkv's plain Python loop, no CUDA graphs); only the "
+                  "cache and the decode-attention kernel differ.", ""]
     ins = res.get("install")
     if ins and ins.get("rows"):
         lines += [f"## T -> P installation: {ins['document']} ({ins['tokens']:,} tokens, {ins['layers']} layers, "
@@ -462,6 +534,9 @@ def main(argv=None):
     p.add_argument("--e2e-prompts", default="2048,8192")
     p.add_argument("--e2e-gen", type=int, default=128)
     p.add_argument("--headroom-gib", type=float, default=1.5)
+    p.add_argument("--e2e-reference", action="store_true",
+                   help="e2e: also time the engine with exactkv's same-arithmetic dense kernel (slow; it is the "
+                        "bit-identity reference, not a production kernel)")
     p.add_argument("--install-doc", default="ctx8192_r0")
     p.add_argument("--rerun", default="", help="stages to measure again (results are kept otherwise)")
     a = p.parse_args(argv)

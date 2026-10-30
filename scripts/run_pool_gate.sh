@@ -6,7 +6,8 @@
 #
 # Uses the run's captures (MODEL's folder under $KV_HOME/runs, made by run_a5000.sh: calcap, datasets, context) and
 # the environment of scripts/a5000_setup.sh. Options: STAGES (default attn,e2e,install,report), EXTRA (more
-# arguments for bench_pool_gate.py), NO_PUSH=1. Finished parts are kept: a rerun continues.
+# arguments for bench_pool_gate.py, e.g. EXTRA="--rerun attn,e2e"), FLASHINFER=1 (also FlashInfer, exactkv's own
+# dense baseline), NO_PUSH=1. Finished parts are kept: a rerun continues.
 set -Eeuo pipefail
 trap 'echo "POOL GATE STOPPED at line $LINENO (exit $?)" >&2' ERR
 BRANCH=llama32-3b-lossy-lossless-compare
@@ -35,6 +36,14 @@ fi
 [ -s "$RUN/captures/meta.json" ] || { echo "STOP: no captures in $RUN (run scripts/run_a5000.sh for $MODEL first)"; exit 1; }
 OUT=$RUN/pool_gate
 mkdir -p "$OUT"
+# FLASHINFER=1: exactkv's own dense baseline (FlashInfer 0.6.18, the version its README reports), installed into
+# the environment; it compiles its kernels on first use with the CUDA toolkit of a5000_setup.sh. Optional.
+if [ "${FLASHINFER:-0}" = 1 ] && ! python -c "import flashinfer" 2>/dev/null; then
+    python -m pip install -q "flashinfer-python==0.6.18" || echo "NOTE: FlashInfer did not install; its rows are left out"
+fi
+if [ -s "$KV_HOME/cuda_home" ]; then
+    CUDA_HOME=$(cat "$KV_HOME/cuda_home"); export CUDA_HOME; export PATH=$CUDA_HOME/bin:$PATH
+fi
 STAGES=${STAGES:-attn,e2e,install,report}
 echo "== P gate: $RUN, stages $STAGES, commit $(git log --oneline -1)"
 nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv,noheader
