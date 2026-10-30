@@ -985,6 +985,96 @@ class MoreBaselinesTests(unittest.TestCase):
         self.assertNotIn("NOT exact", text)
 
 
+class SpanStandIn:
+    """IsolatedCodec's tests, in the child process: "copy" codes a stream as itself in half the bytes, "fail"
+    raises, "crash" kills its process (SIGSEGV, like nvCOMP's encode on the NUC), "flaky" does so only the first
+    time (flag: a file saying it did)."""
+
+    def __init__(self, device, flag=None):
+        self.codecs = {"copy": None, "fail": None, "crash": None, "flaky": None}
+        self.errors = {"missing": "not in this build"}
+        self.version = "stand-in 1"
+        self.flag = flag
+
+    def measure_span(self, alg, raw, timer):
+        import os
+        import signal
+        if alg == "crash" or (alg == "flaky" and not os.path.exists(self.flag)):
+            if alg == "flaky":
+                open(self.flag, "w").close()
+            os.kill(os.getpid(), signal.SIGSEGV)
+        if alg == "fail":
+            raise ValueError("refused")
+        t = timer(lambda: raw.clone())
+        return bool(torch.equal(raw.clone(), raw)), raw.numel() // 2, t, 2 * t, None
+
+
+@unittest.skipIf(torch is None, "PyTorch is required")
+class IsolatedCodecTests(unittest.TestCase):
+    """kv_compare.more_baselines.IsolatedCodec: a codec in a child process, so a native crash costs a row."""
+
+    def test_a_crash_costs_a_row_not_the_run(self):
+        from kv_compare import more_baselines as mb, context_sweep as cs
+        tmp = Path(tempfile.mkdtemp())
+        logs = []
+        c = mb.IsolatedCodec("kv_compare.test_kv_compare:SpanStandIn", "cpu", kwargs={"flag": str(tmp / "once")},
+                             log=logs.append, timeout=120)
+        try:
+            self.assertEqual(sorted(c.codecs), ["copy", "crash", "fail", "flaky"])
+            self.assertEqual(c.errors, {"missing": "not in this build"})
+            self.assertEqual(c.version, "stand-in 1")
+            words = torch.arange(2 * 32 * 8, dtype=torch.int16).view(2, 32, 8)
+            r = c.measure("copy", words, [(0, 16), (16, 32)])
+            self.assertTrue(r["bit_exact"])
+            self.assertEqual((r["streams"], r["bits"], r["isolated"], r["child_crashes"]), (2, 8.0, True, 0))
+            local = mb.measure_streams(SpanStandIn("cpu").measure_span, "copy", words, [(0, 16), (16, 32)],
+                                       lambda fn: (fn(), 0.0)[1])
+            self.assertEqual(local["bits"], r["bits"])
+            with self.assertRaisesRegex(RuntimeError, "refused"):
+                c.measure("fail", words, [(0, 32)])
+            with self.assertRaises(mb.ChildCrash) as cm:     # twice on the same stream: given up
+                c.measure("crash", words, [(0, 32)])
+            self.assertIn("SIGSEGV", str(cm.exception))
+            self.assertEqual(c.crashes, 2)
+            r = c.measure("flaky", words, [(0, 32)])          # once: passes in a new child
+            self.assertTrue(r["bit_exact"])
+            self.assertEqual(r["child_crashes"], 1)
+            self.assertTrue(any("once more in a new one" in m for m in logs))
+            # in a sweep: the crash is an error row, the codecs after it are measured
+            class Study:
+                C, hd, W = 4, 4, 8
+            st = Study()
+            st.rope = type("R", (), {"tables": staticmethod(lambda p: (torch.ones(len(p), 2),
+                                                                        torch.zeros(len(p), 2)))})()
+            rows = cs.measure_case(st, {"cos": torch.ones(32, 2), "sin": torch.zeros(32, 2)}, None, words,
+                                   torch.arange(32), torch.device("cpu"), log=lambda m: None,
+                                   only={"nvCOMP crash", "nvCOMP copy"}, extras={"nvcomp": c},
+                                   baseline_stream_tokens=16)
+            by = {row["method"]: row for row in rows}
+            self.assertIn("ChildCrash", by["nvCOMP crash"]["error"])
+            self.assertTrue(by["nvCOMP copy"]["bit_exact"])
+        finally:
+            c.close()
+
+    def test_crash_records_are_kept_at_once_and_new_software_measures_again(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import bench_llama_compare as b
+        out = Path(tempfile.mkdtemp())
+        path = out / "datasets.json"
+        (out / "crash_marker.json").write_text(json.dumps({"case": "datasets:gsm8k", "method": "nvCOMP LZ4"}))
+        res = {"cases": {}}
+        b.crashed_codecs(out, res, "datasets", path)
+        self.assertEqual(json.loads(path.read_text())["crashed"], {"gsm8k": ["nvCOMP LZ4"]})
+        self.assertIsNone(b.kept_case(res, "gsm8k", "datasets", path))
+        res["cases"]["gsm8k"] = case = {"rows": [], "env": b.env_tag()}
+        self.assertIs(b.kept_case(res, "gsm8k", "datasets", path), case)
+        self.assertEqual(res["crashed"], {"gsm8k": ["nvCOMP LZ4"]})
+        res["cases"]["gsm8k"] = {"rows": []}                       # measured before the tag: again
+        self.assertIsNone(b.kept_case(res, "gsm8k", "datasets", path))
+        saved = json.loads(path.read_text())
+        self.assertEqual((saved["cases"], saved["crashed"], res["crashed"]), ({}, {}, {}))
+
+
 class PackageTests(unittest.TestCase):
     def test_package_copies_small_files_and_refuses_overwrite(self):
         sys.path.insert(0, str(ROOT / "scripts"))

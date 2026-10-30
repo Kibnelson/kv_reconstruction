@@ -55,6 +55,13 @@ fi
 [ -x "$KV_HOME/venv/bin/python" ] || { echo "STOP: no $KV_HOME/venv: run scripts/a5000_setup.sh first"; exit 1; }
 # shellcheck disable=SC1091
 source "$KV_HOME/venv/bin/activate"
+# every run on the pinned torch (requirements-cuda.txt): an install into this environment changes it (FlashInfer's
+# brought torch 2.15 + CUDA 13.2 into the NUC's mid-run); scripts/a5000_setup.sh puts the pin back
+WANT_TORCH=$(sed -n 's/^torch==//p' requirements-cuda.txt)
+HAVE_TORCH=$(python -c "import torch; print(torch.__version__)")
+[ "$HAVE_TORCH" = "$WANT_TORCH" ] || {
+    echo "STOP: torch $HAVE_TORCH in $KV_HOME/venv, not $WANT_TORCH (requirements-cuda.txt); put it back:"
+    echo "  KV_HOME=$KV_HOME bash scripts/a5000_setup.sh   (ALLOW_NO_SLURM=1 on the NUC)"; exit 1; }
 
 case "$MODEL" in
     /*) [ -d "$MODEL" ] || { echo "STOP: no model folder $MODEL"; exit 1; }; IDS=$MODEL; PIN="" ;;   # a local copy
@@ -139,7 +146,7 @@ ARGS=(--device cuda --model "$MODEL_ID" --revision "$REVISION" --output "$RUN"
 [ -s "$KV_HOME/cuda_home" ] && ARGS+=(--cuda-home "$(cat "$KV_HOME/cuda_home")")
 echo "== bench_llama_compare.py, stages $STAGES (log: $RUN/console.log)"
 set +e
-for ATTEMPT in 1 2 3 4; do
+for ATTEMPT in 1 2 3 4 5 6 7 8; do
     # shellcheck disable=SC2086
     python -u scripts/bench_llama_compare.py "${ARGS[@]}" --stages "$STAGES" ${EXTRA:-} 2>&1 | tee -a "$RUN/console.log"
     STATUS=${PIPESTATUS[0]}

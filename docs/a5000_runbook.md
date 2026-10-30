@@ -113,6 +113,16 @@ ALLOW_NO_SLURM=1 KV_HOME=$HOME/kv_a5000 MODEL=llama32_3b bash scripts/run_a5000.
 NUC
 ```
 
+Both scripts check that the environment still has the pinned torch of `requirements-cuda.txt` (2.11.0+cu128) and
+stop otherwise. An unconstrained FlashInfer install replaced it with torch 2.15 + CUDA 13.2 on the NUC; rerunning
+`bash scripts/a5000_setup.sh` (with `ALLOW_NO_SLURM=1 KV_HOME=$HOME/kv_a5000`) puts it back. A case measured with
+other software is measured again on the next run.
+
+nvCOMP runs in a child process: its Python package crashed the process at random inside its encode (SIGSEGV) on
+the NUC's full runs, and in a child a crash costs one retry, or that codec's row of that case after a second, never
+the run. A crash in our process (any other codec) is still recorded by the run and skipped on the automatic resume
+(up to 8 attempts).
+
 Optionally, SplitZip's own Llama-3-8B fits the NUC's 20 GB up to 16K tokens (`MODEL=llama3_8b`). Its 32K capture
 is skipped if it runs out of memory. Disk: about 50 GB under `~/kv_a5000` for the 3B run, captures included.
 

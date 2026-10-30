@@ -4,7 +4,8 @@ and decode times on this GPU.
 
   nvCOMP          NVIDIA's GPU codecs (LZ4, Cascaded, Bitcomp, ANS, Zstd): SplitZip's Table 2 baselines. Python
                   package nvidia-nvcomp-cu12; the KV bytes of a stream as one buffer, default options except the
-                  element type (2 bytes) for Cascaded and Bitcomp.
+                  element type (2 bytes) for Cascaded and Bitcomp. Run in a child process (IsolatedCodec): the
+                  package crashed whole runs at random inside its encode.
   AdaCode         EMNLP 2026 (github.com/lichangshiwhu/Adacode, ADACODE_COMMIT): its CompressorBitMap codec, unchanged,
                   per layer for keys and values. Code length (2, 3 or 4 bits) and exponent window from the authors'
                   rule (analysis_best_bits, reproduced below) on the calibration KV; "own data" picks them from the
@@ -28,6 +29,7 @@ import importlib.util
 import math
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import time
@@ -118,33 +120,209 @@ class Nvcomp:
                 self.errors[a] = repr(exc)[:300]
         self.version = getattr(nvcomp, "__version__", None)
 
-    def measure(self, alg, words, spans, timer):
+    def measure_span(self, alg, raw, timer):
+        """One stream, raw: its bytes (uint8 [n] on the device) -> (bit_exact, coded bytes, encode s, decode s,
+        what differed or None)."""
         codec = self.codecs[alg]
-        ok, nbytes, te, td = True, 0, 0.0, 0.0
+        arr = self.nv.as_array(raw, cuda_stream=self.stream.cuda_stream)
+        enc = codec.encode(arr)
+        dec = codec.decode(enc)
+        # the decoded array keeps the codec's element type (2 bytes for Cascaded and Bitcomp): compare bytes
+        t = torch.from_dlpack(dec)
+        back = t.contiguous().reshape(-1).view(torch.uint8)
+        same = back.numel() == raw.numel() and bool(torch.equal(back, raw))
         diag = None
-        for a, b in spans:
-            raw = words[:, a:b].contiguous().view(torch.uint8).reshape(-1)
-            arr = self.nv.as_array(raw, cuda_stream=self.stream.cuda_stream)
-            enc = codec.encode(arr)
-            dec = codec.decode(enc)
-            # the decoded array keeps the codec's element type (2 bytes for Cascaded and Bitcomp): compare bytes
-            t = torch.from_dlpack(dec)
-            back = t.contiguous().reshape(-1).view(torch.uint8)
-            same = back.numel() == raw.numel() and bool(torch.equal(back, raw))
-            if not same and diag is None:              # what differed, for the report
-                n = min(back.numel(), raw.numel())
-                diag = {"decoded_dtype": str(t.dtype), "decoded_bytes": back.numel(), "raw_bytes": raw.numel(),
-                        "differing_bytes_in_common_prefix": int((back[:n] != raw[:n]).sum())}
-            ok = ok and same
-            size = getattr(enc, "buffer_size", None)
-            nbytes += int(size if size is not None else enc.size * enc.item_size)
-            te += timer(lambda: codec.encode(arr))
-            td += timer(lambda: codec.decode(enc))
-            del raw, arr, enc, dec, back
-        out = {"bit_exact": ok, "bits": 8 * nbytes / (words.numel()), "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
-               "streams": len(spans), "nvcomp": self.version}
-        if diag:
-            out["mismatch"] = diag
+        if not same:                                   # what differed, for the report
+            n = min(back.numel(), raw.numel())
+            diag = {"decoded_dtype": str(t.dtype), "decoded_bytes": back.numel(), "raw_bytes": raw.numel(),
+                    "differing_bytes_in_common_prefix": int((back[:n] != raw[:n]).sum())}
+        size = getattr(enc, "buffer_size", None)
+        nbytes = int(size if size is not None else enc.size * enc.item_size)
+        del t, back, dec
+        te = timer(lambda: codec.encode(arr))
+        td = timer(lambda: codec.decode(enc))
+        return same, nbytes, te, td, diag
+
+    def measure(self, alg, words, spans, timer):
+        return measure_streams(self.measure_span, alg, words, spans, timer, nvcomp=self.version)
+
+
+def measure_streams(span_fn, alg, words, spans, timer, **extra):
+    """A codec's row over the streams spans of words (int16 [L, T, W]): span_fn(alg, raw bytes of a stream, timer)
+    -> (bit_exact, coded bytes, encode s, decode s, mismatch or None), summed over the streams."""
+    ok, nbytes, te, td, diag = True, 0, 0.0, 0.0, None
+    for a, b in spans:
+        raw = words[:, a:b].contiguous().view(torch.uint8).reshape(-1)
+        same, nb, e, d, dg = span_fn(alg, raw, timer)
+        del raw
+        ok, nbytes, te, td = ok and same, nbytes + nb, te + e, td + d
+        diag = diag or dg
+    out = {"bit_exact": ok, "bits": 8 * nbytes / words.numel(), "encode_ms": 1e3 * te, "decode_ms": 1e3 * td,
+           "streams": len(spans), **extra}
+    if diag:
+        out["mismatch"] = diag
+    return out
+
+
+# ------------------------------------------------------------------------------------- a codec in a child process
+class ChildCrash(RuntimeError):
+    """A codec's child process died (a crash in native code, or no answer in time) on the same stream again."""
+
+
+def _exit_name(code):
+    if code is None:
+        return "no answer in time"
+    if code < 0:
+        try:
+            return signal.Signals(-code).name
+        except ValueError:
+            return f"signal {-code}"
+    return f"exit {code}"
+
+
+def _codec_worker(conn, factory, kwargs, device, warmup, reps):
+    """The child of IsolatedCodec: builds factory(device, **kwargs) ("module:name"), sends what it offers, then
+    measures one stream per request ((alg, bytes in shared host memory)) until it receives None."""
+    import faulthandler
+    from .gpu_speed import timer as _timer
+    faulthandler.enable()                            # a crash's Python stack goes to the run's console log
+    dev = torch.device(device)
+    gpu = dev.type == "cuda"
+    if gpu:
+        torch.cuda.set_device(dev)
+    try:
+        mod, _, name = factory.partition(":")
+        codec = getattr(importlib.import_module(mod), name)(dev, **kwargs)
+        conn.send(("ready", {"codecs": list(codec.codecs), "errors": dict(getattr(codec, "errors", {})),
+                             "version": getattr(codec, "version", None)}))
+    except Exception as exc:
+        conn.send(("error", repr(exc)[:300]))
+        return
+    tm = lambda fn: _timer(fn, dev, warmup=warmup if gpu else 0, reps=reps if gpu else 1)
+    while True:
+        try:
+            msg = conn.recv()
+        except EOFError:
+            return
+        if msg is None:
+            return
+        alg, host = msg
+        try:
+            raw = host.to(dev) if gpu else host
+            conn.send(("ok", codec.measure_span(alg, raw, tm)))
+        except Exception as exc:
+            conn.send(("error", repr(exc)[:300]))
+        raw = host = msg = None
+        if gpu:
+            torch.cuda.empty_cache()
+
+
+class IsolatedCodec:
+    """A codec (factory "module:name", the class's measure_span) run in a child process: nvCOMP's Python package
+    crashed the NUC's full runs inside Codec.encode (SIGSEGV, at random: the same codec on the same KV passed on
+    another attempt), taking every later measurement with it. Each stream goes to the child through shared host
+    memory; a crash costs that stream one retry in a new child, and a second crash this codec's row of this case
+    (an error row), never the run. Timed in the child as in the parent (CUDA events, warmup and reps)."""
+    isolated = True
+
+    def __init__(self, factory, device, kwargs=None, warmup=2, reps=5, retries=1, timeout=1800.0, log=print):
+        self.factory, self.device, self.kwargs = factory, torch.device(device), dict(kwargs or {})
+        self.warmup, self.reps, self.retries, self.timeout, self.log = warmup, reps, retries, timeout, log
+        self._proc = self._conn = None
+        self.crashes = 0
+        info = self._start()
+        self.codecs = {a: None for a in info["codecs"]}
+        self.errors = info["errors"]
+        self.version = info["version"]
+
+    def _start(self):
+        ctx = torch.multiprocessing.get_context("spawn")
+        parent, child = ctx.Pipe()
+        proc = ctx.Process(target=_codec_worker, daemon=True,
+                           args=(child, self.factory, self.kwargs, str(self.device), self.warmup, self.reps))
+        proc.start()
+        child.close()
+        self._proc, self._conn = proc, parent
+        r = self._answer(600.0)
+        if r is None or r[0] != "ready":
+            if r is None:
+                proc.join(5)
+            why = _exit_name(proc.exitcode) if r is None else r[1]
+            self.close()
+            raise RuntimeError(f"the codec's child process did not start ({why})")
+        return r[1]
+
+    def _answer(self, timeout):
+        """The child's reply, or None when it died (or gave no answer within timeout seconds)."""
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            if self._conn.poll(0.2):
+                try:
+                    return self._conn.recv()
+                except (EOFError, OSError):
+                    return None
+            if not self._proc.is_alive():
+                if self._conn.poll(0):
+                    try:
+                        return self._conn.recv()
+                    except (EOFError, OSError):
+                        return None
+                return None
+        return None
+
+    def close(self):
+        proc, conn = self._proc, self._conn
+        self._proc = self._conn = None
+        if proc is None:
+            return
+        if proc.is_alive():
+            try:
+                conn.send(None)
+            except (OSError, ValueError):
+                pass
+            proc.join(10)
+        if proc.is_alive():
+            proc.kill()
+            proc.join(10)
+        conn.close()
+
+    def __del__(self):                               # a stage's codecs go when it ends: so does the child
+        try:
+            self.close()
+        except Exception:
+            pass
+
+    def measure_span(self, alg, raw, timer=None):
+        """As the factory's measure_span, in the child (timer unused: the child times with its own)."""
+        host = torch.empty(raw.numel(), dtype=torch.uint8).share_memory_()
+        host.copy_(raw.reshape(-1))
+        if raw.is_cuda:
+            torch.cuda.empty_cache()                 # room for the child's buffers
+        for attempt in range(1 + self.retries):
+            if self._proc is None or not self._proc.is_alive():
+                self.close()
+                self._start()
+            self._conn.send((alg, host))
+            r = self._answer(self.timeout)
+            if r is not None:
+                break
+            self._proc.join(5)                       # its end may not be collected yet (the pipe closes first)
+            code = self._proc.exitcode
+            self.crashes += 1
+            self.log(f"      {alg}: its child process died ({_exit_name(code)})"
+                     + ("; once more in a new one" if attempt < self.retries else ""))
+            self.close()
+        else:
+            raise ChildCrash(f"{alg} took its child process down {1 + self.retries} times on the same stream "
+                             f"({_exit_name(code)}); see the console log")
+        if r[0] != "ok":
+            raise RuntimeError(r[1])
+        return tuple(r[1])
+
+    def measure(self, alg, words, spans, timer=None):
+        before = self.crashes
+        out = measure_streams(self.measure_span, alg, words, spans, timer, nvcomp=self.version, isolated=True)
+        out["child_crashes"] = self.crashes - before
         return out
 
 
@@ -320,7 +498,12 @@ def build(args_like, device, cal_words, C, log=print):
     root = Path(args_like.baseline_sources)
     if "nvcomp" in want:
         try:
-            nv = Nvcomp(device)
+            # in a child process on the GPU (IsolatedCodec: its crashes cost a row, not the run);
+            # KV_NVCOMP_IN_PROCESS=1 runs it in this process as before
+            if device.type == "cuda" and os.environ.get("KV_NVCOMP_IN_PROCESS") != "1":
+                nv = IsolatedCodec(f"{__name__}:Nvcomp", device, log=log)
+            else:
+                nv = Nvcomp(device)
             have["nvcomp"] = nv
             errors.update({f"nvCOMP {a}": e for a, e in nv.errors.items()})
         except Exception as exc:

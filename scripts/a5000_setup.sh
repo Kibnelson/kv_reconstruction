@@ -64,7 +64,16 @@ fi
 # shellcheck disable=SC1091
 source "$KV_HOME/venv/bin/activate"
 python -m pip install -q --upgrade pip
+# FlashInfer's install (scripts/run_pool_gate.sh before it pinned the environment) replaced torch 2.11 + CUDA 12.8
+# with 2.15 + CUDA 13.2 and the CUDA 12 Python bindings with 13's: remove what it brought, then the pins below
+# (torch, triton) and the bindings go back
+python -m pip uninstall -q -y flashinfer-python cuda-python 2>/dev/null || true
 python -m pip install -q -r requirements-cuda.txt
+if python -c "import importlib.metadata as m, sys; sys.exit(0 if m.version('cuda-bindings').startswith('12.') else 1)" \
+        2>/dev/null; then :
+elif python -c "import importlib.metadata as m; m.version('cuda-bindings')" 2>/dev/null; then
+    python -m pip install -q "cuda-bindings==12.9.10"      # the version of the environment before FlashInfer
+fi
 # nvCOMP 5.x: ExANS (openlake de6c38b) calls nvcompBatchedANS*GetTempSizeAsync, which nvCOMP 6.0 renamed; the
 # Python package pins the native library to its own version, so both stay on 5.3.0.16
 python -m pip install -q pyarrow cmake ninja packaging nvidia-libnvcomp-cu12==5.3.0.16 nvidia-nvcomp-cu12==5.3.0.16

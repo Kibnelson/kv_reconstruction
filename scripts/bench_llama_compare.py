@@ -527,10 +527,11 @@ def stage_context(args, out):
     exact_costs(args, out, res, path, single, device)
     study, consts, rc, grouped, books, sz, exans, w16, extras = lossless_codecs(args, out, device, "context")
     bounds = "bounds" in args.extra_baselines
-    crashed = crashed_codecs(out, res, "context")
+    crashed = crashed_codecs(out, res, "context", path)
     from kv_compare.predict import Doc
     for n, b in cases:
         key = f"{n}x{b}"
+        kept_case(res, key, "context", path)
         want = wanted_methods(args, rc, books, sz, exans, extras, bounds)
         bad = set(crashed.get(key, []))
         if key in res["cases"] and want <= measured(res["cases"][key]["rows"]) | bad:
@@ -560,7 +561,7 @@ def stage_context(args, out):
         rows += crash_rows(sorted(bad))
         if kept is not None:
             rows = merge_rows(kept, rows)
-        res["cases"][key] = {"tokens": n, "batch": b, "values": words.numel(), "rows": rows}
+        res["cases"][key] = {"tokens": n, "batch": b, "values": words.numel(), "rows": rows, "env": env_tag()}
         path.write_text(json.dumps(res, indent=1))
         del words, docs
         gc.collect()
@@ -652,9 +653,36 @@ def measured(rows):
             ("error" not in r and (r.get("computed") or r.get("bit_exact")))}
 
 
-def crashed_codecs(out, res, stage):
+def env_tag():
+    """The software a case was measured with: a resumed run measures a case of another again (an install into the
+    environment, FlashInfer's on the NUC, swapped torch 2.11 + CUDA 12.8 for 2.15 + CUDA 13.2 mid-run)."""
+    import torch
+    try:
+        import triton
+        tv = triton.__version__
+    except ImportError:
+        tv = None
+    return f"torch {torch.__version__}, triton {tv}"
+
+
+def kept_case(res, name, stage, path):
+    """res's kept case name when it was measured with this software; else None, with the case and its crash records
+    dropped from res and from path at once (so a crash while it is measured again stays recorded)."""
+    case = res["cases"].get(name)
+    if case is None or case.get("env") == env_tag():
+        return case
+    log(f"{stage} {name}: measured with {case.get('env') or 'an earlier environment'}; measuring again with "
+        f"{env_tag()}")
+    del res["cases"][name]
+    res.get("crashed", {}).pop(name, None)
+    path.write_text(json.dumps(res, indent=1))
+    return None
+
+
+def crashed_codecs(out, res, stage, path=None):
     """{case: [methods]} that crashed the process in this stage, taking a crash marker left by an earlier run
-    (kv_compare.context_sweep.CRASH_MARKER) into res["crashed"]; a marker of another stage stays for that stage."""
+    (kv_compare.context_sweep.CRASH_MARKER) into res["crashed"] (and at once into path: a second crash in the same
+    case must not lose it); a marker of another stage stays for that stage."""
     reg = res.setdefault("crashed", {})
     m = out / "crash_marker.json"
     if m.is_file():
@@ -669,6 +697,8 @@ def crashed_codecs(out, res, stage):
                 meth.append(d["method"])
                 log(f"{stage}: {d['method']} crashed the process in case {case[len(stage) + 1:]} in an earlier run; "
                     "recorded, not tried again")
+                if path is not None:
+                    path.write_text(json.dumps(res, indent=1))
             m.unlink()
     return reg
 
@@ -857,7 +887,7 @@ def stage_datasets(args, out):
     res["splitzip_calibration"] = sz_name
     study, consts, rc, grouped, books, sz, exans, w16, extras = lossless_codecs(args, out, device, "datasets", sz_doc)
     bounds = "bounds" in args.extra_baselines
-    crashed = crashed_codecs(out, res, "datasets")
+    crashed = crashed_codecs(out, res, "datasets", path)
     book_words = w16(sz_doc)
     book_hist = cs.exponent_hist(book_words)
     del book_words
@@ -865,8 +895,8 @@ def stage_datasets(args, out):
         if not ws:
             continue
         want = wanted_methods(args, rc, books, sz, exans, extras, bounds)
+        case = kept_case(res, name, "datasets", path)
         bad = set(crashed.get(name, []))
-        case = res["cases"].get(name)
         only = (want - bad) if bad else None
         if case and case.get("windows") == ws:
             have = measured(case["rows"]) | bad
@@ -894,7 +924,7 @@ def stage_datasets(args, out):
         if case and case.get("windows") == ws:
             rows = merge_rows(case["rows"], rows)
         res["cases"][name] = {"dataset": DATASETS.get(name, name), "tokens": n, "batch": len(wds), "windows": ws,
-                              "values": words.numel(), "coverage": cov, "rows": rows}
+                              "values": words.numel(), "coverage": cov, "rows": rows, "env": env_tag()}
         path.write_text(json.dumps(res, indent=1))
         del words, wds
         gc.collect()

@@ -36,10 +36,20 @@ fi
 [ -s "$RUN/captures/meta.json" ] || { echo "STOP: no captures in $RUN (run scripts/run_a5000.sh for $MODEL first)"; exit 1; }
 OUT=$RUN/pool_gate
 mkdir -p "$OUT"
+WANT_TORCH=$(sed -n 's/^torch==//p' requirements-cuda.txt)
+HAVE_TORCH=$(python -c "import torch; print(torch.__version__)")
+[ "$HAVE_TORCH" = "$WANT_TORCH" ] || {
+    echo "STOP: torch $HAVE_TORCH in $KV_HOME/venv, not $WANT_TORCH (requirements-cuda.txt); put it back:"
+    echo "  KV_HOME=$KV_HOME bash scripts/a5000_setup.sh   (ALLOW_NO_SLURM=1 on the NUC)"; exit 1; }
 # FLASHINFER=1: exactkv's own dense baseline (FlashInfer 0.6.18, the version its README reports), installed into
-# the environment; it compiles its kernels on first use with the CUDA toolkit of a5000_setup.sh. Optional.
+# the environment with everything already there held at its version (unconstrained, it replaced torch 2.11 + CUDA
+# 12.8 with 2.15 + CUDA 13.2); it compiles its kernels on first use with the CUDA toolkit of a5000_setup.sh.
+# Optional: when it cannot install beside the pinned torch, its rows are left out.
 if [ "${FLASHINFER:-0}" = 1 ] && ! python -c "import flashinfer" 2>/dev/null; then
-    python -m pip install -q "flashinfer-python==0.6.18" || echo "NOTE: FlashInfer did not install; its rows are left out"
+    mkdir -p "$KV_HOME/tmp"
+    python -m pip freeze --exclude-editable | grep -E '^[A-Za-z0-9_.-]+==' > "$KV_HOME/tmp/pins.txt"
+    python -m pip install -q "flashinfer-python==0.6.18" -c "$KV_HOME/tmp/pins.txt" \
+        || echo "NOTE: FlashInfer 0.6.18 does not install beside torch $HAVE_TORCH; its rows are left out"
 fi
 if [ -s "$KV_HOME/cuda_home" ]; then
     CUDA_HOME=$(cat "$KV_HOME/cuda_home"); export CUDA_HOME; export PATH=$CUDA_HOME/bin:$PATH
