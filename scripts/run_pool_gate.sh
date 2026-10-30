@@ -27,6 +27,11 @@ git fetch -q origin "$BRANCH"
 source "$KV_HOME/venv/bin/activate"
 TAG=$(echo "${MODEL#/}" | tr '/.' '__' | tr 'A-Z' 'a-z')
 RUN=${RUN:-$KV_RUNS/$TAG}
+if [ ! -s "$RUN/captures/meta.json" ] && [ -s "$KV_RUNS/smoke_$TAG/captures/meta.json" ]; then
+    # before the full run: the smoke test's captures (calibration plus one 8K GSM8K window); 32K is skipped
+    echo "NOTE: no full run in $RUN yet; using the smoke test's captures in $KV_RUNS/smoke_$TAG"
+    RUN=$KV_RUNS/smoke_$TAG
+fi
 [ -s "$RUN/captures/meta.json" ] || { echo "STOP: no captures in $RUN (run scripts/run_a5000.sh for $MODEL first)"; exit 1; }
 OUT=$RUN/pool_gate
 mkdir -p "$OUT"

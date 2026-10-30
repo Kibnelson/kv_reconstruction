@@ -106,7 +106,9 @@ def stage_attn(a, run, meta, res):
     dev = torch.device("cuda")
     for B, T in a.attn_configs:
         # B distinct documents of at least T tokens (the context sweep's first, then any capture), repeated if fewer
-        pool = sorted([n for n, t in have.items() if t >= T], key=lambda n: (not n.startswith(f"ctx{T}_"), n))
+        # evaluation documents first (the context sweep's own length, then the datasets), calibration ones last
+        pool = sorted([n for n, t in have.items() if t >= T],
+                      key=lambda n: (not n.startswith(f"ctx{T}_"), not n.startswith(("ctx", "ds_")), n))
         if not pool:
             log(f"attn {B}x{T}: no capture of {T} tokens; skipped")
             continue
@@ -252,9 +254,14 @@ def stage_install(a, run, meta, res):
     exactkv, K = load_exactkv(a.exactkv_source)
     dev = torch.device("cuda")
     H, D = meta["kv_heads"], meta["head_dim"]
+    have = captures(run)
     name = a.install_doc
-    if not (run / "captures" / f"{name}_K_bits.npy").is_file():
-        raise SystemExit(f"install: no capture {name} in {run / 'captures'}")
+    if name not in have:                              # any evaluation document of 8,192 tokens (not calibration)
+        cand = sorted(n for n, t in have.items() if t >= 8192 and (n.startswith("ctx") or n.startswith("ds_")))
+        if not cand:
+            raise SystemExit(f"install: no capture {name} (nor another evaluation document) in {run / 'captures'}")
+        log(f"install: no {name}; using {cand[0]}")
+        name = cand[0]
     train = [f"wtrain{i}" for i in range(6)]
     study = Study(run / "captures", "cuda", train, "wtables", [], None, log=log)
     consts = fused.prepare(study, log=log)
