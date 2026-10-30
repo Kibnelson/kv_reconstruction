@@ -814,6 +814,100 @@ class FetchTextsTests(unittest.TestCase):
         self.assertIn("Answer: B", m)
 
 
+@unittest.skipIf(torch is None, "PyTorch is required")
+class MoreBaselinesTests(unittest.TestCase):
+    """kv_compare/more_baselines.py without the authors' code (that runs on the GPU machines): the parameter rule,
+    the computed bounds, and the bookkeeping around a codec object."""
+
+    def test_huffman_and_bounds(self):
+        from kv_compare.more_baselines import exponent_bounds, huffman_lengths
+        lens = huffman_lengths([5, 9, 12, 13, 16, 45])         # the textbook example
+        self.assertEqual([lens[i] for i in range(6)], [4, 4, 3, 3, 3, 1])
+        self.assertEqual(huffman_lengths([0, 7, 0]), {1: 1})
+        # words whose exponents take two values equally often: entropy 1 bit, Huffman 1 bit
+        e = torch.tensor([120, 121] * 64)
+        w = ((e << 7) | 3).to(torch.int16).view(1, 16, 8)          # L=1, T=16, W=8 (C=4)
+        b = exponent_bounds(w, 4, [(0, 16)])
+        self.assertAlmostEqual(b["entropy"], 9.0)
+        self.assertAlmostEqual(b["huffman"], 9.0)
+
+    def test_adacode_rule(self):
+        from kv_compare.more_baselines import adacode_best_bits
+        def hist(d):
+            h = [0] * 256
+            for k, v in d.items():
+                h[k] = v
+            return h
+        # peaked: 2 bits (top 3 coded, 100 outliers: 2000 + 800) beats 3 bits (3000 + 8); the window ends at 122
+        self.assertEqual(adacode_best_bits(hist({118: 10, 119: 40, 120: 200, 121: 400, 122: 300, 123: 40, 124: 9,
+                                                 125: 1})), (122, 2))
+        # flatter: 3 bits (3000 + 80) beats 2 bits (2000 + 3600) and 4 bits (4000); the 7 coded end at 124
+        self.assertEqual(adacode_best_bits(hist({118: 100, 119: 150, 120: 200, 121: 200, 122: 150, 123: 100,
+                                                 124: 90, 125: 10})), (124, 3))
+
+    def test_codec_bookkeeping_with_a_stand_in(self):
+        from kv_compare import more_baselines as mb
+
+        class Fake:                                   # AdaCode's CompressorBitMap interface, storing a copy
+            def __init__(self, right=129, nbits=3):
+                self.nbits = nbits
+            def compress(self, x):
+                self.x = x.clone()
+            def uncompress(self):
+                return self.x
+            def get_memory(self):
+                return {"compressed_memory": self.x.numel() * (8 + self.nbits) // 8}
+        ada = mb.AdaCode.__new__(mb.AdaCode)
+        ada.Compressor = Fake
+        g = torch.Generator().manual_seed(0)
+        words = (torch.randn(2, 32, 16, generator=g) * 0.1).to(torch.bfloat16).view(torch.int16)
+        ada.calibrate(words, 8)
+        self.assertEqual(len(ada.params), 2)
+        t = lambda fn: (fn(), 0.001)[1]
+        r = ada.measure(words, [(0, 16), (16, 32)], 8, t)
+        self.assertTrue(r["bit_exact"])
+        self.assertEqual(r["streams"], 2)
+        self.assertAlmostEqual(r["bits"], 8 + r["code_bits"][0], places=6)
+
+    def test_measure_case_rows_and_report(self):
+        import tempfile
+        from kv_compare import context_sweep as cs
+
+        class FakeIbp:
+            def measure(self, words, spans, device, timer):
+                return {"bit_exact": True, "bits": 12.25, "encode_ms": 1.0, "decode_ms": 2.0, "raw_copy_ms": 1.5,
+                        "streams": len(spans)}
+
+        class Study:
+            C, hd, W = 8, 4, 16
+        words = (torch.randn(2, 32, 16) * 0.1).to(torch.bfloat16).view(torch.int16)
+        consts = {"cos": torch.ones(32, 2), "sin": torch.zeros(32, 2)}
+        st = Study()
+        st.rope = type("R", (), {"tables": staticmethod(lambda p: (torch.ones(len(p), 2), torch.zeros(len(p), 2)))})()
+        rows = cs.measure_case(st, consts, None, words, torch.arange(32), torch.device("cpu"), log=lambda m: None,
+                               only={"IBP (authors' codec), host to GPU",
+                                     "exponent coders' floor: 8 + exponent entropy",
+                                     "exponent coders' floor: 8 + Huffman(exponent), DFloat11 / ZipNN format"},
+                               extras={"ibp": FakeIbp()}, bounds=True, baseline_stream_tokens=16)
+        names = [r["method"] for r in rows]
+        self.assertEqual(sorted(names), sorted(cs.extra_method_names({"ibp": FakeIbp()}, True)))
+        for r in rows:
+            self.assertNotIn("error", r)
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import bench_llama_compare as b
+        out = Path(tempfile.mkdtemp())
+        (out / "captures").mkdir()
+        (out / "captures" / "meta.json").write_text(json.dumps({"model": "tiny"}))
+        res = {"calibration": {"set": "wikitext", "documents": ["wtrain0"]},
+               "cases": {"gsm8k": {"dataset": "GSM8K test", "tokens": 32, "batch": 1, "windows": ["ds_gsm8k_r0"],
+                                   "values": words.numel(), "coverage": {}, "rows": rows}}, "links_gbps": [10]}
+        (out / "datasets.json").write_text(json.dumps(res))
+        text = "\n".join(b.dataset_lines(out, "datasets.json"))
+        self.assertIn("(computed)", text)
+        self.assertIn("[raw copy 1.50]", text)
+        self.assertNotIn("NOT exact", text)
+
+
 class PackageTests(unittest.TestCase):
     def test_package_copies_small_files_and_refuses_overwrite(self):
         sys.path.insert(0, str(ROOT / "scripts"))

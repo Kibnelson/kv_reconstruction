@@ -9,12 +9,14 @@
 # family of SplitZip's Qwen3-32B, which does not fit 24 GB), qwen3_4b (Qwen3-4B-Instruct-2507 at the pin of the
 # Phase 2 runs), any Hugging Face model id (Llama / Qwen architecture, head_dim 128), or an absolute path to a
 # downloaded model folder.
-# Stages (STAGES, default calcap,datasets,context,groupspeed,report), all calibrated on WikiText-2 train (SplitZip's
+# Stages (STAGES, default calcap,datasets,context,fp8pred,groupspeed,report), calibrated on WikiText-2 train (SplitZip's
 # protocol; TRAIN_SET to change):
 #   calcap      KV of 7 x 8,192 WikiText-2 train tokens (the calibration documents) and the model's geometry
 #   datasets    SplitZip's five datasets (WikiText-2 test, HumanEval, GSM8K, MMLU, PTB), 4 x 8,192 tokens each:
 #               every codec bit-exact and timed, our exact costs, SplitZip's exponent coverage (its Table 4)
 #   context     WikiText-2 test at 512 ... 32,768 tokens, batch 1 and 16 (SplitZip's sweep), every codec
+#   fp8pred     a whole FP8 copy of the model as the predictor (speculative KV coding's idea), exact cost
+# Every codec: ours, SplitZip, ExANS, AdaCode, exactkv, nvCOMP, IBP (the authors' code), and the exponent bounds.
 #   groupspeed  our head-group decoders against launch shapes, as CUDA graphs
 #   report      summary.md
 # plus the link probe (this GPU's host legs) first. A stage that finished is kept: rerunning continues.
@@ -68,7 +70,7 @@ if [ -d "$MODEL" ]; then TAG=local_$(basename "$MODEL" | tr '.' '_' | tr 'A-Z' '
 RUN=$KV_RUNS/$TAG
 if [ "${SMOKE:-0}" = 1 ]; then
     RUN=$KV_RUNS/smoke_$TAG
-    STAGES=calcap,datasets,report
+    STAGES=calcap,datasets,fp8pred,report
     EXTRA="--datasets gsm8k --dataset-docs 1 --no-dataset-exact ${EXTRA:-}"
 fi
 TEXTS=$KV_RUNS/dataset_texts
@@ -128,12 +130,12 @@ echo "== link probe (this GPU's host legs)"
 python scripts/pd_link_probe.py --output "$RUN/pd_link_probe.json" 2>&1 | tee -a "$RUN/console.log" \
     || echo "link probe failed (see above); continuing"
 
-STAGES=${STAGES:-calcap,datasets,context,groupspeed,report}
+STAGES=${STAGES:-calcap,datasets,context,fp8pred,groupspeed,report}
 TRAIN_SET=${TRAIN_SET:-wikitext}
 ARGS=(--device cuda --model "$MODEL_ID" --revision "$REVISION" --output "$RUN"
       --train-set "$TRAIN_SET" --train-text "$TEXTS/wikitext2_train.txt" --eval-text "$TEXTS/wikitext2.txt"
       --dataset-texts "$TEXTS" --splitzip-source "$KV_HOME/sources/splitzip" --exans-source "$KV_HOME/sources/exans"
-      --baseline-stream-tokens 8192)
+      --baseline-stream-tokens 8192 --baseline-sources "$KV_HOME/sources")
 [ -s "$KV_HOME/cuda_home" ] && ARGS+=(--cuda-home "$(cat "$KV_HOME/cuda_home")")
 echo "== bench_llama_compare.py, stages $STAGES (log: $RUN/console.log)"
 set +e
@@ -145,9 +147,12 @@ if [ "${SMOKE:-0}" = 1 ]; then
     echo "== smoke run finished (exit $STATUS); nothing committed. The table to check:"
     sed -n "/## Lossless on SplitZip's datasets/,/Transfer time per link/p" "$RUN/summary.md" 2>/dev/null | head -n 40
     MISSING=""
-    for m in "SplitZip (authors' codec)" "ExANS (authors' codec)" "ours, per layer, head by head"; do
-        grep -qF "| $m |" "$RUN/summary.md" 2>/dev/null || MISSING="$MISSING [$m]"
+    for m in "SplitZip (authors' codec)" "ExANS (authors' codec)" "ours, per layer, head by head" \
+             "AdaCode (authors' codec)" "exactkv (authors' codec)" "nvCOMP ANS"; do
+        grep -F "| $m |" "$RUN/summary.md" 2>/dev/null | grep -qv "not measured" || MISSING="$MISSING [$m]"
     done
+    grep -F "| IBP (authors' codec), host to GPU |" "$RUN/summary.md" 2>/dev/null | grep -qv "not measured" \
+        || echo "note: IBP not measured (optional: its CUDA build, $KV_HOME/ibp_build.log)"
     if [ "$STATUS" = 0 ] && [ -z "$MISSING" ]; then echo "SMOKE OK: every codec measured"
     else echo "SMOKE: not complete (exit $STATUS; missing:${MISSING:- none}); see $RUN/run.log"; fi
     exit "$STATUS"
@@ -160,13 +165,16 @@ if [ "$STATUS" != 0 ]; then
     python -u scripts/bench_llama_compare.py "${ARGS[@]}" --stages report ${EXTRA:-} 2>&1 | tee -a "$RUN/console.log" || true
 fi
 
-NAME=${TAG}_lossless_a5000_$(date +%Y%m%d_%H%M)$SUFFIX
+# the GPU in the name: rtxa5000 on the cluster, rtxa4500 for a dress rehearsal on the NUC
+GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1)
+GPU_TAG=$(echo "$GPU_NAME" | tr 'A-Z' 'a-z' | sed 's/nvidia//; s/geforce//' | tr -cd 'a-z0-9')
+NAME=${TAG}_lossless_${GPU_TAG:-gpu}_$(date +%Y%m%d_%H%M)$SUFFIX
 if ! python scripts/package_llama_compare.py "$RUN" --destination "benchmark_results/$NAME"; then
     echo "STOP: nothing to package yet (see $RUN/console.log and $RUN/run.log)"
     exit 1
 fi
 git add "benchmark_results/$NAME"
-git commit -q -m "Add $MODEL_ID lossless results on RTX A5000 ($NAME, stages $STAGES)"
+git commit -q -m "Add $MODEL_ID lossless results on $GPU_NAME ($NAME, stages $STAGES)"
 if [ "${NO_PUSH:-0}" = 1 ]; then
     echo "NO_PUSH=1: committed locally as $(git log --oneline -1)"
     exit "$STATUS"

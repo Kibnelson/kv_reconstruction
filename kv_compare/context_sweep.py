@@ -43,13 +43,14 @@ GROUP_NAMES = {2: "keys then values", 4: "4 head groups", 8: "8 head groups", 16
 
 def measure_case(study, consts, rc, words, positions, device, log=print, books=None, sz=None, exans=None,
                  rank_tiles=(128, 128, 64, 4), reps=5, max_stream_tokens=8192, grouped=None, only=None, graph=False,
-                 baseline_stream_tokens=0):
+                 baseline_stream_tokens=0, extras=None, bounds=False):
     """Rows for one case: words int16 [L, T, W] on the device, positions [T]. grouped: {groups: constants of
     kv_compare.grouped.prepare_groups} for our head-group predictors; only: measure just these methods; graph:
     time our decoders as CUDA graphs too; baseline_stream_tokens: code SplitZip and ExANS in streams of this many
     tokens too, like ours (bits and times added; 0: the whole case in one call). Both codecs code independent
     chunks or blocks, so the streams change their bits by at most the remainder ExANS leaves out; they keep a 32K
-    case of an 8B model within 24 GB."""
+    case of an 8B model within 24 GB. extras: the other bit-exact codecs of kv_compare.more_baselines.build
+    ({name: codec}); bounds: also the computed exponent-coder bounds (8 + Huffman / entropy of the exponent)."""
     from .fused import FusedOneStep
     from .layerwise import LayerwiseOneStep
     from .szcodec import SplitZipFormatCodec
@@ -78,8 +79,11 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
         row = {"method": method, "values": n, "tokens": T}
         try:
             row.update(fn())
-            log(f"    {method}: exact={row.get('bit_exact')}, {row['bits']:.3f} bits/value, encode "
-                f"{row['encode_ms']:.1f} ms, decode {row['decode_ms']:.2f} ms")
+            if row.get("computed"):
+                log(f"    {method}: {row['bits']:.3f} bits/value (computed)")
+            else:
+                log(f"    {method}: exact={row.get('bit_exact')}, {row['bits']:.3f} bits/value, encode "
+                    f"{row['encode_ms']:.1f} ms, decode {row['decode_ms']:.2f} ms")
         except Exception as exc:                     # out of memory at long contexts, a shape a kernel refuses
             row["error"] = repr(exc)[:300]
             log(f"    {method}: not measured ({row['error']})")
@@ -196,7 +200,46 @@ def measure_case(study, consts, rc, words, positions, device, log=print, books=N
         record("SplitZip (authors' codec)", splitzip)
     if exans is not None:
         record("ExANS (authors' codec)", exans_run)
+    ex = extras or {}
+    tm = lambda fn: timer(fn, device, warmup=2, reps=reps)
+    if "nvcomp" in ex:
+        for alg in ex["nvcomp"].codecs:
+            record(f"nvCOMP {alg}", lambda alg=alg: ex["nvcomp"].measure(alg, words, bspans, tm))
+    if "adacode" in ex:
+        record("AdaCode (authors' codec)", lambda: ex["adacode"].measure(words, bspans, study.C, tm))
+        record("AdaCode, code from the coded KV (authors' codec)",
+               lambda: ex["adacode"].measure(words, bspans, study.C, tm, own=True))
+    if "exactkv" in ex:
+        record("exactkv (authors' codec)", lambda: ex["exactkv"].measure(words, bspans, study.C, study.hd, tm))
+    if "ibp" in ex:
+        record("IBP (authors' codec), host to GPU", lambda: ex["ibp"].measure(words, bspans, device, tm))
+    if bounds:
+        from .more_baselines import exponent_bounds
+        eb = {}
+
+        def bound(kind):
+            if not eb:
+                eb.update(exponent_bounds(words, study.C, bspans))
+            return {"bits": eb[kind], "computed": True, "streams": len(bspans)}
+        record("exponent coders' floor: 8 + Huffman(exponent), DFloat11 / ZipNN format", lambda: bound("huffman"))
+        record("exponent coders' floor: 8 + exponent entropy", lambda: bound("entropy"))
     return rows
+
+
+def extra_method_names(extras, bounds):
+    """The row names measure_case gives the extra codecs and bounds (to tell which a kept case still lacks)."""
+    ex = extras or {}
+    names = [f"nvCOMP {a}" for a in getattr(ex.get("nvcomp"), "codecs", {})]
+    if "adacode" in ex:
+        names += ["AdaCode (authors' codec)", "AdaCode, code from the coded KV (authors' codec)"]
+    if "exactkv" in ex:
+        names.append("exactkv (authors' codec)")
+    if "ibp" in ex:
+        names.append("IBP (authors' codec), host to GPU")
+    if bounds:
+        names += ["exponent coders' floor: 8 + Huffman(exponent), DFloat11 / ZipNN format",
+                  "exponent coders' floor: 8 + exponent entropy"]
+    return names
 
 
 def best_decode_ms(row):

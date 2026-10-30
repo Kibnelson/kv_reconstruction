@@ -220,6 +220,13 @@ Lossy development pauses: the queued runs finish, but nothing new is built.
   All run inside the one-GPU allocation.
 - **Not covered:** Phi-2 (head size 80 with partial RoPE, not handled by our kernels yet), the 30B-80B models,
   and contexts past 32K.
+- **The rest of the literature** ([lossless_related_work.md](lossless_related_work.md)): every published exponent
+  coder sits at 10.5-13 bits. The comparison now also runs, from the authors' code:
+  - AdaCode (EMNLP 2026), exactkv, nvCOMP's GPU codecs and IBP (EuroSys '26);
+  - the computed floor of exponent-only coders, 8 + Huffman(exponent);
+  - the FP8-model predictor of speculative KV coding (stage `fp8pred`).
+
+  It runs first on the NUC (runbook section 0a), then on the A5000.
 
 ## What is next, in order of expected gain (before 29 October)
 

@@ -65,7 +65,7 @@ fi
 source "$KV_HOME/venv/bin/activate"
 python -m pip install -q --upgrade pip
 python -m pip install -q -r requirements-cuda.txt
-python -m pip install -q pyarrow cmake nvidia-libnvcomp-cu12
+python -m pip install -q pyarrow cmake ninja packaging nvidia-libnvcomp-cu12 nvidia-nvcomp-cu12
 python - <<'EOF'
 import torch, triton, transformers
 print(f"== torch {torch.__version__} (CUDA {torch.version.cuda}), triton {triton.__version__}, transformers {transformers.__version__}")
@@ -103,6 +103,26 @@ git -C "$EX" cat-file -e "$EX_COMMIT" 2>/dev/null || git -C "$EX" fetch -q origi
 git -C "$EX" checkout -q "$EX_COMMIT"           # at the commit, the runs build from it directly (no worktree)
 echo "   ExANS (openlake) $(git -C "$EX" rev-parse --short HEAD) in $EX; the runs build it from source"
 
+echo "== the other bit-exact codecs (docs/lossless_related_work.md) at their pinned commits"
+read -r ADA_REPO ADA_COMMIT XKV_REPO XKV_COMMIT IBP_REPO IBP_COMMIT < <(python - <<'EOF'
+from kv_compare.more_baselines import (ADACODE_REPO, ADACODE_COMMIT, EXACTKV_REPO, EXACTKV_COMMIT, IBP_REPO,
+                                       IBP_COMMIT)
+print(ADACODE_REPO, ADACODE_COMMIT, EXACTKV_REPO, EXACTKV_COMMIT, IBP_REPO, IBP_COMMIT)
+EOF
+)
+for spec in "adacode $ADA_REPO $ADA_COMMIT" "exactkv $XKV_REPO $XKV_COMMIT" "ibp $IBP_REPO $IBP_COMMIT"; do
+    read -r name url commit <<< "$spec"
+    D=$KV_HOME/sources/$name
+    [ -d "$D/.git" ] || git clone -q "$url" "$D"
+    git -C "$D" cat-file -e "$commit" 2>/dev/null || git -C "$D" fetch -q origin "$commit"
+    git -C "$D" checkout -q "$commit"
+    echo "   $name $(git -C "$D" rev-parse --short HEAD) in $D"
+done
+python - <<'EOF'
+from nvidia import nvcomp
+print("   nvCOMP (Python)", getattr(nvcomp, "__version__", "?"))
+EOF
+
 if [ "${SKIP_EXANS:-0}" = 1 ]; then
     echo "== SKIP_EXANS=1: no CUDA toolkit; ExANS is left out of the comparison"
 else
@@ -128,5 +148,22 @@ else
     "$TK/bin/nvcc" --version | tail -n 2
     echo "$TK" > "$KV_HOME/cuda_home"
     echo "   CUDA_HOME for the runs: $TK"
+fi
+# IBP is a CUDA extension: built with the same toolkit (its setup.py reads CONDA_PREFIX for headers; the venv
+# stands in). Optional: SKIP_IBP=1, and a failed build only leaves IBP out of the comparison.
+if [ "${SKIP_IBP:-0}" != 1 ] && [ -s "$KV_HOME/cuda_home" ]; then
+    if python -c "import torch, ibp" 2>/dev/null; then
+        echo "== IBP: already built"
+    else
+        echo "== IBP: building the CUDA extension ($KV_HOME/ibp_build.log, a few minutes)"
+        if (cd "$KV_HOME/sources/ibp" && CUDA_HOME=$(cat "$KV_HOME/cuda_home") CONDA_PREFIX=$VIRTUAL_ENV \
+                PATH=$(cat "$KV_HOME/cuda_home")/bin:$PATH python -m pip install -v . --no-build-isolation) \
+                > "$KV_HOME/ibp_build.log" 2>&1 && python -c "import torch, ibp"; then
+            echo "   IBP built"
+        else
+            echo "   WARNING: IBP did not build (tail of $KV_HOME/ibp_build.log below); the runs leave it out"
+            tail -n 15 "$KV_HOME/ibp_build.log"
+        fi
+    fi
 fi
 echo "SETUP DONE: KV_HOME=$KV_HOME (python $KV_HOME/venv/bin/python)"

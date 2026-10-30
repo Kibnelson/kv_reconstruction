@@ -104,7 +104,8 @@ def memory_note(device=None):
 
 
 STAGES = ("capture", "evalcap", "lossless", "lossy", "frontier", "gpu_speed", "pool", "format", "szcodec", "exans",
-          "transform", "allocate", "aquappl", "calcap", "szprotocol", "datasets", "context", "groupspeed", "report")
+          "transform", "allocate", "aquappl", "calcap", "szprotocol", "datasets", "context", "fp8pred", "groupspeed",
+          "report")
 BRANCH = "llama32-3b-lossy-lossless-compare"
 
 
@@ -524,16 +525,18 @@ def stage_context(args, out):
     cases = [c for c in cases if all(have_doc(nm) for nm in names[c])]
     single = [names[(n, 1)][0] for n in args.context_lengths if have_doc(names[(n, 1)][0])]
     exact_costs(args, out, res, path, single, device)
-    study, consts, rc, grouped, books, sz, exans, w16 = lossless_codecs(args, out, device, "context")
+    study, consts, rc, grouped, books, sz, exans, w16, extras = lossless_codecs(args, out, device, "context")
+    bounds = "bounds" in args.extra_baselines
     from kv_compare.predict import Doc
     for n, b in cases:
         key = f"{n}x{b}"
         want = {f"ours, per layer, {cs.GROUP_NAMES.get(g, f'{g} head groups')}" for g in args.context_groups}
+        want |= set(cs.extra_method_names(extras, bounds))
         if key in res["cases"] and want <= {r["method"] for r in res["cases"][key]["rows"]}:
             log(f"context {key}: kept from context.json")
             continue
         if key in res["cases"]:                      # only the methods not measured yet
-            log(f"context {key}: adding the head-group codecs")
+            log(f"context {key}: adding " + ", ".join(sorted(want - {r["method"] for r in res["cases"][key]["rows"]})))
             kept = res["cases"][key]["rows"]
             only = want - {r["method"] for r in kept}
         else:
@@ -550,7 +553,7 @@ def stage_context(args, out):
         rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans,
                                max_stream_tokens=args.context_stream_tokens, grouped=grouped, only=only,
                                graph=args.graph_decode,
-                               baseline_stream_tokens=args.baseline_stream_tokens)
+                               baseline_stream_tokens=args.baseline_stream_tokens, extras=extras, bounds=bounds)
         if kept is not None:
             have = {r["method"] for r in kept}
             rows = kept + [r for r in rows if r["method"] not in have]
@@ -598,13 +601,19 @@ def lossless_codecs(args, out, device, stage, sz_doc=None):
                                 rank_tiles=(128, 128, 64, 4), layout="row", chunks=2).calibrate(cal)
     del cal
     sz = exans = None
+    extras = {}
     if device.type == "cuda":
+        cal_w = w16(sz_doc or study.train[0])        # SplitZip's and AdaCode's calibration KV
         try:
             from kv_compare.mixed import load_splitzip
             sz, _ = load_splitzip(args.splitzip_source or (out / "splitzip"), device, log)
-            sz.calibrate(w16(sz_doc or study.train[0]).view(torch.bfloat16))
+            sz.calibrate(cal_w.view(torch.bfloat16))
         except Exception as exc:
             log(f"{stage}: SplitZip not available ({exc!r})")
+        if args.extra_baselines:
+            from kv_compare import more_baselines
+            extras, errs = more_baselines.build(args, device, cal_w, study.C, log)
+        del cal_w
         try:
             from kv_compare import exans_official as ex
             exans = ex.build(out / "exans", args.exans_source, args.cuda_home, log)
@@ -613,7 +622,7 @@ def lossless_codecs(args, out, device, stage, sz_doc=None):
     study._f.clear(); study._att.clear(); study._qmap.clear()     # the calibration features prepare() cached
     gc.collect()
     torch.cuda.empty_cache() if device.type == "cuda" else None
-    return study, consts, rc, grouped, books, sz, exans, w16
+    return study, consts, rc, grouped, books, sz, exans, w16, extras
 
 
 def need_calibration(out):
@@ -785,7 +794,8 @@ def stage_datasets(args, out):
     sz_name = "wtrain0" if (out / "captures" / "wtrain0_K_bits.npy").is_file() else TRAIN[0]
     sz_doc = Doc(out / "captures", sz_name)
     res["splitzip_calibration"] = sz_name
-    study, consts, rc, grouped, books, sz, exans, w16 = lossless_codecs(args, out, device, "datasets", sz_doc)
+    study, consts, rc, grouped, books, sz, exans, w16, extras = lossless_codecs(args, out, device, "datasets", sz_doc)
+    bounds = "bounds" in args.extra_baselines
     book_words = w16(sz_doc)
     book_hist = cs.exponent_hist(book_words)
     del book_words
@@ -793,10 +803,16 @@ def stage_datasets(args, out):
         if not ws:
             continue
         want = {f"ours, per layer, {cs.GROUP_NAMES.get(g, f'{g} head groups')}" for g in args.context_groups}
+        want |= set(cs.extra_method_names(extras, bounds))
         case = res["cases"].get(name)
-        if case and case.get("windows") == ws and want <= {r["method"] for r in case["rows"]}:
-            log(f"datasets {name}: kept from {path.name}")
-            continue
+        only = None
+        if case and case.get("windows") == ws:
+            have = {r["method"] for r in case["rows"]}
+            if want <= have:
+                log(f"datasets {name}: kept from {path.name}")
+                continue
+            only = want - have
+            log(f"datasets {name}: adding " + ", ".join(sorted(only)))
         wds = [Doc(out / "captures", w) for w in ws]
         words = torch.empty(study.L, n * len(wds), study.W, dtype=torch.int16, device=device)
         for i, d in enumerate(wds):
@@ -809,7 +825,10 @@ def stage_datasets(args, out):
             f"{cov['exponent_entropy_bits']:.3f} bits")
         rows = cs.measure_case(study, consts, rc, words, positions, device, log, books=books, sz=sz, exans=exans,
                                max_stream_tokens=args.context_stream_tokens, grouped=grouped, graph=args.graph_decode,
-                               baseline_stream_tokens=args.baseline_stream_tokens)
+                               baseline_stream_tokens=args.baseline_stream_tokens, extras=extras, bounds=bounds,
+                               only=only)
+        if only is not None:
+            rows = case["rows"] + [r for r in rows if r["method"] not in {x["method"] for x in case["rows"]}]
         res["cases"][name] = {"dataset": DATASETS.get(name, name), "tokens": n, "batch": len(wds), "windows": ws,
                               "values": words.numel(), "coverage": cov, "rows": rows}
         path.write_text(json.dumps(res, indent=1))
@@ -854,10 +873,12 @@ def dataset_lines(out, name="datasets.json"):
             if row["method"] not in methods:
                 methods.append(row["method"])
 
-    def cell(k, m, f):
+    def cell(k, m, f, decode=False):
         row = next((x for x in cases[k]["rows"] if x["method"] == m), None)
         if row is None or "error" in row:
             return "-" if row is None else "not measured"
+        if row.get("computed"):                      # a bound, not a codec: bits only
+            return "-" if decode else f"{row['bits']:.3f} (computed)"
         return f(row) + ("" if row.get("bit_exact") else " (NOT exact)")
     for m in methods:
         lines.append(f"| {m} | " + " | ".join(cell(k, m, lambda x: f"{x['bits']:.3f}") for k in keys) + " |")
@@ -865,7 +886,8 @@ def dataset_lines(out, name="datasets.json"):
               "| Method | " + " | ".join(head) + " |", "| --- |" + " --- |" * len(keys)]
     for m in methods:
         lines.append(f"| {m} | " + " | ".join(
-            cell(k, m, lambda x: f"{x['decode_ms']:.2f} ms ({x['encode_ms']:.0f})" + graph_note(x)) for k in keys) + " |")
+            cell(k, m, lambda x: f"{x['decode_ms']:.2f} ms ({x['encode_ms']:.0f})" + graph_note(x), True)
+            for k in keys) + " |")
     model = str(json.loads((out / "captures" / "meta.json").read_text()).get("model", "")).lower()
     ref = "Qwen3-32B" if "qwen" in model else "Llama-3-8B" if "llama" in model else None
     paper = SPLITZIP_TABLE4.get(ref)
@@ -901,6 +923,142 @@ def dataset_lines(out, name="datasets.json"):
         lines.append(f"| {g} Gb/s | " + " | ".join(cells) + " |")
     lines.append("")
     return lines
+
+
+def fp8_fake_quant(model):
+    """Speculative KV coding's predictor, emulated: every linear layer of the decoder with FP8 (E4M3) weights, one
+    scale per output channel, and FP8 inputs, one scale per token (the dynamic W8A8 FP8 scheme serving engines use),
+    computed in BF16 (Ampere has no FP8 tensor cores). Returns the hooks (remove them to undo the inputs' part)."""
+    import torch
+    fmax = float(torch.finfo(torch.float8_e4m3fn).max)
+
+    def q(x, dim):
+        s = (x.abs().amax(dim=dim, keepdim=True).float() / fmax).clamp_min(1e-12)
+        return ((x.float() / s).to(torch.float8_e4m3fn).float() * s).to(x.dtype)
+    hooks = []
+    with torch.no_grad():
+        for mod in model.model.layers.modules():
+            if isinstance(mod, torch.nn.Linear):
+                mod.weight.copy_(q(mod.weight, 1))
+                hooks.append(mod.register_forward_pre_hook(lambda m, inp: (q(inp[0], -1),) + tuple(inp[1:])))
+    return hooks
+
+
+def stage_fp8pred(args, out):
+    """The predictor of speculative KV coding (fergusfinn.com/blog/kv-entropy-coder: the FP8 copy of the model run
+    on the prompt on both sides, its KV the mean of each value) on our KV, as an exact cost with our coder: the
+    model after fp8_fake_quant prefills each document's own tokens; per layer and channel the spread is the mean
+    absolute residual on the calibration documents (Logistic, as ours); the cost is -log2 P of every BF16 word.
+    Documents: the first window of each dataset (stage datasets) and ctx8192_r0 (stage context), where captured.
+    The note's own coder is a Gaussian mixture; its predictor costs a whole prefill at the receiver, timed here
+    as the emulated prefill (not representative of FP8 hardware). Results in fp8pred<set>.json."""
+    import gc
+    import torch
+    from kv_compare.capture import load_model
+    from kv_compare.core import LN2X2, exact_bits, words_to_float
+    from kv_compare.predict import Doc
+    from qwen_kv_bench.model_runtime import cache_to_matrices
+    need_calibration(out)
+    device = torch.device(args.device)
+    path = out / f"fp8pred{set_suffix(args)}.json"
+    res = json.loads(path.read_text()) if path.is_file() and "fp8pred" not in args.aqua_rerun else {}
+    tests = [f"ds_{d}_r0" for d in args.datasets] + ["ctx8192_r0"]
+    tests = [t for t in tests if (out / "captures" / f"{t}_K_bits.npy").is_file()]
+    todo = [t for t in tests if t not in res.get("documents", {})]
+    if not todo:
+        log("fp8pred: kept")
+        return res
+    tokenizer, model = load_model(args.model, args.revision, device)
+    del tokenizer
+    hooks = fp8_fake_quant(model)
+
+    def predict(doc):
+        ids = [int(v) for v in np.load(out / "captures" / f"{doc}_ids.npy")]
+        t0 = time.perf_counter()
+        with torch.inference_mode():
+            if len(ids) > args.capture_chunk:
+                from transformers import DynamicCache
+                cache = DynamicCache()
+                for a in range(0, len(ids), args.capture_chunk):
+                    o = model(torch.tensor([ids[a:a + args.capture_chunk]], device=device), past_key_values=cache,
+                              use_cache=True, logits_to_keep=1)
+                    cache = o.past_key_values
+            else:
+                o = model(torch.tensor([ids], device=device), use_cache=True, logits_to_keep=1)
+            m = cache_to_matrices(o.past_key_values)
+        torch.cuda.synchronize(device) if device.type == "cuda" else None
+        return m, time.perf_counter() - t0
+
+    def as_mu(m, l):
+        k, v = m[l]
+        w = torch.from_numpy(np.concatenate([k, v], 1).astype(np.int32)).to(device)
+        mu = words_to_float(w)
+        return torch.nan_to_num(mu, nan=0.0, posinf=3e38, neginf=-3e38)
+    if "spread" not in res:                          # per layer and channel, on the calibration documents
+        acc, cnt = None, 0
+        for name in TRAIN:
+            m, _ = predict(name)
+            d = Doc(out / "captures", name)
+            if acc is None:
+                acc = torch.zeros(d.layers, 2 * d.columns, dtype=torch.float64, device=device)
+            for l in range(d.layers):
+                x = words_to_float(d.words(l, device))
+                r = (x - as_mu(m, l)).abs()
+                acc[l] += torch.nan_to_num(r, nan=0.0, posinf=0.0).sum(0)
+            cnt += d.tokens
+            del m
+            log(f"fp8pred: spread from {name}")
+        res["spread"] = ((acc / cnt) / LN2X2 + 1e-12).cpu().tolist()
+        path.write_text(json.dumps(res, indent=1))
+    sp = torch.tensor(res["spread"], dtype=torch.float64, device=device)
+    res.setdefault("documents", {})
+    for name in todo:
+        m, sec = predict(name)
+        d = Doc(out / "captures", name)
+        bits = []
+        for l in range(d.layers):
+            w = d.words(l, device)
+            bits.append(float(exact_bits(w, as_mu(m, l), sp[l]).mean()))
+        res["documents"][name] = {"bits": sum(bits) / len(bits), "per_layer": bits, "tokens": d.tokens,
+                                  "predictor_prefill_seconds": sec}
+        log(f"fp8pred {name}: {sum(bits) / len(bits):.3f} bits per value (emulated FP8 prefill {sec:.2f} s)")
+        path.write_text(json.dumps(res, indent=1))
+        del m
+    for h in hooks:
+        h.remove()
+    del model
+    gc.collect()
+    torch.cuda.empty_cache() if device.type == "cuda" else None
+    res["method"] = ("FP8 (E4M3) weights per output channel and inputs per token, emulated in BF16; spread per layer "
+                     "and channel from the calibration documents; Logistic exact cost")
+    path.write_text(json.dumps(res, indent=1))
+    return res
+
+
+def fp8pred_lines(out, name):
+    r = json.loads((out / name).read_text())
+    docs = r.get("documents", {})
+    if not docs:
+        return []
+    ours = {}
+    for f in ("datasets.json", "datasets_wikitext.json", "datasets_mixed.json", "context.json",
+              "context_wikitext.json", "context_mixed.json"):
+        if (out / f).is_file():
+            for label, per in json.loads((out / f).read_text()).get("exact_costs", {}).items():
+                for dn, v in per.items():
+                    ours.setdefault(dn, {})[label] = v
+    lines = ["## A whole FP8 model as the predictor (speculative KV coding's idea), on our KV", "",
+             "The model with FP8 weights and inputs (emulated in BF16) prefills the same prompt; its KV is each "
+             "value's mean, coded with our Logistic coder (spread per layer and channel from the calibration "
+             "documents). The receiver must run that prefill too, a cost our predictors do not have.", "",
+             "| Document | FP8-model predictor | ours, one step (exact) | ours, strong (exact) | emulated prefill |",
+             "| --- | --- | --- | --- | --- |"]
+    for dn, v in docs.items():
+        o = ours.get(dn, {})
+        g = lambda k: f"{o[k]:.3f}" if k in o else "-"
+        lines.append(f"| {dn} | {v['bits']:.3f} | {g(LABELS_EXACT['prev'])} | {g(LABELS_EXACT['fast'])} | "
+                     f"{v['predictor_prefill_seconds']:.2f} s |")
+    return lines + [""]
 
 
 def link_probe_lines(out):
@@ -988,10 +1146,14 @@ def frontier_gpu_lines(out, name="frontier_gpu.json"):
 
 
 def graph_note(row):
-    """' [graph 1.23 ms]' when the decode was also timed as an exact CUDA graph."""
-    if row.get("decode_ms_graph") is None:
-        return ""
-    return f" [graph {row['decode_ms_graph']:.2f}" + ("" if row.get("bit_exact_graph") else ", NOT exact") + "]"
+    """' [graph 1.23 ms]' when the decode was also timed as an exact CUDA graph; ' [raw copy 0.9 ms]' for a decode
+    that includes a host-to-GPU copy (IBP)."""
+    note = ""
+    if row.get("decode_ms_graph") is not None:
+        note += f" [graph {row['decode_ms_graph']:.2f}" + ("" if row.get("bit_exact_graph") else ", NOT exact") + "]"
+    if row.get("raw_copy_ms") is not None:
+        note += f" [raw copy {row['raw_copy_ms']:.2f}]"
+    return note
 
 
 def context_lines(out, name="context.json"):
@@ -1028,10 +1190,12 @@ def context_lines(out, name="context.json"):
             cells.append(f"{v:.3f}" if v is not None else "-")
         lines.append(f"| {label} | " + " | ".join(cells) + " |")
 
-    def cell(k, m, f):
+    def cell(k, m, f, decode=False):
         row = next((x for x in cases[k]["rows"] if x["method"] == m), None)
         if row is None or "error" in row:
             return "-" if row is None else "not measured"
+        if row.get("computed"):                      # a bound, not a codec: bits only
+            return "-" if decode else f"{row['bits']:.3f} (computed)"
         return f(row) + ("" if row.get("bit_exact") else " (NOT exact)")
     for m in methods:
         lines.append(f"| {m} | " + " | ".join(cell(k, m, lambda x: f"{x['bits']:.3f}") for k in keys) + " |")
@@ -1039,7 +1203,8 @@ def context_lines(out, name="context.json"):
               "| --- |" + " --- |" * len(keys)]
     for m in methods:
         lines.append(f"| {m} | " + " | ".join(
-            cell(k, m, lambda x: f"{x['decode_ms']:.2f} ms ({x['encode_ms']:.0f})" + graph_note(x)) for k in keys) + " |")
+            cell(k, m, lambda x: f"{x['decode_ms']:.2f} ms ({x['encode_ms']:.0f})" + graph_note(x), True)
+            for k in keys) + " |")
     lines += ["", "**Transfer time per link** (ideal link, decoding overlapped with arrival: the longer of the wire "
               "time and the decode; our decode as a CUDA graph where that was measured and exact). Ours = our "
               "fastest exact mode at that link; the speed-up is against SplitZip.", ""]
@@ -2662,6 +2827,9 @@ def stage_report(args, out):
     for name in ("datasets.json", "datasets_wikitext.json", "datasets_mixed.json"):
         if (out / name).is_file():
             lines += [""] + dataset_lines(out, name)
+    for name in ("fp8pred.json", "fp8pred_wikitext.json", "fp8pred_mixed.json"):
+        if (out / name).is_file():
+            lines += [""] + fp8pred_lines(out, name)
     for name in ("groupspeed.json", "groupspeed_wikitext.json", "groupspeed_mixed.json"):
         if (out / name).is_file():
             lines += [""] + groupspeed_lines(out, name)
@@ -2775,6 +2943,11 @@ def parser():
                    help="datasets stage: skip our predictors' exact costs (the strong predictor's fit takes a while)")
     p.add_argument("--capture-chunk", type=int, default=8192,
                    help="context / datasets captures: prefill longer inputs in chunks of this many tokens")
+    p.add_argument("--extra-baselines", default="nvcomp,adacode,exactkv,ibp,bounds",
+                   help="context / datasets: the other bit-exact codecs (kv_compare/more_baselines.py) and the "
+                        "computed exponent-coder bounds; '' for none")
+    p.add_argument("--baseline-sources", type=Path, default=Path.home() / "kv_a5000" / "sources",
+                   help="checkouts of AdaCode and exactkv (cloned at the pinned commits if missing)")
     p.add_argument("--baseline-stream-tokens", type=int, default=0,
                    help="context / datasets: code SplitZip and ExANS in streams of this many tokens like ours "
                         "(0: each case in one call, as the NUC runs did; scripts/run_a5000.sh passes 8192)")
@@ -2843,6 +3016,7 @@ def main(argv=None):
     elif args.revision is None:            # the pinned revision belongs to the default model only
         args.revision = DEFAULT_REVISION if args.model == DEFAULT_MODEL else "none"
     args.datasets = [d for d in args.datasets.split(",") if d]
+    args.extra_baselines = [b for b in args.extra_baselines.split(",") if b]
     if args.dataset_tokens % 128:
         raise SystemExit("--dataset-tokens: a multiple of 128 tokens")
     args.configs = [c for c in args.configs.split(",") if c]
@@ -2970,6 +3144,8 @@ def main(argv=None):
             stage_datasets(args, out)
         if "context" in stages:
             stage_context(args, out)
+        if "fp8pred" in stages:
+            stage_fp8pred(args, out)
         if "groupspeed" in stages:
             stage_groupspeed(args, out)
         if "report" in stages:

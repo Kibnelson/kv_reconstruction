@@ -39,14 +39,26 @@ see section 7).
      and the exponent entropy.
    - `context`: WikiText-2 test at 512, 1K, 2K, 4K, 8K, 16K and 32K tokens with batch 1, and at 512, 1K and 2K
      with batch 16.
+   - `fp8pred`: the predictor of speculative KV coding, a whole FP8 copy of the model run on the prompt, as an
+     exact cost on the first window of each dataset and the 8K context document.
    - `groupspeed`: launch shapes of our head-group decoders, as CUDA graphs.
    - `report`: writes `summary.md`.
-6. Packages the small files (JSON, logs, `summary.md`; no KV) into `benchmark_results/<model>_lossless_a5000_<date>`.
-   It commits them and pushes to the branch.
+6. Packages the small files (JSON, logs, `summary.md`; no KV) into
+   `benchmark_results/<model>_lossless_<gpu>_<date>`, where `<gpu>` is `rtxa5000` (or `rtxa4500` on the NUC). It
+   commits them and pushes to the branch.
 
-Methods in every case:
+Methods in every case (the literature is checked in [lossless_related_work.md](lossless_related_work.md)):
 - SplitZip, the authors' codec at `42c7431`.
 - ExANS, the authors' codec at `de6c38b`, built from source with one build fix.
+- AdaCode (EMNLP 2026), the authors' codec at `d46cf6c`. It runs per layer for keys and values, with the code
+  length and exponent window chosen by the authors' rule. Two variants: chosen on the WikiText-2 train KV, and
+  chosen on the coded KV itself.
+- exactkv, the authors' page encoder and decoder at `d90376b`.
+- nvCOMP LZ4, Cascaded, Bitcomp, ANS and Zstd: SplitZip's GPU baselines, from NVIDIA's Python package.
+- IBP (EuroSys '26), the authors' CUDA extension at `b2f7100`. Its decode is a fetch from pinned host memory over
+  PCIe, decompressing on the way, timed beside a plain copy. It is optional: setup builds it if it can.
+- Two computed floors, which are not codecs: 8 + Huffman(exponent), the DFloat11 / ZipNN format; and 8 + exponent
+  entropy. No coder of the exponent alone can do better.
 - Our per-layer rANS codec in four predictor modes: one step (dense), keys then values, 4 head groups, and head by
   head.
 - Our codec with the rank-256 product.
@@ -60,6 +72,45 @@ Measured on the A4500 for Llama-3.2-3B, each stage takes minutes: `context` abou
 costs, `groupspeed` about 3. Our best estimate for a whole model is 1-1.5 hours for 3B and 2-3 hours for 8B, plus
 the first download. All three models fit in one 12-hour allocation. If one ends early, rerunning the same block
 continues where it stopped.
+
+## 0a. Dress rehearsal on the NUC (same scripts, no Slurm)
+
+The NUC's RTX A4500 has the same GPU architecture as the A5000 (Ampere, sm_86), so every codec and script can be
+checked there first. `ALLOW_NO_SLURM=1` lets the scripts run outside an allocation. `KV_HOME` keeps everything
+apart from the NUC's own environment. Paste in a terminal on the NUC:
+
+```bash
+bash <<'NUC'
+set -Eeuo pipefail
+trap 'printf "NUC REHEARSAL STOPPED: line=%s exit=%s\n" "$LINENO" "$?" >&2' ERR
+cd ~/kv_llama32
+git checkout -q llama32-3b-lossy-lossless-compare
+git pull -q --ff-only origin llama32-3b-lossy-lossless-compare
+export ALLOW_NO_SLURM=1 KV_HOME=$HOME/kv_a5000
+# reuse the NUC's CUDA 12.8 toolkit for ExANS and IBP instead of downloading one
+export CUDA_HOME=$HOME/kv_reconstruction/runs/_matched_baselines/cuda12_8/toolkit
+bash scripts/a5000_setup.sh
+SMOKE=1 MODEL=llama32_3b bash scripts/run_a5000.sh
+NUC
+```
+
+Success markers: `SETUP DONE`, then `SMOKE OK: every codec measured`. A note that IBP was not measured is
+allowed: its build is optional. The whole block takes about 30-45 minutes, mostly the first downloads.
+
+Then the full Llama-3.2-3B run on the NUC, measured, packaged and pushed as `llama32_3b_lossless_rtxa4500_<date>`
+(about 1.5-2 hours):
+
+```bash
+bash <<'NUC'
+set -Eeuo pipefail
+cd ~/kv_llama32
+git pull -q --ff-only origin llama32-3b-lossy-lossless-compare
+ALLOW_NO_SLURM=1 KV_HOME=$HOME/kv_a5000 MODEL=llama32_3b bash scripts/run_a5000.sh
+NUC
+```
+
+Optionally, SplitZip's own Llama-3-8B fits the NUC's 20 GB up to 16K tokens (`MODEL=llama3_8b`). Its 32K capture
+is skipped if it runs out of memory. Disk: about 50 GB under `~/kv_a5000` for the 3B run, captures included.
 
 ## 0. Before you start
 
@@ -168,8 +219,9 @@ SMOKE=1 MODEL=llama32_3b bash scripts/run_a5000.sh
 A5000
 ```
 
-Success marker: `SMOKE OK: every codec measured`. The bits table printed just above it should show about 9 bits
-for our dense mode and about 12 for SplitZip, as on the NUC.
+Success marker: `SMOKE OK: every codec measured`. That includes SplitZip, ExANS, AdaCode, exactkv, nvCOMP ANS
+and our head-by-head mode. The bits table printed just above it should show about 9 bits for our dense mode and
+about 12 for SplitZip, as on the NUC.
 
 If the smoke test does not pass, stop here and send the last 60 lines of `~/kv_a5000/runs/smoke_llama32_3b/run.log`.
 
