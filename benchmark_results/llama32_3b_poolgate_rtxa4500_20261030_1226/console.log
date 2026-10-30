@@ -1,0 +1,97 @@
+/home/nelson/kv_llama32/scripts/bench_pool_gate.py:93: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  return torch.from_numpy(w).to(device).view(torch.bfloat16).view(T, H, D)
+12:23:11 attn 1x2048 layer 0: pool 53.1 us, dense 138.7 us, SDPA 42.4 us, identical=True, 12.82 bits allocated
+12:23:11 attn 1x2048 layer 9: pool 51.2 us, dense 137.2 us, SDPA 42.4 us, identical=True, 12.82 bits allocated
+12:23:11 attn 1x2048 layer 18: pool 51.3 us, dense 138.2 us, SDPA 42.8 us, identical=True, 12.82 bits allocated
+12:23:11 attn 1x2048 layer 27: pool 51.1 us, dense 138.2 us, SDPA 42.0 us, identical=True, 12.82 bits allocated
+12:23:13 attn 16x2048 layer 0: pool 355.3 us, dense 1781.8 us, SDPA 317.4 us, identical=True, 12.82 bits allocated
+12:23:14 attn 16x2048 layer 9: pool 355.3 us, dense 1780.7 us, SDPA 317.4 us, identical=True, 12.82 bits allocated
+12:23:14 attn 16x2048 layer 18: pool 355.3 us, dense 1779.7 us, SDPA 317.4 us, identical=True, 12.82 bits allocated
+12:23:14 attn 16x2048 layer 27: pool 354.3 us, dense 1780.6 us, SDPA 317.6 us, identical=True, 12.82 bits allocated
+12:23:14 attn 32x2048 layer 0: pool 669.7 us, dense 3526.7 us, SDPA 516.8 us, identical=True, 12.82 bits allocated
+12:23:14 attn 32x2048 layer 9: pool 669.7 us, dense 3523.6 us, SDPA 516.5 us, identical=True, 12.82 bits allocated
+12:23:14 attn 32x2048 layer 18: pool 669.7 us, dense 3524.6 us, SDPA 517.1 us, identical=True, 12.82 bits allocated
+12:23:15 attn 32x2048 layer 27: pool 669.7 us, dense 3524.6 us, SDPA 517.0 us, identical=True, 12.82 bits allocated
+12:23:15 attn 1x8192 layer 0: pool 113.7 us, dense 468.0 us, SDPA 84.7 us, identical=True, 12.72 bits allocated
+12:23:15 attn 1x8192 layer 9: pool 113.7 us, dense 468.0 us, SDPA 84.0 us, identical=True, 12.72 bits allocated
+12:23:15 attn 1x8192 layer 18: pool 113.7 us, dense 467.9 us, SDPA 84.0 us, identical=True, 12.72 bits allocated
+12:23:15 attn 1x8192 layer 27: pool 113.7 us, dense 468.0 us, SDPA 84.0 us, identical=True, 12.72 bits allocated
+12:23:15 attn 4x8192 layer 0: pool 352.7 us, dense 1779.2 us, SDPA 252.9 us, identical=True, 12.72 bits allocated
+12:23:15 attn 4x8192 layer 9: pool 353.7 us, dense 1779.7 us, SDPA 253.3 us, identical=True, 12.72 bits allocated
+12:23:15 attn 4x8192 layer 18: pool 354.1 us, dense 1777.7 us, SDPA 252.9 us, identical=True, 12.72 bits allocated
+12:23:15 attn 4x8192 layer 27: pool 353.3 us, dense 1778.0 us, SDPA 252.9 us, identical=True, 12.72 bits allocated
+12:23:16 attn 8x8192 layer 0: pool 670.7 us, dense 3527.1 us, SDPA 491.5 us, identical=True, 12.72 bits allocated
+12:23:16 attn 8x8192 layer 9: pool 670.7 us, dense 3527.6 us, SDPA 491.0 us, identical=True, 12.72 bits allocated
+12:23:16 attn 8x8192 layer 18: pool 669.6 us, dense 3525.7 us, SDPA 490.8 us, identical=True, 12.72 bits allocated
+12:23:16 attn 8x8192 layer 27: pool 669.7 us, dense 3526.7 us, SDPA 491.3 us, identical=True, 12.72 bits allocated
+12:23:16 attn 1x32768: no capture of 32768 tokens; skipped
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 152.36it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+12:23:24 e2e identity: {'tokens_equal': True, 'logits_bit_identical': True, 'batch': 2, 'prompt': 1024, 'generated': 32}
+12:23:55 e2e prompt 2048: {"backend": "bf16", "batch": 49, "kv_mib_per_sequence": 238.0, "ms_per_step": 154.04083409647305, "decode_tokens_per_s": 318.0974725786811, "prefill_s": 10.827282190322876, "pool_grows": 0}
+12:24:18 e2e prompt 2048: {"backend": "exactkv", "batch": 62, "kv_mib_per_sequence": 190.53125, "ms_per_step": 70.01313449829583, "decode_tokens_per_s": 885.5481252808233, "prefill_s": 14.123115301132202, "pool_grows": 0}
+12:24:36 e2e prompt 2048: {"backend": "exactkv", "batch": 49, "kv_mib_per_sequence": 190.53125, "ms_per_step": 48.288645706777494, "decode_tokens_per_s": 1014.7312951690973, "prefill_s": 11.313025951385498, "pool_grows": 0}
+12:24:37 e2e prompt 8192: bf16 out of memory at batch 13
+12:25:08 e2e prompt 8192: {"backend": "bf16", "batch": 12, "kv_mib_per_sequence": 910.0, "ms_per_step": 146.19873452374316, "decode_tokens_per_s": 82.08005383282685, "prefill_s": 12.01073431968689, "pool_grows": 0}
+12:25:09 e2e prompt 8192: exactkv out of memory at batch 16
+12:25:32 e2e prompt 8192: {"backend": "exactkv", "batch": 15, "kv_mib_per_sequence": 723.5703125, "ms_per_step": 54.79834023423082, "decode_tokens_per_s": 273.73091841621084, "prefill_s": 15.286650896072388, "pool_grows": 0}
+12:25:51 e2e prompt 8192: {"backend": "exactkv", "batch": 12, "kv_mib_per_sequence": 723.5703125, "ms_per_step": 44.975117435605505, "decode_tokens_per_s": 266.81420047832813, "prefill_s": 12.26787543296814, "pool_grows": 0}
+12:25:51 install: no ctx8192_r0; using ds_gsm8k_r0
+12:26:17   fused one-step predictor prepared for 28 layers
+12:26:18 install ours, layer by layer into the pool (two-layer ring): 52.5 ms, peak +777 MiB (pool 712, transient 64), exact=True
+12:26:19 install ours, whole cache decoded, then the pool: 47.0 ms, peak +1609 MiB (pool 712, transient 896), exact=True
+12:26:20 install SplitZip, whole cache decoded, then the pool: 58.4 ms, peak +1609 MiB (pool 712, transient 896), exact=True
+12:26:20 install raw BF16 received whole, then the pool: 45.5 ms, peak +1609 MiB (pool 712, transient 896), exact=True
+# The P gate on NVIDIA RTX A4500: unsloth/Llama-3.2-3B
+
+P = exact KV kept compressed in decode-GPU memory, decoded in registers by attention. The pool is exactkv (the published P; its dense kernel performs the same arithmetic). See scripts/bench_pool_gate.py.
+
+## Decode attention: pool vs dense on identical KV
+
+Per decode step = the mean per layer x 28 layers. Bits per value of the pool include its directory and raw-row reserve (allocated) or only the rows used.
+
+| Batch x context | Pool, per step | Dense, same arithmetic | PyTorch SDPA (dense) | Pool vs dense | Bit-identical | Bits allocated / used |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 x 2,048 | 1.45 ms | 3.87 ms | 1.19 ms | 2.67x | yes | 12.82 / 12.58 |
+| 16 x 2,048 | 9.94 ms | 49.86 ms | 8.89 ms | 5.02x | yes | 12.82 / 12.58 |
+| 32 x 2,048 | 18.75 ms | 98.70 ms | 14.47 ms | 5.26x | yes | 12.82 / 12.58 |
+| 1 x 8,192 | 3.18 ms | 13.10 ms | 2.36 ms | 4.12x | yes | 12.72 / 12.58 |
+| 4 x 8,192 | 9.90 ms | 49.80 ms | 7.08 ms | 5.03x | yes | 12.72 / 12.58 |
+| 8 x 8,192 | 18.77 ms | 98.75 ms | 13.75 ms | 5.26x | yes | 12.72 / 12.58 |
+
+## Generation: BF16 cache vs pool (same engine and weights)
+
+Greedy check, batch 2, 1024-token prompts, 32 tokens: tokens equal True, logits bit-identical True.
+
+| Prompt | Backend | Batch | KV per sequence | ms per step | Decode tokens/s |
+| --- | --- | --- | --- | --- | --- |
+| 2,048 + 128 | bf16 | 49 | 238 MiB | 154.04 | 318 |
+| 2,048 + 128 | exactkv | 62 | 191 MiB | 70.01 | 886 |
+| 2,048 + 128 | exactkv | 49 | 191 MiB | 48.29 | 1015 |
+| 8,192 + 128 | bf16 | 12 | 910 MiB | 146.20 | 82 |
+| 8,192 + 128 | exactkv | 15 | 724 MiB | 54.80 | 274 |
+| 8,192 + 128 | exactkv | 12 | 724 MiB | 44.98 | 267 |
+
+Each backend runs at the largest batch the same KV budget fits, then the pool at the BF16 batch (same work). The engine is exactkv's plain Python loop (no CUDA graphs) for both.
+
+## T -> P installation: ds_gsm8k_r0 (8,192 tokens, 28 layers, 896 MiB in BF16)
+
+| Path | Wire bits/value | Install time | Peak extra memory | of which transient | Pool | Pool exact |
+| --- | --- | --- | --- | --- | --- | --- |
+| ours, layer by layer into the pool (two-layer ring) | 9.28 | 52 ms | 777 MiB | 64 MiB | 712 MiB | True |
+| ours, whole cache decoded, then the pool | 9.28 | 47 ms | 1609 MiB | 896 MiB | 712 MiB | True |
+| SplitZip, whole cache decoded, then the pool | 12.06 | 58 ms | 1609 MiB | 896 MiB | 712 MiB | True |
+| raw BF16 received whole, then the pool | 16.00 | 45 ms | 1609 MiB | 896 MiB | 712 MiB | True |
+
+**Time until the pool is ready, per link** (the wire and the installation in sequence; a chunked protocol would overlap them):
+
+| Link | ours (layer by layer) | ours | SplitZip | raw BF16 received whole |
+| --- | --- | --- | --- | --- |
+| 1 Gb/s | 4414 ms | 4408 ms | 5722 ms | 7562 ms |
+| 10 Gb/s | 489 ms | 483 ms | 625 ms | 797 ms |
+| 25 Gb/s | 227 ms | 221 ms | 285 ms | 346 ms |
+| 50 Gb/s | 140 ms | 134 ms | 172 ms | 196 ms |
+| 100 Gb/s | 96 ms | 91 ms | 115 ms | 121 ms |
+| 200 Gb/s | 74 ms | 69 ms | 87 ms | 83 ms |
+| 400 Gb/s | 63 ms | 58 ms | 73 ms | 64 ms |
+
