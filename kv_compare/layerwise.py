@@ -564,12 +564,17 @@ class LayerwiseOneStep:
                 "gemm_streams": ([torch.cuda.Stream(dev, priority=-1) for _ in range(self.chunks)]
                                  if dev.type == "cuda" and self.split else None)}
 
-    def decode(self, buf, starts, T, out=None, bufs=None, accs=None, products_only=False):
+    def decode(self, buf, starts, T, out=None, bufs=None, accs=None, products_only=False, sink=None):
         """accs: precomputed int32 products per layer (list of [T, W]; layer 0 ignored) - times the coding
-        alone; products_only: run only the products (on features already in bufs["xbuf"]) - times them alone."""
+        alone; products_only: run only the products (on features already in bufs["xbuf"]) - times them alone.
+        sink(layer, words [T, W]): hand each decoded layer over as soon as it is complete (installation into a
+        pool) instead of keeping the whole cache: the words go to a two-layer ring (out, if given, is [2, T, W]),
+        and the sink runs on the current stream before the slot is written again. The next layer reads only the
+        features, so a layer's words are free once its sink has run."""
         L, W = self.L, self.W
         S, _ = self.layout(T)
-        words = torch.empty(L, T, W, dtype=torch.int16, device=self.device) if out is None else out
+        nl = 2 if sink is not None else L
+        words = torch.empty(nl, T, W, dtype=torch.int16, device=self.device) if out is None else out
         bufs = self.buffers(T) if bufs is None else bufs
         k, t = self.k, self.tables
         Tc = T // self.chunks
@@ -579,6 +584,10 @@ class LayerwiseOneStep:
         for s in (streams or []) + (gstreams or []):
             s.wait_stream(cur)
         for layer in range(L):                       # issued layer by layer, so the chunks' streams interleave
+            wl = words[layer % 2] if sink is not None else words[layer]
+            if sink is not None and layer >= 2:      # the ring slot's sink (two layers back) has run
+                for s in (streams or []) + (gstreams or []):
+                    s.wait_stream(cur)
             for c in range(self.chunks):
                 rows = slice(c * Tc, (c + 1) * Tc)
                 acc = bufs["acc"][c] if accs is None else accs[layer][rows]
@@ -605,7 +614,7 @@ class LayerwiseOneStep:
                             acc[:, j * gw:(j + 1) * gw] += int_mm(xin, self.Ag[j][layer])
                         GN = self.GN if self.ng > 1 else self.G
                         self._launch(_ldec_kernel, ((Tc // self.TB) * GN,), buf, starts, bufs["state"], bufs["pos"],
-                                     words[layer], acc, bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer],
+                                     wl, acc, bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer],
                                      k["sp"][layer], k["inv"][layer], k["isx"][layer], k["cos"], k["sin"],
                                      bufs["ssum"][(layer + 1) % 2], bufs["ssum"][layer % 2],
                                      bufs["smult"][c * P * self.TB:], t["cumf"], t["lut"], t["tail"], c * Tc, T, W,
@@ -616,9 +625,13 @@ class LayerwiseOneStep:
                                      FEAT=self.features == "inline", LEAN=self.lean, ONES=layer == 0)
                     if self.features == "pass" and layer < L - 1:
                         nv = Tc * W
-                        self._launch(_lfeat_kernel, (triton.cdiv(nv, 1024),), words[layer], bufs["xbuf"][layer % 2],
+                        self._launch(_lfeat_kernel, (triton.cdiv(nv, 1024),), wl, bufs["xbuf"][layer % 2],
                                      k["isx"][layer], k["cos"], k["sin"], c * Tc, nv, W, self.C, HD=self.hd, BLOCK=1024,
                                      warps=4)
+            if sink is not None and not products_only:
+                for s in (streams or []) + (gstreams or []):
+                    cur.wait_stream(s)
+                sink(layer, wl)
         for s in (streams or []) + (gstreams or []):
             cur.wait_stream(s)
         return words

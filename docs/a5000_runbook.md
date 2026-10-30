@@ -116,6 +116,29 @@ NUC
 Optionally, SplitZip's own Llama-3-8B fits the NUC's 20 GB up to 16K tokens (`MODEL=llama3_8b`). Its 32K capture
 is skipped if it runs out of memory. Disk: about 50 GB under `~/kv_a5000` for the 3B run, captures included.
 
+## 0b. The P gate on the NUC (after the full 3B run)
+
+The question is whether a compressed, GPU-resident pool (P) pays off before we build the transfer lifecycle
+around it. The pool is exactkv, the published P: about 12.7 bits per value, decoded in registers by attention,
+with a dense kernel that does identical arithmetic. Our own part is the T-to-P installation.
+`scripts/bench_pool_gate.py` measures three things on the 3B run's captures:
+- decode attention, pool against dense, on identical KV, with bit-identity checked;
+- generation, BF16 cache against the pool, at the same batch and at the largest batch each fits;
+- installing our stream layer by layer into the pool, against decoding the whole cache first (ours, SplitZip,
+  raw BF16).
+
+```bash
+bash <<'NUC'
+set -Eeuo pipefail
+cd ~/kv_llama32
+git pull -q --ff-only origin llama32-3b-lossy-lossless-compare
+ALLOW_NO_SLURM=1 KV_HOME=$HOME/kv_a5000 MODEL=llama32_3b bash scripts/run_pool_gate.sh
+NUC
+```
+
+Success marker: `PUSHED benchmark_results/llama32_3b_poolgate_rtxa4500_<date>`. It takes about 30-60 minutes;
+most of it is generation. A rerun keeps the finished parts.
+
 ## 0. Before you start
 
 - Slurm access to the A5000 node with the partition, account and QoS the Phase 2 cards use (`all` / `oana2026` /

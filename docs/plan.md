@@ -227,6 +227,18 @@ Lossy development pauses: the queued runs finish, but nothing new is built.
   - the FP8-model predictor of speculative KV coding (stage `fp8pred`).
 
   It runs first on the NUC (runbook section 0a), then on the A5000.
+- **The P gate** (`scripts/bench_pool_gate.py`, runbook section 0b): is a compressed GPU-resident pool worth
+  building the lifecycle around?
+  - exactkv is the published P: 4-bit exponent offsets per 16-token page, bit-exact attention in registers,
+    -20% memory, +17-23% generation throughput on a 4090. It serves as the backbone; our P1 prototype (13.05 bits
+    on Smol) is weaker.
+  - Measured on our Llama KV:
+    - attention, pool vs dense with identical arithmetic;
+    - generation at equal and at maximum batch;
+    - our layer-by-layer T-to-P installation (`LayerwiseOneStep.decode(sink=...)`, a two-layer ring) against
+      decoding the whole cache first.
+  - If the pool pays off, our own P format (a 3-bit exponent window fused into the same attention, about 11.4
+    bits on our data) is next.
 
 ## What is next, in order of expected gain (before 29 October)
 

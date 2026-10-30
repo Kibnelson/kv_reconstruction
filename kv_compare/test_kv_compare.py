@@ -594,6 +594,36 @@ for groups, chunks in ((2, 2), (4, 1), (4, 2)):
 """
 
 
+SINK_CHECK = FUSED_CHECK.split("for mode, rows, search in")[0] + r"""
+from kv_compare import layerwise
+codec = layerwise.LayerwiseOneStep(consts, study.C, study.hd, tokens_per_program=16, chunks=2)
+xall, prior = codec.model(words)
+buf, starts = codec.encode(words, xall, prior)
+full = codec.decode(buf, starts, T)
+got = {}
+ring = codec.decode(buf, starts, T, sink=lambda l, w: got.__setitem__(l, w.clone()))
+assert ring.shape[0] == 2, ring.shape
+assert sorted(got) == list(range(L)), sorted(got)
+assert torch.equal(torch.stack([got[l] for l in range(L)]), full)
+assert torch.equal(full, words)
+print("ok sink")
+"""
+
+
+class DecodeSinkTests(unittest.TestCase):
+    def test_layer_by_layer_sink_matches_the_whole_decode_interpreted(self):
+        """decode(sink=...): every layer handed over once, in order, through a two-layer ring, equal to the whole
+        decode (installation into a pool without the whole BF16 cache)."""
+        import importlib.util
+        import subprocess
+        if importlib.util.find_spec("triton") is None or torch is None:
+            self.skipTest("Triton and PyTorch are required")
+        r = subprocess.run([sys.executable, "-c", SINK_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=3600)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        self.assertIn("ok sink", r.stdout)
+
+
 class GroupedCodecTests(unittest.TestCase):
     def test_head_group_codec_round_trip_interpreted(self):
         """The head-group predictor in the per-layer codec (2 and 4 groups, 1 and 2 token chunks): the decoder,
