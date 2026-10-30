@@ -1,0 +1,46 @@
+{
+  "actual_cuda_available": false,
+  "actual_cuda_tests_pending": 2,
+  "expected_nuc": {
+    "fresh_receivers": 24,
+    "own_packet_comparisons": 12,
+    "rows": 48,
+    "workers": 24
+  },
+  "gpu_performance_measured": false,
+  "independent_reviews": {
+    "completed_result_integrity": true,
+    "rolling_controller": true,
+    "runner_protocol": true
+  },
+  "scope": "CPU and explicit Triton interpreter semantic checks only; two actual CUDA gates remain required on NUC",
+  "status": "completed",
+  "syntax": {
+    "bash_syntax": true,
+    "python_files_parsed": 4
+  },
+  "tests": {
+    "contract": {
+      "command": "python -m unittest tests.test_standalone_rolling_codec.ContractTests -v",
+      "log": "contract.log",
+      "passed": 1,
+      "seconds": 0.113
+    },
+    "interpreter": {
+      "command": "python -m unittest tests.test_standalone_rolling_codec.InterpreterTests -v",
+      "log": "interpreter.log",
+      "passed": 3,
+      "seconds": 295.647,
+      "triton_interpret": true
+    },
+    "protocol": {
+      "command": "python -m unittest tests.test_standalone_rolling -v",
+      "log": "protocol.log",
+      "log_scope": "final output excerpt",
+      "passed": 14,
+      "seconds": 1.386
+    }
+  },
+  "total_cpu_passes": 18,
+  "unchanged_existing_tracked_files": true
+}
