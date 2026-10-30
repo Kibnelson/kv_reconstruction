@@ -240,6 +240,18 @@ Lossy development pauses: the queued runs finish, but nothing new is built.
   - If the pool pays off, our own P format (a 3-bit exponent window fused into the same attention, about 11.4
     bits on our data) is next.
 
+## From 30 October: our protocol in vLLM PD (branch pd-vllm-protocol)
+
+T is the contribution; a separate resident pool (P) has no measured edge over exactkv yet. The protocol now runs
+inside unmodified vLLM 0.32 as a KV connector (docs/pd_protocol.md):
+- 1 prefill + 3 decode engines on the 4 x A5000 node;
+- every codec bit-exact through a paced link of 3-400 Gb/s;
+- requests/s, goodput and TTFT per link x codec x rate, against the same engines without disaggregation.
+
+Before anything is sent differently, a multi-turn run measures the reuse opportunities: KV already on the decode
+GPU, held before (a DRAM tier), or held by another decode engine. Phase 3 (track and send only what is missing,
+pulling evicted bases from DRAM alongside) is built only if those are large.
+
 ## What is next, in order of expected gain (before 29 October)
 
 0. **Finish the baselines' own evaluations.** Done (`61d6db1`): AQUA-KV's perplexity protocol for every method.
