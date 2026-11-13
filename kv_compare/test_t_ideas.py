@@ -267,6 +267,15 @@ class TIdeasTests(unittest.TestCase):
         name, bits = codec.pick_fast(words, {"wikitext": consts, "other": oc}, st.C, st.hd, tokens=256)
         self.assertEqual(set(bits), {"wikitext", "other"})
         self.assertEqual(name, min(bits, key=bits.get))
+        # the batched density cost ranks the sets as T's exact bits do, and its gaps are T's gaps
+        from kv_compare.t2 import proxy_costs
+        for d in st.tests:
+            w = torch.stack([d.words(l, cpu) for l in range(st.L)]).to(torch.int16)
+            exact = [proxy_bits(c, w, st.C, st.hd, (1, 2)) for c in (consts, oc)]
+            cheap = proxy_costs([consts, oc], w, st.C, st.hd, (1, 2))
+            self.assertEqual(exact[0] < exact[1], cheap[0] < cheap[1], d.name)
+            gap_e, gap_c = exact[1] - exact[0], cheap[1] - cheap[0]
+            self.assertLess(abs(gap_c - gap_e), 0.25 * abs(gap_e) + 1e-6 * abs(exact[0]), (d.name, gap_e, gap_c))
 
     def test_compare_report(self):
         """Section 8 from rows of the compare stage's shape: T2 and T renamed, sorted by bits, failed rows listed,

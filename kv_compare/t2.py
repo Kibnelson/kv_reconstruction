@@ -20,6 +20,8 @@ Kept apart from T: no module of T changes. This file adds a codec class that run
 """
 from __future__ import annotations
 
+import math
+
 import torch
 
 from .layerwise import (LayerwiseOneStep, _lenc_kernel, _ldec_kernel, _lfeat_kernel, _lsurp_kernel, _null, gc,
@@ -164,38 +166,69 @@ def sample_rows(T, tokens=1024, blocks=8):
     return torch.cat([torch.arange(int(a), int(a) + size) for a in starts])
 
 
+def _turn(x, cs, sn, C, hd, inverse):
+    """Keys of rows x [n, W] rotated (T's prediction) or de-rotated (T's features) with the RoPE tables of the rows."""
+    n = x.shape[0]
+    h2 = hd // 2
+    k = x[:, :C].reshape(n, -1, hd)
+    a, b = k[..., :h2], k[..., h2:]
+    c, s = cs[:, None, :], sn[:, None, :]
+    if inverse:
+        k = torch.cat([a * c + b * s, b * c - a * s], -1)
+    else:
+        k = torch.cat([a * c - b * s, b * c + a * s], -1)
+    return torch.cat([k.reshape(n, C), x[:, C:]], 1)
+
+
+def _features(prev, consts_l1, cs, sn, C, hd):
+    """T's 8-bit features of a layer's rows (float32 values) with that layer's scales."""
+    q = torch.floor(_turn(prev, cs, sn, C, hd, True) * consts_l1[None, :] + 0.5)
+    return torch.where(q == q, q, torch.zeros_like(q)).clamp(-127, 127).to(torch.int8)
+
+
 def proxy_bits(consts, words, C, hd, layers=(1, 2), rows=None):
     """T's exact model bits of `layers` on the token rows `rows`, from one set's constants in plain torch: T's 8-bit
     features of the previous layer (de-rotated keys, the set's scales), T's int8 product and its scale, bias and
-    RoPE, the set's spreads (no spread prior). For ranking constant sets, not for coding. words int16 [L, T, W]."""
+    RoPE, the set's spreads (no spread prior). The reference for proxy_costs. words int16 [L, T, W]."""
     from .core import exact_bits, words_to_float
     dev = words.device
-    T = words.shape[1]
-    rows = torch.arange(T, device=dev) if rows is None else rows.to(dev)
-    cs, sn = consts["cos"][rows], consts["sin"][rows]                 # [n, hd / 2]
-    h2 = hd // 2
-
-    def turn(x, inverse):
-        n = x.shape[0]
-        k = x[:, :C].reshape(n, -1, hd)
-        a, b = k[..., :h2], k[..., h2:]
-        c, s = cs[:, None, :], sn[:, None, :]
-        if inverse:                                   # de-rotate (T's features)
-            k = torch.cat([a * c + b * s, b * c - a * s], -1)
-        else:                                         # rotate (T's prediction)
-            k = torch.cat([a * c - b * s, b * c + a * s], -1)
-        return torch.cat([k.reshape(n, C), x[:, C:]], 1)
-
+    rows = torch.arange(words.shape[1], device=dev) if rows is None else rows.to(dev)
+    cs, sn = consts["cos"][rows], consts["sin"][rows]
     total = 0.0
     for l in layers:
         prev = words_to_float(words[l - 1, rows].to(torch.int32) & 0xFFFF).to(torch.float32)
-        q = torch.floor(turn(prev, True) * consts["isx"][l - 1][None, :] + 0.5)
-        q = torch.where(q == q, q, torch.zeros_like(q)).clamp(-127, 127).to(torch.int8)
-        acc = int_mm(q, consts["Aq"][l])
-        mu = turn(acc.to(torch.float32) * consts["sa"][l][None, :] + consts["b"][l][None, :], False)
+        acc = int_mm(_features(prev, consts["isx"][l - 1], cs, sn, C, hd), consts["Aq"][l])
+        mu = _turn(acc.to(torch.float32) * consts["sa"][l][None, :] + consts["b"][l][None, :], cs, sn, C, hd, False)
         w = words[l, rows].to(torch.int32) & 0xFFFF
         total += float(exact_bits(w, mu.double(), consts["sp"][l].double()[None, :].expand_as(mu)).sum())
     return total
+
+
+def proxy_costs(sets, words, C, hd, layers=(1, 2), rows=None):
+    """For several constant sets at once: the part of T's cost that differs between sets, in bits - the logistic
+    density -log2 f(x; mu, s) of every value (T's prediction and spreads as in proxy_bits). A BF16 word's
+    probability is its density times its bin's width, and the width depends on the word only, so the ranking of
+    the sets is that of T's bits wherever the spread is wider than the bins. float32, batched over the sets: a few
+    dozen kernels whatever the number of sets. sets: list of constants; returns a list of floats."""
+    from .core import words_to_float
+    dev = words.device
+    rows = torch.arange(words.shape[1], device=dev) if rows is None else rows.to(dev)
+    cs, sn = sets[0]["cos"][rows], sets[0]["sin"][rows]
+    S, n = len(sets), rows.numel()
+    total = torch.zeros(S, dtype=torch.float64, device=dev)
+    for l in layers:
+        prev = words_to_float(words[l - 1, rows].to(torch.int32) & 0xFFFF).to(torch.float32)
+        acc = torch.stack([int_mm(_features(prev, c["isx"][l - 1], cs, sn, C, hd), c["Aq"][l]) for c in sets])
+        sa = torch.stack([c["sa"][l] for c in sets])[:, None, :]
+        b = torch.stack([c["b"][l] for c in sets])[:, None, :]
+        sp = torch.stack([c["sp"][l] for c in sets]).to(torch.float32)[:, None, :]
+        mud = (acc.to(torch.float32) * sa + b).reshape(S * n, -1)
+        mu = _turn(mud, cs.repeat(S, 1), sn.repeat(S, 1), C, hd, False).reshape(S, n, -1)
+        x = words_to_float(words[l, rows].to(torch.int32) & 0xFFFF).to(torch.float32)
+        z = (x[None] - mu).abs() / sp
+        nll = z + 2 * torch.log1p(torch.exp(-z)) + torch.log(sp)
+        total += nll.sum((1, 2), dtype=torch.float64)
+    return (total / math.log(2)).tolist()
 
 
 class T2:
@@ -240,7 +273,8 @@ class T2:
         """The set with the fewest proxy bits (proxy_bits) on layers `layers` of `tokens` tokens sampled across the
         request; consts {set: T's dense constants}. A few small products instead of coding with every set."""
         rows = sample_rows(words.shape[1], tokens).to(words.device)
-        bits = {n: proxy_bits(consts[n], words, C, hd, layers, rows) for n in self.names}
+        cost = proxy_costs([consts[n] for n in self.names], words, C, hd, layers, rows)
+        bits = dict(zip(self.names, cost))
         return min(bits, key=bits.get), bits
 
     def encode(self, words, l0_ok, name=None):

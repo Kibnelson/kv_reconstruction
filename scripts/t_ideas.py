@@ -625,6 +625,7 @@ def bench_args(args):
         cand = [os.environ.get("CUDA_HOME"), str(Path(nvcc).resolve().parents[1]) if nvcc else None]
         a.cuda_home = next((Path(c) for c in cand if c and (Path(c) / "bin/nvcc").exists()), None)
     B.TRAIN, B.TABLES = list(B.TRAIN_SETS[args.train_set][0]), B.TRAIN_SETS[args.train_set][1]
+    B.LOG_PATH = LOG                                 # the benchmark's own lines (a baseline that does not load) too
     return B, a
 
 
