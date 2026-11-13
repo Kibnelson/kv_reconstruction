@@ -168,6 +168,27 @@ Its scales document leaves that source out too. The per-request pick is also run
 - decode times of T and T2, and the recompute;
 - then every mode on one window (HumanEval's, to use a set other than WikiText's).
 
+**compare (8).** T2 against T and every baseline: the same windows (one per dataset), the same GPU, the same
+run. In order:
+- the receiver's layer 0 per window (the model is on the GPU for this part only);
+- T2's cheap pick of the constant set (`T2.pick_fast`): T's int8 product of each set on 1,024 tokens sampled
+  across the request (8 blocks), layers 1-2, in plain torch, timed and checked against coding layers 1-4 with
+  every set;
+- T2 in every mode with the picked set;
+- T's modes and the baselines, measured by the benchmark's own code (`context_sweep.measure_case`, as the datasets
+  stage of `bench_llama_compare.py`): SplitZip and ExANS (the authors' codecs), nvCOMP's algorithms, AdaCode,
+  exactkv, IBP, and the exponent coders' floors.
+
+The report gives:
+- bits per value per dataset and the ratio;
+- encode and decode time per request (T2's encode includes its pick, its decode the receiver's layer-0
+  recompute);
+- the requests per second one link carries at 1-400 Gb/s (the longer of wire time and decode time, as the
+  benchmark computes it), with raw BF16 as reference.
+
+A baseline that crashes the process is recorded by the crash marker; the runner's next attempt goes on without it.
+`--compare-skip` leaves methods out.
+
 **report** writes `summary.md` with the tables and the verdicts below.
 
 ## Decision rules (set before the numbers)
@@ -185,6 +206,7 @@ Its scales document leaves that source out too. The per-request pick is also run
 | 2d layer 0, steps known | Padding to the sender's step sizes gives 100% bit for bit in every schedule |
 | 6b unseen text | Mixed-all without the dataset's source, or the pick without its own set, saves at least 1% of T's bits over the datasets |
 | 7 T2 | Every round trip is bit-exact (every window, every mode) and every T2 stream is smaller than T's |
+| 8 T2 against the baselines | The best T2 mode codes fewer bits than every bit-exact baseline on every dataset (the link table says which codec carries the most requests at each link speed) |
 
 ## Results so far
 
@@ -221,8 +243,10 @@ torch reference equal the kernel's (8.8627).
     layer l from layer l-1.
 - **The sender checks layer 0.** It sends layer 0 as recomputed only when the receiver's recompute equals its own
   layer 0. Otherwise the request goes as T (layer 0 coded) with the same set. A header field says which.
-- **Constant sets.** The codec holds T's constants for several calibration sets. The sender codes layers 1-4 with
-  each set (codecs cut to those layers) and sends the request with the cheapest; the header carries the set's name.
+- **Constant sets.** The codec holds T's constants for several calibration sets, and the header carries the
+  chosen set's name.
+  - `pick`: code layers 1-4 with each set and keep the cheapest. It took 104 ms per 8K request.
+  - `pick_fast`: rank the sets by T's int8 product on 1,024 sampled tokens of layers 1-2, in plain torch.
 - **Not yet:**
   - PD wiring (the bundle with several sets, the header, the sender's step sizes for layer 0);
   - coding a mismatched layer 0 against the recompute rather than falling back to T.

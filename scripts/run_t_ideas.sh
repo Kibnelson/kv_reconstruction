@@ -62,20 +62,31 @@ then
 fi
 GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1 | tr 'A-Z' 'a-z' | sed 's/nvidia//; s/geforce//; s/[^a-z0-9]//g')
 STAMP=$(date +%Y%m%d_%H%M)
-STAGES=${STAGES:-capture,adapt,layer0,layer0x,layer0m,anchor,classes,gpu,calib,calib_loo,t2,report}
+STAGES=${STAGES:-capture,adapt,layer0,layer0x,layer0m,anchor,classes,gpu,calib,calib_loo,t2,compare,report}
 OUT=$RUN/t_ideas
-ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --stages "$STAGES" --device cuda)
+ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --stages "$STAGES" --device cuda --kv-home "$KV_HOME")
 if [ "${SMOKE:-0}" = 1 ]; then
     OUT=$RUN/t_ideas_smoke
     rm -rf "$OUT"
-    ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --device cuda
-          --stages adapt,layer0x,layer0m,anchor,classes,gpu,calib,t2,report --datasets wikitext2 --windows 1 --float-docs 1
+    ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --device cuda --kv-home "$KV_HOME"
+          --stages adapt,layer0x,layer0m,anchor,classes,gpu,calib,t2,compare,report --datasets wikitext2 --windows 1 --float-docs 1
           --max-layers 4 --modes dense,rank256 --cal-windows 1)
 fi
 echo "== commit $(git log --oneline -1); run folder $RUN; output $OUT; GPU $GPU"
 nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv,noheader
-# shellcheck disable=SC2086
-python scripts/t_ideas.py "${ARGS[@]}" ${EXTRA:-}
+# a baseline's native code can take the process down: the next attempt records it (crash_marker.json) and goes on
+STATUS=0
+for ATTEMPT in 1 2 3 4; do
+    STATUS=0
+    # shellcheck disable=SC2086
+    python scripts/t_ideas.py "${ARGS[@]}" ${EXTRA:-} || STATUS=$?
+    if [ "$STATUS" != 0 ] && [ -s "$OUT/crash_marker.json" ]; then
+        echo "== attempt $ATTEMPT: a codec crashed the process ($(cat "$OUT/crash_marker.json")); recording it, going on"
+        continue
+    fi
+    break
+done
+[ "$STATUS" = 0 ] || { echo "STOP: scripts/t_ideas.py exited with $STATUS"; exit "$STATUS"; }
 [ -s "$OUT/summary.md" ] || { echo "STOP: no $OUT/summary.md"; exit 1; }
 if [ "${SMOKE:-0}" = 1 ]; then
     echo "SMOKE OK: $OUT/summary.md (nothing committed)"

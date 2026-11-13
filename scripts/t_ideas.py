@@ -23,6 +23,9 @@ Stages (a finished stage is kept in OUT/t_ideas.json; --redo STAGE measures it a
            without its own set)
   t2       T2 (kv_compare/t2.py, separate from T): round trips with the receiver's layer 0 and the picked set, bits
            against T, times; every mode on one window
+  compare  T2 (cheap pick, every mode) against T's modes and every baseline (SplitZip, ExANS, nvCOMP, AdaCode,
+           exactkv, IBP, the exponent coders' floors) on the same windows, the baselines measured by the benchmark's
+           own code; bits, times, requests per second per link
   report   OUT/summary.md with the decision rules of docs/t_ideas.md
 """
 from __future__ import annotations
@@ -43,7 +46,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 STAGES = ("capture", "adapt", "layer0", "layer0x", "layer0m", "anchor", "classes", "gpu", "calib", "calib_loo", "t2",
-          "report")
+          "compare", "report")
 DATASETS = ("wikitext2", "humaneval", "gsm8k", "mmlu", "ptb")
 NAMES = {"wikitext2": "WikiText-2", "humaneval": "HumanEval", "gsm8k": "GSM8K", "mmlu": "MMLU", "ptb": "PTB"}
 LINKS = (1, 3, 10, 25, 100, 400)
@@ -591,6 +594,209 @@ def stage_t2(args, res, device, out):
     res["t2"] = r
 
 
+MODE_LABEL = {"dense": "dense", "kv": "keys then values", "4g": "4 head groups", "hbh": "head by head",
+              "rank256": "rank 256"}
+
+
+def bench_args(args):
+    """The benchmark's own arguments for its baseline codecs (scripts/bench_llama_compare.py: its parser, then the
+    conversions its main makes), with the KV_HOME layout of scripts/run_a5000.sh."""
+    import os
+    import shutil
+    import bench_llama_compare as B
+    kv = Path(args.kv_home)
+    argv = ["--output", str(args.run), "--device", args.device, "--train-set", args.train_set,
+            "--splitzip-source", str(kv / "sources" / "splitzip"), "--exans-source", str(kv / "sources" / "exans"),
+            "--baseline-sources", str(kv / "sources"), "--baseline-stream-tokens", "8192"]
+    if args.compare_baselines is not None:
+        argv += ["--extra-baselines", args.compare_baselines]
+    ch = kv / "cuda_home"
+    if ch.is_file() and ch.read_text().strip():
+        argv += ["--cuda-home", ch.read_text().strip()]
+    a = B.parser().parse_args(argv)
+    a.extra_baselines = [b for b in a.extra_baselines.split(",") if b]
+    a.context_groups = [int(g) for g in a.context_groups.split(",") if g]
+    if a.splitzip_source is not None and not (a.splitzip_source / "codec_gpu.py").is_file():
+        a.splitzip_source = None
+    if a.exans_source is not None and not (a.exans_source / ".git").exists():
+        a.exans_source = None
+    if a.cuda_home is None:
+        nvcc = shutil.which("nvcc")
+        cand = [os.environ.get("CUDA_HOME"), str(Path(nvcc).resolve().parents[1]) if nvcc else None]
+        a.cuda_home = next((Path(c) for c in cand if c and (Path(c) / "bin/nvcc").exists()), None)
+    B.TRAIN, B.TABLES = list(B.TRAIN_SETS[args.train_set][0]), B.TRAIN_SETS[args.train_set][1]
+    return B, a
+
+
+def stage_compare(args, res, device, out):
+    """T2 against T and every baseline, on the same windows (one per dataset) in one run on this GPU: layer 0 on the
+    receiver, the cheap pick of the constant set, T2 in every mode; then T's modes and the baselines measured by the
+    benchmark's own code (kv_compare.context_sweep.measure_case, as the datasets stage of bench_llama_compare)."""
+    import gc
+    import torch
+    from kv_compare import context_sweep as cs
+    from kv_compare import t_ideas as ti
+    from kv_compare.gpu_speed import timer
+    from kv_compare.grouped import prepare_groups
+    from kv_compare.layerwise import prepare_rank
+    from kv_compare.predict import Doc
+    from kv_compare.t2 import Layer0Recomputed, T2
+    dev = torch.device(device)
+    if dev.type != "cuda":
+        res["compare"] = {"skipped": "needs a CUDA GPU"}
+        log("compare: skipped (no CUDA)")
+        return
+    cap = Path(args.run) / "captures"
+    ws = windows(cap, args.datasets, args.windows)
+    docs = [v[0] for v in ws.values()]
+    r = res.setdefault("compare", {})
+    r.setdefault("docs", {})
+    r.setdefault("crashed", {})
+    marker = out / "crash_marker.json"
+    if marker.is_file():                              # a codec took the process down: recorded, not tried again
+        try:
+            m = json.loads(marker.read_text())
+        except ValueError:
+            m = {}
+        case = str(m.get("case") or "")
+        if case.startswith("compare:") and m.get("method"):
+            got = r["crashed"].setdefault(case[len("compare:"):], [])
+            if m["method"] not in got:
+                got.append(m["method"])
+                log(f"compare: {m['method']} crashed the process on {case[8:]} in an earlier attempt; recorded")
+        marker.unlink()
+        save(res, out)
+    st = study_of(args, docs, device)
+    L, W, C, hd = st.L, st.W, st.C, st.hd
+    G = W // hd
+
+    def doc_words(d, T):
+        w = torch.empty(L, T, W, dtype=torch.int16, device=dev)
+        for l in range(L):
+            w[l] = _int16(d.words(l, dev, rows=T))
+        return w
+
+    # A. the receiver's layer 0 (the model is on the GPU for this part only); kept on disk for a resumed run
+    need = [d for d in st.tests if not (out / f"compare_l0_{d.name}.pt").is_file()]
+    if need:
+        _, model = load_model(args, device)
+        for d in need:
+            T = d.tokens - d.tokens % 256
+            ids = d.ids[:T].tolist()
+            l0 = _int16(torch.cat(ti.layer0_kv(model, ids, dev), 1))
+            ok = bool(torch.equal(l0, _int16(d.words(0, dev, rows=T))))
+            ms = 1e3 * timer(lambda: ti.layer0_kv(model, ids, dev), dev)
+            torch.save(l0.cpu(), out / f"compare_l0_{d.name}.pt")
+            r["docs"].setdefault(d.name, {})["layer0"] = {"recomputed": ok, "recompute_ms": ms}
+            log(f"compare {d.name}: layer 0 {'bit for bit' if ok else 'NOT equal'}, recompute {ms:.1f} ms")
+        model = None
+        gc.collect()
+        torch.cuda.empty_cache()
+        save(res, out)
+    # B. T2: the cheap pick (and the full pick, for agreement), then every mode with the picked set
+    names = ["wikitext"] + list(ti.CAL_DOMAINS)
+    sets = {n: v for n, v in ti.cal_sets(args.cal_windows).items() if n in names and
+            all((cap / f"{x}_K_bits.npy").is_file() for x in v[0] + [v[1]])}
+    if any(not r["docs"].get(d.name, {}).get("t2") for d in st.tests):
+        consts, studies = {}, {}
+        for n, (train, tables, _) in sets.items():
+            consts[n], studies[n] = t2_consts(args, out, cap, n, train, tables, device)
+
+        def builders(T, mode="dense", extra=None):
+            extra = extra or {}
+            return {n: (lambda nl, rec, tokens=None, n=n: ti.mode_codec(
+                consts[n], *(extra.get(n, (None, None))), mode, C, hd, tokens or T,
+                cls=Layer0Recomputed if rec else None, layers=nl)) for n in sets}
+
+        for d in st.tests:
+            row = r["docs"].setdefault(d.name, {})
+            if row.get("t2"):
+                continue
+            T = d.tokens - d.tokens % 256
+            n = L * T * W
+            words = doc_words(d, T)
+            codec = T2(builders(T))
+            name, _ = codec.pick_fast(words, consts, C, hd)
+            fast_ms = 1e3 * timer(lambda: codec.pick_fast(words, consts, C, hd), dev, warmup=1, reps=5)
+            full, _ = codec.pick(words)
+            row["pick"] = {"fast": name, "fast_ms": fast_ms, "full": full}
+            log(f"compare {d.name}: cheap pick {name} in {fast_ms:.1f} ms (the coding pick: {full})")
+            extra = {name: (prepare_rank(studies[name], consts[name], 256, lambda m: None),
+                            prepare_groups(studies[name], consts[name], sorted({2, 4, G}), log=lambda m: None))}
+            l0 = torch.load(out / f"compare_l0_{d.name}.pt").to(dev)
+            l0_ok = bool(torch.equal(l0, words[0]))
+            dec = torch.empty(L, T, W, dtype=torch.int16, device=dev)
+            rows = []
+            for mode in args.modes:
+                x = {"method": f"T2, {MODE_LABEL[mode]}", "set": name, "values": n, "tokens": T,
+                     "layer0": "recomputed" if l0_ok else "coded", "pick_ms": fast_ms,
+                     "recompute_ms": row.get("layer0", {}).get("recompute_ms", 0.0)}
+                try:
+                    c2 = builders(T, mode, extra)[name](None, l0_ok)
+                    xa, pa = c2.model(words)
+                    cb, cst = c2.encode(words, xa, pa)
+                    bufs = c2.buffers(T)
+                    a2 = (cb, cst, T, l0) if l0_ok else (cb, cst, T)
+                    c2.decode(*a2, out=dec, bufs=bufs)
+                    x["bit_exact"] = bool(torch.equal(dec, words))
+                    x["bits"] = c2.bits(cst, T) / n
+                    tm = timer(lambda: c2.model(words), dev, warmup=1, reps=3)
+                    te = timer(lambda: c2.encode(words, xa, pa, out=cb), dev, warmup=1, reps=3)
+                    x["encode_ms"] = 1e3 * (tm + te)
+                    x["decode_ms"] = 1e3 * timer(lambda: c2.decode(*a2, out=dec, bufs=bufs), dev, warmup=2, reps=5)
+                    c2 = xa = pa = cb = cst = bufs = None
+                except Exception as exc:
+                    x["error"] = repr(exc)[:300]
+                torch.cuda.empty_cache()
+                rows.append(x)
+                log(f"compare {d.name} {x['method']}: " + (x["error"] if "error" in x else
+                    f"exact={x['bit_exact']}, {x['bits']:.4f} bits/value, encode {x['encode_ms']:.1f} ms, "
+                    f"decode {x['decode_ms']:.1f} ms"))
+            row["t2"] = rows
+            extra = words = dec = l0 = codec = None
+            gc.collect()
+            torch.cuda.empty_cache()
+            save(res, out)
+        consts = studies = None
+        gc.collect()
+        torch.cuda.empty_cache()
+    # C. T's modes and every baseline, measured by the benchmark's own code on the same windows
+    B, bargs = bench_args(args)
+    bounds = "bounds" in bargs.extra_baselines
+    skip = {s for s in (args.compare_skip or "").split(",") if s}
+    todo = [d for d in st.tests if not r["docs"].get(d.name, {}).get("baselines_done")]
+    if todo:
+        study_b, consts_b, rc, grouped, books, sz, exans, w16, extras = B.lossless_codecs(
+            bargs, Path(args.run), dev, "compare", Doc(cap, "wtrain0"))
+        want = B.wanted_methods(bargs, rc, books, sz, exans, extras, bounds)
+        want = {m for m in want if not any(s in m for s in skip)}
+        r["skipped_methods"] = sorted(skip)
+        cs.CRASH_MARKER = marker
+        try:
+            for d in todo:
+                row = r["docs"][d.name]
+                old = row.get("rows", [])
+                bad = set(r["crashed"].get(d.name, []))
+                only = want - B.measured(old) - bad
+                if only:
+                    words = w16(Doc(cap, d.name))
+                    positions = torch.arange(words.shape[1], device=dev)
+                    cs.CURRENT_CASE = f"compare:{d.name}"
+                    log(f"compare {d.name}: T's modes and the baselines ({len(only)} methods)")
+                    new = cs.measure_case(study_b, consts_b, rc, words, positions, dev, log, books=books, sz=sz,
+                                          exans=exans, max_stream_tokens=8192, grouped=grouped, graph=False,
+                                          baseline_stream_tokens=8192, extras=extras, bounds=bounds, only=only)
+                    new += B.crash_rows(sorted(bad - B.measured(old)))
+                    row["rows"] = B.merge_rows(old, new) if old else new
+                    words = None
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                row["baselines_done"] = True
+                save(res, out)
+        finally:
+            cs.CRASH_MARKER = None
+
+
 def stage_float(args, res, device, out, stage, specs):
     from kv_compare import t_ideas as ti
     ws = windows(Path(args.run) / "captures", args.datasets, args.windows)
@@ -821,6 +1027,8 @@ def report(res, out):
         lines += loo_report(res, verdicts)
     if res.get("t2", {}).get("docs"):
         lines += t2_report(res["t2"], verdicts)
+    if res.get("compare", {}).get("docs"):
+        lines += compare_report(res, verdicts)
     if verdicts:
         lines += ["## Verdicts", "", "| Idea | worth building? | evidence |", "| --- | --- | --- |"]
         lines += [f"| {n} | {'yes' if ok else 'no'} | {e} |" for n, ok, e in verdicts]
@@ -1061,6 +1269,116 @@ def t2_report(t2, verdicts):
     return out
 
 
+COMPARE_LINKS = (1, 10, 25, 100, 400)
+
+
+def compare_rows(cmp_res):
+    """{method: {doc: row}} over the windows: T2's modes, T's modes (the benchmark's 'ours' rows, renamed) and the
+    baselines."""
+    out = {}
+    for d, row in cmp_res["docs"].items():
+        for x in row.get("t2", []):
+            out.setdefault(x["method"], {})[d] = x
+        for x in row.get("rows", []):
+            m = x["method"]
+            if m.startswith("ours, per layer, "):
+                m = "T, " + m[len("ours, per layer, "):]
+            elif m.startswith("ours, "):
+                m = "T, " + m[len("ours, "):]
+            out.setdefault(m, {})[d] = dict(x, method=m)
+    return out
+
+
+def compare_report(res, verdicts):
+    """Section 8: T2 against T and every baseline on the same windows."""
+    c = res["compare"]
+    rows = compare_rows(c)
+    docs = sorted(c["docs"])
+    keys = [k for k in DATASETS if any(ds_of(d) == k for d in docs)]
+    by = {}
+
+    def ok(x):
+        return x and "error" not in x and (x.get("bit_exact") or x.get("computed"))
+
+    for m, per in rows.items():
+        vals = {d: x for d, x in per.items() if ok(x)}
+        if not vals:
+            continue
+        bits = by_dataset({d: x["bits"] for d, x in vals.items()})
+        mean_bits = float(np.mean([x["bits"] for x in vals.values()]))
+        computed = any(x.get("computed") for x in vals.values())
+        dec = None if computed else float(np.mean([x["decode_ms"] + x.get("recompute_ms", 0.0) for x in vals.values()]))
+        enc = None if computed else float(np.mean([x["encode_ms"] + x.get("pick_ms", 0.0) for x in vals.values()]))
+        values = float(np.mean([x["values"] for x in vals.values()]))
+        by[m] = {"bits": bits, "mean": mean_bits, "decode": dec, "encode": enc, "values": values,
+                 "computed": computed, "complete": len(vals) == len(docs)}
+    if not by:
+        return []
+    values = float(np.mean([v["values"] for v in by.values()]))
+    by["raw BF16 (no codec)"] = {"bits": {k: 16.0 for k in keys}, "mean": 16.0, "decode": 0.0, "encode": 0.0,
+                                 "values": values, "computed": False, "complete": True, "reference": True}
+    order = sorted(by, key=lambda m: by[m]["mean"])
+    picks = [(c["docs"][d].get("pick") or {}) for d in docs]
+    agree = sum(1 for p in picks if p and p.get("fast") == p.get("full"))
+    fast = [p["fast_ms"] for p in picks if p.get("fast_ms")]
+    out = ["## 8. T2 against T and the baselines (same windows, same GPU, same run)", "",
+           f"One 8,192-token window per dataset. Bit-exact round trips only (a failed or crashed codec is listed "
+           "below). T2: layer 0 recomputed by the receiver, its constant set picked per request by the cheap pick "
+           f"(T's int8 product on 1,024 sampled tokens of layers 1-2: {np.mean(fast):.1f} ms per request on average, "
+           f"the same set as coding layers 1-4 with every set in {agree} of {len(picks)} windows). T: WikiText-2 "
+           "constants, layer 0 coded. The baselines are measured by the benchmark's own code "
+           "(bench_llama_compare's datasets stage).", "",
+           "**Bits per value** (lower is better; ratio = 16 / bits)", "",
+           "| Method | " + " | ".join(NAMES.get(k, k) for k in keys) + " | mean | ratio |",
+           "| --- |" + " --- |" * (len(keys) + 2)]
+    for m in order:
+        b = by[m]
+        tag = " (computed bound)" if b["computed"] else ""
+        out.append(f"| {m}{tag} | " + " | ".join(fmt(b["bits"].get(k)) for k in keys) +
+                   f" | {b['mean']:.3f} | {16 / b['mean']:.2f}x |")
+    out += ["", "**Time per 8K request** (mean over the windows; T2's encode includes its pick, its decode the "
+            "receiver's layer-0 recompute; IBP decodes from host memory)", "",
+            "| Method | encode | decode | " + " | ".join(f"{g} Gb/s" for g in COMPARE_LINKS) + " |",
+            "| --- | --- | --- |" + " --- |" * len(COMPARE_LINKS)]
+    best = {}
+    for m in order:
+        b = by[m]
+        if b["computed"]:
+            continue
+        cells = []
+        for g in COMPARE_LINKS:
+            wire = b["mean"] * b["values"] / (g * 1e9) * 1e3
+            t = max(wire, b["decode"])
+            rps = 1e3 / t
+            cells.append(f"{rps:.2f}" if rps < 10 else f"{rps:.1f}")
+            if b["complete"] and not b.get("reference") and (g not in best or rps > best[g][1]):
+                best[g] = (m, rps)
+        out.append(f"| {m} | {b['encode']:.1f} ms | {b['decode']:.1f} ms | " + " | ".join(cells) + " |")
+    out += ["", "Requests per second one link carries, decoding overlapped with arrival (max of wire time and "
+            "decode time, as the benchmark computes it); the sender's encode runs on the prefill GPU.", ""]
+    if best:
+        out.append("| Link | most requests per second |")
+        out.append("| --- | --- |")
+        out += [f"| {g} Gb/s | {best[g][0]} ({best[g][1]:.1f}/s) |" for g in COMPARE_LINKS if g in best]
+        out.append("")
+    bad = [(d, x["method"], x.get("error", "not bit-exact")[:90]) for d in docs for x in
+           c["docs"][d].get("t2", []) + c["docs"][d].get("rows", []) if not ok(x)]
+    if bad or c.get("skipped_methods"):
+        out += ["Not in the tables: " + "; ".join(f"{m} on {d} ({e})" for d, m, e in bad)
+                + ("; skipped: " + ", ".join(c["skipped_methods"]) if c.get("skipped_methods") else ""), ""]
+    t2 = [m for m in by if m.startswith("T2,") and by[m]["complete"]]
+    base = [m for m in by if not m.startswith(("T2,", "T,")) and not by[m]["computed"] and by[m]["complete"]
+            and not by[m].get("reference")]
+    if t2 and base:
+        win = all(min(by[m]["bits"][k] for m in t2) < min(by[b]["bits"][k] for b in base) for k in keys)
+        bt = min(t2, key=lambda m: by[m]["mean"])
+        bb = min(base, key=lambda m: by[m]["mean"])
+        verdicts.append(("8 T2 against the baselines", win,
+                         f"best T2 ({bt}) {by[bt]['mean']:.3f} bits/value against the best baseline ({bb}) "
+                         f"{by[bb]['mean']:.3f}; T2 lower on every dataset: {'yes' if win else 'NO'}"))
+    return out
+
+
 def save(res, out):
     (out / "t_ideas.json").write_text(json.dumps(res, indent=1))
 
@@ -1071,7 +1389,7 @@ def main():
     ap.add_argument("--run", required=True, help="run folder with captures/ (scripts/run_a5000.sh)")
     ap.add_argument("--output", required=True)
     ap.add_argument("--stages", default="capture,adapt,layer0,layer0x,layer0m,anchor,classes,gpu,calib,calib_loo,t2,"
-                                        "report")
+                                        "compare,report")
     ap.add_argument("--redo", default="", help="stages to measure again")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--train-set", default="wikitext", choices=sorted(TRAIN_SETS))
@@ -1085,6 +1403,11 @@ def main():
     ap.add_argument("--max-layers", type=int, default=None)
     ap.add_argument("--modes", default=",".join(MODES))
     ap.add_argument("--cal-windows", type=int, default=3, help="calib: calibration windows per domain")
+    ap.add_argument("--kv-home", default=str(Path.home() / "kv_a5000"),
+                    help="compare: KV_HOME of scripts/run_a5000.sh (baseline sources, cuda_home)")
+    ap.add_argument("--compare-baselines", default=None,
+                    help="compare: the benchmark's --extra-baselines (default its own: nvcomp,adacode,exactkv,ibp,bounds)")
+    ap.add_argument("--compare-skip", default="", help="compare: methods to leave out (comma list of name parts)")
     args = ap.parse_args()
     args.datasets = [d for d in args.datasets.split(",") if d]
     args.modes = [m for m in args.modes.split(",") if m]
@@ -1136,6 +1459,8 @@ def main():
             stage_calib_loo(args, res, args.device, out)
         elif s == "t2":
             stage_t2(args, res, args.device, out)
+        elif s == "compare":
+            stage_compare(args, res, args.device, out)
         elif s == "report":
             for line in report(res, out):
                 print(line)

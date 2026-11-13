@@ -237,6 +237,74 @@ class TIdeasTests(unittest.TestCase):
         self.assertTrue(math.isfinite(vb) and vb < 16)
         self.assertLess(vb, ulp_bits(got, ref, ulp_table(got, ref)))
 
+    def test_proxy_pick(self):
+        """The cheap set ranking reproduces T's exact model bits (spread prior aside) from T's own reference, on all
+        rows and on a sample; a set fitted on other text ranks behind T's on T's kind of text."""
+        from kv_compare import fused
+        from kv_compare.core import exact_bits, words_to_float
+        from kv_compare.t2 import T2, proxy_bits, sample_rows
+        st, consts = self.study, self.consts
+        cpu = torch.device("cpu")
+        d = st.tests[0]
+        words = torch.stack([d.words(l, cpu) for l in range(st.L)]).to(torch.int16)
+        pos = torch.arange(d.tokens)
+        ref = 0.0
+        for l in (1, 2):
+            prev = fused._feat_ref(words_to_float(d.words(l - 1, cpu)), st.rope, pos, consts["isx"][l - 1])
+            mu = fused.reference_mu(consts, l, prev.float(), pos, st.C, st.hd)
+            ref += float(exact_bits(d.words(l, cpu), mu.double(), consts["sp"][l].double()[None, :].expand_as(mu)).sum())
+        got = proxy_bits(consts, words, st.C, st.hd, (1, 2))
+        self.assertLess(abs(got - ref) / ref, 2e-3, (got, ref))
+        rows = sample_rows(d.tokens, 64)
+        self.assertEqual(len(rows), 64)
+        self.assertTrue(bool((rows[1:] >= rows[:-1]).all()) and int(rows.max()) < d.tokens)
+        part = proxy_bits(consts, words, st.C, st.hd, (1, 2), rows)
+        self.assertTrue(0 < part < got)
+        from kv_compare.predict import Study
+        other = Study(self.root, "cpu", ["ds_gsm8k_r0", "shifted"], "ds_gsm8k_r0", [], log=lambda m: None)
+        oc = fused.prepare(other, log=lambda m: None)
+        codec = T2({"wikitext": None, "other": None})
+        name, bits = codec.pick_fast(words, {"wikitext": consts, "other": oc}, st.C, st.hd, tokens=256)
+        self.assertEqual(set(bits), {"wikitext", "other"})
+        self.assertEqual(name, min(bits, key=bits.get))
+
+    def test_compare_report(self):
+        """Section 8 from rows of the compare stage's shape: T2 and T renamed, sorted by bits, failed rows listed,
+        requests per second per link, the verdict."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import t_ideas as drv
+        n = 28 * 8192 * 2048
+
+        def row(m, bits, enc=30.0, dec=30.0, **kw):
+            return dict({"method": m, "bits": bits, "encode_ms": enc, "decode_ms": dec, "values": n, "bit_exact": True},
+                        **kw)
+        docs = {}
+        for d, shift in (("ds_wikitext2_r0", 0.0), ("ds_gsm8k_r0", 0.3)):
+            docs[d] = {"pick": {"fast": "math", "full": "math", "fast_ms": 4.0},
+                       "t2": [row("T2, dense", 8.4 + shift, recompute_ms=9.8, pick_ms=4.0),
+                              row("T2, rank 256", 8.9 + shift, dec=23.0, recompute_ms=9.8, pick_ms=4.0)],
+                       "rows": [row("ours, per layer, dense", 8.98 + shift),
+                                row("SplitZip (authors' codec)", 10.9 + shift, enc=5.0, dec=4.0),
+                                row("nvCOMP ANS", 12.0, enc=3.0, dec=2.0),
+                                {"method": "exponent coders' floor: 8 + exponent entropy", "bits": 10.5, "computed": True,
+                                 "values": n},
+                                {"method": "ExANS (authors' codec)", "error": "crashed", "crashed": True}]}
+        res = {"compare": {"docs": docs, "crashed": {}}}
+        verdicts = []
+        lines = drv.compare_report(res, verdicts)
+        text = "\n".join(lines)
+        self.assertIn("## 8. T2 against T and the baselines", text)
+        body = [l for l in lines if l.startswith("| T2, dense |") or l.startswith("| T, dense |")]
+        self.assertEqual(len(body), 4)                       # bits table and time table
+        bits_rows = [l.split(" |")[0][2:] for l in lines[lines.index("| --- | --- | --- | --- | --- |") + 1:]
+                     if l.startswith("| ")][:6]
+        self.assertEqual(bits_rows[0], "T2, dense")
+        self.assertIn("ExANS (authors' codec) on ds_gsm8k_r0", text)
+        self.assertIn("(computed bound)", text)
+        self.assertEqual(verdicts[0][0], "8 T2 against the baselines")
+        self.assertTrue(verdicts[0][1])
+        self.assertIn("| 400 Gb/s |", text)
+
     def test_ulp_coder(self):
         from kv_compare.t_ideas import ulp_bits, ulp_table
         rng = np.random.default_rng(1)

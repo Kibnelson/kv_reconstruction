@@ -13,9 +13,10 @@ Kept apart from T: no module of T changes. This file adds a codec class that run
   The receiver's recompute must give the sender's layer 0 bit for bit. The sender checks it (the same recompute,
   with the prefill's own pass shapes) and otherwise sends the request as T, layer 0 coded; a header flag says which.
 
-  Constant sets: T's constants fitted on several calibration texts (kv_compare.t_ideas.cal_sets). The sender codes
-  layers 1..4 with each set and sends the request with the set that took the fewest bits; the header carries its
-  number.
+  Constant sets: T's constants fitted on several calibration texts (kv_compare.t_ideas.cal_sets). The sender
+  ranks the sets by T's cost on a sample of the request (pick_fast: layers 1-2 of 1,024 tokens, T's int8 product in
+  plain torch; or pick: coding layers 1-4 with each set) and sends the request with the cheapest; the header
+  carries its name.
 """
 from __future__ import annotations
 
@@ -154,6 +155,49 @@ def slice_layers(d, n, L):
     return out
 
 
+def sample_rows(T, tokens=1024, blocks=8):
+    """Row indices of `blocks` evenly spaced blocks of tokens // blocks tokens each (the whole request, sampled)."""
+    if tokens >= T:
+        return torch.arange(T)
+    size = max(1, tokens // blocks)
+    starts = torch.linspace(0, T - size, blocks).round().long()
+    return torch.cat([torch.arange(int(a), int(a) + size) for a in starts])
+
+
+def proxy_bits(consts, words, C, hd, layers=(1, 2), rows=None):
+    """T's exact model bits of `layers` on the token rows `rows`, from one set's constants in plain torch: T's 8-bit
+    features of the previous layer (de-rotated keys, the set's scales), T's int8 product and its scale, bias and
+    RoPE, the set's spreads (no spread prior). For ranking constant sets, not for coding. words int16 [L, T, W]."""
+    from .core import exact_bits, words_to_float
+    dev = words.device
+    T = words.shape[1]
+    rows = torch.arange(T, device=dev) if rows is None else rows.to(dev)
+    cs, sn = consts["cos"][rows], consts["sin"][rows]                 # [n, hd / 2]
+    h2 = hd // 2
+
+    def turn(x, inverse):
+        n = x.shape[0]
+        k = x[:, :C].reshape(n, -1, hd)
+        a, b = k[..., :h2], k[..., h2:]
+        c, s = cs[:, None, :], sn[:, None, :]
+        if inverse:                                   # de-rotate (T's features)
+            k = torch.cat([a * c + b * s, b * c - a * s], -1)
+        else:                                         # rotate (T's prediction)
+            k = torch.cat([a * c - b * s, b * c + a * s], -1)
+        return torch.cat([k.reshape(n, C), x[:, C:]], 1)
+
+    total = 0.0
+    for l in layers:
+        prev = words_to_float(words[l - 1, rows].to(torch.int32) & 0xFFFF).to(torch.float32)
+        q = torch.floor(turn(prev, True) * consts["isx"][l - 1][None, :] + 0.5)
+        q = torch.where(q == q, q, torch.zeros_like(q)).clamp(-127, 127).to(torch.int8)
+        acc = int_mm(q, consts["Aq"][l])
+        mu = turn(acc.to(torch.float32) * consts["sa"][l][None, :] + consts["b"][l][None, :], False)
+        w = words[l, rows].to(torch.int32) & 0xFFFF
+        total += float(exact_bits(w, mu.double(), consts["sp"][l].double()[None, :].expand_as(mu)).sum())
+    return total
+
+
 class T2:
     """The T2 codec over several constant sets in one mode.
 
@@ -190,6 +234,13 @@ class T2:
             xall, prior = c.model(part)
             _, starts = c.encode(part, xall, prior)
             bits[name] = c.bits(starts, part.shape[1])
+        return min(bits, key=bits.get), bits
+
+    def pick_fast(self, words, consts, C, hd, layers=(1, 2), tokens=1024):
+        """The set with the fewest proxy bits (proxy_bits) on layers `layers` of `tokens` tokens sampled across the
+        request; consts {set: T's dense constants}. A few small products instead of coding with every set."""
+        rows = sample_rows(words.shape[1], tokens).to(words.device)
+        bits = {n: proxy_bits(consts[n], words, C, hd, layers, rows) for n in self.names}
         return min(bits, key=bits.get), bits
 
     def encode(self, words, l0_ok, name=None):
