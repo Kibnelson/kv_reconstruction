@@ -6,6 +6,7 @@ branch only adds files.
 - `kv_compare/t_ideas.py`: the measurements;
 - `scripts/t_ideas.py`: the driver;
 - `scripts/fetch_calib_texts.py`: the calibration texts of the calib stage;
+- `kv_compare/t2.py`: T2, the codec that carries the winning ideas, kept apart from T (tests: `kv_compare/test_t2.py`);
 - `scripts/run_t_ideas.sh`: the runner, which also packages and pushes;
 - `kv_compare/test_t_ideas.py`: CPU tests on a tiny random Llama.
 
@@ -131,6 +132,42 @@ layer 0 recomputed. Three per-request picks are shown, the sender sending the se
 
 The cross-fitted oracle of the adapt stage shows the room.
 
+**layer0m (2d).** The second run showed that chunked prefill breaks the recompute's bit identity, while other
+requests in the same pass do not: what matters is the size of the step's matrix product, not what the other rows
+hold. The sender here computes layer 0 in simulated vLLM steps of at most 2,048 rows:
+- 2,048 of its own tokens;
+- 1,024 of its own after 1,024 of another request's;
+- 1,536 of its own before 512 of another's;
+- 512 of its own after 1,536 of another's.
+
+Four receivers recompute it:
+- in one pass;
+- in the same chunks, without the other rows;
+- padded with dummy rows to the sender's step size at the sender's offset (the sender sends its step sizes, a few
+  bytes);
+- padded with its own rows first.
+
+The stage reports the share of K and V words that come out bit for bit and the cost of coding the rest. The cost
+is the better of the step coder and a value coder: a flag, then a logistic around the recomputed value with a
+per-channel spread, so a sign flip next to zero is cheap.
+
+**calib_loo (6b).** Section 6's mixed set and pick include each test dataset's own kind of text. This stage
+measures text the calibration never saw. For each dataset, mixed-all is refitted without its source:
+- WikiText-2 train for WikiText-2;
+- MBPP for HumanEval;
+- GSM8K train for GSM8K;
+- MMLU dev for MMLU;
+- PTB train for PTB.
+
+Its scales document leaves that source out too. The per-request pick is also run without the source's own set.
+
+**t2 (7).** T2, the separate codec (`kv_compare/t2.py`), measured on the GPU:
+- one window per dataset in dense mode: the receiver's lean layer 0, the sender's check that it is bit-identical,
+  the set picked on layers 1-4, then encode, decode and comparison with the captured KV;
+- bits of the real streams against T's, also with T's own constants (layer 0's share alone);
+- decode times of T and T2, and the recompute;
+- then every mode on one window (HumanEval's, to use a set other than WikiText's).
+
 **report** writes `summary.md` with the tables and the verdicts below.
 
 ## Decision rules (set before the numbers)
@@ -145,11 +182,14 @@ The cross-fitted oracle of the adapt stage shows the room.
 | 5 classes | A form saves at least 0.05 bits/value net of side bits |
 | 2c layer 0, robust | The saving stays at least 0.3 bits/value in every prefill shape (most of the 0.355 measured) and the lean recompute takes at most 10 ms per 8K window |
 | 6 calibration breadth | A mixed set or the per-request pick chosen on layers 1-4 saves at least 1% of T's bits over the five datasets (the WikiText change is reported) |
+| 2d layer 0, steps known | Padding to the sender's step sizes gives 100% bit for bit in every schedule |
+| 6b unseen text | Mixed-all without the dataset's source, or the pick without its own set, saves at least 1% of T's bits over the datasets |
+| 7 T2 | Every round trip is bit-exact (every window, every mode) and every T2 stream is smaller than T's |
 
 ## Results so far
 
 Llama-3.2-3B on the NUC's RTX A4500, 13 Nov 2026
-(`benchmark_results/llama32_3b_tideas_rtxa4500_20261113_0625`). The check passed: T's exact-model bits from the
+(`benchmark_results/llama32_3b_tideas_rtxa4500_20261113_0625` and `..._0740` for layer0x and calib). The check passed: T's exact-model bits from the
 torch reference equal the kernel's (8.8627).
 
 | Idea | Verdict | Numbers |
@@ -159,7 +199,37 @@ torch reference equal the kernel's (8.8627).
 | 4 anchors | drop | All the gain is in layer 0 (+2.70 bits there), which recomputing it takes. Beyond layer 0 the two-wave forms give at most +0.07 bits per layer and are often negative |
 | 5 classes | drop | Negative everywhere except WikiText (the calibration text): splitting the predictor overfits the calibration data |
 | 2b per-layer modes | drop | 3.4% at 100 Gb/s at best |
+| 2c layer 0, other prefill shapes | mostly holds | Lean recompute 9.7 ms per 8K window (the whole first layer: 53 ms). Bit for bit in one pass and with other requests' tokens in the same pass. Prefill chunks of 2,048 or 512 tokens break it (54-83% of words equal), yet the saving stays 0.30 / 0.28 bits/value |
+| 6 calibration breadth | build | Layer 0 recomputed: T's constants 8.782 bits/value on average; one mixed set (15 documents) 8.432; a per-request pick among WikiText and 4 domain sets, chosen on layers 1-4, 8.341 (it chose the matching set for all 10 windows). With the right set, per-request bias and spread add only 0.01. Caveat: 4 of 5 datasets had a matching calibration source; 6b tests unseen text |
 | 3 coding kernel | refocus | Dense and rank 256 code at 2.4x their memory floor (15.9 vs 6.7 ms). Head by head, the smallest mode (8.29 vs 8.98 bits/value), takes 108 ms because each layer's 16 head groups run one after another: one kernel per layer over all its groups is the prize |
+
+## T2: the winning ideas as a separate codec
+
+`kv_compare/t2.py` adds a codec beside T. No file of T changes, and T's tests and the PD branch keep using T.
+
+- **Layer 0 does not travel.**
+  - The receiver recomputes it from the token ids (`t_ideas.layer0_kv`).
+  - With T's own kernels (features and surprise sums of layer 0), it builds what T's decoder would have had after
+    layer 0, then decodes layers 1..L-1.
+  - The stream is T's stream minus layer 0. The encoder runs T's coding kernel over layers L-1..1 and writes the
+    final states after layer 1; the decoder starts there (the kernels' `FIRST` flag).
+  - Every mode works this way (dense, keys then values, head groups, head by head, rank 256), because each predicts
+    layer l from layer l-1.
+- **The sender checks layer 0.** It sends layer 0 as recomputed only when the receiver's recompute equals its own
+  layer 0. Otherwise the request goes as T (layer 0 coded) with the same set. A header field says which.
+- **Constant sets.** The codec holds T's constants for several calibration sets. The sender codes layers 1-4 with
+  each set (codecs cut to those layers) and sends the request with the cheapest; the header carries the set's name.
+- **Not yet:**
+  - PD wiring (the bundle with several sets, the header, the sender's step sizes for layer 0);
+  - coding a mismatched layer 0 against the recompute rather than falling back to T.
+
+`kv_compare/test_t2.py` runs every check under Triton's CPU interpreter on a tiny model:
+- each mode restores the KV bit for bit, also through the layer-by-layer sink;
+- the per-layer stream words for layers 2..L-1 equal T's, and the stream is smaller than T's;
+- the pick chooses the cheapest set;
+- the fallback is exactly T's stream.
+
+The t2 stage repeats the round trips on the GPU on real windows.
 
 ## Running it
 

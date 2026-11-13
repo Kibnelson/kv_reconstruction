@@ -199,6 +199,44 @@ class TIdeasTests(unittest.TestCase):
         self.assertAlmostEqual(row["lean_ms"], 1.0)
         self.assertEqual(len(self.model.model.layers), st.L)
 
+    def test_layer0_schedules(self):
+        """A receiver that pads its products to the sender's step sizes recomputes the sender's layer 0 bit for bit,
+        wherever the other request's rows were and whatever they held."""
+        from kv_compare import t_ideas as ti
+        st = self.study
+        d, other = st.tests[0], st.tables.ids[:512].tolist()
+        cpu = torch.device("cpu")
+        ids = d.ids.tolist()
+        for sch in ((64, 32, 0), (48, 0, 80), (128, 0, 0)):
+            Ks, Vs = ti.layer0_schedule(self.model, ids, cpu, sch, None, other)
+            self.assertEqual(tuple(Ks.shape), (self.tokens, st.C))
+            Kr, Vr = ti.layer0_schedule(self.model, ids, cpu, sch, "padded to the step")
+            self.assertTrue(torch.equal(Ks, Kr) and torch.equal(Vs, Vr), sch)
+            for rec in ti.L0_RECEIVERS:
+                K, V = ti.layer0_schedule(self.model, ids, cpu, sch, rec)
+                self.assertEqual(tuple(V.shape), (self.tokens, st.W - st.C), rec)
+        r = ti.layer0_matched(st, self.model, [d], st.tables, cpu, t_layer0={d.name: 12.0})
+        rows = r["docs"][d.name]
+        self.assertEqual(len(rows), len(ti.L0_SCHEDULES) * len(ti.L0_RECEIVERS))
+        for key, row in rows.items():
+            if key.endswith("| padded to the step"):
+                self.assertEqual((row["keys_equal"], row["values_equal"]), (1.0, 1.0), key)
+            self.assertLessEqual(row["bits_per_layer0_value"], min(row["step_bits"], row["value_bits"]) + 1e-12)
+
+    def test_value_coder(self):
+        from kv_compare.core import float_to_words
+        from kv_compare.t_ideas import ulp_bits, ulp_table, value_bits, value_table
+        rng = np.random.default_rng(2)
+        x = torch.as_tensor(rng.normal(0, 1e-3, size=(500, 16)))
+        ref = float_to_words(x).to(torch.int32)
+        self.assertLess(value_bits(ref, ref, value_table(ref, ref)), 0.01)
+        got = float_to_words(x + torch.as_tensor(rng.normal(0, 2e-5, size=x.shape))).to(torch.int32)
+        flips = int(((got >= 0x8000) != (ref >= 0x8000)).sum())
+        self.assertGreater(flips, 0)                       # values next to zero change sign
+        vb = value_bits(got, ref, value_table(got, ref))
+        self.assertTrue(math.isfinite(vb) and vb < 16)
+        self.assertLess(vb, ulp_bits(got, ref, ulp_table(got, ref)))
+
     def test_ulp_coder(self):
         from kv_compare.t_ideas import ulp_bits, ulp_table
         rng = np.random.default_rng(1)
@@ -228,6 +266,14 @@ class TIdeasTests(unittest.TestCase):
         self.assertEqual({d: s for d, (s, _) in early.items()}, {"x": "a", "y": "b"})
         whole = pick_sets(costs, ["a", "b"], slice(1, None), cost=lambda v: float(np.sum(v)), side_bits=lambda d: 1.0)
         self.assertEqual(whole["x"], ("b", 15.0))
+        from kv_compare.t_ideas import HELD_OUT, cal_loo_sets
+        loo = cal_loo_sets(3)
+        self.assertEqual(set(loo), set(HELD_OUT.values()))
+        self.assertEqual(len(loo["wikitext"][0]), 12)
+        self.assertNotIn("wtrain0", loo["wikitext"][0])
+        self.assertEqual(len(loo["code"][0]), 12)
+        self.assertFalse(any(d.startswith("cal_code") for d in loo["code"][0]))
+        self.assertEqual(loo["code"][1], "cal_mixedx_code_3")
         sets = cal_sets(3)
         self.assertEqual(sets["wikitext"][0], [f"wtrain{i}" for i in range(6)])
         self.assertEqual(len(sets["mixed"][0]), 6)
@@ -238,16 +284,16 @@ class TIdeasTests(unittest.TestCase):
     def test_driver_calib_cpu(self):
         """The calib stage on the tiny run folder (calibration windows captured beforehand) and its report."""
         from kv_compare.capture import capture_ids
-        from kv_compare.t_ideas import cal_sets
+        from kv_compare.t_ideas import cal_loo_sets, cal_sets
         from kv_compare.test_kv_compare import doc_ids
-        names = sorted({n for tr, tb, _ in cal_sets(3).values() for n in tr + [tb]} - {f"wtrain{i}" for i in range(6)}
-                       - {"wtables"})
+        both = list(cal_sets(3).values()) + list(cal_loo_sets(3).values())
+        names = sorted({n for tr, tb, _ in both for n in tr + [tb]} - {f"wtrain{i}" for i in range(6)} - {"wtables"})
         for i, n in enumerate(names):
             if not (self.root / f"{n}_K_bits.npy").is_file():
                 capture_ids(self.model, doc_ids(40 + i, self.tokens), self.root, n, torch.device("cpu"))
         out = Path(self.tmp.name) / "out_calib"
         cmd = [sys.executable, str(ROOT / "scripts" / "t_ideas.py"), "--run", str(self.run_dir), "--output", str(out),
-               "--device", "cpu", "--windows", "1", "--stages", "calib,report"]
+               "--device", "cpu", "--windows", "1", "--stages", "calib,calib_loo,t2,report"]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
         self.assertEqual(r.returncode, 0, r.stderr[-3000:])
         res = json.loads((out / "t_ideas.json").read_text())
@@ -259,6 +305,11 @@ class TIdeasTests(unittest.TestCase):
         self.assertIn("## 6. Calibration breadth", s)
         self.assertIn("pick per request", s)
         self.assertIn("6 calibration breadth", s)
+        self.assertIn("## 6b. Calibration with the test's own source left out", s)
+        self.assertIn("6b calibration breadth on unseen text", s)
+        held = res["calib_loo"]["sets"]
+        self.assertTrue(held["wikitext"]["docs"] and held["math"]["docs"], held)
+        self.assertEqual(res["t2"], {"skipped": "needs a CUDA GPU"})
 
     def test_driver_cpu(self):
         """The driver's CPU stages and the report, on the tiny run folder."""

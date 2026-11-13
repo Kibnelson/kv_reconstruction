@@ -266,11 +266,9 @@ L0_VARIANTS = {
 }
 
 
-def layer0_kv(model, ids, device, variant="same", other=()):
-    """Layer 0's K and V words [n, Hk*hd] (int32 on device) computed with the embedding, the first layer's input
-    norm, the K and V projections and RoPE only (no attention, no MLP): the model runs up to its first attention
-    module, which a hook stops after taking its inputs. `variant` (L0_VARIANTS) sets the prefill shape; `other`
-    are another request's token ids for the batched variants."""
+def _run_passes(model, device, passes):
+    """Layer-0 K and V words of the kept rows of each pass (tokens, positions, first kept row, kept rows): the model
+    runs up to its first attention module, whose hook takes the inputs and stops the pass."""
     attn = model.model.layers[0].self_attn
     grab = {}
 
@@ -279,37 +277,89 @@ def layer0_kv(model, ids, device, variant="same", other=()):
         grab["pe"] = kwargs["position_embeddings"] if "position_embeddings" in kwargs else args[1]
         raise _Stop
 
+    h = attn.register_forward_pre_hook(hook, with_kwargs=True)
+    ks, vs = [], []
+    try:
+        with torch.inference_mode():
+            for tok, pos, keep, n in passes:
+                try:
+                    model.model(input_ids=torch.tensor([list(tok)], device=device),
+                                position_ids=torch.tensor([list(pos)], device=device), use_cache=False)
+                except _Stop:
+                    pass
+                cos, sin = grab["pe"]
+                k, v = _kv_from(attn, grab["h"], cos, sin)
+                ks.append(_words(k)[keep:keep + n])
+                vs.append(_words(v)[keep:keep + n])
+    finally:
+        h.remove()
+    return torch.cat(ks, 0), torch.cat(vs, 0)
+
+
+def layer0_kv(model, ids, device, variant="same", other=()):
+    """Layer 0's K and V words [n, Hk*hd] (int32 on device) computed with the embedding, the first layer's input
+    norm, the K and V projections and RoPE only (no attention, no MLP). `variant` (L0_VARIANTS) sets the prefill
+    shape; `other` are another request's token ids for the batched variants."""
     n = len(ids)
     if variant == "same":
-        passes = [(list(ids), list(range(n)), 0)]
+        passes = [(list(ids), list(range(n)), 0, n)]
     elif variant.startswith("chunks of "):
         c = int(variant.split()[-1])
-        passes = [(list(ids[a:a + c]), list(range(a, min(a + c, n))), 0) for a in range(0, n, c)]
+        passes = [(list(ids[a:a + c]), list(range(a, min(a + c, n))), 0, min(c, n - a)) for a in range(0, n, c)]
     elif variant.startswith("behind "):
         m = int(variant.split()[1])
         if not len(other):
             raise ValueError(f"{variant} needs another request's tokens")
         other = (list(other) * (m // len(other) + 1))[:m]          # repeated if shorter (only the shape matters)
-        passes = [(list(other[:m]) + list(ids), list(range(m)) + list(range(n)), m)]
+        passes = [(list(other[:m]) + list(ids), list(range(m)) + list(range(n)), m, n)]
     else:
         raise ValueError(f"variant is one of {sorted(L0_VARIANTS)}")
-    h = attn.register_forward_pre_hook(hook, with_kwargs=True)
-    ks, vs = [], []
-    try:
-        with torch.inference_mode():
-            for tok, pos, skip in passes:
-                try:
-                    model.model(input_ids=torch.tensor([tok], device=device),
-                                position_ids=torch.tensor([pos], device=device), use_cache=False)
-                except _Stop:
-                    pass
-                cos, sin = grab["pe"]
-                k, v = _kv_from(attn, grab["h"], cos, sin)
-                ks.append(_words(k)[skip:])
-                vs.append(_words(v)[skip:])
-    finally:
-        h.remove()
-    return torch.cat(ks, 0), torch.cat(vs, 0)
+    return _run_passes(model, device, passes)
+
+
+# Simulated vLLM prefill steps: (own tokens per step, other tokens before them, other tokens after them). The step's
+# matrix product has own + before + after rows; vLLM caps a step (max_num_batched_tokens) at 2,048 in our PD setup.
+L0_SCHEDULES = {
+    "2048 own": (2048, 0, 0),
+    "1024 own after 1024 other": (1024, 1024, 0),
+    "1536 own before 512 other": (1536, 0, 512),
+    "512 own after 1536 other": (512, 1536, 0),
+}
+L0_RECEIVERS = {
+    "one pass": "the receiver computes the request in one pass",
+    "same chunks": "the sender's chunks, without the other request's rows",
+    "padded to the step": "the sender's chunks padded with dummy rows to the sender's step size, at its offset",
+    "padded, own rows first": "padded to the step size, the request's rows first",
+}
+
+
+def layer0_schedule(model, ids, device, schedule, receiver=None, other=(), dummy=0):
+    """Layer-0 words of a request computed in prefill steps. schedule (own, before, after) from L0_SCHEDULES. The
+    sender (receiver None) fills the other rows with another request's tokens `other`; a receiver (L0_RECEIVERS)
+    recomputes with what the sender told it (the step sizes), filling with the dummy token at position 0."""
+    own, before, after = schedule
+    n = len(ids)
+    if receiver == "one pass":
+        return layer0_kv(model, ids, device)
+    other = list(other) or [dummy]
+    other = (other * ((before + after) // len(other) + 1))[:before + after]
+    passes = []
+    for a in range(0, n, own):
+        m = min(own, n - a)
+        mine, pos = list(ids[a:a + m]), list(range(a, a + m))
+        if receiver is None:
+            tok = other[:before] + mine + other[before:before + after]
+            ps = list(range(before)) + pos + list(range(after))
+            passes.append((tok, ps, before, m))
+        elif receiver == "same chunks":
+            passes.append((mine, pos, 0, m))
+        elif receiver == "padded to the step":
+            passes.append(([dummy] * before + mine + [dummy] * after, [0] * before + pos + [0] * after, before, m))
+        elif receiver == "padded, own rows first":
+            passes.append((mine + [dummy] * (before + after), pos + [0] * (before + after), 0, m))
+        else:
+            raise ValueError(f"receiver is one of {sorted(L0_RECEIVERS)}")
+    return _run_passes(model, device, passes)
 
 
 def _ordered(w):
@@ -335,6 +385,72 @@ def ulp_bits(got, ref, table):
     sym = torch.where(esc, torch.full_like(d, 2 * R + 1), d + R).long()
     bits = -torch.log2(table.to(sym.device)[sym]) + 16.0 * esc
     return float(bits.mean())
+
+
+def value_table(got, ref):
+    """The value coder's parameters from a scales document: the chance a word is recomputed exactly, and per channel
+    the spread of the unequal words around the recomputed value (mean absolute difference / 2 ln 2)."""
+    eq = got == ref
+    n = eq.numel()
+    p_eq = (float(eq.sum()) + 1) / (n + 2)
+    d = (words_to_float(got) - words_to_float(ref)).abs()
+    d = torch.where(eq, torch.zeros_like(d), d)
+    cnt = (~eq).sum(0).to(torch.float64)
+    pooled = float(d.sum() / max(float(cnt.sum()), 1.0))
+    s = torch.where(cnt > 0, d.sum(0) / cnt.clamp_min(1), torch.full_like(cnt, pooled)) / LN2X2
+    return {"p_eq": p_eq, "s": s.clamp_min(1e-30)}
+
+
+def value_bits(got, ref, table):
+    """Bits per value of coding got against ref: a flag (equal or not), then an unequal word against a logistic
+    around the recomputed value with the channel's spread (exact -log2 P of the BF16 word; a sign flip next to zero
+    is a small difference here, unlike a difference in BF16 steps)."""
+    eq = got == ref
+    p = table["p_eq"]
+    bits = torch.full(eq.shape, -math.log2(p), dtype=torch.float64, device=eq.device)
+    if (~eq).any():
+        mm = exact_bits(got, words_to_float(ref), table["s"].to(eq.device)[None, :].expand(eq.shape))
+        bits = torch.where(eq, bits, mm - math.log2(1 - p))
+    return float(bits.mean())
+
+
+def layer0_matched(study, model, docs, scale_doc, device, t_layer0=None, schedules=tuple(L0_SCHEDULES),
+                   receivers=tuple(L0_RECEIVERS)):
+    """For each simulated prefill schedule (the sender) and each receiver: the share of layer-0 K and V words the
+    receiver recomputes bit for bit, and the bits per layer-0 value with the step coder and the value coder (tables
+    from the scales document under the same pair)."""
+    C = study.C
+    out = {"schedules": {k: list(L0_SCHEDULES[k]) for k in schedules}, "receivers": {k: L0_RECEIVERS[k] for k in receivers},
+           "docs": {}}
+    other_of = {d.name: scale_doc.ids[:2048].tolist() for d in docs}
+    other_of[scale_doc.name] = docs[0].ids[:2048].tolist()
+
+    def both(doc, sch, rec):
+        ids = doc.ids[: doc.tokens].tolist()
+        Ks, Vs = layer0_schedule(model, ids, device, L0_SCHEDULES[sch], None, other_of[doc.name])
+        Kr, Vr = layer0_schedule(model, ids, device, L0_SCHEDULES[sch], rec)
+        return torch.cat([Ks, Vs], 1), torch.cat([Kr, Vr], 1)
+
+    tables = {}
+    for sch in schedules:
+        for rec in receivers:
+            got, ref = both(scale_doc, sch, rec)
+            tables[(sch, rec)] = (ulp_table(got, ref), value_table(got, ref))
+    for d in docs:
+        rows = {}
+        for sch in schedules:
+            for rec in receivers:
+                got, ref = both(d, sch, rec)
+                ut, vt = tables[(sch, rec)]
+                r = {"keys_equal": float((got[:, :C] == ref[:, :C]).float().mean()),
+                     "values_equal": float((got[:, C:] == ref[:, C:]).float().mean()),
+                     "step_bits": ulp_bits(got, ref, ut), "value_bits": value_bits(got, ref, vt)}
+                r["bits_per_layer0_value"] = min(r["step_bits"], r["value_bits"])
+                if t_layer0 and d.name in t_layer0:
+                    r["saving_per_value_all_layers"] = (t_layer0[d.name] - r["bits_per_layer0_value"]) / study.L
+                rows[f"{sch} | {rec}"] = r
+        out["docs"][d.name] = rows
+    return out
 
 
 def layer0_robust(study, model, docs, scale_doc, device, t_layer0=None, timer=None, variants=tuple(L0_VARIANTS)):
@@ -395,6 +511,21 @@ def cal_sets(windows=3):
     for d in dom:
         sets[d] = ([f"cal_{d}_{i}" for i in range(windows)], f"cal_{d}_{windows}", CAL_DOMAINS[d])
     return sets
+
+
+HELD_OUT = {"wikitext2": "wikitext", "humaneval": "code", "gsm8k": "math", "mmlu": "exam", "ptb": "news"}
+
+
+def cal_loo_sets(windows=3):
+    """{held-out source: (calibration documents, scales document, note)}: 'mixed-all' without one source (its
+    documents and its share of the scales document), for testing on that source's datasets. The scales document
+    cal_mixedx_<source>_<windows> has an equal share of every other source."""
+    out = {}
+    for m in ["wikitext"] + list(CAL_DOMAINS):
+        docs = ([f"wtrain{i}" for i in range(windows)] if m != "wikitext" else []) + \
+               [f"cal_{d}_{i}" for d in CAL_DOMAINS if d != m for i in range(windows)]
+        out[m] = (docs, f"cal_mixedx_{m}_{windows}", f"mixed-all without {m}: {len(docs)} documents")
+    return out
 
 
 def pick_sets(costs, sets, layers=None, cost=None, side_bits=None):
@@ -745,12 +876,21 @@ def oracle_costs(study, doc, block=512, log=print):
 MODE_GROUPS = {"dense": 1, "kv": 2, "4g": 4, "hbh": None, "rank256": 1}
 
 
-def mode_codec(consts, rank, groups, mode, C, hd, T):
-    """T in one mode, with the launch choices of the PD codec (tokens per program, chunks, rank tiles)."""
+def mode_codec(consts, rank, groups, mode, C, hd, T, cls=None, layers=None):
+    """T in one mode, with the launch choices of the PD codec (tokens per program, chunks, rank tiles). cls: the
+    codec class (default T's LayerwiseOneStep; kv_compare.t2.Layer0Recomputed for T2); layers: cut the constants
+    to the first n layers."""
     from .layerwise import LayerwiseOneStep
+    cls = cls or LayerwiseOneStep
     W = consts["Aq"].shape[1]
     ng = MODE_GROUPS[mode] or W // hd
     base = groups[ng] if ng > 1 else consts
+    if layers is not None:
+        from .t2 import slice_layers
+        L = consts["Aq"].shape[0]
+        base = slice_layers(base, layers, L)
+        consts = slice_layers(consts, layers, L)
+        rank = slice_layers(rank, layers, L) if rank is not None else None
     TB, ch = (32, 2) if ng <= 4 else (16, 4)
     while ch > 1 and T % (TB * ch):
         ch //= 2
@@ -758,8 +898,8 @@ def mode_codec(consts, rank, groups, mode, C, hd, T):
     r = int(rank["rank"]) if rk is not None else 128
     tiles = (128, 128, 64, 4) if (T % 256 == 0 and r % 128 == 0 and W % 64 == 0) else (16, 16, 32, 4)
     kp = dict(base, cos=consts["cos"][:T].contiguous(), sin=consts["sin"][:T].contiguous())
-    return LayerwiseOneStep(kp, C, hd, tokens_per_program=TB, mode="uniform", search=True, chunks=ch, rank=rk,
-                            requant="epilogue" if rk is not None else "kernel", rank_tiles=tiles)
+    return cls(kp, C, hd, tokens_per_program=TB, mode="uniform", search=True, chunks=ch, rank=rk,
+               requant="epilogue" if rk is not None else "kernel", rank_tiles=tiles)
 
 
 def copy_bandwidth(device, mib=1024, reps=5):

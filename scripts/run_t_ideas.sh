@@ -5,7 +5,8 @@
 #   MODEL=llama32_3b bash scripts/run_t_ideas.sh            (ALLOW_NO_SLURM=1 on the NUC)
 #
 # Options (environment): KV_HOME (default ~/kv_a5000), KV_RUNS (default $KV_HOME/runs), MODEL (the run folder's
-# tag, default llama32_3b), STAGES (default capture,adapt,layer0,layer0x,anchor,classes,gpu,calib,report; finished
+# tag, default llama32_3b), STAGES (default capture,adapt,layer0,layer0x,layer0m,anchor,classes,gpu,calib,calib_loo,t2,
+# report; finished
 # stages are kept from the output folder's t_ideas.json), EXTRA (more
 # arguments for scripts/t_ideas.py), NO_PUSH=1 (commit locally only), SMOKE=1 (4 layers, one WikiText-2 window, one
 # calibration window per domain, a separate output folder, nothing committed: checks the whole path in minutes).
@@ -61,14 +62,14 @@ then
 fi
 GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1 | tr 'A-Z' 'a-z' | sed 's/nvidia//; s/geforce//; s/[^a-z0-9]//g')
 STAMP=$(date +%Y%m%d_%H%M)
-STAGES=${STAGES:-capture,adapt,layer0,layer0x,anchor,classes,gpu,calib,report}
+STAGES=${STAGES:-capture,adapt,layer0,layer0x,layer0m,anchor,classes,gpu,calib,calib_loo,t2,report}
 OUT=$RUN/t_ideas
 ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --stages "$STAGES" --device cuda)
 if [ "${SMOKE:-0}" = 1 ]; then
     OUT=$RUN/t_ideas_smoke
     rm -rf "$OUT"
     ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --device cuda
-          --stages adapt,layer0x,anchor,classes,gpu,calib,report --datasets wikitext2 --windows 1 --float-docs 1
+          --stages adapt,layer0x,layer0m,anchor,classes,gpu,calib,t2,report --datasets wikitext2 --windows 1 --float-docs 1
           --max-layers 4 --modes dense,rank256 --cal-windows 1)
 fi
 echo "== commit $(git log --oneline -1); run folder $RUN; output $OUT; GPU $GPU"

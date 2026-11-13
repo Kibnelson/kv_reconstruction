@@ -17,6 +17,12 @@ Stages (a finished stage is kept in OUT/t_ideas.json; --redo STAGE measures it a
            (chunks of 2048 and 512, behind 1 or 2048 tokens of another request): bit identity, coding cost, time
   calib    T's constants from other calibration sets (mixed, per domain: code, math, exam, news; texts of
            scripts/fetch_calib_texts.py), on every dataset window, and a per-request pick among the sets
+  layer0m  layer 0 under simulated vLLM prefill steps (own tokens with another request's in one product), recomputed
+           in one pass, in the same chunks, or padded to the sender's step sizes
+  calib_loo  each dataset with its own source left out of the calibration (mixed-all refitted without it; the pick
+           without its own set)
+  t2       T2 (kv_compare/t2.py, separate from T): round trips with the receiver's layer 0 and the picked set, bits
+           against T, times; every mode on one window
   report   OUT/summary.md with the decision rules of docs/t_ideas.md
 """
 from __future__ import annotations
@@ -36,7 +42,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-STAGES = ("capture", "adapt", "layer0", "layer0x", "anchor", "classes", "gpu", "calib", "report")
+STAGES = ("capture", "adapt", "layer0", "layer0x", "layer0m", "anchor", "classes", "gpu", "calib", "calib_loo", "t2",
+          "report")
 DATASETS = ("wikitext2", "humaneval", "gsm8k", "mmlu", "ptb")
 NAMES = {"wikitext2": "WikiText-2", "humaneval": "HumanEval", "gsm8k": "GSM8K", "mmlu": "MMLU", "ptb": "PTB"}
 LINKS = (1, 3, 10, 25, 100, 400)
@@ -257,22 +264,30 @@ def capture_calib(args, res, device, sets):
             ids[name] = tok(f.read_text(encoding="utf-8"), add_special_tokens=False)["input_ids"] if f.is_file() else None
         return ids[name]
 
+    def mixed(srcs):
+        """An equal share of each (source, offset), filled to a window from the first source's continuation."""
+        share = step // len(srcs)
+        pieces = []
+        for src, off in srcs:
+            t = text_ids(src)
+            if t is None or len(t) < off + 2 * share:
+                return None
+            pieces += t[off:off + share]
+        src, off = srcs[0]
+        return pre + pieces + text_ids(src)[off + share:off + share + step - len(pieces)]
+
     done = []
     for n in missing:
-        if n.startswith("cal_mixed_"):
-            share = step // (len(ti.CAL_DOMAINS) + 1)
-            pieces = []
-            k = int(n.rsplit("_", 1)[1])            # after window k of every domain
-            for src, off in [("wikitext2_train", 7 * step)] + [(d, (k + 1) * step) for d in ti.CAL_DOMAINS]:
-                t = text_ids(src)
-                if t is None or len(t) < off + share:
-                    pieces = None
-                    break
-                pieces += t[off:off + share]
-            if pieces is None:
+        if n.startswith("cal_mixedx_") or n.startswith("cal_mixed_"):
+            held, k = (n[len("cal_mixedx_"):].rsplit("_", 1) if n.startswith("cal_mixedx_")
+                       else (None, n.rsplit("_", 1)[1]))
+            k = int(k)                               # after window k of every domain
+            srcs = [("wikitext2_train", 7 * step)] + [(d, (k + 1) * step) for d in ti.CAL_DOMAINS]
+            srcs = [x for x in srcs if x[0] != held and not (held == "wikitext" and x[0] == "wikitext2_train")]
+            window = mixed(srcs)
+            if window is None:
                 log(f"calib: {n} skipped (a source text is missing or short)")
                 continue
-            window = pre + pieces + text_ids("wikitext2_train")[7 * step + share:7 * step + share + step - len(pieces)]
         else:
             dom, idx = n[4:].rsplit("_", 1)
             i = int(idx)
@@ -335,6 +350,230 @@ def stage_calib(args, res, device, out):
         del consts, study
         if str(device).startswith("cuda"):
             torch.cuda.empty_cache()
+
+
+def stage_layer0m(args, res, device, out):
+    """Layer 0 under simulated vLLM prefill steps, recomputed by receivers that know the sender's step sizes."""
+    import torch
+    from kv_compare import t_ideas as ti
+    ws = windows(Path(args.run) / "captures", args.datasets, args.windows)
+    docs = [v[0] for v in ws.values()]
+    study = study_of(args, docs, device)
+    t0 = {n: row["T"]["layers"][0] for n, row in res.get("adapt", {}).get("docs", {}).items()}
+    _, model = load_model(args, device)
+    r = ti.layer0_matched(study, model, study.tests, study.tables, torch.device(device), t_layer0=t0)
+    res["layer0m"] = r
+    first = next(iter(r["docs"].values()))
+    for key in first:
+        xs = [row[key] for row in r["docs"].values()]
+        log(f"layer0m {key}: keys {100 * min(x['keys_equal'] for x in xs):.3f}% / values "
+            f"{100 * min(x['values_equal'] for x in xs):.3f}% bit for bit, step coder "
+            f"{max(x['step_bits'] for x in xs):.4f}, value coder {max(x['value_bits'] for x in xs):.4f} bits per "
+            "layer-0 value (worst window)")
+    del model
+
+
+def stage_calib_loo(args, res, device, out):
+    """Leave one source out: mixed-all refitted without it, tested on that source's datasets."""
+    import torch
+    from kv_compare import fused
+    from kv_compare import t_ideas as ti
+    from kv_compare.predict import Study
+    cap = Path(args.run) / "captures"
+    ws = windows(cap, args.datasets, args.windows)
+    loo = ti.cal_loo_sets(args.cal_windows)
+    r = res.setdefault("calib_loo", {})
+    r.setdefault("sets", {})
+    r["captured"] = r.get("captured", []) + capture_calib(args, res, device, loo)
+    for held, (train, tables, note) in loo.items():
+        dsname = next(k for k, v in ti.HELD_OUT.items() if v == held)
+        tests = ws.get(dsname, [])
+        missing = [d for d in train + [tables] if not (cap / f"{d}_K_bits.npy").is_file()]
+        if not tests or missing:
+            r["sets"][held] = {"note": note, "skipped": f"missing {', '.join(missing)}" if missing else "no windows"}
+            log(f"calib_loo {held}: skipped ({r['sets'][held]['skipped']})")
+            continue
+        if r["sets"].get(held, {}).get("docs"):
+            continue
+        t0 = time.time()
+        study = Study(cap, device, train, tables, tests, args.max_layers, log=lambda m: None)
+        consts = fused.prepare(study, log=lambda m: None)
+        row = {"note": note, "dataset": dsname, "train": train, "tables": tables, "docs": {}}
+        for d in study.tests:
+            per, _ = ti.t_costs(study, consts, d, variants=("T",))
+            row["docs"][d.name] = {"T": per["T"].tolist()}
+        r["sets"][held] = row
+        log(f"calib_loo without {held}: " + ", ".join(f"{n} {np.mean(v['T']):.4f}" for n, v in row["docs"].items())
+            + f" ({time.time() - t0:.0f} s)")
+        save(res, out)
+        del consts, study
+        if str(device).startswith("cuda"):
+            torch.cuda.empty_cache()
+
+
+def _int16(w):
+    import torch
+    return (w - 65536 * (w >= 32768).to(torch.int32)).to(torch.int16)
+
+
+def t2_consts(args, out, cap, name, train, tables, device):
+    """T's constants for one calibration set, cached in OUT."""
+    import torch
+    from kv_compare import fused
+    from kv_compare.predict import Study
+    study = Study(cap, device, train, tables, [], args.max_layers, log=lambda m: None)
+    if name == "wikitext" and args.train_set == "wikitext":
+        return consts_of(args, study, out), study
+    p = out / f"t2_consts_{name}.pt"
+    key = {"run": str(Path(args.run).resolve()), "train": train, "tables": tables, "layers": study.L}
+    if p.is_file():
+        blob = torch.load(p, map_location=study.device, weights_only=False)
+        if blob.get("key") == key:
+            return blob["consts"], study
+    log(f"t2: fitting T's constants for {name}")
+    consts = fused.prepare(study, log=lambda m: None)
+    torch.save({"key": key, "consts": consts}, p)
+    return consts, study
+
+
+def stage_t2(args, res, device, out):
+    """T2 (kv_compare/t2.py), kept apart from T: on every dataset window the round trip with the receiver's layer 0,
+    its bits against T's, the set it picks, and the times; then every mode on one window."""
+    import torch
+    from kv_compare import t_ideas as ti
+    from kv_compare.gpu_speed import timer
+    from kv_compare.grouped import prepare_groups
+    from kv_compare.layerwise import prepare_rank
+    from kv_compare.t2 import Layer0Recomputed, T2
+    dev = torch.device(device)
+    if dev.type != "cuda":
+        res["t2"] = {"skipped": "needs a CUDA GPU"}
+        log("t2: skipped (no CUDA)")
+        return
+    cap = Path(args.run) / "captures"
+    ws = windows(cap, args.datasets, args.windows)
+    docs = [v[0] for v in ws.values()]
+    names = ["wikitext"] + list(ti.CAL_DOMAINS)
+    sets = {n: v for n, v in ti.cal_sets(args.cal_windows).items() if n in names and
+            all((cap / f"{d}_K_bits.npy").is_file() for d in v[0] + [v[1]])}
+    r = {"sets": list(sets), "docs": {}, "modes": [], "partial": True}      # until the stage finishes
+    consts, studies = {}, {}
+    for n, (train, tables, _) in sets.items():
+        consts[n], studies[n] = t2_consts(args, out, cap, n, train, tables, device)
+    st = study_of(args, docs, device)
+    L, W, C, hd = st.L, st.W, st.C, st.hd
+    _, model = load_model(args, device)
+
+    def builders(T, mode="dense", extra=None):
+        extra = extra or {}
+        return {n: (lambda nl, rec, n=n: ti.mode_codec(consts[n], *(extra.get(n, (None, None))), mode, C, hd, T,
+                                                      cls=Layer0Recomputed if rec else None, layers=nl))
+                for n in sets}
+
+    def doc_words(d, T):
+        w = torch.empty(L, T, W, dtype=torch.int16, device=dev)
+        for l in range(L):
+            w[l] = _int16(d.words(l, dev, rows=T))
+        return w
+
+    for d in st.tests:
+        T = d.tokens - d.tokens % 256
+        n = L * T * W
+        words = doc_words(d, T)
+        ids = d.ids[:T].tolist()
+        l0 = _int16(torch.cat(ti.layer0_kv(model, ids, dev), 1))
+        l0_ok = bool(torch.equal(l0, words[0]))
+        codec = T2(builders(T))
+        t0 = time.perf_counter()
+        name, pbits = codec.pick(words)
+        torch.cuda.synchronize(dev)
+        pick_ms = 1e3 * (time.perf_counter() - t0)
+        parts, header = codec.encode(words, l0_ok, name)
+        c2 = codec.codec(name, l0_ok)
+        dec = torch.empty(L, T, W, dtype=torch.int16, device=dev)
+        bufs = c2.buffers(T)
+        if l0_ok:
+            c2.decode(parts["words"], parts["starts"], T, l0, out=dec, bufs=bufs)
+        else:
+            c2.decode(parts["words"], parts["starts"], T, out=dec, bufs=bufs)
+        row = {"set": name, "pick_bits": {k: v / n for k, v in pbits.items()}, "layer0_recomputed": l0_ok,
+               "bit_exact": bool(torch.equal(dec, words)), "t2_bits": codec.bits(parts, header) / n,
+               "pick_ms": pick_ms}
+        if l0_ok:
+            row["t2_decode_ms"] = 1e3 * timer(lambda: c2.decode(parts["words"], parts["starts"], T, l0, out=dec,
+                                                                bufs=bufs), dev)
+        else:
+            row["t2_decode_ms"] = 1e3 * timer(lambda: c2.decode(parts["words"], parts["starts"], T, out=dec,
+                                                                bufs=bufs), dev)
+        xa, pa = c2.model(words)
+        row["t2_encode_ms"] = 1e3 * timer(lambda: c2.encode(words, xa, pa, out=parts["words"]), dev)
+        parts = xa = pa = None
+        if name != "wikitext":                        # layer 0 alone: T2 with T's constants
+            p0, h0 = codec.encode(words, l0_ok, "wikitext")
+            row["t2_wikitext_bits"] = codec.bits(p0, h0) / n
+            p0 = None
+        else:
+            row["t2_wikitext_bits"] = row["t2_bits"]
+        tc = ti.mode_codec(consts["wikitext"], None, None, "dense", C, hd, T)
+        xa, pa = tc.model(words)
+        tb, ts = tc.encode(words, xa, pa)
+        row["t_bits"] = tc.bits(ts, T) / n
+        tbufs = tc.buffers(T)
+        row["t_decode_ms"] = 1e3 * timer(lambda: tc.decode(tb, ts, T, out=dec, bufs=tbufs), dev)
+        row["recompute_ms"] = 1e3 * timer(lambda: ti.layer0_kv(model, ids, dev), dev)
+        tb = ts = xa = pa = tbufs = bufs = dec = words = None
+        torch.cuda.empty_cache()
+        r["docs"][d.name] = row
+        log(f"t2 {d.name}: set {name}, layer 0 {'recomputed' if l0_ok else 'coded'}, exact={row['bit_exact']}, "
+            f"T {row['t_bits']:.4f} -> T2 {row['t2_bits']:.4f} bits/value (T2 with T's constants "
+            f"{row['t2_wikitext_bits']:.4f}); decode T {row['t_decode_ms']:.1f} ms, T2 {row['t2_decode_ms']:.1f} ms "
+            f"+ recompute {row['recompute_ms']:.1f} ms")
+        res["t2"] = r
+        save(res, out)
+    # every mode on one window (HumanEval's if there, to show a set other than WikiText's)
+    d = next((x for x in st.tests if x.name.startswith("ds_humaneval")), st.tests[0])
+    name = r["docs"][d.name]["set"]
+    G = W // hd
+    extra = {}
+    for n in {"wikitext", name}:
+        extra[n] = (prepare_rank(studies[n], consts[n], 256, lambda m: None),
+                    prepare_groups(studies[n], consts[n], sorted({2, 4, G}), log=lambda m: None))
+    T = d.tokens - d.tokens % 256
+    words = doc_words(d, T)
+    l0 = _int16(torch.cat(ti.layer0_kv(model, d.ids[:T].tolist(), dev), 1))
+    l0_ok = bool(torch.equal(l0, words[0]))
+    n = L * T * W
+    dec = torch.empty(L, T, W, dtype=torch.int16, device=dev)
+    for mode in args.modes:
+        row = {"mode": mode, "doc": d.name, "set": name}
+        try:
+            b = builders(T, mode, extra)
+            t = b["wikitext"](None, False)
+            xa, pa = t.model(words)
+            tb, ts = t.encode(words, xa, pa)
+            tbufs = t.buffers(T)
+            row["t_bits"] = t.bits(ts, T) / n
+            row["t_decode_ms"] = 1e3 * timer(lambda: t.decode(tb, ts, T, out=dec, bufs=tbufs), dev)
+            tb = ts = xa = pa = tbufs = None
+            c2 = b[name](None, l0_ok)
+            xa, pa = c2.model(words)
+            cb, cs = c2.encode(words, xa, pa)
+            bufs = c2.buffers(T)
+            args2 = (cb, cs, T, l0) if l0_ok else (cb, cs, T)
+            c2.decode(*args2, out=dec, bufs=bufs)
+            row["bit_exact"] = bool(torch.equal(dec, words))
+            row["t2_bits"] = c2.bits(cs, T) / n
+            row["t2_decode_ms"] = 1e3 * timer(lambda: c2.decode(*args2, out=dec, bufs=bufs), dev)
+            cb = cs = xa = pa = bufs = None
+        except Exception as exc:
+            row["error"] = repr(exc)[:300]
+        torch.cuda.empty_cache()
+        r["modes"].append(row)
+        log(f"t2 mode {mode}: " + (row["error"] if "error" in row else
+                                   f"exact={row['bit_exact']}, T {row['t_bits']:.4f} ({row['t_decode_ms']:.1f} ms) -> "
+                                   f"T2 {row['t2_bits']:.4f} ({row['t2_decode_ms']:.1f} ms)"))
+    res["t2"] = r
+    model = None
 
 
 def stage_float(args, res, device, out, stage, specs):
@@ -493,6 +732,8 @@ def report(res, out):
                              f"worst saving {worst:.3f} bits/value over the shapes"
                              + (f", lean recompute up to {max(lean):.1f} ms" if lean else "")
                              + " (rule: >= 0.3 bits/value in every shape and <= 10 ms)"))
+    if res.get("layer0m", {}).get("docs"):
+        lines += layer0m_report(res["layer0m"], verdicts)
     for stage, title, rule in (("anchor", "## 4. Anchors (float one-step predictor)", 0.1),
                                ("classes", "## 5. Token classes (float one-step predictor)", 0.05)):
         f = res.get(stage)
@@ -561,6 +802,10 @@ def report(res, out):
     cb = res.get("calib")
     if cb and any(s.get("docs") for s in cb.get("sets", {}).values()):
         lines += calib_report(res, cb, verdicts)
+    if res.get("calib_loo", {}).get("sets"):
+        lines += loo_report(res, verdicts)
+    if res.get("t2", {}).get("docs"):
+        lines += t2_report(res["t2"], verdicts)
     if verdicts:
         lines += ["## Verdicts", "", "| Idea | worth building? | evidence |", "| --- | --- | --- |"]
         lines += [f"| {n} | {'yes' if ok else 'no'} | {e} |" for n, ok, e in verdicts]
@@ -653,6 +898,144 @@ def calib_report(res, cb, verdicts):
     return out
 
 
+def layer0m_report(lm, verdicts):
+    """Section 2d: layer 0 under simulated prefill steps."""
+    docs = lm["docs"]
+    first = next(iter(docs.values()))
+    out = ["## 2d. Layer 0 when the receiver knows the sender's prefill steps", "",
+           "The sender computes layer 0 in vLLM-like steps (its own tokens with another request's tokens in the same "
+           "matrix product, at most 2,048 rows); the receiver recomputes it as said. Worst window of "
+           f"{len(docs)}. Bits: the better of the step coder and the value coder (a flag, then a logistic around the "
+           "recomputed value), tables from the scales document under the same pair.", "",
+           "| Sender's steps | receiver | keys bit for bit | values bit for bit | step coder | value coder | saving per "
+           "value (all layers) |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    padded = []
+    for key in first:
+        xs = [row[key] for row in docs.values()]
+        sch, rec = key.split(" | ")
+        sv = [x["saving_per_value_all_layers"] for x in xs if "saving_per_value_all_layers" in x]
+        eq = min(min(x["keys_equal"], x["values_equal"]) for x in xs)
+        if rec == "padded to the step":
+            padded.append(eq)
+        out.append(f"| {sch} | {rec} | {100 * min(x['keys_equal'] for x in xs):.3f}% | "
+                   f"{100 * min(x['values_equal'] for x in xs):.3f}% | {max(x['step_bits'] for x in xs):.4f} | "
+                   f"{max(x['value_bits'] for x in xs):.4f} | {fmt(min(sv) if sv else None, 4)} |")
+    out.append("")
+    if padded:
+        verdicts.append(("2d layer 0 exact when the receiver pads to the sender's steps", min(padded) == 1.0,
+                         f"worst share bit for bit with padding {100 * min(padded):.3f}% (rule: 100% in every "
+                         "schedule)"))
+    return out
+
+
+def loo_report(res, verdicts):
+    """Section 6b: each dataset with its own source left out of the calibration."""
+    from kv_compare.t_ideas import CAL_DOMAINS, HELD_OUT, pick_sets
+    cb, lo = res.get("calib", {}).get("sets", {}), res["calib_loo"]["sets"]
+    L = None
+    l0 = 0.0
+    if res.get("layer0x", {}).get("docs"):
+        l0 = max(r["same"]["bits_per_layer0_value"] for r in res["layer0x"]["docs"].values() if "same" in r)
+
+    def with_l0(v):
+        v = np.asarray(v, dtype=np.float64)
+        return float((v[1:].sum() + l0) / len(v))
+
+    rows = {"T's constants (WikiText-2 train)": {}, "its own source's set (in-domain, from section 6)": {},
+            "mixed-all, which contains its source (section 6)": {}, "mixed-all without its source": {},
+            "pick per request, its own source's set left out (chosen on layers 1-4)": {},
+            "pick per request with every set (section 6)": {}}
+    picked = {}
+    for ds, held in HELD_OUT.items():
+        s = lo.get(held, {})
+        if not s.get("docs"):
+            continue
+        for d, v in s["docs"].items():
+            L = len(v["T"])
+            costs = {"mixed-x": {d: v["T"]}}
+            for n in ("wikitext",) + tuple(CAL_DOMAINS) + ("mixed-all",):
+                if cb.get(n, {}).get("docs", {}).get(d):
+                    costs[n] = {d: cb[n]["docs"][d]["T"]}
+            if "wikitext" in costs:
+                rows["T's constants (WikiText-2 train)"][d] = with_l0(costs["wikitext"][d])
+            if held in costs:
+                rows["its own source's set (in-domain, from section 6)"][d] = with_l0(costs[held][d])
+            if "mixed-all" in costs:
+                rows["mixed-all, which contains its source (section 6)"][d] = with_l0(costs["mixed-all"][d])
+            rows["mixed-all without its source"][d] = with_l0(v["T"])
+            cands = [n for n in costs if n not in (held, "mixed-all")]
+            early = list(range(1, min(5, L)))
+            p = pick_sets(costs, cands, early, cost=with_l0)
+            rows["pick per request, its own source's set left out (chosen on layers 1-4)"][d] = p[d][1]
+            picked.setdefault(ds, []).append(p[d][0].replace("mixed-x", "mixed without it"))
+            allc = [n for n in costs if n != "mixed-x"]
+            if len(allc) > 1:
+                rows["pick per request with every set (section 6)"][d] = pick_sets(costs, allc, early, cost=with_l0)[d][1]
+    if not any(rows.values()):
+        return []
+    keys = [k for k in DATASETS if any(ds_of(d) == k for r in rows.values() for d in r)]
+    out = ["## 6b. Calibration with the test's own source left out", "",
+           "Each dataset is coded with constants that never saw its kind of text: mixed-all refitted without its "
+           "source (WikiText-2 for WikiText-2, MBPP for HumanEval, GSM8K train for GSM8K, MMLU dev for MMLU, PTB "
+           "train for PTB; its scales document leaves the source out too), and the per-request pick without the "
+           "source's own set. Layer 0 recomputed; bits per value.", "",
+           "| Constants | " + " | ".join(NAMES.get(k, k) for k in keys) + " | mean |", "| --- |" + " --- |" * (len(keys) + 1)]
+    means = {}
+    for label, vals in rows.items():
+        m = by_dataset(vals)
+        avg = sum(m.values()) / len(m) if m else None
+        means[label] = (m, avg)
+        out.append(f"| {label} | " + " | ".join(fmt(m.get(k)) for k in keys) + f" | {fmt(avg)} |")
+        if label.startswith("pick per request, its own"):
+            out.append("| (sets chosen) | " + " | ".join("/".join(picked.get(k, [])) for k in keys) + " | |")
+    out.append("")
+    base = means["T's constants (WikiText-2 train)"]
+    honest = min(("mixed-all without its source", "pick per request, its own source's set left out (chosen on layers 1-4)"),
+                 key=lambda lbl: means[lbl][1] if means[lbl][1] is not None else 1e9)
+    if base[1] is not None and means[honest][1] is not None:
+        sav = base[1] - means[honest][1]
+        verdicts.append(("6b calibration breadth on unseen text", sav >= 0.01 * base[1],
+                         f"{honest.split(' (')[0]} saves {sav:.3f} bits/value over the datasets (rule: >= 1% of T, "
+                         f"{0.01 * base[1]:.3f})"))
+    return out
+
+
+def t2_report(t2, verdicts):
+    """Section 7: T2, the separate codec, measured."""
+    out = ["## 7. T2: T with layer 0 recomputed and a constant set per request (kv_compare/t2.py)", "",
+           "T2 is a separate codec on T's kernels; T is unchanged. Dense mode, one window per dataset, cut to a "
+           "multiple of 256 tokens. Bits per value of the real streams (data, states, starts). T: WikiText-2 "
+           "constants, layer 0 coded. Decode: the codec's GPU time; T2 adds the receiver's layer-0 recompute.", "",
+           "| Window | set picked | layer 0 | bit-exact | T | T2, T's constants | T2 | saving | decode T | decode T2 | "
+           "recompute |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    ok, savings = True, []
+    for d, r in t2["docs"].items():
+        ok = ok and r["bit_exact"] and r["t2_bits"] < r["t_bits"]
+        savings.append(1 - r["t2_bits"] / r["t_bits"])
+        out.append(f"| {d} | {r['set']} | {'recomputed' if r['layer0_recomputed'] else 'coded'} | "
+                   f"{'yes' if r['bit_exact'] else 'NO'} | {r['t_bits']:.4f} | {r['t2_wikitext_bits']:.4f} | "
+                   f"{r['t2_bits']:.4f} | {100 * savings[-1]:.1f}% | {r['t_decode_ms']:.1f} ms | "
+                   f"{r['t2_decode_ms']:.1f} ms | {r['recompute_ms']:.1f} ms |")
+    out.append("")
+    if t2.get("modes"):
+        out += [f"Every mode on {t2['modes'][0]['doc']} (T2 with its picked set {t2['modes'][0]['set']}):", "",
+                "| Mode | bit-exact | T | T2 | saving | decode T | decode T2 |", "| --- | --- | --- | --- | --- | --- | --- |"]
+        for m in t2["modes"]:
+            if "error" in m:
+                ok = False
+                out.append(f"| {m['mode']} | error: {m['error'][:80]} | | | | | |")
+                continue
+            ok = ok and m["bit_exact"]
+            out.append(f"| {m['mode']} | {'yes' if m['bit_exact'] else 'NO'} | {m['t_bits']:.4f} | {m['t2_bits']:.4f} | "
+                       f"{100 * (1 - m['t2_bits'] / m['t_bits']):.1f}% | {m['t_decode_ms']:.1f} ms | "
+                       f"{m['t2_decode_ms']:.1f} ms |")
+        out.append("")
+    if savings:
+        verdicts.append(("7 T2 works", ok, f"every round trip bit-exact and smaller than T: {'yes' if ok else 'NO'}; "
+                         f"saving {100 * min(savings):.1f}-{100 * max(savings):.1f}% of T's bytes (dense)"))
+    return out
+
+
 def save(res, out):
     (out / "t_ideas.json").write_text(json.dumps(res, indent=1))
 
@@ -662,7 +1045,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", required=True, help="run folder with captures/ (scripts/run_a5000.sh)")
     ap.add_argument("--output", required=True)
-    ap.add_argument("--stages", default="capture,adapt,layer0,layer0x,anchor,classes,gpu,calib,report")
+    ap.add_argument("--stages", default="capture,adapt,layer0,layer0x,layer0m,anchor,classes,gpu,calib,calib_loo,t2,"
+                                        "report")
     ap.add_argument("--redo", default="", help="stages to measure again")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--train-set", default="wikitext", choices=sorted(TRAIN_SETS))
@@ -721,6 +1105,12 @@ def main():
             stage_layer0x(args, res, args.device, out)
         elif s == "calib":
             stage_calib(args, res, args.device, out)
+        elif s == "layer0m":
+            stage_layer0m(args, res, args.device, out)
+        elif s == "calib_loo":
+            stage_calib_loo(args, res, args.device, out)
+        elif s == "t2":
+            stage_t2(args, res, args.device, out)
         elif s == "report":
             for line in report(res, out):
                 print(line)
