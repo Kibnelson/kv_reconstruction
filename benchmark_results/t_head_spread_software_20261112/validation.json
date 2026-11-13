@@ -1,0 +1,444 @@
+{
+  "format": "t_head_spread_local_validation_v1",
+  "date": "2026-11-12",
+  "timezone": "America/Toronto",
+  "base_commit": "d95fd10a1fae447d47c4ac6abaf77b90af1b7952",
+  "gpu_executed": false,
+  "nuc_validation": "PENDING",
+  "pretrained_kv_gain": "NOT MEASURED",
+  "software": {
+    "torch": "2.11.0+cpu",
+    "triton": "3.6.0",
+    "numpy": "2.3.5",
+    "triton_interpreter": true
+  },
+  "unique_unit_tests_passed": 8,
+  "interpreted_policy_schedule_checks_passed": 12,
+  "offline_cuda_compilations_passed": 12,
+  "fresh_process_packet_decodes_passed": 18,
+  "baseline_source_pins_checked": 6,
+  "real_cuda_entry_rejects_cpu_workspace": true,
+  "experimental_sources": [
+    {
+      "path": "kv_compare/head_spread.py",
+      "sha256": "68920db90f555d90b7097f2c9789b8f97ed4fa721dcbc67f0b83e81d28e1d1a8"
+    },
+    {
+      "path": "kv_compare/head_spread_checks.py",
+      "sha256": "552f6bb8248f4babf1df45ff82645cd7e0e611495b6981fba27c4eb2cd0dd713"
+    },
+    {
+      "path": "kv_compare/head_spread_kernels.py",
+      "sha256": "f1bc735fbe2faae988068245e9f80acc6356a7bf4264396c58e4989267b99285"
+    },
+    {
+      "path": "kv_compare/head_spread_wire.py",
+      "sha256": "a16861082a9075bafb9914baaf4c73edd229d05981f30f080f9001090e5f4828"
+    },
+    {
+      "path": "kv_compare/test_head_spread.py",
+      "sha256": "19a0dc824806d44a3adc739185b36d7f06943f0139291db359f464c88df6b111"
+    },
+    {
+      "path": "scripts/bench_head_spread.py",
+      "sha256": "f6e64e5a11dcb8a25608e8d9e46f2452d57a2d051f827d01bd49bf7f9a6ca3dc"
+    },
+    {
+      "path": "scripts/check_head_spread_compile.py",
+      "sha256": "4d970bc026e62326c8cc3bbad7f901880f38cfe80c1ddb9cedbe4764fd1adf76"
+    },
+    {
+      "path": "scripts/run_head_spread_nuc.sh",
+      "sha256": "af37a35181e2f9e222c45856f508472aaf32008f65e9384dbc8d780e6aa4ed95"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "head_spread_driver_check",
+      "layers": 2,
+      "tokens": 32,
+      "fixture": "synthetic-functional-fixture",
+      "gpu_executed": false,
+      "full_model": true,
+      "frozen_dev_choices_unchanged": true,
+      "all_matched_globals_have_identical_packets": true,
+      "cpu_cannot_pass_gpu_gate": true,
+      "rows": [
+        {
+          "mode": "dense",
+          "variant": "legacy_global",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "078911daf0fe3dbe64a089ae77d0d3e054666d746d7bc704b63988401e8ea9cd",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "matched_global",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "078911daf0fe3dbe64a089ae77d0d3e054666d746d7bc704b63988401e8ea9cd",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "head_selected",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "11509fe77fcd2bc31ba143b701d2b23183025d92b9c9e95c8cd56bd0974d3e1f",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "learned_selected",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "078911daf0fe3dbe64a089ae77d0d3e054666d746d7bc704b63988401e8ea9cd",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "head_shifted_control",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "7093848b01b94bc5336573290439a1cfa1ce576a761311b0ee56134f7c628c8f",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "learned_shifted_control",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "078911daf0fe3dbe64a089ae77d0d3e054666d746d7bc704b63988401e8ea9cd",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "hbh",
+          "variant": "legacy_global",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "b160d8bcc9c89ec28994105fd89296c336e4dbd3c65176d0894866f9f05a98f9",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "hbh",
+          "variant": "matched_global",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "b160d8bcc9c89ec28994105fd89296c336e4dbd3c65176d0894866f9f05a98f9",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "hbh",
+          "variant": "head_selected",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "b160d8bcc9c89ec28994105fd89296c336e4dbd3c65176d0894866f9f05a98f9",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "hbh",
+          "variant": "learned_selected",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "b160d8bcc9c89ec28994105fd89296c336e4dbd3c65176d0894866f9f05a98f9",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "hbh",
+          "variant": "head_shifted_control",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "b160d8bcc9c89ec28994105fd89296c336e4dbd3c65176d0894866f9f05a98f9",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "hbh",
+          "variant": "learned_shifted_control",
+          "case": "test_text",
+          "values": 4096,
+          "bit_exact": true,
+          "packet_sha256": "b160d8bcc9c89ec28994105fd89296c336e4dbd3c65176d0894866f9f05a98f9",
+          "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 4096,
+            "words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "head_spread_final_driver_check",
+      "layers": 1,
+      "tokens": 32,
+      "fixture": "synthetic-functional-fixture",
+      "gpu_executed": false,
+      "full_model": false,
+      "frozen_dev_choices_unchanged": true,
+      "all_matched_globals_have_identical_packets": true,
+      "cpu_cannot_pass_gpu_gate": true,
+      "rows": [
+        {
+          "mode": "dense",
+          "variant": "legacy_global",
+          "case": "test_text",
+          "values": 2048,
+          "bit_exact": true,
+          "packet_sha256": "dabb1de202ff3a89387b87466865c227fbbbad8249f63df55aa0e75de81c99ca",
+          "source_words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 2048,
+            "words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "matched_global",
+          "case": "test_text",
+          "values": 2048,
+          "bit_exact": true,
+          "packet_sha256": "dabb1de202ff3a89387b87466865c227fbbbad8249f63df55aa0e75de81c99ca",
+          "source_words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 2048,
+            "words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "head_selected",
+          "case": "test_text",
+          "values": 2048,
+          "bit_exact": true,
+          "packet_sha256": "dabb1de202ff3a89387b87466865c227fbbbad8249f63df55aa0e75de81c99ca",
+          "source_words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 2048,
+            "words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "learned_selected",
+          "case": "test_text",
+          "values": 2048,
+          "bit_exact": true,
+          "packet_sha256": "dabb1de202ff3a89387b87466865c227fbbbad8249f63df55aa0e75de81c99ca",
+          "source_words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 2048,
+            "words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "head_shifted_control",
+          "case": "test_text",
+          "values": 2048,
+          "bit_exact": true,
+          "packet_sha256": "dabb1de202ff3a89387b87466865c227fbbbad8249f63df55aa0e75de81c99ca",
+          "source_words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 2048,
+            "words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        },
+        {
+          "mode": "dense",
+          "variant": "learned_shifted_control",
+          "case": "test_text",
+          "values": 2048,
+          "bit_exact": true,
+          "packet_sha256": "dabb1de202ff3a89387b87466865c227fbbbad8249f63df55aa0e75de81c99ca",
+          "source_words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+          "fresh_process_proof": {
+            "bit_exact": true,
+            "values": 2048,
+            "words_sha256": "4646cca2872c427e621e7b8db698f2bc7553b78713f1251315316ff8e45edab6",
+            "gpu_executed": false,
+            "known_source_words": false,
+            "data_input_types": [
+              "frozen state",
+              "compact packet"
+            ]
+          }
+        }
+      ],
+      "shared_state_accounting_exercised": true
+    }
+  ]
+}
