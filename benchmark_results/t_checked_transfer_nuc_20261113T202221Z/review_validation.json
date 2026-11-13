@@ -1,0 +1,396 @@
+{
+  "aggregates_recomputed": [
+    {
+      "bpv": 16.00000618185316,
+      "fresh_total_ms": 3386.6810728795826,
+      "method": "raw_bf16",
+      "packet_bytes": 3758097836,
+      "path": "legacy_checked",
+      "retrieval_total_ms": 1554.1299120523036,
+      "saved_percent": -3.86365822446777e-05
+    },
+    {
+      "bpv": 16.00000618185316,
+      "fresh_total_ms": 1045.5582942813635,
+      "method": "raw_bf16",
+      "packet_bytes": 3758097836,
+      "path": "pinned_checked",
+      "retrieval_total_ms": 526.6448436304927,
+      "saved_percent": -3.86365822446777e-05
+    },
+    {
+      "bpv": 8.95226069859096,
+      "fresh_total_ms": 1720.6051372922957,
+      "method": "t_fast",
+      "packet_bytes": 2102716160,
+      "path": "legacy_checked",
+      "retrieval_total_ms": 618.1390839628875,
+      "saved_percent": 44.0483706338065
+    },
+    {
+      "bpv": 8.95226069859096,
+      "fresh_total_ms": 684.7810158506036,
+      "method": "t_fast",
+      "packet_bytes": 2102716160,
+      "path": "pinned_checked",
+      "retrieval_total_ms": 332.2017639875412,
+      "saved_percent": 44.0483706338065
+    },
+    {
+      "bpv": 8.22909266608102,
+      "fresh_total_ms": 1817.5948834978044,
+      "method": "t_hbh",
+      "packet_bytes": 1932857712,
+      "path": "legacy_checked",
+      "retrieval_total_ms": 749.3235799483955,
+      "saved_percent": 48.56817083699363
+    },
+    {
+      "bpv": 8.22909266608102,
+      "fresh_total_ms": 863.721591886133,
+      "method": "t_hbh",
+      "packet_bytes": 1932857712,
+      "path": "pinned_checked",
+      "retrieval_total_ms": 485.5401632376015,
+      "saved_percent": 48.56817083699363
+    },
+    {
+      "bpv": 12.05019612823214,
+      "fresh_total_ms": 2840.1264525018632,
+      "method": "splitzip",
+      "packet_bytes": 2830362406,
+      "path": "legacy_checked",
+      "retrieval_total_ms": 1187.948813661933,
+      "saved_percent": 24.68627419854913
+    },
+    {
+      "bpv": 12.05019612823214,
+      "fresh_total_ms": 795.3637456521392,
+      "method": "splitzip",
+      "packet_bytes": 2830362406,
+      "path": "pinned_checked",
+      "retrieval_total_ms": 397.4886448122561,
+      "saved_percent": 24.68627419854913
+    },
+    {
+      "bpv": 10.872737050056458,
+      "fresh_total_ms": 2758.897568564862,
+      "method": "exans",
+      "packet_bytes": 2553799612,
+      "path": "legacy_checked",
+      "retrieval_total_ms": 1081.5933882258832,
+      "saved_percent": 32.04539343714714
+    },
+    {
+      "bpv": 10.872737050056458,
+      "fresh_total_ms": 931.1014120467007,
+      "method": "exans",
+      "packet_bytes": 2553799612,
+      "path": "pinned_checked",
+      "retrieval_total_ms": 379.12156619131565,
+      "saved_percent": 32.04539343714714
+    }
+  ],
+  "archive": {
+    "all_members_match_uploaded_git_blobs": true,
+    "bytes": 162278,
+    "crc_valid": true,
+    "git_blob_sha1": "956dbf1238a84d9a17ee254c3916fcdb246dc6f9",
+    "members": 167,
+    "sha256": "6757fc7b642a0b742a8b3dcc46123f3ce40ea75a1a027c123dba74f019f73006"
+  },
+  "automatic_merge": false,
+  "fast_T_host_stage_share_fraction": 0.8601891738591173,
+  "limitations": [
+    "Host preparation/restoration combine copies, CPU checksum and bookkeeping; their separate contributions were not timed.",
+    "Warm codec state and reusable buffer setup are outside the reported paths.",
+    "Measurements cover four WikiText-2 windows from one model, not cross-dataset serving workloads.",
+    "P/D page layout, arbitrary request lengths, buffer lifetime and actual worker integration remain unvalidated."
+  ],
+  "per_case_comparison": [
+    {
+      "case": "ds_wikitext2_r0",
+      "fast_T_vs_splitzip_fresh_gain_fraction": 0.13787856111661845,
+      "fast_T_vs_splitzip_retrieval_gain_fraction": 0.16658724804127711
+    },
+    {
+      "case": "ds_wikitext2_r1",
+      "fast_T_vs_splitzip_fresh_gain_fraction": 0.14370395395034363,
+      "fast_T_vs_splitzip_retrieval_gain_fraction": 0.16995421128056953
+    },
+    {
+      "case": "ds_wikitext2_r2",
+      "fast_T_vs_splitzip_fresh_gain_fraction": 0.13754136135515915,
+      "fast_T_vs_splitzip_retrieval_gain_fraction": 0.1661327462521267
+    },
+    {
+      "case": "ds_wikitext2_r3",
+      "fast_T_vs_splitzip_fresh_gain_fraction": 0.13700505188582346,
+      "fast_T_vs_splitzip_retrieval_gain_fraction": 0.15432159406664103
+    }
+  ],
+  "protected_refs": {
+    "main": "c9eebefa92eb3e9319358a6ca830cfbff7bcb70f",
+    "original_T": "d95fd10a1fae447d47c4ac6abaf77b90af1b7952"
+  },
+  "review_schema": "checked_transfer_archive_review_v1",
+  "scope": {
+    "buffer_setup_timed": false,
+    "cases": [
+      "ds_wikitext2_r0",
+      "ds_wikitext2_r1",
+      "ds_wikitext2_r2",
+      "ds_wikitext2_r3"
+    ],
+    "gpu": "NVIDIA RTX A4500",
+    "local_serial_host_staged": true,
+    "model": {
+      "attention_scaling": 1.0,
+      "captures": [
+        {
+          "kv_sha256": "7c4201982e1046cf696488a50bb75a381e9eaa15c78e3d8373a07f03b83d4cd4",
+          "name": "wtrain0",
+          "queries": true,
+          "seconds": 3.1879540402442217,
+          "shape": [
+            28,
+            8192,
+            1024
+          ],
+          "source": "/home/nelson/kv_a5000/runs/dataset_texts/wikitext2_train.txt tokens 0-8190",
+          "tokens": 8192
+        },
+        {
+          "kv_sha256": "1a220acb4210c00160b1378a72c840bf0fe7a6540a6ce834ad0c4d8051ab7253",
+          "name": "wtrain1",
+          "queries": true,
+          "seconds": 2.2469836119562387,
+          "shape": [
+            28,
+            8192,
+            1024
+          ],
+          "source": "/home/nelson/kv_a5000/runs/dataset_texts/wikitext2_train.txt tokens 8191-16381",
+          "tokens": 8192
+        },
+        {
+          "kv_sha256": "f0e055a34ab9ee79985253dfebc7d0e8387c0ea99f607f00a8f6010a054982dd",
+          "name": "wtrain2",
+          "queries": true,
+          "seconds": 1.9814241286367178,
+          "shape": [
+            28,
+            8192,
+            1024
+          ],
+          "source": "/home/nelson/kv_a5000/runs/dataset_texts/wikitext2_train.txt tokens 16382-24572",
+          "tokens": 8192
+        },
+        {
+          "kv_sha256": "1af820d574ff501f41e4d11ebfb946f792f9a99b17fdae106d6f15f744eb5e20",
+          "name": "wtrain3",
+          "queries": true,
+          "seconds": 1.9714480843394995,
+          "shape": [
+            28,
+            8192,
+            1024
+          ],
+          "source": "/home/nelson/kv_a5000/runs/dataset_texts/wikitext2_train.txt tokens 24573-32763",
+          "tokens": 8192
+        },
+        {
+          "kv_sha256": "a3e59fbeb462b78f7349261cb68f9b4e46a30acd76cc573ff82f8cc114b6e5ae",
+          "name": "wtrain4",
+          "queries": true,
+          "seconds": 1.977654667571187,
+          "shape": [
+            28,
+            8192,
+            1024
+          ],
+          "source": "/home/nelson/kv_a5000/runs/dataset_texts/wikitext2_train.txt tokens 32764-40954",
+          "tokens": 8192
+        },
+        {
+          "kv_sha256": "526e4d0a97fff166a556122ba13c5b652c3955d29b59146c7e04cebed90e01f1",
+          "name": "wtrain5",
+          "queries": true,
+          "seconds": 1.9853328168392181,
+          "shape": [
+            28,
+            8192,
+            1024
+          ],
+          "source": "/home/nelson/kv_a5000/runs/dataset_texts/wikitext2_train.txt tokens 40955-49145",
+          "tokens": 8192
+        },
+        {
+          "kv_sha256": "9292152bd11461dd17e99b6b8935dbaadc559c456113b37aa9534221f4c12d84",
+          "name": "wtables",
+          "queries": false,
+          "seconds": 1.328642601147294,
+          "shape": [
+            28,
+            8192,
+            1024
+          ],
+          "source": "/home/nelson/kv_a5000/runs/dataset_texts/wikitext2_train.txt tokens 49146-57336",
+          "tokens": 8192
+        }
+      ],
+      "head_dim": 128,
+      "inv_freq": [
+        1.0,
+        0.8146172165870667,
+        0.663601279258728,
+        0.5405809879302979,
+        0.44036662578582764,
+        0.3587302267551422,
+        0.2922278344631195,
+        0.2380538135766983,
+        0.193922758102417,
+        0.1579728126525879,
+        0.12868738174438477,
+        0.10483095049858093,
+        0.08539710193872452,
+        0.06956595182418823,
+        0.05666961893439293,
+        0.046164050698280334,
+        0.03760603070259094,
+        0.030634520575404167,
+        0.02495540864765644,
+        0.020329104736447334,
+        0.016560440883040428,
+        0.013490419834852219,
+        0.010989529080688953,
+        0.008952259086072445,
+        0.00729266507551074,
+        0.005940730683505535,
+        0.00483942124992609,
+        0.003942275885492563,
+        0.0032114461064338684,
+        0.002118406817317009,
+        0.0012905480107292533,
+        0.000762541254516691,
+        0.000429556705057621,
+        0.00022276341042015702,
+        9.708286233944818e-05,
+        2.389053042861633e-05,
+        1.9461638657958247e-05,
+        1.585378595336806e-05,
+        1.291476746700937e-05,
+        1.052059178618947e-05,
+        8.570255886297673e-06,
+        6.981477326917229e-06,
+        5.687232260243036e-06,
+        4.632917352864752e-06,
+        3.7740544485131977e-06,
+        3.0744097330170916e-06,
+        2.504467147446121e-06,
+        2.0401819256221643e-06,
+        1.6619674170215148e-06,
+        1.3538673329094308e-06,
+        1.1028836297555245e-06,
+        8.984279702417552e-07,
+        7.318749339901842e-07,
+        5.961979354651703e-07,
+        4.856731266045244e-07,
+        3.956376986025134e-07,
+        3.2229328894572973e-07,
+        2.6254565455019474e-07,
+        2.1387423032592778e-07,
+        1.7422563303171046e-07,
+        1.4192720243499934e-07,
+        1.1561634494228201e-07,
+        9.418306490260875e-08,
+        7.672314694673332e-08
+      ],
+      "kv_heads": 8,
+      "layers": 28,
+      "model": "unsloth/Llama-3.2-3B",
+      "query_heads": 24,
+      "revision": "d4446454d87d51aa42e1fb174f25acc5f8762331",
+      "rope_layout": "half",
+      "rope_scaling": {
+        "factor": 32.0,
+        "high_freq_factor": 4.0,
+        "low_freq_factor": 1.0,
+        "original_max_position_embeddings": 8192,
+        "rope_type": "llama3"
+      },
+      "rope_theta": 500000.0,
+      "tokens": 8192,
+      "torch": "2.11.0+cu128",
+      "transformers": "4.57.6"
+    },
+    "network_measured": false,
+    "new_GPU_execution_during_review": false,
+    "overlap_measured": false,
+    "packet_SHA256_inside_timers": true,
+    "raw_bytes_per_window": 939524096,
+    "repeats": 3,
+    "rounds": 3,
+    "serving_TTFT_measured": false,
+    "shape": [
+      28,
+      8192,
+      2048
+    ],
+    "shared_state_load_timed": false,
+    "ssd_measured": false
+  },
+  "stages_ms": {
+    "exans": {
+      "decode_ms": 18.268659245222807,
+      "encode_ms": 195.16111118718982,
+      "pack_D2H_ms": 357.68555384129286,
+      "restore_H2D_ms": 359.9707647226751,
+      "total_ms": 931.1014120467007
+    },
+    "raw_bf16": {
+      "decode_ms": 3.3219349570572376,
+      "encode_ms": 0.0047907233238220215,
+      "pack_D2H_ms": 519.7281357832253,
+      "restore_H2D_ms": 522.5456650368869,
+      "total_ms": 1045.5582942813635
+    },
+    "splitzip": {
+      "decode_ms": 3.095019608736038,
+      "encode_ms": 6.6016437485814095,
+      "pack_D2H_ms": 391.75799023360014,
+      "restore_H2D_ms": 393.848676700145,
+      "total_ms": 795.3637456521392
+    },
+    "t_fast": {
+      "decode_ms": 35.237382631748915,
+      "encode_ms": 60.57297345250845,
+      "pack_D2H_ms": 294.02143275365233,
+      "restore_H2D_ms": 295.01978354528546,
+      "total_ms": 684.7810158506036
+    },
+    "t_hbh": {
+      "decode_ms": 213.60112726688385,
+      "encode_ms": 108.70522260665894,
+      "pack_D2H_ms": 270.2236562035978,
+      "restore_H2D_ms": 271.14930562675,
+      "total_ms": 863.721591886133
+    }
+  },
+  "uploaded_commit": "83766a76ac4bf24ef782ebb9bf5463a1b04368ff",
+  "validation": {
+    "aggregates_recomputed": true,
+    "all_five_improvement_gates_recomputed": true,
+    "fresh_samples": 360,
+    "frozen_T_packet_rows": 48,
+    "gpu_workers": 15,
+    "independent_receiver_proofs": 40,
+    "input_fingerprints_match_reference": true,
+    "passed": true,
+    "retrieval_samples": 360,
+    "rows": 120,
+    "shared_state_fingerprints_match_reference": true,
+    "source_files_checked": 8,
+    "timed_path_samples": 720
+  }
+}
