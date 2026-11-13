@@ -9,8 +9,9 @@
 #
 # Options (environment): NUM_DECODE (3), SHARE_GPU=1 (every engine on GPU 0, small memory shares: the NUC smoke),
 # SMOKE=1 (few codecs, links, rates and prompts), STAGES (pd_bench stages), CODECS, LINKS, RATES, NUM_PROMPTS,
-# PROMPT_TOKENS (2048,8192), OUTPUT_LEN (128), TTFT_SLO_MS (2000), PORT_BASE (18000), NO_PUSH=1, KEEP_ENGINES=1
-# (leave the engines running after the benchmark, for manual checks).
+# PROMPT_TOKENS (2048,8192), OUTPUT_LEN (128), TTFT_SLO_MS (2000), PORT_BASE (from the Slurm job id: a shared node
+# runs other people's jobs), NO_PUSH=1, KEEP_ENGINES=1 (leave the engines running after the benchmark, for manual
+# checks). On the cluster, scripts/pd_a5000.sbatch runs the setup and this script as one batch job.
 set -Eeuo pipefail
 trap 'echo "PD RUN STOPPED at line $LINENO (exit $?)" >&2' ERR
 BRANCH=pd-vllm-protocol
@@ -19,6 +20,10 @@ REPO=$PWD
 KV_HOME=${KV_HOME:-$HOME/kv_a5000}
 KV_RUNS=${KV_RUNS:-$KV_HOME/runs}
 export HF_HOME=$KV_HOME/hf TMPDIR=$KV_HOME/tmp
+# every cache under KV_HOME, not the home directory (its quota ran out installing vLLM on gpu-grad-01): pip, vLLM's
+# compile cache and FlashInfer follow XDG_CACHE_HOME; Triton has its own variable
+export XDG_CACHE_HOME=$KV_HOME/cache TRITON_CACHE_DIR=$KV_HOME/cache/triton
+mkdir -p "$TMPDIR" "$TRITON_CACHE_DIR"
 MODEL=${MODEL:-llama32_3b}
 case "$MODEL" in
     llama32_3b) MODEL_ID=${MODEL_ID:-unsloth/Llama-3.2-3B}; REVISION=${REVISION:-d4446454d87d51aa42e1fb174f25acc5f8762331} ;;
@@ -27,7 +32,8 @@ esac
 TAG=$(echo "${MODEL#/}" | tr '/.' '__' | tr 'A-Z' 'a-z')
 RUN=$KV_RUNS/$TAG
 NUM_DECODE=${NUM_DECODE:-3}
-PORT_BASE=${PORT_BASE:-18000}
+# ports from the job id: ports PORT_BASE .. PORT_BASE+303 are used, and other jobs on the node may run engines too
+PORT_BASE=${PORT_BASE:-$((20000 + ${SLURM_JOB_ID:-0} % 100 * 400))}
 if [ -z "${SLURM_JOB_ID:-}" ] && [ "${ALLOW_NO_SLURM:-0}" != 1 ]; then
     echo "STOP: not inside a Slurm allocation (or set ALLOW_NO_SLURM=1 on the NUC)"; exit 1
 fi
@@ -39,7 +45,16 @@ git fetch -q origin "$BRANCH"
 VPY=$KV_HOME/venv_vllm/bin/python
 [ -x "$VPY" ] || { echo "STOP: no $KV_HOME/venv_vllm: run scripts/pd_setup.sh first"; exit 1; }
 [ -s "$RUN/pd_codecs.pt" ] || { echo "STOP: no $RUN/pd_codecs.pt: run scripts/pd_setup.sh first"; exit 1; }
-NGPU=$(nvidia-smi --query-gpu=index --format=csv,noheader | wc -l)
+# the GPUs this job may use, in Slurm's order: CUDA_VISIBLE_DEVICES as Slurm set it (0..N-1 where the node confines
+# jobs to their devices, as gpu-grad-01 does; the physical ids elsewhere), else every GPU nvidia-smi lists. Engine i
+# gets the i-th of them, never a bare index that could be another job's card.
+if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
+    IFS=, read -r -a DEVS <<< "$CUDA_VISIBLE_DEVICES"
+else
+    mapfile -t DEVS < <(nvidia-smi --query-gpu=index --format=csv,noheader)
+fi
+NGPU=${#DEVS[@]}
+echo "== GPUs of this job: ${DEVS[*]} (prefill on ${DEVS[0]})"
 if [ "${SHARE_GPU:-0}" != 1 ] && [ "$NGPU" -lt $((NUM_DECODE + 1)) ]; then
     echo "STOP: $NGPU GPU(s) visible; 1 prefill + $NUM_DECODE decode engines need $((NUM_DECODE + 1)) (or SHARE_GPU=1)"
     exit 1
@@ -91,6 +106,22 @@ if [ ! -s "$PROMPTS/check.jsonl" ]; then
 fi
 LINKFILE=$OUT/link.json
 echo '{"gbps": 100}' > "$LINKFILE"
+"$VPY" - "$PORT_BASE" "$NUM_DECODE" <<'EOF'
+import socket, sys
+base, n = int(sys.argv[1]), int(sys.argv[2])
+busy = []
+for port in [base, base + 100] + [base + 200 + i for i in range(1, n + 1)] + [base + 300 + i for i in range(1, n + 1)]:
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", port))
+    except OSError:
+        busy.append(port)
+    finally:
+        s.close()
+if busy:
+    sys.exit(f"STOP: port(s) {busy} already in use on this node (another job?): start again with PORT_BASE=<another>")
+print(f"   ports {base}-{base + 300 + n} free")
+EOF
 PIDS=()
 cleanup() {
     if [ "${KEEP_ENGINES:-0}" != 1 ]; then
@@ -104,12 +135,13 @@ trap cleanup EXIT
 serve() {   # name gpu port mem role extra_json
     local name=$1 gpu=$2 port=$3 mem=$4 role=$5 extra=$6
     local cfg="{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_role\":\"$role\",\"kv_connector_extra_config\":$extra}"
-    CUDA_VISIBLE_DEVICES=$gpu PYTHONPATH=$REPO nohup "$KV_HOME/venv_vllm/bin/vllm" serve "$MP" --port "$port" \
+    CUDA_VISIBLE_DEVICES=${DEVS[$gpu]} PYTHONPATH=$REPO nohup "$KV_HOME/venv_vllm/bin/vllm" serve "$MP" \
+        --host 127.0.0.1 --port "$port" \
         --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" \
         --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" \
         --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1 &
     PIDS+=($!)
-    echo "   $name on GPU $gpu, port $port (log $OUT/engine_$name.log)"
+    echo "   $name on GPU ${DEVS[$gpu]}, port $port (log $OUT/engine_$name.log)"
 }
 COMMON="\"codecs_file\":\"$RUN/pd_codecs.pt\",\"splitzip_source\":\"$KV_HOME/sources/splitzip\",\"adacode_source\":\"$KV_HOME/sources/adacode\",\"log_dir\":\"$LOGS\""
 P_PORT=$((PORT_BASE + 100))

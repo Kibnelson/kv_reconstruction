@@ -17,6 +17,15 @@ REPO=$PWD
 KV_HOME=${KV_HOME:-$HOME/kv_a5000}
 mkdir -p "$KV_HOME"/{hf,sources,tmp}
 export HF_HOME=$KV_HOME/hf TMPDIR=$KV_HOME/tmp
+# every cache under KV_HOME, not the home directory (its quota ran out installing vLLM on gpu-grad-01): pip, vLLM and
+# FlashInfer follow XDG_CACHE_HOME; Triton has its own variable
+export XDG_CACHE_HOME=$KV_HOME/cache TRITON_CACHE_DIR=$KV_HOME/cache/triton
+mkdir -p "$TRITON_CACHE_DIR"
+case "$KV_HOME/" in
+    "$HOME"/*) echo "NOTE: KV_HOME ($KV_HOME) is in your home directory. On a cluster with a home quota (gpu-grad-01:"
+               echo "      'Disk quota exceeded' installing vLLM), set KV_HOME to a place with about 70 GB first." ;;
+esac
+command -v quota >/dev/null && quota -s 2>/dev/null | tail -n +2 | sed 's/^/   quota: /' || true
 
 if [ -z "${SLURM_JOB_ID:-}" ] && [ "${ALLOW_NO_SLURM:-0}" != 1 ]; then
     echo "STOP: not inside a Slurm allocation (SLURM_JOB_ID is empty). Request the GPU first (runbook step 1)."

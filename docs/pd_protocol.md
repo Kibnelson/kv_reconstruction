@@ -85,7 +85,35 @@ Success markers:
 - `check <codec>: OK` for each codec;
 - `PUSHED benchmark_results/llama32_3b_pdvllm_..._smoke`.
 
-**A5000, four GPUs (inside the allocation):**
+**A5000, four GPUs (`gpu-grad-01`, account `oana2026`, QoS `research12h`).** The QoS allows 4 GPUs at a time,
+so 1 prefill + 3 decode is the largest layout it gives. Run it as one batch job (`scripts/pd_a5000.sbatch`): the
+codec setup, the vLLM setup and the run, with no SSH session or login-host tmux to lose. From the login host, in
+the repository's root:
+
+```bash
+module load slurm
+cd ~/kv_llama32
+git fetch -q origin pd-vllm-protocol && git checkout -q pd-vllm-protocol && git pull -q --ff-only origin pd-vllm-protocol
+export KV_HOME=/a/place/with/70GB/kv_a5000                 # not the home directory: see below
+SMOKE=1 sbatch --time=3:00:00 scripts/pd_a5000.sbatch       # first: the whole path with few prompts
+squeue --me; tail -f kv-pd.<job id>.out                     # success: PUSHED benchmark_results/..._smoke
+sbatch scripts/pd_a5000.sbatch                              # then: the full sweep
+```
+
+Before the first job:
+- **Disk.** `KV_HOME` holds both Python environments (about 8 and 12 GB), the model (6 GB), the calibration
+  captures (about 7 GB) and every cache (pip, Triton, vLLM's compile cache). The home directory's quota ran out
+  installing vLLM alone in September ("Disk quota exceeded"), so put `KV_HOME` on larger storage (`quota -s` and
+  `df -h` show what you have). `/tmp/$USER` on gpu-grad-01 had 84 GB free, but it is the node's own disk, shared and
+  not backed up: it works only while every job runs on that node. Results do not depend on it: they are pushed.
+- **Push access** from the compute node without a prompt (an SSH key without a passphrase, or a stored token), as
+  in `docs/a5000_runbook.md`. Without it the results stay committed in the job's checkout.
+- **The node is shared.** The engines listen on 127.0.0.1 only, their ports come from the job id (`PORT_BASE`), and
+  the run stops at once if one is taken. Engine i gets the i-th GPU of Slurm's `CUDA_VISIBLE_DEVICES`.
+- **Another node.** If gpu-grad-01 has no 4 free cards, `sbatch --nodelist=gpu-grad-02 scripts/pd_a5000.sbatch`
+  (8 A5000s, the same setup; `KV_HOME` must then be shared storage, not `/tmp`).
+
+The interactive form still works, from tmux or screen on the login host, if you want to watch the engines:
 
 ```bash
 srun --partition=all --account=oana2026 --qos=research12h --nodelist=gpu-grad-01 \
@@ -100,8 +128,8 @@ set -Eeuo pipefail
 [ -n "${SLURM_JOB_ID:-}" ] || { echo "STOP: run this inside the allocation"; exit 1; }
 cd ~/kv_llama32
 git fetch -q origin pd-vllm-protocol && git checkout -q pd-vllm-protocol && git pull -q --ff-only origin pd-vllm-protocol
-export KV_HOME=$HOME/kv_a5000
-bash scripts/a5000_setup.sh
+export KV_HOME=/a/place/with/70GB/kv_a5000
+SKIP_EXANS=1 SKIP_IBP=1 bash scripts/a5000_setup.sh
 bash scripts/pd_setup.sh
 MODEL=llama32_3b bash scripts/run_pd_vllm.sh
 A5000
@@ -120,6 +148,10 @@ Defaults run every stage: check, sweep, colocated, multiturn, report.
 
 ## Honest limits
 
+- On gpu-grad-01 (from `nvidia-smi topo -m` in a 4-GPU job in September), GPU 0 reaches the others through the host
+  bridges, while GPUs 1-3 sit behind one PCIe switch. The transport stages every transfer through pinned host
+  memory, so the three decode engines probably share that switch's one link to the host. That link and PCIe bound
+  the achieved speed, which every transfer records.
 - The links are emulated on one machine. The transfer bytes and every codec's GPU work are real; the network is a
   pacer on top of a PCIe-bound copy path. Above about 190 Gb/s the machine, not the setting, sets the speed, and the
   achieved speed is reported per run.
