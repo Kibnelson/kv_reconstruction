@@ -33,8 +33,8 @@ export KV_HOME=${KV_HOME:-$HOME/kv_a5000}
 echo "== job $SLURM_JOB_ID on $(hostname): GPUs ${CUDA_VISIBLE_DEVICES:-?}, KV_HOME $KV_HOME, commit $(git log --oneline -1)"
 nvidia-smi -L
 nvidia-smi topo -m || true
-# the codec environment and the authors' SplitZip and AdaCode; the PD runs need neither ExANS's CUDA toolkit (about
-# 8 GB) nor IBP: SKIP_EXANS=0 builds them as for the lossless benchmark
-SKIP_EXANS=${SKIP_EXANS:-1} SKIP_IBP=${SKIP_IBP:-1} bash scripts/a5000_setup.sh
+# the codec environment, the authors' sources, and the CUDA 12.8 toolkit that builds ExANS (about 8 GB; SKIP_EXANS=1
+# leaves ExANS out); IBP is not built (docs/pd_baselines.md)
+SKIP_EXANS=${SKIP_EXANS:-0} SKIP_IBP=${SKIP_IBP:-1} bash scripts/a5000_setup.sh
 bash scripts/pd_setup.sh
 MODEL=${MODEL:-llama32_3b} bash scripts/run_pd_vllm.sh

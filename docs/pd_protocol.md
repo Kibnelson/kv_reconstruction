@@ -1,5 +1,7 @@
 # PD transfer protocol on vLLM (1 prefill + 3 decode)
 
+Branch `pd-baselines` extends this with every published baseline, T2, 2 prefill + 2 decode, the direct GPU-to-GPU path, a CPU tier, and vLLM's NIXL and LMCache as references: `docs/pd_baselines.md`.
+
 Branch `pd-vllm-protocol`. Goal: in prefill/decode disaggregation on ordinary GPUs, show how many requests a
 system serves, and how fast, when the KV moves in our format (T) against the published bit-exact codecs. Then find
 out, before building any of it, whether a smarter protocol could avoid sending KV the decode side already holds or

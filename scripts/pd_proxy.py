@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Push proxy for the PD protocol (kv_compare/pd/connector.py): one prefill engine, N decode engines.
+"""Push proxy for the PD protocol (kv_compare/pd/connector.py): one or more prefill engines, N decode engines.
 
 Each request goes to the prefill engine (max_tokens 1, kv_transfer_params telling it where to send the KV and with
 which codec) and, at the same time, to one decode engine (told to wait for that transfer); the client gets the
@@ -13,7 +13,10 @@ request carries a "conversation_id" (vLLM's multi-turn benchmark, --send-convers
 Control (the benchmark driver):  POST /t/config {"codec": "ours-hbh", "verify": false, "mode": "pd" | "local",
   "policy": "round_robin" | "least_loaded" | "conversation", "reset_conversations": true}
   mode local: no transfer; requests go straight to the decode engines, which prefill themselves (the colocated
-  baseline on the same GPUs).
+  baseline on the same GPUs, and the CPU-tier runs).
+  mode nixl: vLLM's own NixlConnector (its toy proxy's flow): the prefill engine first (max_tokens 1,
+  do_remote_decode), then the decode engine with the kv_transfer_params the prefill returned (it pulls the KV).
+Several --prefill engines: each request goes to the one with the fewest requests in flight (each has its own link).
 """
 from __future__ import annotations
 
@@ -33,8 +36,12 @@ TIMEOUT = aiohttp.ClientTimeout(total=6 * 3600)
 
 
 class Proxy:
-    def __init__(self, prefill, decodes, policy, codec, log_path):
-        self.prefill = prefill.rstrip("/")
+    def __init__(self, prefills, decodes, policy, codec, log_path):
+        if isinstance(prefills, str):
+            prefills = [prefills]
+        self.prefills = [u.rstrip("/") for u in prefills]
+        self.prefill = self.prefills[0]
+        self.p_inflight = [0] * len(self.prefills)
         self.decodes = [(u.rstrip("/"), kv) for u, kv in decodes]
         self.policy = policy
         self.cfg = {"codec": codec, "verify": False, "mode": "pd"}
@@ -60,6 +67,9 @@ class Proxy:
             self.conv[conv] = i
         return i
 
+    def pick_prefill(self):
+        return min(range(len(self.prefills)), key=lambda j: (self.p_inflight[j], j))
+
     async def handle(self, raw: Request, path: str):
         body = await raw.json()
         conv = body.pop("conversation_id", None)
@@ -69,10 +79,37 @@ class Proxy:
         cfg = dict(self.cfg)
         rec = {"key": key, "dest": i, "codec": cfg["codec"], "mode": cfg["mode"], "conv": conv, "t_in": time.time()}
         headers = {"X-Request-Id": key}
-        self.inflight[i] += 1
         d_body = dict(body)
         p_task = None
+        if cfg["mode"] == "nixl":
+            j = self.pick_prefill()
+            rec["prefill"] = j
+            p_body = dict(body, max_tokens=1, stream=False)
+            p_body.pop("stream_options", None)
+            p_body.pop("min_tokens", None)
+            if "max_completion_tokens" in p_body:
+                p_body["max_completion_tokens"] = 1
+            p_body["kv_transfer_params"] = {"do_remote_decode": True, "do_remote_prefill": False,
+                                            "remote_engine_id": None, "remote_block_ids": None, "remote_host": None,
+                                            "remote_port": None}
+            self.p_inflight[j] += 1
+            try:
+                async with self.session.post(self.prefills[j] + path, json=p_body, headers=headers) as r:
+                    txt = await r.read()
+                    rec["t_prefill_done"] = time.time()
+                    if r.status != 200:
+                        rec.update(error=f"prefill engine {r.status}: {txt[:300]!r}", t_out=time.time())
+                        self.log(rec)
+                        return JSONResponse(status_code=r.status, content={"error": txt.decode(errors="replace")})
+                    ktp = json.loads(txt).get("kv_transfer_params")
+            finally:
+                self.p_inflight[j] -= 1
+            if ktp:
+                d_body["kv_transfer_params"] = ktp
+        self.inflight[i] += 1
         if cfg["mode"] == "pd":
+            j = self.pick_prefill()
+            rec["prefill"] = j
             p_body = dict(body, max_tokens=1, stream=False)
             p_body.pop("stream_options", None)
             if "max_completion_tokens" in p_body:
@@ -81,12 +118,16 @@ class Proxy:
                                             "t_verify": bool(cfg["verify"]), "t_conv": conv}
             d_body["kv_transfer_params"] = {"t_recv": True, "t_key": key}
 
-            async def prefill():
-                async with self.session.post(self.prefill + path, json=p_body, headers=headers) as r:
-                    txt = await r.read()
-                    rec["t_prefill_done"] = time.time()
-                    if r.status != 200:
-                        raise RuntimeError(f"prefill engine {r.status}: {txt[:300]!r}")
+            async def prefill(j=j):
+                self.p_inflight[j] += 1
+                try:
+                    async with self.session.post(self.prefills[j] + path, json=p_body, headers=headers) as r:
+                        txt = await r.read()
+                        rec["t_prefill_done"] = time.time()
+                        if r.status != 200:
+                            raise RuntimeError(f"prefill engine {r.status}: {txt[:300]!r}")
+                finally:
+                    self.p_inflight[j] -= 1
             p_task = asyncio.create_task(prefill())
 
         resp = await self.session.post(durl + path, json=d_body, headers=headers)
@@ -136,14 +177,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8000)
-    ap.add_argument("--prefill", required=True)
+    ap.add_argument("--prefill", action="append", default=[], help="prefill engine URL (repeat for several)")
     ap.add_argument("--decode", action="append", required=True, help="http_url=kv_host:kv_port (repeat)")
     ap.add_argument("--policy", default="round_robin", choices=["round_robin", "least_loaded", "conversation"])
     ap.add_argument("--codec", default="raw")
     ap.add_argument("--log", default=None)
     a = ap.parse_args()
     decodes = [tuple(d.split("=", 1)) for d in a.decode]
-    px = Proxy(a.prefill, decodes, a.policy, a.codec, a.log)
+    px = Proxy(a.prefill or [decodes[0][0]], decodes, a.policy, a.codec, a.log)
     app = FastAPI()
 
     @app.on_event("startup")
@@ -165,6 +206,8 @@ def main():
     @app.post("/t/config")
     async def config(raw: Request):
         body = await raw.json()
+        if body.get("mode") not in (None, "pd", "local", "nixl"):
+            return JSONResponse(status_code=400, content={"error": f"mode {body['mode']!r}"})
         px.cfg.update({k: v for k, v in body.items() if k in ("codec", "verify", "mode")})
         if body.get("policy") in ("round_robin", "least_loaded", "conversation"):
             px.policy = body["policy"]
@@ -175,6 +218,7 @@ def main():
     @app.get("/t/status")
     async def status():
         return {"cfg": px.cfg, "inflight": px.inflight, "decodes": px.decodes, "prefill": px.prefill,
+                "prefills": px.prefills, "prefill_inflight": px.p_inflight,
                 "policy": px.policy, "conversations": len(px.conv)}
 
     @app.get("/health")

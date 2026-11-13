@@ -4,7 +4,12 @@ scripts/run_a5000.sh (its calcap stage: the WikiText-2 train calibration capture
 ($KV_HOME/venv) on the GPU; the vLLM environment only loads the file.
 
   python scripts/pd_export_codecs.py --run $KV_HOME/runs/llama32_3b --output $KV_HOME/runs/llama32_3b/pd_codecs.pt \
-      --splitzip-source $KV_HOME/sources/splitzip
+      --splitzip-source $KV_HOME/sources/splitzip [--t2-sets wikitext,code,math,exam,news --texts DIR]
+
+--t2-sets adds T2's constant sets (bundle["t2"]): T's constants, rank-256 and head-group predictors fitted on each
+calibration set of kv_compare.t_ideas.cal_sets (WikiText-2 train, and MBPP, GSM8K train, MMLU dev and validation,
+PTB train: scripts/fetch_calib_texts.py). Missing calibration windows (cal_<domain>_<i>, about 1 GB each for the
+3B) are captured first with the run's model (scripts/t_ideas.py's capture_calib).
 """
 from __future__ import annotations
 
@@ -28,6 +33,10 @@ def main():
     ap.add_argument("--max-positions", type=int, default=32768)
     ap.add_argument("--splitzip-source", default=None)
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--t2-sets", default="", help="T2's constant sets, e.g. wikitext,code,math,exam,news")
+    ap.add_argument("--texts", default=None, help="folder with the calibration texts (cal_<domain>.txt)")
+    ap.add_argument("--cal-windows", type=int, default=3)
+    ap.add_argument("--tokens", type=int, default=8192)
     a = ap.parse_args()
     import torch
     from bench_llama_compare import TRAIN_SETS
@@ -61,10 +70,60 @@ def main():
     b = make_bundle(study, consts, rc, groups, a.max_positions, splitzip=sz, adacode=ada,
                     meta={"model": meta.get("model"), "revision": meta.get("revision"), "train_set": a.train_set,
                           "calibration": [d.name for d in study.train], "splitzip_book_from": cal.name})
+    names = [n for n in a.t2_sets.split(",") if n]
+    if names:
+        b["t2"] = t2_sets(a, run, names, b)
+        b["meta"]["t2_sets"] = names
     out = Path(a.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(b, out)
     print(json.dumps({"written": str(out), **b["meta"]}, indent=1))
+
+
+def t2_sets(a, run, names, main):
+    """{"order", "sets": {name: {consts, rank, groups}}, ...} for T2; WikiText reuses the main constants."""
+    import types
+    import torch
+    import t_ideas as drv
+    from kv_compare import fused, layerwise
+    from kv_compare import t_ideas as ti
+    from kv_compare.grouped import prepare_groups
+    from kv_compare.pd.export import _cpu
+    from kv_compare.predict import Study
+    every = ti.cal_sets(a.cal_windows)
+    unknown = [n for n in names if n not in every]
+    if unknown:
+        raise SystemExit(f"unknown T2 sets {unknown}; known: {sorted(every)}")
+    sets = {n: every[n] for n in names}
+    args = types.SimpleNamespace(run=str(run), texts=a.texts, tokens=a.tokens, model=None, revision=None)
+    got = drv.capture_calib(args, {}, a.device, {n: v for n, v in sets.items() if n != "wikitext"})
+    if got:
+        print(f"T2: captured {len(got)} calibration windows")
+    cap = run / "captures"
+    out = {"order": names, "sets": {}, "pick_tokens": 1024, "pick_layers": [1, 2], "cal_windows": a.cal_windows}
+    gl = [int(g) for g in a.groups.split(",") if g]
+    for n in names:
+        train, tables, note = sets[n]
+        missing = [d for d in train + [tables] if not (cap / f"{d}_K_bits.npy").is_file()]
+        if missing:
+            raise SystemExit(f"T2 set {n}: calibration windows {missing} missing in {cap}")
+        if n == "wikitext" and a.train_set == "wikitext":
+            out["sets"][n] = {"consts": main["consts"], "rank": main["rank"], "groups": main["groups"], "note": note,
+                              "train": train, "tables": tables}   # the bundle's own tensors: saved and loaded once
+            print(f"T2 set {n}: the main constants")
+            continue
+        else:
+            st = Study(cap, a.device, train, tables, [], None, log=lambda m: None)
+            c = fused.prepare(st, log=lambda m: None)
+            r = layerwise.prepare_rank(st, c, a.rank, lambda m: None) if a.rank else None
+            g = prepare_groups(st, c, gl, lambda m: None)
+            del st
+        out["sets"][n] = {"consts": _cpu(c), "rank": _cpu(r) if r is not None else None,
+                          "groups": {int(k): _cpu(v) for k, v in g.items()}, "note": note, "train": train,
+                          "tables": tables}
+        print(f"T2 set {n}: {len(train)} calibration documents ({note})")
+        torch.cuda.empty_cache()
+    return out
 
 
 if __name__ == "__main__":

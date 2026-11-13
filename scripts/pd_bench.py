@@ -10,7 +10,15 @@ proxy (scripts/run_pd_vllm.sh starts them). Stages (--stages, in order):
   colocated   the same prompts and rates without disaggregation (each decode engine prefills its own requests)
   multiturn   vLLM's multi-turn benchmark through the proxy with conversation routing: the requests' block hashes
               in the connector log feed scripts/pd_opportunity.py (reuse opportunities before any base sending)
+  tier        colocated engines with a CPU tier (kv_compare.pd.tier, or LMCache's): for every tier codec x number
+              of clients, the tiers emptied (a new generation in --tier-control; vLLM's reset_prefix_cache with
+              reset_external on every engine), then vLLM's multi-turn benchmark on fresh conversations (a seed per
+              point) with conversation routing; TTFT, TPOT, latency, and the tier's loads and stores
   report      results.json and summary.md
+
+Links: a number is a paced link in Gb/s; "native" leaves the transport unpaced (the machine's own path: the host
+ring, or GPU to GPU with the p2p transport). Codec "nixl": vLLM's NixlConnector through the proxy's nixl mode (no
+codec, the production reference); "lmcache" in the tier stage: LMCache's CPU offload.
 
 Every run's raw result stays in <out>/runs/; a rerun skips runs already there (--rerun to redo).
 """
@@ -48,7 +56,8 @@ def log(msg):
 def wait_idle(proxy, timeout=1800):
     end = time.time() + timeout
     while time.time() < end:
-        if sum(get(proxy + "/t/status")["inflight"]) == 0:
+        st = get(proxy + "/t/status")
+        if sum(st["inflight"]) + sum(st.get("prefill_inflight") or [0]) == 0:
             return True
         time.sleep(1)
     return False
@@ -70,6 +79,41 @@ def records(log_dir, t0, t1):
     return out
 
 
+def loaded(log_dir):
+    """(codecs every engine loaded, {codec: why one did not}) from the connectors' "ready" records; (None, {}) when
+    there are none (vLLM's own connectors)."""
+    have, why = None, {}
+    for p in glob.glob(os.path.join(log_dir, "tkv_*w_*.jsonl")):
+        with open(p) as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if r.get("event") != "ready":
+                    continue
+                cs = set(r.get("codecs") or [])
+                have = cs if have is None else have & cs
+                why.update({k: str(v) for k, v in (r.get("codec_errors") or {}).items()})
+                why.update({k: str(v) for k, v in (r.get("warm_up") or {}).items() if v is not True})
+    return have, why
+
+
+def usable(a, res, codecs):
+    """The codecs to run: those every engine loaded (nixl, lmcache, none always); the rest in res["skipped"]."""
+    have, why = loaded(a.log_dir)
+    if have is None:
+        return list(codecs)
+    keep = []
+    for c in codecs:
+        if c in ("nixl", "lmcache", "none") or c in have:
+            keep.append(c)
+        else:
+            res.setdefault("skipped", {})[c] = why.get(c, "not loaded by every engine")
+            log(f"{c}: skipped ({res['skipped'][c][:160]})")
+    return keep
+
+
 def mean(xs):
     xs = [x for x in xs if x is not None]
     return sum(xs) / len(xs) if xs else None
@@ -81,6 +125,11 @@ def transfer_stats(recs):
     tmo = [r for r in recs if r.get("event") == "timeout"]
     ach = [8 * r["blob_bytes"] / (r["send_end"] - r["send_begin"]) / 1e9 for r in s
            if r.get("send_end") and r.get("send_begin") and r["send_end"] > r["send_begin"]]
+    l0 = [r for r in s if r.get("layer0")]
+    sets = {}
+    for r in s:
+        if r.get("set"):
+            sets[r["set"]] = sets.get(r["set"], 0) + 1
     return {"sends": len(s), "send_errors": sum(1 for r in s if r.get("error")),
             "installs": len(d), "install_errors": sum(1 for r in d if r.get("error")), "timeouts": len(tmo),
             "bits": mean([r.get("bits") for r in s]), "gather_ms": mean([r.get("gather_ms") for r in s]),
@@ -91,7 +140,11 @@ def transfer_stats(recs):
             "install_ms": mean([r.get("decode_install_ms") for r in d]),
             "wait_ms": mean([1e3 * (r["done_at"] - r["admitted_at"]) for r in d if r.get("admitted_at")]),
             "exact": sum(1 for r in d if r.get("exact") is True), "inexact": sum(1 for r in d if r.get("exact") is False),
-            "spilled_to_host": sum(1 for r in s if r.get("queued_on") == "host")}
+            "spilled_to_host": sum(1 for r in s if r.get("queued_on") == "host"),
+            "layer0_recomputed": sum(1 for r in l0 if r["layer0"] == "recomputed") if l0 else None,
+            "layer0_coded": sum(1 for r in l0 if r["layer0"] == "coded") if l0 else None,
+            "layer0_checks": sorted({str(r.get("layer0_check")) for r in l0})[:5] if l0 else None,
+            "sets": sets or None}
 
 
 def bench_serve(a, dataset, rate, n, out_dir, name):
@@ -125,8 +178,9 @@ def stage_check(a, res):
     ref = None
     post(a.proxy + "/t/config", {"mode": "local"})
     ref = [completion(a, r["prompt"], r["output_tokens"]) for r in rows]
-    for codec in a.codecs:
-        post(a.proxy + "/t/config", {"mode": "pd", "codec": codec, "verify": True})
+    for codec in usable(a, res, a.codecs):
+        post(a.proxy + "/t/config", {"mode": "nixl"} if codec == "nixl" else {"mode": "pd", "codec": codec,
+                                                                                "verify": True})
         t0 = time.time()
         got = []
         for r in rows:
@@ -138,8 +192,11 @@ def stage_check(a, res):
         time.sleep(1)
         st = transfer_stats(records(a.log_dir, t0, time.time()))
         same = sum(1 for x, y in zip(got, ref) if x.get("text") is not None and x.get("text") == y.get("text"))
-        ok = st["installs"] == len(rows) and st["exact"] == len(rows) and not st["install_errors"] and \
-            not any("error" in g for g in got)
+        if codec == "nixl":                          # vLLM's connector: no checksums; the outputs and no errors
+            ok = not any("error" in g for g in got)
+        else:
+            ok = st["installs"] == len(rows) and st["exact"] == len(rows) and not st["install_errors"] and \
+                not any("error" in g for g in got)
         out[codec] = {"prompts": len(rows), "same_text_as_local": same, "transfers": st, "ok": ok,
                       "errors": [g["error"] for g in got if "error" in g]}
         log(f"check {codec}: {'OK' if ok else 'FAILED'} - {st['exact']}/{len(rows)} transfers bit-exact, "
@@ -164,14 +221,16 @@ def stage_sweep(a, res, colocated=False):
     out_dir = a.out / "runs"
     out_dir.mkdir(parents=True, exist_ok=True)
     links = [None] if colocated else a.links
-    codecs = ["none"] if colocated else a.codecs
+    codecs = ["none"] if colocated else usable(a, res, a.codecs)
     for link in links:
         if link is not None:
-            Path(a.link_control).write_text(json.dumps({"gbps": link}))
+            Path(a.link_control).write_text(json.dumps({"gbps": None if link == "native" else link}))
             time.sleep(0.5)
         for codec in codecs:
             if colocated:
                 post(a.proxy + "/t/config", {"mode": "local"})
+            elif codec == "nixl":
+                post(a.proxy + "/t/config", {"mode": "nixl"})
             else:
                 post(a.proxy + "/t/config", {"mode": "pd", "codec": codec, "verify": False})
             for rate in a.rates:
@@ -183,7 +242,7 @@ def stage_sweep(a, res, colocated=False):
                 rc, r, t0, t1 = bench_serve(a, str(a.dataset), rate, n, out_dir, name)
                 wait_idle(a.proxy)
                 time.sleep(1)
-                st = transfer_stats(records(a.log_dir, t0, time.time())) if not colocated else {}
+                st = transfer_stats(records(a.log_dir, t0, time.time())) if not colocated and codec != "nixl" else {}
                 runs[name] = {"link_gbps": link, "codec": codec, "rate": rate, "exit": rc,
                               "bench": {k: r.get(k) for k in KEEP}, "transfers": st}
                 b = runs[name]["bench"]
@@ -230,6 +289,99 @@ def stage_multiturn(a, res):
                             (["--window", f"{v['t0']},{v['t1']}"] for v in out.values()), []),
                        capture_output=True, text=True)
     log(p.stdout[-3000:] + p.stderr[-2000:])
+
+
+def pct(xs, q):
+    xs = sorted(x for x in xs if x is not None and x >= 0)
+    if not xs:
+        return None
+    k = min(len(xs) - 1, max(0, int(round(q / 100 * (len(xs) - 1)))))
+    return xs[k]
+
+
+def tier_stats(recs):
+    loads = [r for r in recs if r.get("event") == "install" and r.get("kind") == "tier"]
+    stores = [r for r in recs if r.get("event") == "tier_store"]
+    snaps = [r for r in recs if r.get("event") == "tier"]
+    ok = [r for r in loads if not r.get("error")]
+    raw = sum(r.get("raw_bytes") or 0 for r in ok)
+    return {"loads": len(loads), "load_errors": len(loads) - len(ok),
+            "exact_chunks": sum(r.get("exact_chunks") or 0 for r in ok),
+            "chunks_loaded": sum(r.get("chunks") or 0 for r in ok),
+            "loaded_tokens": sum(r.get("tokens") or 0 for r in ok),
+            "load_ms": mean([r.get("decode_install_ms") for r in ok]), "h2d_ms": mean([r.get("h2d_ms") for r in ok]),
+            "decode_ms": mean([r.get("decode_ms") for r in ok]),
+            "bits": 16 * sum(r.get("loaded_bytes") or 0 for r in ok) / raw if raw else None,
+            "stores": len(stores), "store_errors": sum(1 for r in stores if r.get("error")),
+            "stored_chunks": sum(r.get("stored") or 0 for r in stores),
+            "store_ms": mean([r.get("store_ms") for r in stores if not r.get("error")]),
+            "tier_chunks": max((r.get("chunks") or 0 for r in snaps), default=None),
+            "evicted": sum(r.get("evicted") or 0 for r in snaps[-4:]) if snaps else None}
+
+
+def stage_tier(a, res):
+    src = Path(a.vllm_source) / "benchmarks" / "multi_turn"
+    if not (src / "benchmark_serving_multi_turn.py").is_file():
+        res["tier"] = {"error": f"no {src} (scripts/pd_setup.sh clones the vLLM source)"}
+        return
+    conf = json.loads((src / "generate_multi_turn.json").read_text())
+    conf["text_files"] = [str(p) for p in sorted(Path(a.texts).glob("wikitext2*.txt"))][:1] or conf["text_files"]
+    conf["num_conversations"] = a.tier_conversations
+    cfile = a.out / "tier_conversations_config.json"
+    cfile.write_text(json.dumps(conf, indent=1))
+    runs = res.setdefault("tier", {})
+    engines = [d[0] for d in get(a.proxy + "/t/status")["decodes"]]
+    ctl = Path(a.tier_control) if a.tier_control else None
+    gen = int(time.time())
+    for codec in usable(a, res, a.tier_codecs):
+        for clients in a.tier_clients:
+            name = f"tier_{codec}_c{clients}"
+            if name in runs and not a.rerun:
+                continue
+            gen += 1
+            if ctl is not None:
+                ctl.write_text(json.dumps({"generation": gen, "codec": codec}))
+            time.sleep(1.0)
+            resets = []
+            for u in engines:
+                try:
+                    resets.append(post(u + "/reset_prefix_cache?reset_external=true", {}, timeout=120))
+                except Exception as exc:
+                    resets.append({"error": repr(exc)[:200]})
+            post(a.proxy + "/t/config", {"mode": "local", "policy": "conversation", "reset_conversations": True})
+            out_json = a.out / "runs" / (name + ".json")
+            out_json.parent.mkdir(parents=True, exist_ok=True)
+            cmd = [sys.executable, str(src / "benchmark_serving_multi_turn.py"), "--model", a.model,
+                   "--served-model-name", a.served_name, "--url", a.proxy, "--input-file", str(cfile),
+                   "--num-clients", str(clients), "--max-active-conversations", str(2 * clients),
+                   "--send-conversation-id", "--seed", str(gen % 100000), "--max-turns", str(a.tier_max_turns),
+                   "--stats-json-output", str(out_json)]
+            t0 = time.time()
+            r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(src))
+            (a.out / "runs" / (name + ".log")).write_text(r.stdout[-30000:] + "\n" + r.stderr[-30000:])
+            wait_idle(a.proxy)
+            time.sleep(2)
+            t1 = time.time()
+            stats = json.loads(out_json.read_text()) if out_json.is_file() else []
+            ttft = [x.get("ttft_ms") for x in stats]
+            starts = [x.get("start_time_ms") for x in stats if x.get("start_time_ms")]
+            ends = [x["start_time_ms"] + x["latency_ms"] for x in stats if x.get("start_time_ms") and x.get("latency_ms")]
+            dur = (max(ends) - min(starts)) / 1e3 if starts and ends else None
+            bench = {"requests": len(stats), "duration_s": dur,
+                     "request_throughput": len(stats) / dur if dur else None,
+                     "mean_ttft_ms": mean(ttft), "median_ttft_ms": pct(ttft, 50), "p90_ttft_ms": pct(ttft, 90),
+                     "p99_ttft_ms": pct(ttft, 99), "median_tpot_ms": pct([x.get("tpot_ms") for x in stats], 50),
+                     "mean_latency_ms": mean([x.get("latency_ms") for x in stats]),
+                     "input_tokens": mean([x.get("input_num_tokens") for x in stats])}
+            st = tier_stats(records(a.log_dir, t0, t1))
+            runs[name] = {"codec": codec, "clients": clients, "exit": r.returncode, "bench": bench, "tier": st,
+                          "resets": resets, "generation": gen}
+            log(f"{name}: exit {r.returncode}, {bench['requests']} requests, {fmt(bench['request_throughput'], 2)} "
+                f"req/s, TTFT p50 {fmt(bench['median_ttft_ms'], 0)} / p99 {fmt(bench['p99_ttft_ms'], 0)} ms; tier "
+                f"{st['loads']} loads ({st['loaded_tokens']} tokens, {fmt(st['load_ms'], 1)} ms each, bits "
+                f"{fmt(st['bits'])}), {st['stored_chunks']} chunks stored")
+            save(a, res)
+    post(a.proxy + "/t/config", {"policy": "round_robin"})
 
 
 def save(a, res):
@@ -284,6 +436,25 @@ def stage_report(a, res):
             L.append(f"| {v['rate']} | {fmt(b.get('request_throughput'), 2)} | {fmt(b.get('request_goodput'), 2)} | "
                      f"{fmt(b.get('median_ttft_ms'), 0)} / {fmt(b.get('p99_ttft_ms'), 0)} | {fmt(b.get('median_tpot_ms'), 1)} |")
         L.append("")
+    ti = res.get("tier", {})
+    if ti and "error" not in ti:
+        L += ["## CPU tier (colocated engines, multi-turn conversations)", "",
+              "| Tier codec | Clients | Req/s | TTFT p50 / p90 / p99 (ms) | TPOT p50 (ms) | Tier loads | Tokens loaded | "
+              "Load ms (copy / decode) | Bits stored | Chunks stored | Chunks in tier |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+        for v in ti.values():
+            b, st = v["bench"], v["tier"]
+            L.append(f"| {v['codec']} | {v['clients']} | {fmt(b.get('request_throughput'), 2)} | "
+                     f"{fmt(b.get('median_ttft_ms'), 0)} / {fmt(b.get('p90_ttft_ms'), 0)} / {fmt(b.get('p99_ttft_ms'), 0)} | "
+                     f"{fmt(b.get('median_tpot_ms'), 1)} | {st.get('loads')} | {st.get('loaded_tokens')} | "
+                     f"{fmt(st.get('load_ms'), 1)} ({fmt(st.get('h2d_ms'), 1)} / {fmt(st.get('decode_ms'), 1)}) | "
+                     f"{fmt(st.get('bits'))} | {st.get('stored_chunks')} | {st.get('tier_chunks')} |")
+        L.append("")
+    elif ti:
+        L += ["## CPU tier", "", ti["error"], ""]
+    if res.get("skipped"):
+        L += ["Codecs not run (did not load on every engine): " + "; ".join(f"{c} ({w[:120]})" for c, w in
+                                                                         res["skipped"].items()), ""]
     opp = a.out / "opportunity.json"
     if opp.is_file():
         o = json.loads(opp.read_text())
@@ -316,6 +487,11 @@ def main():
     ap.add_argument("--mt-conversations", type=int, default=24)
     ap.add_argument("--mt-clients", type=int, default=4)
     ap.add_argument("--env", default=None, help="JSON with model, gpus, vllm, torch for the report")
+    ap.add_argument("--tier-codecs", default="raw,ours-hbh")
+    ap.add_argument("--tier-clients", default="8,16")
+    ap.add_argument("--tier-conversations", type=int, default=64)
+    ap.add_argument("--tier-max-turns", type=int, default=12)
+    ap.add_argument("--tier-control", default=None, help="the connectors' tier control file")
     ap.add_argument("--rerun", action="store_true")
     a = ap.parse_args()
     a.out = Path(a.out)
@@ -324,7 +500,9 @@ def main():
     a.dataset = Path(a.dataset) if a.dataset else a.prompts / "prompts_mixed.jsonl"
     a.codecs = [c for c in a.codecs.split(",") if c]
     a.mt_codecs = [c for c in a.mt_codecs.split(",") if c]
-    a.links = [float(x) if "." in x else int(x) for x in a.links.split(",")]
+    a.links = [x if x == "native" else (float(x) if "." in x else int(x)) for x in a.links.split(",")]
+    a.tier_codecs = [c for c in a.tier_codecs.split(",") if c]
+    a.tier_clients = [int(c) for c in a.tier_clients.split(",") if c]
     a.rates = [x if x == "inf" else float(x) for x in a.rates.split(",")]
     p = a.out / "results.json"
     res = json.loads(p.read_text()) if p.is_file() else {}
@@ -340,6 +518,8 @@ def main():
             stage_sweep(a, res, colocated=True)
         elif stage == "multiturn":
             stage_multiturn(a, res)
+        elif stage == "tier":
+            stage_tier(a, res)
         elif stage == "report":
             stage_report(a, res)
         save(a, res)

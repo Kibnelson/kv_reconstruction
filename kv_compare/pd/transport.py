@@ -10,6 +10,10 @@ Link      one FIFO link per sender process (the prefill engine's egress, shared 
 ring      the receiver owns a shared-memory ring (/dev/shm), registered with CUDA as pinned memory on both sides:
           the sender copies GPU -> ring (one DMA), the receiver ring -> GPU (one DMA), chunk by chunk, overlapped -
           about what GPUDirect over a PCIe NIC does, bounded by the same PCIe links.
+p2p       the receiver's ring is in its GPU memory, shared with the sender by a CUDA IPC handle: the sender copies
+          GPU -> peer GPU (one DMA over PCIe or NVLink, no host memory), the receiver ring -> its blob on its own
+          GPU. Both engines must see both GPUs (the runner orders CUDA_VISIBLE_DEVICES with the engine's own first);
+          the sender finds the receiver's GPU by its UUID. Unpaced (gbps null) it is the machine's direct path.
 tcp       the bytes travel on the control socket (any two machines; host copies on both sides).
 
 Messages are a 4-byte length and JSON; on tcp, a data message is followed by its bytes. A transfer is
@@ -18,6 +22,7 @@ in order (a "skip" of the ring's tail before a wrap is acknowledged like data).
 """
 from __future__ import annotations
 
+import base64
 import json
 import mmap
 import os
@@ -66,6 +71,35 @@ def _register(t):
         return int(rc) == 0
     except Exception:
         return False
+
+
+def _uuid(index):
+    return str(torch.cuda.get_device_properties(index).uuid)
+
+
+def share_cuda(t):
+    """A JSON-able CUDA IPC description of tensor t's storage (torch's own sharing, as torch.multiprocessing)."""
+    dev, handle, size, off, rc_handle, rc_off, ev_handle, ev_sync = t.untyped_storage()._share_cuda_()
+    b64 = lambda b: base64.b64encode(b).decode() if b is not None else None
+    return {"uuid": _uuid(dev), "handle": b64(handle), "size": int(size), "offset": int(off),
+            "ref_handle": b64(rc_handle), "ref_offset": int(rc_off), "event": b64(ev_handle), "event_sync": bool(ev_sync),
+            "numel": int(t.numel())}
+
+
+def open_cuda(desc):
+    """The tensor of a share_cuda description, in this process (on the GPU with that UUID here)."""
+    idx = next((i for i in range(torch.cuda.device_count()) if _uuid(i) == desc["uuid"]), None)
+    if idx is None:
+        raise RuntimeError(f"GPU {desc['uuid']} is not visible in this process (CUDA_VISIBLE_DEVICES): the direct "
+                           "path needs every engine to see the peer GPUs")
+    unb = lambda s: base64.b64decode(s) if s is not None else None
+    torch.cuda._lazy_init()
+    st = torch.UntypedStorage._new_shared_cuda(idx, unb(desc["handle"]), desc["size"], desc["offset"],
+                                               unb(desc["ref_handle"]), desc["ref_offset"], unb(desc["event"]),
+                                               desc["event_sync"])
+    t = torch.empty(0, dtype=torch.uint8, device=f"cuda:{idx}")
+    t.set_(st, 0, (desc["numel"],), (1,))
+    return t
 
 
 class Link:
@@ -119,9 +153,10 @@ class Receiver:
 
     device: where blobs land (the decode GPU); ring_bytes: the shared-memory ring per sender (0: tcp only)."""
 
-    def __init__(self, host, port, device, ring_bytes=1 << 30, log=print, gpu_budget=None):
+    def __init__(self, host, port, device, ring_bytes=1 << 30, log=print, gpu_budget=None, gpu_ring_bytes=512 << 20):
         self.device = torch.device(device)
         self.ring_bytes = int(ring_bytes)
+        self.gpu_ring_bytes = int(gpu_ring_bytes)
         self.log = log
         self.done = {}                               # key -> (header, blob, record)
         self.dropped = set()                         # keys to discard on arrival
@@ -184,6 +219,10 @@ class Receiver:
                 path, mm, rt, pinned = self._make_ring(tag)
                 ring = (path, mm, rt)
                 _send_msg(conn, {"op": "ring", "path": path, "bytes": self.ring_bytes, "pinned": pinned})
+            elif mode == "p2p" and self.device.type == "cuda":
+                rt = torch.empty(self.gpu_ring_bytes, dtype=torch.uint8, device=self.device)
+                ring = (None, None, rt)
+                _send_msg(conn, {"op": "p2p", "bytes": self.gpu_ring_bytes, "share": share_cuda(rt)})
             else:
                 _send_msg(conn, {"op": "tcp"})
             stage = None
@@ -197,7 +236,7 @@ class Receiver:
                 elif op == "data":
                     header, blob, rec = cur[m["key"]]
                     off, n = m["off"], m["n"]
-                    if mode == "ring":
+                    if mode in ("ring", "p2p"):
                         src = ring[2][m["pos"]:m["pos"] + n]
                     else:
                         if stage is None or stage.numel() < n:
@@ -211,7 +250,7 @@ class Receiver:
                         self.copy_stream.synchronize()
                     else:
                         blob[off:off + n].copy_(src)
-                    if mode == "ring":
+                    if mode in ("ring", "p2p"):
                         _send_msg(conn, {"op": "ack", "pos": m["pos"], "n": n})
                 elif op == "skip":
                     _send_msg(conn, {"op": "ack", "n": m["n"]})
@@ -232,7 +271,7 @@ class Receiver:
                 self.log(f"tkv receiver: connection {tag} closed ({exc!r})")
         finally:
             conn.close()
-            if ring is not None:
+            if ring is not None and ring[0] is not None:
                 try:
                     os.unlink(ring[0])
                 except OSError:
@@ -291,7 +330,13 @@ class _Dest:
         r = _recv_msg(self.sock)
         self.mode = r["op"]
         self.ring = None
-        if self.mode == "ring":
+        if self.mode == "p2p":
+            self.ring = open_cuda(r["share"])
+            self.pinned = False
+            self.size = r["bytes"]
+            self.head = 0
+            self.acked = 0
+        elif self.mode == "ring":
             fd = os.open(r["path"], os.O_RDWR)
             self.mm = mmap.mmap(fd, r["bytes"])
             os.close(fd)
@@ -370,7 +415,7 @@ class Sender:
                     # copy's time (the machine's limit), not to the sum of both
                     t0, t1 = self.link.reserve(n)
                     first = t0 if first is None else first
-                    if d.mode == "ring":
+                    if d.mode in ("ring", "p2p"):
                         if d.head % d.size + n > d.size:    # no wrap inside a chunk: skip to the ring start
                             pad = d.size - d.head % d.size   # the skipped bytes count as sent until the receiver
                             self._ring_space(d, pad)          # acknowledges them in order (after all earlier data)
@@ -388,7 +433,7 @@ class Sender:
                         d.head += n
                     _sleep_until(t1)
                     last = t1
-                    if d.mode == "ring":
+                    if d.mode in ("ring", "p2p"):
                         _send_msg(d.sock, {"op": "data", "key": key, "off": off, "n": n, "pos": pos})
                     else:
                         host = src.cpu() if src.is_cuda else src

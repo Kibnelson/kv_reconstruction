@@ -26,6 +26,8 @@ def main(argv=None):
     ap.add_argument("--names", default="raw,ours-dense,ours-kv,ours-4g,ours-hbh,ours-rank256,splitzip,adacode")
     ap.add_argument("--splitzip-source", default=None)
     ap.add_argument("--adacode-source", default=None)
+    ap.add_argument("--exactkv-source", default=None)
+    ap.add_argument("--exans-info", default=None)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--gbps", type=float, default=100.0, help="link speed of the transport check")
     ap.add_argument("--output", default=None, help="JSON results")
@@ -36,7 +38,8 @@ def main(argv=None):
     from .wire import bundle, payload_bytes, unbundle, word_checksum
     dev = torch.device(a.device)
     sync = (lambda: torch.cuda.synchronize(dev)) if dev.type == "cuda" else (lambda: None)
-    built, errors, meta = cd.build(a.codecs, dev, a.names.split(","), a.splitzip_source, a.adacode_source)
+    built, errors, meta = cd.build(a.codecs, dev, a.names.split(","), a.splitzip_source, a.adacode_source,
+                                   exactkv_source=a.exactkv_source, exans_info=a.exans_info)
     doc = Doc(a.captures, a.doc)
     rows, ok_all = [], True
     for T in [int(t) for t in a.tokens.split(",")]:
@@ -48,6 +51,19 @@ def main(argv=None):
         want = word_checksum(words)
         for name, c in built.items():
             row = {"codec": name, "tokens": T}
+            if getattr(c, "tier_only", False):       # the CPU tier's codec: host memory and back
+                try:
+                    state, nb, coded = c.tier_store(words)
+                    back = torch.empty_like(words)
+                    c.tier_load(state, lambda l, w: back[l].copy_(w))
+                    row.update(exact=bool(torch.equal(back, words)), host_bytes=nb, bits=8.0 * coded / words.numel())
+                    ok_all = ok_all and row["exact"]
+                except Exception as exc:
+                    row["error"] = repr(exc)[:300]
+                    ok_all = False
+                rows.append(row)
+                print(json.dumps(row), flush=True)
+                continue
             try:
                 c.encode(words)                      # compile
                 sync()
@@ -57,6 +73,9 @@ def main(argv=None):
                 row["encode_ms"] = 1e3 * (time.perf_counter() - t)
                 header, blob = bundle(parts, m)
                 row["bits"] = 8.0 * payload_bytes(header) / words.numel()
+                for k in ("set", "layer0"):
+                    if k in m:
+                        row[k] = m[k]
                 back = torch.empty_like(words)
                 p2, m2 = unbundle(header, blob)
                 c.decode(p2, m2, lambda l, w: back[l].copy_(w))

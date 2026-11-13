@@ -43,7 +43,7 @@ if [ "$HAVE" = 0 ] && [ "${SETUP:-1}" = 1 ]; then
     SKIP_EXANS=1 SKIP_IBP=1 bash scripts/a5000_setup.sh
 fi
 HOST=$(hostname -s)
-GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1 | tr 'A-Z' 'a-z' | sed 's/nvidia//' | tr -cd 'a-z0-9')
+GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n 1p | tr 'A-Z' 'a-z' | sed 's/nvidia//' | tr -cd 'a-z0-9')
 NGPU=$(nvidia-smi --query-gpu=index --format=csv,noheader | wc -l)
 DEST=benchmark_results/${HOST}_specs_${GPU_TAG}x${NGPU}_$(date +%Y%m%d_%H%M)
 python3 -u scripts/node_specs.py --output "$DEST" --kv-home "$KV_HOME" 2>&1 | tee "$DEST.log"
