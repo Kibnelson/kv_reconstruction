@@ -5,9 +5,12 @@
 #   MODEL=llama32_3b bash scripts/run_t_ideas.sh            (ALLOW_NO_SLURM=1 on the NUC)
 #
 # Options (environment): KV_HOME (default ~/kv_a5000), KV_RUNS (default $KV_HOME/runs), MODEL (the run folder's
-# tag, default llama32_3b), STAGES (default capture,adapt,layer0,anchor,classes,gpu,report), EXTRA (more
-# arguments for scripts/t_ideas.py), NO_PUSH=1 (commit locally only), SMOKE=1 (4 layers, one WikiText-2 window, a
-# separate output folder, nothing committed: checks the whole path in a few minutes).
+# tag, default llama32_3b), STAGES (default capture,adapt,layer0,layer0x,anchor,classes,gpu,calib,report; finished
+# stages are kept from the output folder's t_ideas.json), EXTRA (more
+# arguments for scripts/t_ideas.py), NO_PUSH=1 (commit locally only), SMOKE=1 (4 layers, one WikiText-2 window, one
+# calibration window per domain, a separate output folder, nothing committed: checks the whole path in minutes).
+# The calib stage captures calibration windows into the run folder (about 1 GB each for the 3B; it checks the
+# free disk first).
 set -Eeuo pipefail
 trap 'echo "RUN STOPPED at line $LINENO (exit $?)" >&2' ERR
 BRANCH=t-ideas
@@ -46,16 +49,27 @@ if [ ! -s "$TEXTS/manifest.json" ]; then
     echo "== dataset texts into $TEXTS"
     python scripts/fetch_eval_texts.py --output "$TEXTS"
 fi
+if ! python - "$TEXTS" <<'PY'
+import json, sys
+from pathlib import Path
+m = Path(sys.argv[1]) / "cal_manifest.json"
+sys.exit(0 if m.is_file() and {"code", "math", "exam", "news"} <= set(json.loads(m.read_text())) else 1)
+PY
+then
+    echo "== calibration texts into $TEXTS"
+    python scripts/fetch_calib_texts.py --output "$TEXTS"
+fi
 GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1 | tr 'A-Z' 'a-z' | sed 's/nvidia//; s/geforce//; s/[^a-z0-9]//g')
 STAMP=$(date +%Y%m%d_%H%M)
-STAGES=${STAGES:-capture,adapt,layer0,anchor,classes,gpu,report}
+STAGES=${STAGES:-capture,adapt,layer0,layer0x,anchor,classes,gpu,calib,report}
 OUT=$RUN/t_ideas
 ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --stages "$STAGES" --device cuda)
 if [ "${SMOKE:-0}" = 1 ]; then
     OUT=$RUN/t_ideas_smoke
     rm -rf "$OUT"
-    ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --device cuda --stages adapt,anchor,classes,gpu,report
-          --datasets wikitext2 --windows 1 --float-docs 1 --max-layers 4 --modes dense,rank256)
+    ARGS=(--run "$RUN" --output "$OUT" --texts "$TEXTS" --device cuda
+          --stages adapt,layer0x,anchor,classes,gpu,calib,report --datasets wikitext2 --windows 1 --float-docs 1
+          --max-layers 4 --modes dense,rank256 --cal-windows 1)
 fi
 echo "== commit $(git log --oneline -1); run folder $RUN; output $OUT; GPU $GPU"
 nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv,noheader

@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 
 try:
     import torch
-    import transformers  # noqa: F401  (the tests need it)
+    import transformers  # noqa: F401
 except ImportError:  # pragma: no cover
     torch = None
 
@@ -168,6 +168,97 @@ class TIdeasTests(unittest.TestCase):
             self.assertEqual(len(a["pipelined"]["mix_modes"]), L)
         self.assertEqual(allocate(rows, 1)["serial"]["best_single"], "small-slow")
         self.assertEqual(allocate(rows, 400)["serial"]["best_single"], "big-fast")
+
+    def test_layer0_lean_and_shapes(self):
+        """The lean recompute (no attention, no MLP) gives the captured layer 0 bit for bit in the capture's own
+        shape, and every other prefill shape gives the right rows with a finite cost."""
+        from kv_compare import t_ideas as ti
+        st = self.study
+        d, other = st.tests[0], st.tables.ids[:2048].tolist()
+        cpu = torch.device("cpu")
+        K, V = ti.layer0_kv(self.model, d.ids.tolist(), cpu)
+        got = d.words(0, cpu)
+        self.assertTrue(torch.equal(torch.cat([K, V], 1), got))
+        K2, V2 = ti.layer0_words(self.model, d.ids.tolist(), cpu)
+        self.assertTrue(np.array_equal(K.numpy().astype(np.uint16), K2) and np.array_equal(V.numpy().astype(np.uint16), V2))
+        for v in ti.L0_VARIANTS:
+            K, V = ti.layer0_kv(self.model, d.ids.tolist(), cpu, v, other)
+            self.assertEqual(tuple(K.shape), (self.tokens, st.C), v)
+            self.assertEqual(tuple(V.shape), (self.tokens, st.W - st.C), v)
+            # values carry no position: a different pass shape may change rounding, not the rows' identity
+            self.assertGreater(float((V == got[:, st.C:]).float().mean()), 0.5, v)
+        r = ti.layer0_robust(st, self.model, [d], st.tables, cpu, t_layer0={d.name: 12.0},
+                             timer=lambda fn: (fn(), 0.001)[1])
+        row = r["docs"][d.name]
+        self.assertEqual(row["same"]["keys_equal"], 1.0)
+        self.assertEqual(row["same"]["values_equal"], 1.0)
+        self.assertLess(row["same"]["bits_per_layer0_value"], 0.01)
+        for v in ti.L0_VARIANTS:
+            self.assertTrue(math.isfinite(row[v]["bits_per_layer0_value"]), v)
+            self.assertLess(row[v]["bits_per_layer0_value"], 16.5, v)
+        self.assertAlmostEqual(row["lean_ms"], 1.0)
+        self.assertEqual(len(self.model.model.layers), st.L)
+
+    def test_ulp_coder(self):
+        from kv_compare.t_ideas import ulp_bits, ulp_table
+        rng = np.random.default_rng(1)
+        ref = torch.as_tensor(rng.integers(0, 65536, size=(400, 32)), dtype=torch.int32)
+        ref[0, 0], ref[0, 1] = 0x0000, 0x8000
+        same = ulp_table(ref, ref)
+        self.assertLess(ulp_bits(ref, ref, same), 0.01)
+        got = ref.clone()
+        got[0, 0] = 0x8000                              # -0 for +0: equal order, different word: an escape
+        self.assertGreater(ulp_bits(got, ref, same), ulp_bits(ref, ref, same) + 15 / ref.numel())
+        # one BF16 step away on half the values: the cost is the empirical entropy of the step differences
+        from kv_compare.t_ideas import _ordered
+        mag = ref & 0x7FFF
+        step = torch.where((torch.rand(ref.shape, generator=torch.Generator().manual_seed(0)) < 0.5) & (mag < 0x7F00)
+                           & (mag > 0), 1, 0)
+        got = ref + step
+        d = (_ordered(got) - _ordered(ref)).reshape(-1)
+        p = torch.bincount(d + 1).double() / d.numel()
+        H = float(-(p[p > 0] * torch.log2(p[p > 0])).sum())
+        self.assertAlmostEqual(ulp_bits(got, ref, ulp_table(got, ref)), H, delta=0.02)
+        self.assertGreater(H, 1.0)
+
+    def test_pick_sets(self):
+        from kv_compare.t_ideas import cal_sets, pick_sets
+        costs = {"a": {"x": [9, 1, 1, 9], "y": [9, 5, 5, 1]}, "b": {"x": [9, 2, 2, 1], "y": [9, 1, 1, 9]}}
+        early = pick_sets(costs, ["a", "b"], [1, 2])
+        self.assertEqual({d: s for d, (s, _) in early.items()}, {"x": "a", "y": "b"})
+        whole = pick_sets(costs, ["a", "b"], slice(1, None), cost=lambda v: float(np.sum(v)), side_bits=lambda d: 1.0)
+        self.assertEqual(whole["x"], ("b", 15.0))
+        sets = cal_sets(3)
+        self.assertEqual(sets["wikitext"][0], [f"wtrain{i}" for i in range(6)])
+        self.assertEqual(len(sets["mixed"][0]), 6)
+        self.assertEqual(len(sets["mixed-all"][0]), 15)
+        self.assertEqual(sets["code"][1], "cal_code_3")
+        self.assertEqual(sets["mixed"][1], "cal_mixed_3")
+
+    def test_driver_calib_cpu(self):
+        """The calib stage on the tiny run folder (calibration windows captured beforehand) and its report."""
+        from kv_compare.capture import capture_ids
+        from kv_compare.t_ideas import cal_sets
+        from kv_compare.test_kv_compare import doc_ids
+        names = sorted({n for tr, tb, _ in cal_sets(3).values() for n in tr + [tb]} - {f"wtrain{i}" for i in range(6)}
+                       - {"wtables"})
+        for i, n in enumerate(names):
+            if not (self.root / f"{n}_K_bits.npy").is_file():
+                capture_ids(self.model, doc_ids(40 + i, self.tokens), self.root, n, torch.device("cpu"))
+        out = Path(self.tmp.name) / "out_calib"
+        cmd = [sys.executable, str(ROOT / "scripts" / "t_ideas.py"), "--run", str(self.run_dir), "--output", str(out),
+               "--device", "cpu", "--windows", "1", "--stages", "calib,report"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        res = json.loads((out / "t_ideas.json").read_text())
+        sets = res["calib"]["sets"]
+        self.assertEqual(set(sets), set(cal_sets(3)))
+        for name, s in sets.items():
+            self.assertEqual(set(s["docs"]), set(TESTS), name)
+        s = (out / "summary.md").read_text()
+        self.assertIn("## 6. Calibration breadth", s)
+        self.assertIn("pick per request", s)
+        self.assertIn("6 calibration breadth", s)
 
     def test_driver_cpu(self):
         """The driver's CPU stages and the report, on the tiny run folder."""

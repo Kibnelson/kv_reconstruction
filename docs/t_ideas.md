@@ -5,6 +5,7 @@ branch only adds files.
 
 - `kv_compare/t_ideas.py`: the measurements;
 - `scripts/t_ideas.py`: the driver;
+- `scripts/fetch_calib_texts.py`: the calibration texts of the calib stage;
 - `scripts/run_t_ideas.sh`: the runner, which also packages and pushes;
 - `kv_compare/test_t_ideas.py`: CPU tests on a tiny random Llama.
 
@@ -93,6 +94,43 @@ at the bandwidth of a measured device copy. The allocation then picks a mode per
 
 Each is compared with the best single mode.
 
+**layer0x (2c, the checks before building idea 2).** The receiver's recompute the lean way. The model runs only up
+to its first attention module, where a hook takes the inputs; then the module's own K and V projections and RoPE
+run. That is the embedding, the input norm, two projections and RoPE: no attention, no MLP, no Q. The stage records:
+- the share of K and V words that come out bit for bit, under five prefill shapes:
+  - one pass, as the capture ran it;
+  - chunks of 2,048 tokens and of 512 tokens;
+  - one token, or 2,048 tokens, of another request ahead of it in the same pass (vLLM flattens a batch into one
+    matrix product, so its row count changes);
+- the largest difference in BF16 steps;
+- the cost of coding the captured words against the recomputed ones: each word is coded as its difference in BF16
+  steps (-8..8, with an escape to the raw word), with the table from wtables under the same shape. A mismatch costs
+  bits, never correctness;
+- the time of the lean recompute and of the whole first layer.
+
+**calib (6, calibration breadth).** The first run showed the dataset gap is mostly the predictor's coefficients. A
+predictor fitted on half a HumanEval window beats T by 0.65 bits/value; bias and spread recover about a fifth.
+`scripts/fetch_calib_texts.py` writes calibration text disjoint from every test window:
+- code: MBPP, all splits (HumanEval's kind of text, not HumanEval);
+- math: GSM8K train;
+- exam: MMLU dev and validation (the test's format, other questions);
+- news: Penn Treebank train.
+
+The stage captures 3 windows of each, plus a scales window, plus a mixed scales window (an equal share of each source
+and of WikiText-2 train). It then fits T's constants for each set:
+- wikitext (today's);
+- mixed (6 documents, like today's: 2 WikiText-2 train and 1 of each domain);
+- mixed-all (all 15 documents);
+- each domain alone.
+
+It codes every dataset window with each set, with and without the request's own bias and spread. All rows are with
+layer 0 recomputed. Three per-request picks are shown, the sender sending the set's number:
+- WikiText or a domain set, chosen on layers 1-4 (cheap: the sender encodes 4 layers per set);
+- the same, chosen on the whole cache;
+- any set, chosen on layers 1-4.
+
+The cross-fitted oracle of the adapt stage shows the room.
+
 **report** writes `summary.md` with the tables and the verdicts below.
 
 ## Decision rules (set before the numbers)
@@ -105,6 +143,23 @@ Each is compared with the best single mode.
 | 3 coding kernel | The coding alone takes at least 2x its memory floor. The prize is at most (coding - floor) ms per request |
 | 4 anchors | A two-wave form saves at least 0.1 bits/value against the float one-step. Many-wave forms are shown, not counted. For key frames, the extra matrix product must fit inside the decode time it saves |
 | 5 classes | A form saves at least 0.05 bits/value net of side bits |
+| 2c layer 0, robust | The saving stays at least 0.3 bits/value in every prefill shape (most of the 0.355 measured) and the lean recompute takes at most 10 ms per 8K window |
+| 6 calibration breadth | A mixed set or the per-request pick chosen on layers 1-4 saves at least 1% of T's bits over the five datasets (the WikiText change is reported) |
+
+## Results so far
+
+Llama-3.2-3B on the NUC's RTX A4500, 13 Nov 2026
+(`benchmark_results/llama32_3b_tideas_rtxa4500_20261113_0625`). The check passed: T's exact-model bits from the
+torch reference equal the kernel's (8.8627).
+
+| Idea | Verdict | Numbers |
+| --- | --- | --- |
+| 2 layer 0 on the decode side | build | 100% of layer-0 words recomputed bit for bit on all five datasets. T's layer 0 costs 9.92-10.15 bits/value, so the saving is 0.354-0.362 bits/value over the cache, about 4%. The 54-61 ms measured was the whole first layer; layer0x measures the lean path |
+| 1 per-request bias and spread | build (small) | Net savings: HumanEval 0.117, PTB 0.079, GSM8K 0.077, MMLU 0.044, WikiText 0.017 bits/value; side 0.0017. Room to the cross-fitted oracle: 0.65 / 0.23 / 0.43 / 0.16, so calib tests the coefficients |
+| 4 anchors | drop | All the gain is in layer 0 (+2.70 bits there), which recomputing it takes. Beyond layer 0 the two-wave forms give at most +0.07 bits per layer and are often negative |
+| 5 classes | drop | Negative everywhere except WikiText (the calibration text): splitting the predictor overfits the calibration data |
+| 2b per-layer modes | drop | 3.4% at 100 Gb/s at best |
+| 3 coding kernel | refocus | Dense and rank 256 code at 2.4x their memory floor (15.9 vs 6.7 ms). Head by head, the smallest mode (8.29 vs 8.98 bits/value), takes 108 ms because each layer's 16 head groups run one after another: one kernel per layer over all its groups is the prize |
 
 ## Running it
 
@@ -123,6 +178,9 @@ NUC
 
 - The smoke takes a few minutes: 4 layers, one window, nothing committed. Its success marker is `SMOKE OK`.
 - The full run takes about 1.5-2 hours on an A4500. Its success marker is `PUSHED benchmark_results/llama32_3b_tideas_<gpu>_<date>`.
+- A rerun of the same command after new stages are added measures only those stages (the others are kept in the
+  output folder's `t_ideas.json`) and packages everything again. layer0x and calib add about 30 minutes and about
+  17 GB of calibration captures for the 3B (the stage checks the free disk first).
 - An interrupted run continues where it stopped: finished stages and windows are kept in `t_ideas.json`.
 
 On an A5000 node, run the same commands inside the allocation, without `ALLOW_NO_SLURM`.
@@ -138,5 +196,10 @@ On an A5000 node, run the same commands inside the allocation, without `ALLOW_NO
 - Recomputing layer 0 is exact only when the receiver runs the same kernels as the sender: the same GPU type and
   libraries. Elsewhere, unequal words are coded at their measured cost, so the codec stays lossless; only the saving
   shrinks.
+- layer0x runs Hugging Face's code (cuBLAS projections, its norm and RoPE). In PD both ends run vLLM, whose norm
+  and RoPE kernels differ from Hugging Face's, so identity must hold between vLLM on the sender and vLLM on the
+  receiver. The shapes tested here are the ones vLLM varies; the final check is in the PD branch.
+- The calibration sets use 3 windows per domain (24K rows for 2,048 inputs); WikiText's set has 6. A domain set
+  is therefore at a small disadvantage, and mixed-all has the most data.
 - The oracles fit up to 2W inputs on one 8K window. The in-sample one is optimistic by construction, so the room is
   taken from the cross-fitted one.

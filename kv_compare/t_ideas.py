@@ -231,6 +231,188 @@ def layer0_costs(study, model, docs, scale_doc, device, chunk_tokens=None, t_lay
     return out
 
 
+# ---------------------------------------------------------------------------------------------- layer 0, lean
+class _Stop(Exception):
+    pass
+
+
+def _kv_from(attn, hs, cos, sin):
+    """The attention module's first lines: K and V projections (K norm where the model has one) and RoPE, through
+    the module's own functions. hs [B, n, hidden] -> K, V [B, heads, n, hd]."""
+    import sys
+    shape = (*hs.shape[:-1], -1, attn.head_dim)
+    k = attn.k_proj(hs).view(shape)
+    if getattr(attn, "k_norm", None) is not None:
+        k = attn.k_norm(k)
+    k = k.transpose(1, 2)
+    v = attn.v_proj(hs).view(shape).transpose(1, 2)
+    rot = sys.modules[type(attn).__module__].apply_rotary_pos_emb
+    _, k = rot(k, k, cos, sin)
+    return k, v
+
+
+def _words(t):
+    """[1, heads, n, hd] -> int32 words [n, heads*hd] in cache order."""
+    n = t.shape[2]
+    return (t[0].permute(1, 0, 2).contiguous().view(torch.int16).reshape(n, -1).to(torch.int32)) & 0xFFFF
+
+
+L0_VARIANTS = {
+    "same": "one pass of the request, as the capture ran it",
+    "chunks of 2048": "the request in prefill chunks of 2,048 tokens",
+    "chunks of 512": "the request in prefill chunks of 512 tokens",
+    "behind 1 token": "one token of another request ahead of it in the same pass (vLLM flattens a batch)",
+    "behind 2048 tokens": "2,048 tokens of another request ahead of it in the same pass",
+}
+
+
+def layer0_kv(model, ids, device, variant="same", other=()):
+    """Layer 0's K and V words [n, Hk*hd] (int32 on device) computed with the embedding, the first layer's input
+    norm, the K and V projections and RoPE only (no attention, no MLP): the model runs up to its first attention
+    module, which a hook stops after taking its inputs. `variant` (L0_VARIANTS) sets the prefill shape; `other`
+    are another request's token ids for the batched variants."""
+    attn = model.model.layers[0].self_attn
+    grab = {}
+
+    def hook(mod, args, kwargs):
+        grab["h"] = kwargs["hidden_states"] if "hidden_states" in kwargs else args[0]
+        grab["pe"] = kwargs["position_embeddings"] if "position_embeddings" in kwargs else args[1]
+        raise _Stop
+
+    n = len(ids)
+    if variant == "same":
+        passes = [(list(ids), list(range(n)), 0)]
+    elif variant.startswith("chunks of "):
+        c = int(variant.split()[-1])
+        passes = [(list(ids[a:a + c]), list(range(a, min(a + c, n))), 0) for a in range(0, n, c)]
+    elif variant.startswith("behind "):
+        m = int(variant.split()[1])
+        if not len(other):
+            raise ValueError(f"{variant} needs another request's tokens")
+        other = (list(other) * (m // len(other) + 1))[:m]          # repeated if shorter (only the shape matters)
+        passes = [(list(other[:m]) + list(ids), list(range(m)) + list(range(n)), m)]
+    else:
+        raise ValueError(f"variant is one of {sorted(L0_VARIANTS)}")
+    h = attn.register_forward_pre_hook(hook, with_kwargs=True)
+    ks, vs = [], []
+    try:
+        with torch.inference_mode():
+            for tok, pos, skip in passes:
+                try:
+                    model.model(input_ids=torch.tensor([tok], device=device),
+                                position_ids=torch.tensor([pos], device=device), use_cache=False)
+                except _Stop:
+                    pass
+                cos, sin = grab["pe"]
+                k, v = _kv_from(attn, grab["h"], cos, sin)
+                ks.append(_words(k)[skip:])
+                vs.append(_words(v)[skip:])
+    finally:
+        h.remove()
+    return torch.cat(ks, 0), torch.cat(vs, 0)
+
+
+def _ordered(w):
+    """BF16 words as signed magnitudes (monotone in the value; +0 and -0 both 0)."""
+    return torch.where(w >= 0x8000, -(w & 0x7FFF), w & 0x7FFF)
+
+
+def ulp_table(got, ref, R=8):
+    """Probabilities of the coded symbol d = ordered(got) - ordered(ref) in [-R, R], and of an escape (|d| > R, or
+    equal order but different words), add-one smoothed."""
+    d = _ordered(got) - _ordered(ref)
+    esc = (d.abs() > R) | ((d == 0) & (got != ref))
+    counts = torch.bincount((d[~esc] + R).reshape(-1).long(), minlength=2 * R + 1).double()
+    counts = torch.cat([counts, torch.tensor([float(esc.sum())], dtype=torch.float64, device=counts.device)]) + 1
+    return counts / counts.sum()
+
+
+def ulp_bits(got, ref, table):
+    """Bits per value of coding got against ref with the symbol table (an escape then costs the 16-bit word)."""
+    R = (table.numel() - 2) // 2
+    d = _ordered(got) - _ordered(ref)
+    esc = (d.abs() > R) | ((d == 0) & (got != ref))
+    sym = torch.where(esc, torch.full_like(d, 2 * R + 1), d + R).long()
+    bits = -torch.log2(table.to(sym.device)[sym]) + 16.0 * esc
+    return float(bits.mean())
+
+
+def layer0_robust(study, model, docs, scale_doc, device, t_layer0=None, timer=None, variants=tuple(L0_VARIANTS)):
+    """Per prefill shape: the share of layer-0 K and V words the lean recompute gives bit for bit, the largest
+    difference in BF16 steps, and the bits per layer-0 value of coding the captured words against it (the symbol
+    table from the scales document under the same shape). t_layer0: {doc: T's layer-0 bits} for the saving.
+    timer(fn) -> seconds: the lean recompute's time per document."""
+    C = study.C
+    out = {"variants": {v: L0_VARIANTS[v] for v in variants}, "docs": {}, "tables": {}}
+    others = {d.name: (scale_doc if d.name != scale_doc.name else docs[0]).ids[:2048].tolist() for d in docs}
+    others[scale_doc.name] = docs[0].ids[:2048].tolist()
+    tables = {}
+    for v in variants:
+        got = scale_doc.words(0, study.device)
+        K, V = layer0_kv(model, scale_doc.ids[: scale_doc.tokens].tolist(), device, v, others[scale_doc.name])
+        tables[v] = ulp_table(got, torch.cat([K, V], 1).to(got.device))
+        out["tables"][v] = {"equal": float((got == torch.cat([K, V], 1).to(got.device)).float().mean())}
+    for d in docs:
+        got = d.words(0, study.device)
+        row = {}
+        for v in variants:
+            K, V = layer0_kv(model, d.ids[: d.tokens].tolist(), device, v, others[d.name])
+            ref = torch.cat([K, V], 1).to(got.device)
+            diff = (_ordered(got) - _ordered(ref)).abs()
+            r = {"keys_equal": float((got[:, :C] == ref[:, :C]).float().mean()),
+                 "values_equal": float((got[:, C:] == ref[:, C:]).float().mean()),
+                 "max_steps": int(diff.max()), "bits_per_layer0_value": ulp_bits(got, ref, tables[v])}
+            if t_layer0 and d.name in t_layer0:
+                r["saving_per_value_all_layers"] = (t_layer0[d.name] - r["bits_per_layer0_value"]) / study.L
+            row[v] = r
+        if timer is not None:
+            ids = d.ids[: d.tokens].tolist()
+            row["lean_ms"] = 1e3 * timer(lambda: layer0_kv(model, ids, device))
+            row["first_layer_ms"] = 1e3 * timer(lambda: layer0_words(model, ids, device))
+        out["docs"][d.name] = row
+    return out
+
+
+# ---------------------------------------------------------------------------------------------- calibration sets
+CAL_DOMAINS = {"code": "MBPP, all splits (Python problems and solutions; HumanEval's kind of text)",
+               "math": "GSM8K train",
+               "exam": "MMLU dev and validation (MMLU's prompt format)",
+               "news": "Penn Treebank train"}
+
+
+def cal_sets(windows=3):
+    """{set: (calibration documents, scales document, note)}. Calibration window i of a domain is cal_<domain>_<i>;
+    every domain set fits on windows 0..windows-1 and takes window `windows` as its scales document. 'mixed' has 6
+    documents like 'wikitext' (two WikiText-2 train, one of each domain), 'mixed-all' every calibration document;
+    both take cal_mixed_<windows> as scales document, an equal share of each source after those windows."""
+    dom = list(CAL_DOMAINS)
+    mixed_t = f"cal_mixed_{windows}"
+    sets = {"wikitext": ([f"wtrain{i}" for i in range(6)], "wtables", "T's constants: WikiText-2 train"),
+            "mixed": (["wtrain0", "wtrain1"] + [f"cal_{d}_0" for d in dom], mixed_t,
+                      "6 documents: 2 WikiText-2 train, 1 of each domain"),
+            "mixed-all": ([f"wtrain{i}" for i in range(windows)] + [f"cal_{d}_{i}" for d in dom for i in range(windows)],
+                          mixed_t, f"{windows * (len(dom) + 1)} documents: {windows} of every source")}
+    for d in dom:
+        sets[d] = ([f"cal_{d}_{i}" for i in range(windows)], f"cal_{d}_{windows}", CAL_DOMAINS[d])
+    return sets
+
+
+def pick_sets(costs, sets, layers=None, cost=None, side_bits=None):
+    """Per-request choice among constant sets. costs {set: {doc: per-layer bits [L]}}. For every document the set
+    with the fewest bits over `layers` (None: all) is chosen; its cost is cost(per-layer bits) (default: the mean),
+    plus side_bits(doc) when given (the choice itself). Returns {doc: (set, bits)}."""
+    cost = cost or (lambda v: float(np.mean(v)))
+    out = {}
+    docs = set.intersection(*(set(costs[s]) for s in sets))
+    for d in sorted(docs):
+        def score(s):
+            v = np.asarray(costs[s][d], dtype=np.float64)
+            return float(v[layers].sum() if layers is not None else v.sum())
+        s = min(sets, key=score)
+        out[d] = (s, cost(costs[s][d]) + (side_bits(d) if side_bits else 0.0))
+    return out
+
+
 # ---------------------------------------------------------------------------------------------- float predictor
 @dataclass(frozen=True)
 class Spec:

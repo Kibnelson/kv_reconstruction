@@ -13,6 +13,10 @@ Stages (a finished stage is kept in OUT/t_ideas.json; --redo STAGE measures it a
   classes  idea 5: token classes (sink, repeated, k-means of layer l-1, encoder's choice of 2 or 4)
   gpu      ideas 2 and 3 on the GPU: every mode's bits and decode time per layer, products alone, coding alone, the
            coding kernel's memory floor; per-layer mode allocation for each link speed
+  layer0x  layer 0 recomputed the lean way (embedding, norm, K/V projections, RoPE) under other prefill shapes
+           (chunks of 2048 and 512, behind 1 or 2048 tokens of another request): bit identity, coding cost, time
+  calib    T's constants from other calibration sets (mixed, per domain: code, math, exam, news; texts of
+           scripts/fetch_calib_texts.py), on every dataset window, and a per-request pick among the sets
   report   OUT/summary.md with the decision rules of docs/t_ideas.md
 """
 from __future__ import annotations
@@ -26,11 +30,13 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-STAGES = ("capture", "adapt", "layer0", "anchor", "classes", "gpu", "report")
+STAGES = ("capture", "adapt", "layer0", "layer0x", "anchor", "classes", "gpu", "calib", "report")
 DATASETS = ("wikitext2", "humaneval", "gsm8k", "mmlu", "ptb")
 NAMES = {"wikitext2": "WikiText-2", "humaneval": "HumanEval", "gsm8k": "GSM8K", "mmlu": "MMLU", "ptb": "PTB"}
 LINKS = (1, 3, 10, 25, 100, 400)
@@ -191,6 +197,146 @@ def stage_layer0(args, res, device, out):
     del model
 
 
+def stage_layer0x(args, res, device, out):
+    """Layer 0 recomputed the lean way (no attention, no MLP) under other prefill shapes, and its time."""
+    import torch
+    from kv_compare import t_ideas as ti
+    from kv_compare.gpu_speed import timer
+    ws = windows(Path(args.run) / "captures", args.datasets, args.windows)
+    docs = [v[0] for v in ws.values()]
+    study = study_of(args, docs, device)
+    t0 = {n: row["T"]["layers"][0] for n, row in res.get("adapt", {}).get("docs", {}).items()}
+    _, model = load_model(args, device)
+    dev = torch.device(device)
+    r = ti.layer0_robust(study, model, study.tests, study.tables, dev, t_layer0=t0,
+                         timer=lambda fn: timer(fn, dev, warmup=2, reps=5))
+    res["layer0x"] = r
+    for v in r["variants"]:
+        rows = [row[v] for row in r["docs"].values()]
+        log(f"layer0x {v}: keys {100 * min(x['keys_equal'] for x in rows):.3f}% / values "
+            f"{100 * min(x['values_equal'] for x in rows):.3f}% bit for bit (worst window), at most "
+            f"{max(x['max_steps'] for x in rows)} BF16 steps apart, "
+            f"{max(x['bits_per_layer0_value'] for x in rows):.4f} bits per layer-0 value")
+    for n, row in r["docs"].items():
+        if "lean_ms" in row:
+            log(f"layer0x {n}: lean recompute {row['lean_ms']:.2f} ms, whole first layer {row['first_layer_ms']:.2f} ms")
+    del model
+
+
+def cal_texts(args):
+    return Path(args.texts) if args.texts else Path(args.run).parent / "dataset_texts"
+
+
+def capture_calib(args, res, device, sets):
+    """Calibration windows still missing: cal_<domain>_<i> (window i of the domain's text), and cal_mixed_<n> (an
+    equal share of WikiText-2 train after the wtrain/wtables windows and of each domain after its window n)."""
+    import shutil
+    from kv_compare import t_ideas as ti
+    from kv_compare.capture import bos_prefix, capture_ids
+    cap = Path(args.run) / "captures"
+    texts = cal_texts(args)
+    have = lambda n: (cap / f"{n}_K_bits.npy").is_file()
+    wanted = sorted({d for tr, tb, _ in sets.values() for d in tr + [tb]})
+    missing = [n for n in wanted if not have(n)]
+    if not missing:
+        return []
+    per = sum((cap / f"wtables_{p}").stat().st_size for p in ("K_bits.npy", "V_bits.npy", "ids.npy")
+              if (cap / f"wtables_{p}").is_file())
+    free = shutil.disk_usage(cap).free
+    if per and free < per * len(missing) + 2 * 2 ** 30:
+        raise SystemExit(f"STOP: {len(missing)} calibration windows need about {per * len(missing) / 2 ** 30:.1f} GiB, "
+                         f"{free / 2 ** 30:.1f} GiB free in {cap}")
+    tok, model = load_model(args, device)
+    pre = bos_prefix(tok)
+    step = args.tokens - len(pre)
+    ids = {}
+
+    def text_ids(name):
+        if name not in ids:
+            f = texts / (f"cal_{name}.txt" if name in ti.CAL_DOMAINS else f"{name}.txt")
+            ids[name] = tok(f.read_text(encoding="utf-8"), add_special_tokens=False)["input_ids"] if f.is_file() else None
+        return ids[name]
+
+    done = []
+    for n in missing:
+        if n.startswith("cal_mixed_"):
+            share = step // (len(ti.CAL_DOMAINS) + 1)
+            pieces = []
+            k = int(n.rsplit("_", 1)[1])            # after window k of every domain
+            for src, off in [("wikitext2_train", 7 * step)] + [(d, (k + 1) * step) for d in ti.CAL_DOMAINS]:
+                t = text_ids(src)
+                if t is None or len(t) < off + share:
+                    pieces = None
+                    break
+                pieces += t[off:off + share]
+            if pieces is None:
+                log(f"calib: {n} skipped (a source text is missing or short)")
+                continue
+            window = pre + pieces + text_ids("wikitext2_train")[7 * step + share:7 * step + share + step - len(pieces)]
+        else:
+            dom, idx = n[4:].rsplit("_", 1)
+            i = int(idx)
+            t = text_ids(dom)
+            if t is None or len(t) < (i + 1) * step:
+                log(f"calib: {n} skipped ({'no text' if t is None else f'{len(t)} tokens'}; "
+                    f"scripts/fetch_calib_texts.py --output {texts})")
+                continue
+            window = pre + t[i * step:(i + 1) * step]
+        capture_ids(model, window, cap, n, device, chunk_tokens=8192)
+        done.append(n)
+        log(f"calib: captured {n}")
+    del model
+    import gc
+    import torch
+    gc.collect()
+    if str(device).startswith("cuda"):
+        torch.cuda.empty_cache()
+    return done
+
+
+def stage_calib(args, res, device, out):
+    """T's constants from several calibration sets, measured on every dataset window; and a per-request pick."""
+    import torch
+    from kv_compare import fused
+    from kv_compare import t_ideas as ti
+    from kv_compare.predict import Study
+    ws = windows(Path(args.run) / "captures", args.datasets, args.windows)
+    tests = [w for v in ws.values() for w in v]
+    sets = ti.cal_sets(args.cal_windows)
+    r = res.setdefault("calib", {})
+    r.setdefault("sets", {})
+    r["captured"] = r.get("captured", []) + capture_calib(args, res, device, sets)
+    cap = Path(args.run) / "captures"
+    for name, (train, tables, note) in sets.items():
+        missing = [d for d in train + [tables] if not (cap / f"{d}_K_bits.npy").is_file()]
+        if missing:
+            r["sets"][name] = {"note": note, "skipped": f"missing {', '.join(missing)}"}
+            log(f"calib {name}: skipped (missing {', '.join(missing)})")
+            continue
+        row = r["sets"].get(name, {})
+        if row.get("docs") and set(row["docs"]) >= set(tests):
+            continue
+        t0 = time.time()
+        study = Study(cap, device, train, tables, tests, args.max_layers, log=lambda m: None)
+        if name == "wikitext" and args.train_set == "wikitext":
+            consts = consts_of(args, study, out)
+        else:
+            log(f"calib {name}: fitting T's constants on {len(train)} documents")
+            consts = fused.prepare(study, log=lambda m: None)
+        row = {"note": note, "train": train, "tables": tables, "docs": {}}
+        for d in study.tests:
+            per, side = ti.t_costs(study, consts, d, variants=("T", "fwd-bias+spread/ch"))
+            row["docs"][d.name] = {"T": per["T"].tolist(), "fwd": per["fwd-bias+spread/ch"].tolist(),
+                                   "fwd_side": side["fwd-bias+spread/ch"], "values": study.L * d.tokens * study.W}
+        r["sets"][name] = row
+        log(f"calib {name}: " + ", ".join(f"{n} {np.mean(v['T']):.4f}" for n, v in row["docs"].items())
+            + f" ({time.time() - t0:.0f} s)")
+        save(res, out)
+        del consts, study
+        if str(device).startswith("cuda"):
+            torch.cuda.empty_cache()
+
+
 def stage_float(args, res, device, out, stage, specs):
     from kv_compare import t_ideas as ti
     ws = windows(Path(args.run) / "captures", args.datasets, args.windows)
@@ -313,6 +459,40 @@ def report(res, out):
             verdicts.append(("2 layer 0 on the decode side", min(sv) >= 0.1 and eqf >= 0.99,
                              f"saving {min(sv):.3f} bits/value, {100 * eqf:.2f}% bit-identical "
                              "(rule: >= 0.1 bits/value and >= 99%)"))
+    lx = res.get("layer0x")
+    if lx and lx.get("docs"):
+        rows = lx["docs"]
+        lines += ["## 2c. Layer 0: the lean recompute under other prefill shapes", "",
+                  "The receiver computes layer 0 with the embedding, the first layer's input norm, the K and V "
+                  "projections and RoPE only. Worst window of " + str(len(rows)) + " (one per dataset); the cost "
+                  "codes each captured word against the recomputed one (difference in BF16 steps, table from the "
+                  "scales document under the same shape).", "",
+                  "| Prefill shape | keys bit for bit | values bit for bit | largest difference | bits per layer-0 "
+                  "value | saving per value (all layers) |", "| --- | --- | --- | --- | --- | --- |"]
+        worst = None
+        for v, note in lx["variants"].items():
+            xs = [r[v] for r in rows.values() if v in r]
+            sv = [x["saving_per_value_all_layers"] for x in xs if "saving_per_value_all_layers" in x]
+            if sv:
+                worst = min(sv) if worst is None else min(worst, min(sv))
+            lines.append(f"| {v}: {note} | {100 * min(x['keys_equal'] for x in xs):.3f}% | "
+                         f"{100 * min(x['values_equal'] for x in xs):.3f}% | {max(x['max_steps'] for x in xs)} steps | "
+                         f"{max(x['bits_per_layer0_value'] for x in xs):.4f} | {fmt(min(sv) if sv else None, 4)} |")
+        lean = [r["lean_ms"] for r in rows.values() if "lean_ms" in r]
+        first = [r["first_layer_ms"] for r in rows.values() if "first_layer_ms" in r]
+        dense = next((r for r in res.get("gpu", {}).get("rows", []) if r.get("mode") == "dense" and "decode_ms" in r),
+                     None)
+        if lean:
+            lines += ["", f"Time per window: lean recompute {min(lean):.2f}-{max(lean):.2f} ms, the whole first layer "
+                          f"(attention and MLP too) {min(first):.2f}-{max(first):.2f} ms"
+                      + (f"; T's dense decode of the cache takes {dense['decode_ms']:.1f} ms." if dense else ".")]
+        lines.append("")
+        if worst is not None:
+            ok = worst >= 0.3 and (not lean or max(lean) <= 10)
+            verdicts.append(("2c layer 0 holds under other prefill shapes", ok,
+                             f"worst saving {worst:.3f} bits/value over the shapes"
+                             + (f", lean recompute up to {max(lean):.1f} ms" if lean else "")
+                             + " (rule: >= 0.3 bits/value in every shape and <= 10 ms)"))
     for stage, title, rule in (("anchor", "## 4. Anchors (float one-step predictor)", 0.1),
                                ("classes", "## 5. Token classes (float one-step predictor)", 0.05)):
         f = res.get(stage)
@@ -378,12 +558,99 @@ def report(res, out):
         if ratios:
             verdicts.append(("3 leaner coding kernel (table-free decode)", min(ratios) >= 2,
                              f"coding / memory floor {min(ratios):.2f}-{max(ratios):.2f} (rule: >= 2)"))
+    cb = res.get("calib")
+    if cb and any(s.get("docs") for s in cb.get("sets", {}).values()):
+        lines += calib_report(res, cb, verdicts)
     if verdicts:
         lines += ["## Verdicts", "", "| Idea | worth building? | evidence |", "| --- | --- | --- |"]
         lines += [f"| {n} | {'yes' if ok else 'no'} | {e} |" for n, ok, e in verdicts]
         lines.append("")
     (out / "summary.md").write_text("\n".join(lines))
     return lines
+
+
+def calib_report(res, cb, verdicts):
+    """Section 6: T's bits per constant set with layer 0 recomputed, the per-request picks, and the room."""
+    import math
+    from kv_compare.t_ideas import CAL_DOMAINS, pick_sets
+    sets = {n: s for n, s in cb["sets"].items() if s.get("docs")}
+    first = next(iter(sets.values()))
+    docs = sorted(set.intersection(*(set(s["docs"]) for s in sets.values())))
+    keys = [k for k in DATASETS if any(ds_of(n) == k for n in docs)] + sorted({ds_of(n) for n in docs} - set(DATASETS))
+    L = len(first["docs"][docs[0]]["T"])
+    l0 = 0.0
+    if res.get("layer0x", {}).get("docs"):
+        l0 = max(r["same"]["bits_per_layer0_value"] for r in res["layer0x"]["docs"].values() if "same" in r)
+    elif res.get("layer0", {}).get("docs"):
+        l0 = max(r["bits_per_layer0_value"] for r in res["layer0"]["docs"].values())
+    values = {d: first["docs"][d]["values"] for d in docs}
+
+    def with_l0(v):
+        v = np.asarray(v, dtype=np.float64)
+        return float((v[1:].sum() + l0) / L)
+
+    def mean_by(vals):
+        m = by_dataset({d: vals[d] for d in docs if d in vals})
+        return m, (sum(m.values()) / len(m) if m else None)
+
+    dom = [n for n in ("wikitext",) + tuple(CAL_DOMAINS) if n in sets]
+    early = list(range(1, min(5, L)))
+    out = ["## 6. Calibration breadth: T's constants from other text", "",
+           f"Every row is T (its int8 predictor) with layer 0 recomputed by the receiver (layer 0 at {l0:.4f} bits "
+           "per value), in bits per value, mean of the windows of each dataset. Calibration texts are disjoint from "
+           "the test windows (scripts/fetch_calib_texts.py). A pick sends the chosen set's number "
+           "(log2 of the number of sets per request, counted).", ""]
+    verdict_rows = {}
+    for title, key, side in (("**T with layer 0 recomputed**", "T", None),
+                             ("**... and the request's own bias and spread (sent, counted)**", "fwd", "fwd_side")):
+        costs = {n: {d: s["docs"][d][key] for d in s["docs"]} for n, s in sets.items()}
+        extra = {d: (first["docs"][d][side] if side else 0.0) for d in docs}
+        rows = []
+        for n, s in sets.items():
+            rows.append((f"{n}: {s['note']}", {d: with_l0(costs[n][d]) + extra[d] for d in docs}, None))
+        for label, cands, layers in (("pick per request: WikiText or a domain set, chosen on layers 1-4", dom, early),
+                                     ("pick per request: WikiText or a domain set, chosen on the whole cache", dom,
+                                      slice(1, None)),
+                                     ("pick per request: any set, chosen on layers 1-4", list(sets), early)):
+            if len(cands) < 2:
+                continue
+            p = pick_sets(costs, cands, layers, cost=with_l0,
+                          side_bits=lambda d, k=len(cands): extra[d] + math.log2(k) / values[d])
+            rows.append((label, {d: b for d, (_, b) in p.items()}, {d: c for d, (c, _) in p.items()}))
+        out += [title, "", "| Constants | " + " | ".join(NAMES.get(k, k) for k in keys) + " | mean |",
+                "| --- |" + " --- |" * (len(keys) + 1)]
+        for label, vals, chosen in rows:
+            m, avg = mean_by(vals)
+            out.append(f"| {label} | " + " | ".join(fmt(m.get(k)) for k in keys) + f" | {fmt(avg)} |")
+            verdict_rows.setdefault(key, {})[label] = (m, avg)
+            if chosen and "layers 1-4" in label and "WikiText or" in label:
+                picks = {}
+                for d, c in chosen.items():
+                    picks.setdefault(ds_of(d), []).append(c)
+                out.append("| (sets chosen) | " + " | ".join("/".join(picks.get(k, [])) for k in keys) + " | |")
+        if key == "T" and res.get("adapt", {}).get("docs"):
+            orc = {d: with_l0(r["oracle"]["layers"]) for d, r in res["adapt"]["docs"].items()
+                   if d in docs and "layers" in r.get("oracle", {})}
+            if orc:
+                m, avg = mean_by(orc)
+                out.append("| room: one-step predictor fitted on the other half of the window (not sendable) | "
+                           + " | ".join(fmt(m.get(k)) for k in keys) + f" | {fmt(avg)} |")
+            today = {d: float(np.mean(r["T"]["layers"])) for d, r in res["adapt"]["docs"].items() if d in docs}
+            m, avg = mean_by(today)
+            out.append("| today: T as it is, layer 0 coded | " + " | ".join(fmt(m.get(k)) for k in keys)
+                       + f" | {fmt(avg)} |")
+        out.append("")
+    base = verdict_rows["T"].get(next(lbl for lbl in verdict_rows["T"] if lbl.startswith("wikitext:")))
+    options = {lbl: v for lbl, v in verdict_rows["T"].items() if not lbl.startswith(("wikitext:",))
+               and (lbl.startswith(("mixed", "pick")) and "whole cache" not in lbl)}
+    if base and options:
+        best = min(options, key=lambda lbl: options[lbl][1])
+        sav = base[1] - options[best][1]
+        wiki = options[best][0].get("wikitext2", 0) - base[0].get("wikitext2", 0)
+        verdicts.append(("6 calibration breadth", sav >= 0.01 * base[1],
+                         f"best practical option ({best.split(':')[0]}) saves {sav:.3f} bits/value over the five "
+                         f"datasets, WikiText {wiki:+.3f} (rule: >= 1% of T, {0.01 * base[1]:.3f})"))
+    return out
 
 
 def save(res, out):
@@ -395,7 +662,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", required=True, help="run folder with captures/ (scripts/run_a5000.sh)")
     ap.add_argument("--output", required=True)
-    ap.add_argument("--stages", default="capture,adapt,layer0,anchor,classes,gpu,report")
+    ap.add_argument("--stages", default="capture,adapt,layer0,layer0x,anchor,classes,gpu,calib,report")
     ap.add_argument("--redo", default="", help="stages to measure again")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--train-set", default="wikitext", choices=sorted(TRAIN_SETS))
@@ -408,6 +675,7 @@ def main():
     ap.add_argument("--revision", default=None)
     ap.add_argument("--max-layers", type=int, default=None)
     ap.add_argument("--modes", default=",".join(MODES))
+    ap.add_argument("--cal-windows", type=int, default=3, help="calib: calibration windows per domain")
     args = ap.parse_args()
     args.datasets = [d for d in args.datasets.split(",") if d]
     args.modes = [m for m in args.modes.split(",") if m]
@@ -449,6 +717,10 @@ def main():
             stage_float(args, res, args.device, out, "classes", CLASSES)
         elif s == "gpu":
             stage_gpu(args, res, args.device, out)
+        elif s == "layer0x":
+            stage_layer0x(args, res, args.device, out)
+        elif s == "calib":
+            stage_calib(args, res, args.device, out)
         elif s == "report":
             for line in report(res, out):
                 print(line)
