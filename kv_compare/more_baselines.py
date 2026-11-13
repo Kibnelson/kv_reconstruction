@@ -180,17 +180,26 @@ def _exit_name(code):
     return f"exit {code}"
 
 
+def _indexed(device):
+    """torch.device(device) with its GPU index: torch.cuda.set_device refuses a plain "cuda" (no index), which
+    made nvCOMP's child exit at once on every GPU run since it moved to a child (exit 1, no message)."""
+    d = torch.device(device)
+    if d.type == "cuda" and d.index is None:
+        d = torch.device("cuda", torch.cuda.current_device())
+    return d
+
+
 def _codec_worker(conn, factory, kwargs, device, warmup, reps):
     """The child of IsolatedCodec: builds factory(device, **kwargs) ("module:name"), sends what it offers, then
     measures one stream per request ((alg, bytes in shared host memory)) until it receives None."""
-    import faulthandler
-    from .gpu_speed import timer as _timer
-    faulthandler.enable()                            # a crash's Python stack goes to the run's console log
-    dev = torch.device(device)
-    gpu = dev.type == "cuda"
-    if gpu:
-        torch.cuda.set_device(dev)
-    try:
+    try:                                             # any failure here comes back as its message, not as "exit 1"
+        import faulthandler
+        from .gpu_speed import timer as _timer
+        faulthandler.enable()                        # a crash's Python stack goes to the run's console log
+        dev = torch.device(device)
+        gpu = dev.type == "cuda"
+        if gpu:
+            torch.cuda.set_device(dev)               # needs an index (IsolatedCodec passes one)
         mod, _, name = factory.partition(":")
         codec = getattr(importlib.import_module(mod), name)(dev, **kwargs)
         conn.send(("ready", {"codecs": list(codec.codecs), "errors": dict(getattr(codec, "errors", {})),
@@ -226,7 +235,7 @@ class IsolatedCodec:
     isolated = True
 
     def __init__(self, factory, device, kwargs=None, warmup=2, reps=5, retries=1, timeout=1800.0, log=print):
-        self.factory, self.device, self.kwargs = factory, torch.device(device), dict(kwargs or {})
+        self.factory, self.device, self.kwargs = factory, _indexed(device), dict(kwargs or {})
         self.warmup, self.reps, self.retries, self.timeout, self.log = warmup, reps, retries, timeout, log
         self._proc = self._conn = None
         self.crashes = 0
