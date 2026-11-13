@@ -1,0 +1,7 @@
+# Checked transfer path: software validation
+
+The new experiment keeps the complete original packet format and frozen codec state, replacing repeated payload byte-string copies with reusable pinned-host and device buffers. All checksum work remains in the timed path. The runner separately measures fresh KV preparation/restoration and retrieval of a previously prepared compressed packet.
+
+Eleven software tests pass (`python -m unittest kv_compare.test_pinned_transfer -v`). They cover every BF16 word pattern in the generic packet, all component dtypes including odd offsets and empty/noncontiguous tensors, byte identity for global and learned T, changing inputs, receiver-buffer poisoning, original-reader compatibility, corrupted packets, rechecksummed invalid directories/descriptors, capacity bounds, independent-receiver gates, separate fresh/retrieval accounting and rejection of CPU-interpreter GPU runs. T's copy/codec checks run in an explicitly identified CPU Triton interpreter subprocess; they are not GPU measurements. A mocked CUDA synchronization call in the stage-accounting test checks control flow only.
+
+The original T source hashes are unchanged. Python compilation and shell syntax were checked. See `validation.json` and `tests.txt`. No native GPU speedup, real network transfer, H100 ExANS reproduction, P1 conversion or serving improvement is claimed. The NUC smoke and full runs remain required. All changes stay on `experiment/t-head-aware-spread-v1`.
