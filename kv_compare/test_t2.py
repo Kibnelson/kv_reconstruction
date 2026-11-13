@@ -75,12 +75,16 @@ for mode in ("dense", "4g", "rank256"):
     assert bits2 < bits, (mode, bits, bits2)
     print("ok", mode, bits, bits2, lw.tolist(), lw2.tolist())
 # the wrapper: two sets, pick on layers 1..2, the fallback to T
-builders = {n: (lambda n_layers, rec, s=s: ti.mode_codec(s[0], s[1], s[2], "dense", C, hd, T,
-                                                          cls=Layer0Recomputed if rec else None, layers=n_layers))
+builders = {n: (lambda n_layers, rec, tokens=None, s=s: ti.mode_codec(s[0], s[1], s[2], "dense", C, hd, tokens or T,
+                                                                       cls=Layer0Recomputed if rec else None,
+                                                                       layers=n_layers))
             for n, s in sets.items()}
 codec = T2(builders, pick_layers=2)
 name, pbits = codec.pick(words)
 assert name == min(pbits, key=pbits.get)
+assert codec.pick(words) == (name, pbits)                 # the kept codecs give the same choice
+sub, sbits = codec.pick(words, layers=1, tokens=32)
+assert sub in sets and set(sbits) == set(sets)
 parts, header = codec.encode(words, True, name)
 assert header == {"set": name, "layer0": "recomputed", "T": T}
 assert torch.equal(codec.decode(parts, header, l0=l0), words)

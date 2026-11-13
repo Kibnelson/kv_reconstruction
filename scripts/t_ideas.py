@@ -466,8 +466,9 @@ def stage_t2(args, res, device, out):
 
     def builders(T, mode="dense", extra=None):
         extra = extra or {}
-        return {n: (lambda nl, rec, n=n: ti.mode_codec(consts[n], *(extra.get(n, (None, None))), mode, C, hd, T,
-                                                      cls=Layer0Recomputed if rec else None, layers=nl))
+        return {n: (lambda nl, rec, tokens=None, n=n: ti.mode_codec(consts[n], *(extra.get(n, (None, None))), mode, C,
+                                                                    hd, tokens or T,
+                                                                    cls=Layer0Recomputed if rec else None, layers=nl))
                 for n in sets}
 
     def doc_words(d, T):
@@ -488,6 +489,15 @@ def stage_t2(args, res, device, out):
         name, pbits = codec.pick(words)
         torch.cuda.synchronize(dev)
         pick_ms = 1e3 * (time.perf_counter() - t0)
+        variants = {}                                 # the sender's cost of the pick: cheaper looks at the request
+        for label, kw in (("layers 1-4, all tokens (codecs kept)", {}), ("layers 1-2, all tokens", {"layers": 2}),
+                          ("layers 1-4, first 1024 tokens", {"tokens": 1024}),
+                          ("layers 1-2, first 1024 tokens", {"layers": 2, "tokens": 1024})):
+            if kw.get("tokens", 0) >= T:
+                continue
+            codec.pick(words, **kw)                   # builds and warms the codecs
+            ms = 1e3 * timer(lambda: codec.pick(words, **kw), dev, warmup=0, reps=3)
+            variants[label] = {"set": codec.pick(words, **kw)[0], "ms": ms}
         parts, header = codec.encode(words, l0_ok, name)
         c2 = codec.codec(name, l0_ok)
         dec = torch.empty(L, T, W, dtype=torch.int16, device=dev)
@@ -498,7 +508,7 @@ def stage_t2(args, res, device, out):
             c2.decode(parts["words"], parts["starts"], T, out=dec, bufs=bufs)
         row = {"set": name, "pick_bits": {k: v / n for k, v in pbits.items()}, "layer0_recomputed": l0_ok,
                "bit_exact": bool(torch.equal(dec, words)), "t2_bits": codec.bits(parts, header) / n,
-               "pick_ms": pick_ms}
+               "pick_ms": pick_ms, "pick_variants": variants}
         if l0_ok:
             row["t2_decode_ms"] = 1e3 * timer(lambda: c2.decode(parts["words"], parts["starts"], T, l0, out=dec,
                                                                 bufs=bufs), dev)
@@ -539,8 +549,14 @@ def stage_t2(args, res, device, out):
         extra[n] = (prepare_rank(studies[n], consts[n], 256, lambda m: None),
                     prepare_groups(studies[n], consts[n], sorted({2, 4, G}), log=lambda m: None))
     T = d.tokens - d.tokens % 256
-    words = doc_words(d, T)
     l0 = _int16(torch.cat(ti.layer0_kv(model, d.ids[:T].tolist(), dev), 1))
+    model = None                                     # the modes need the memory (rank 256 ran out beside the model)
+    for k in [k for k in consts if k not in ("wikitext", name)]:
+        consts[k] = None
+    import gc
+    gc.collect()
+    torch.cuda.empty_cache()
+    words = doc_words(d, T)
     l0_ok = bool(torch.equal(l0, words[0]))
     n = L * T * W
     dec = torch.empty(L, T, W, dtype=torch.int16, device=dev)
@@ -573,7 +589,6 @@ def stage_t2(args, res, device, out):
                                    f"exact={row['bit_exact']}, T {row['t_bits']:.4f} ({row['t_decode_ms']:.1f} ms) -> "
                                    f"T2 {row['t2_bits']:.4f} ({row['t2_decode_ms']:.1f} ms)"))
     res["t2"] = r
-    model = None
 
 
 def stage_float(args, res, device, out, stage, specs):
@@ -1017,6 +1032,16 @@ def t2_report(t2, verdicts):
                    f"{r['t2_bits']:.4f} | {100 * savings[-1]:.1f}% | {r['t_decode_ms']:.1f} ms | "
                    f"{r['t2_decode_ms']:.1f} ms | {r['recompute_ms']:.1f} ms |")
     out.append("")
+    pv = [r.get("pick_variants", {}) for r in t2["docs"].values()]
+    labels = [lbl for lbl in (pv[0] if pv else {})]
+    if labels:
+        out += ["The sender's pick (GPU time per request; the decision against the pick on layers 1-4 of all tokens):",
+                "", "| Pick | time | same set as the full pick |", "| --- | --- | --- |"]
+        for lbl in labels:
+            xs = [(v[lbl], r["set"]) for v, r in zip(pv, t2["docs"].values()) if lbl in v]
+            same = sum(x["set"] == full for x, full in xs)
+            out.append(f"| {lbl} | {np.mean([x['ms'] for x, _ in xs]):.1f} ms | {same} of {len(xs)} windows |")
+        out.append("")
     if t2.get("modes"):
         out += [f"Every mode on {t2['modes'][0]['doc']} (T2 with its picked set {t2['modes'][0]['set']}):", "",
                 "| Mode | bit-exact | T | T2 | saving | decode T | decode T2 |", "| --- | --- | --- | --- | --- | --- | --- |"]

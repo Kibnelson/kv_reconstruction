@@ -189,7 +189,8 @@ Its scales document leaves that source out too. The per-request pick is also run
 ## Results so far
 
 Llama-3.2-3B on the NUC's RTX A4500, 13 Nov 2026
-(`benchmark_results/llama32_3b_tideas_rtxa4500_20261113_0625` and `..._0740` for layer0x and calib). The check passed: T's exact-model bits from the
+(`benchmark_results/llama32_3b_tideas_rtxa4500_20261113_0625`, `..._0740` for layer0x and calib, `..._0906` for
+layer0m, calib_loo and t2). The check passed: T's exact-model bits from the
 torch reference equal the kernel's (8.8627).
 
 | Idea | Verdict | Numbers |
@@ -201,6 +202,9 @@ torch reference equal the kernel's (8.8627).
 | 2b per-layer modes | drop | 3.4% at 100 Gb/s at best |
 | 2c layer 0, other prefill shapes | mostly holds | Lean recompute 9.7 ms per 8K window (the whole first layer: 53 ms). Bit for bit in one pass and with other requests' tokens in the same pass. Prefill chunks of 2,048 or 512 tokens break it (54-83% of words equal), yet the saving stays 0.30 / 0.28 bits/value |
 | 6 calibration breadth | build | Layer 0 recomputed: T's constants 8.782 bits/value on average; one mixed set (15 documents) 8.432; a per-request pick among WikiText and 4 domain sets, chosen on layers 1-4, 8.341 (it chose the matching set for all 10 windows). With the right set, per-request bias and spread add only 0.01. Caveat: 4 of 5 datasets had a matching calibration source; 6b tests unseen text |
+| 2d layer 0, steps known | build | Padding to the sender's step sizes gives 100% bit for bit in all four simulated vLLM schedules, own rows first or not: the step's row count is all that matters, not the other rows' content or place. The same chunks without padding give 50-97% |
+| 6b unseen text | weak | Mixed-all without the dataset's source saves 0.054 bits/value over the five (rule: 0.088). On the four non-WikiText datasets it saves 0.137 (1.5%) against T's WikiText constants; WikiText itself loses 0.275 when WikiText leaves the mix. The big gain needs the request's kind of text among the sets |
+| 7 T2 | works | Dense, layer 0 recomputed in all 5 windows (the sender's check passed), every round trip bit-exact. Real streams: WikiText 8.98 to 8.62 (-4.0%), HumanEval 9.57 to 8.63 (-9.9%), GSM8K 9.28 to 8.16 (-12.1%), MMLU 9.33 to 8.38 (-10.1%), PTB 9.24 to 8.44 (-8.7%). Decode time unchanged (31 ms), plus the receiver's 9.9 ms recompute. On HumanEval keys then values, 4 groups and head by head are bit-exact too (head by head 9.01 to 7.96 bits/value). Rank 256 ran out of GPU memory beside the model (fixed: rerun the t2 stage). The sender's pick took 156-183 ms (now timed in cheaper forms) |
 | 3 coding kernel | refocus | Dense and rank 256 code at 2.4x their memory floor (15.9 vs 6.7 ms). Head by head, the smallest mode (8.29 vs 8.98 bits/value), takes 108 ms because each layer's 16 head groups run one after another: one kernel per layer over all its groups is the prize |
 
 ## T2: the winning ideas as a separate codec

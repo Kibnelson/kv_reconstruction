@@ -157,8 +157,9 @@ def slice_layers(d, n, L):
 class T2:
     """The T2 codec over several constant sets in one mode.
 
-    builders {set name: callable(n_layers or None) -> codec}: a function that returns the mode's codec for that
-    set (kv_compare.t_ideas.mode_codec arguments), on all layers (None) or cut to the first n layers (for the pick).
+    builders {set name: callable(n_layers or None, recomputed, tokens=None) -> codec}: the mode's codec for that
+    set (kv_compare.t_ideas.mode_codec arguments), on all layers (None) or cut to the first n layers, for the
+    request's token count or `tokens` (the pick may look at the first tokens only). Codecs are built once and kept.
     """
 
     def __init__(self, builders, pick_layers=4):
@@ -166,6 +167,7 @@ class T2:
         self.names = list(self.builders)
         self.pick_layers = int(pick_layers)
         self._full = {}
+        self._part = {}
 
     def codec(self, name, recomputed=True):
         key = (name, recomputed)
@@ -173,13 +175,18 @@ class T2:
             self._full[key] = self.builders[name](None, recomputed)
         return self._full[key]
 
-    def pick(self, words):
-        """The set whose codec codes layers 1..pick_layers in the fewest bits ({set: bits} too)."""
-        n = min(self.pick_layers + 1, words.shape[0])
-        part = words[:n].contiguous()
+    def pick(self, words, layers=None, tokens=None):
+        """The set whose codec codes layers 1..layers (default pick_layers) of the first `tokens` tokens (default
+        all) in the fewest bits ({set: bits} too)."""
+        n = min((layers or self.pick_layers) + 1, words.shape[0])
+        part = words[:n] if tokens is None else words[:n, :tokens]
+        part = part.contiguous()
         bits = {}
         for name in self.names:
-            c = self.builders[name](n, True)
+            key = (name, n, tokens)
+            if key not in self._part:
+                self._part[key] = self.builders[name](n, True, tokens)
+            c = self._part[key]
             xall, prior = c.model(part)
             _, starts = c.encode(part, xall, prior)
             bits[name] = c.bits(starts, part.shape[1])
