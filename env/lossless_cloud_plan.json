@@ -1,0 +1,103 @@
+{
+  "schema": "lossless_cloud_plan_v1",
+  "checked_date": "2026-11-13",
+  "status": "researched_specification_not_a_built_or_provisioned_environment",
+  "experiment_branch": "experiment/t-head-aware-spread-v1",
+  "continuity_commit": "97c686fb4a00efb80cffa1cb31733a82fb5b56f3",
+  "bit_exact_definition": "Every original BF16 word must reconstruct; task accuracy alone is insufficient.",
+  "cloud_profiles": {
+    "aws_h100_codec": {
+      "instance": "p5.4xlarge", "gpus_per_vm": 1, "gpu": "H100", "gpu_memory_GB_each_advertised": 80,
+      "network_Gbps_vm_max_advertised": 100, "gpudirect_rdma_supported": false,
+      "purpose": "single-GPU codec/local path; two such VMs may test host-staged traffic within measured link limits", "network_performance_validated": false,
+      "source": "https://aws.amazon.com/ec2/instance-types/accelerated-computing/"
+    },
+    "gcp_h100_codec": {
+      "instance": "a3-highgpu-1g", "gpus_per_vm": 1, "gpu": "H100 SXM", "gpu_memory_GB_each_advertised": 80,
+      "network_Gbps_vm_max_advertised": 25, "provisioning": ["Spot", "Flex-start"],
+      "purpose": "single-GPU codec/local path; two such VMs may test host-staged traffic within measured link limits", "network_performance_validated": false,
+      "source": "https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines"
+    },
+    "aws_h100_network": {
+      "instance": "p5.48xlarge", "vm_count_for_transfer": 2, "gpus_per_vm": 8, "gpu": "H100",
+      "network_Gbps_vm_max_advertised": 3200, "transport_family": "EFA/libfabric", "gpudirect_rdma_supported": true,
+      "purpose": "candidate for measured inter-node GPU transfers", "network_performance_validated": false,
+      "source": "https://aws.amazon.com/ec2/instance-types/accelerated-computing/"
+    },
+    "aws_h200_network": {
+      "instance": "p5en.48xlarge", "vm_count_for_transfer": 2, "gpus_per_vm": 8, "gpu": "H200",
+      "network_Gbps_vm_max_advertised": 3200, "transport_family": "EFAv3/libfabric", "gpudirect_rdma_supported": true,
+      "purpose": "candidate for H200 codec and inter-node transfer tests", "network_performance_validated": false,
+      "source": "https://aws.amazon.com/blogs/aws/new-amazon-ec2-p5en-instances-with-nvidia-h200-tensor-core-gpus-and-efav3-networking/"
+    },
+    "gcp_h100_network": {
+      "instance": "a3-highgpu-8g", "vm_count_for_transfer": 2, "gpus_per_vm": 8, "gpu": "H100 SXM",
+      "network_Gbps_vm_max_advertised": 1000, "transport_family": "GPUDirect-TCPX",
+      "purpose": "candidate only with a verified TCPX-compatible transport integration", "network_performance_validated": false,
+      "source": "https://docs.cloud.google.com/compute/docs/gpus/gpudirect"
+    },
+    "gcp_h200_network": {
+      "instance": "a3-ultragpu-8g", "vm_count_for_transfer": 2, "gpus_per_vm": 8, "gpu": "H200",
+      "network_Gbps_vm_max_advertised": 3600, "transport_family": "GPUDirect RDMA/RoCE",
+      "purpose": "closest listed GPU/network family to SplitZip's H200/RoCE platform; not an identical testbed",
+      "network_performance_validated": false,
+      "source": "https://docs.cloud.google.com/compute/docs/gpus/gpu-network-bandwidth"
+    }
+  },
+  "runtime_profiles": {
+    "matched_t": {
+      "python_major_minor": "3.12", "torch": "2.11.0+cu128", "triton": "3.6.0",
+      "cuda_toolkit_major_minor": "12.8", "nvcomp_sdk_package": "nvidia-libnvcomp-cu12",
+      "nvcomp_sdk_version": "5.3.0.16", "nvcomp_python_package": "nvidia-nvcomp-cu12",
+      "nvcomp_python_version": "5.3.0.16", "native_gpu_arch": "detect_actual_device",
+      "base_image_digest": null, "built_on_cloud": false
+    },
+    "splitzip_authors": {
+      "python_major_minor": "3.12", "torch": "2.9.0", "triton": "3.5.0", "transformers": "4.57.1",
+      "source_commit": "42c743118a29db3270ae6a921a4a4eecb20cad04", "built_on_cloud": false
+    },
+    "ibp_authors_a100": {
+      "os": "Ubuntu 22.04", "python_major_minor": "3.8", "cuda_toolkit_major_minor": "11.7", "torch": "1.13.1",
+      "gpu_family": "A100", "full_artifact_host_memory_GB_min": 300, "full_artifact_disk_TB_min": 1,
+      "note": "Original A100 reproduction; native H100 build needs a separately validated newer-toolkit port.", "built_on_cloud": false
+    },
+    "lct_authors": {
+      "python_major_minor": "3.14", "torch": null, "triton": null,
+      "note": "Author requirements do not pin versions; resolve, validate and freeze independently. H100/H200 tuning is unchecked in the reviewed README.",
+      "source_commit": "396b9d6fb725956cb0735a83b5de368319d0b823", "built_on_cloud": false
+    },
+    "zipfusion_reported": {
+      "cuda_toolkit_major_minor": "13.0", "torch": "2.11.0", "flashinfer": "0.6.12", "gpu_family": "H100 80GB",
+      "sglang_commit": null, "public_artifact_verified": false, "built_on_cloud": false
+    }
+  },
+  "baseline_inventory": [
+    {"name": "SplitZip", "role": "direct_transfer", "latest_five_method_GPU_run": true, "source_commit": "42c743118a29db3270ae6a921a4a4eecb20cad04", "source": "https://github.com/Intelligent-Microsystems-Lab/SplitZip"},
+    {"name": "ExANS", "role": "direct_transfer_retrieval", "latest_five_method_GPU_run": true, "source_commit": "de6c38bcc5438475bd1abf1e9b3d154cef414ef6", "source": "https://github.com/openlake-project/openlake", "paper_protocol_match_verified": false},
+    {"name": "AdaCode", "role": "BF16_KV_codec", "latest_five_method_GPU_run": false, "existing_adapter": "kv_compare/more_baselines.py", "source_commit": "d46cf6cbf7e5de497a7e79bf0d1766023a366854", "source": "https://github.com/lichangshiwhu/Adacode"},
+    {"name": "IBP", "role": "PCIe_fetch_and_decompress", "latest_five_method_GPU_run": false, "existing_adapter": "kv_compare/more_baselines.py", "source_commit": "b2f71003113defb4e387caf18843b241f6280ba9", "source": "https://github.com/AKKamath/InvariantBitPacking"},
+    {"name": "nvCOMP", "role": "generic_GPU_controls", "algorithms": ["LZ4", "Cascaded", "Bitcomp", "ANS", "Zstd"], "latest_five_method_GPU_run": false, "existing_adapter": "kv_compare/more_baselines.py", "source": "https://developer.nvidia.com/nvcomp", "note": "Audit symbol widths and headers. Keep ExANS-compatible 5.3 isolated from a separate latest-6.0 comparison."},
+    {"name": "LCT", "role": "generic_BF16_candidate", "latest_five_method_GPU_run": false, "adapter_ready": false, "source_commit": "396b9d6fb725956cb0735a83b5de368319d0b823", "source": "https://github.com/Maxzhu123/Losslessly_Compressed_Tensors", "paper_hardware_and_full_timing_protocol_verified": false},
+    {"name": "exactkv", "role": "resident_compressed_attention", "latest_five_method_GPU_run": false, "existing_page_codec_adapter": "kv_compare/more_baselines.py", "source_commit": "d90376b84e8c116424298e98027995bdbbf0e8ee", "source": "https://github.com/zyfyz666/exactkv"},
+    {"name": "ZipFusion", "role": "resident_compressed_attention", "latest_five_method_GPU_run": false, "public_artifact_verified": false, "source": "https://arxiv.org/abs/2610.33719"},
+    {"name": "DFloat11/ZipServ/Falcon/ZipNN/DietGPU/NeuZip", "role": "secondary_dtype_and_artifact_audit", "latest_five_method_GPU_run": false, "note": "Codec/weight/training-oriented candidates. Require real encoded buffers, supported BF16 input and complete timing; do not substitute entropy floors."}
+  ],
+  "required_experiments": [
+    "authors_protocol_reproduction_when_public_inputs_harness_and_environment_are_available",
+    "matched_frozen_KV_bits_and_complete_serialized_packets_on_one_common_GPU",
+    "fresh_encode_pack_transfer_restore_decode",
+    "prepared_compressed_KV_read_transfer_restore_decode",
+    "resident_attention_and_serving_in_separate_track",
+    "actual_two_node_transport_raw_and_compressed_with_same_backend"
+  ],
+  "cloud_readiness_blockers": [
+    "No cloud profile is provisioned, container image built or cloud performance validated.",
+    "exans_official.py currently hardcodes CMAKE_CUDA_ARCHITECTURES=86; rebuild in a new cloud run with the actual SM (90 for H100/H200) and recorded build flags.",
+    "Current transfer-path runner measures a local host-buffer handoff, not real network I/O.",
+    "ExANS blog does not identify its model/dataset snapshot or exact timing harness.",
+    "SplitZip public release does not contain its full SGLang/Mooncake serving integration.",
+    "LCT's paper-level timing/hardware protocol and a locked Python 3.14 environment need verification.",
+    "ZipFusion's public artifact and SGLang commit have not been verified.",
+    "Quota, region, capacity, reservation/provisioning model and current price must be checked before allocation."
+  ]
+}
