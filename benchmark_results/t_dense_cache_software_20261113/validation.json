@@ -1,0 +1,117 @@
+{
+  "format": "t_dense_cache_software_validation_v1",
+  "date": "2026-11-13",
+  "base_commit": "b2dae7bc2446ad40b3333b322fc37e7bb7daeb39",
+  "gpu_executed": false,
+  "new_cached_original_GPU_speed": "PENDING NUC",
+  "unique_unit_test_methods_passed": 10,
+  "additional_gate_assertion_checks_passed": 2,
+  "synthetic_reference_packets_exact": 2,
+  "independent_decoder_processes_exact": 2,
+  "CPU_cannot_pass_GPU_review_gate": true,
+  "prior_GPU_audit": {
+    "metrics": {
+      "verified_GPU_timing_rows": 108,
+      "verified_independent_GPU_decodes": 20,
+      "verified_changed_input_graph_cases": 48,
+      "all_reference_packet_hashes_exact": true,
+      "only_graph_failure": "original dense setup inside capture",
+      "dense_encode_time_reduction_percent": 27.227704891466985,
+      "dense_pair_time_reduction_percent": 19.122769913947234,
+      "hbh_graph_pair_time_reduction_percent": 0.8119644815698934,
+      "hbh_graph_pair_ratio_vs_dense_graph": 3.1198292162851566,
+      "ideal_link_crossover_Gbps": 1.5975683092351411
+    },
+    "comparison": [
+      {
+        "implementation": "dense_original/eager",
+        "bpv": 8.95226069859096,
+        "saving_from_bf16": 0.440483706338065,
+        "encode_ms": 87.47480010986328,
+        "decode_ms": 36.82737922668457,
+        "pair_ms": 124.4927806854248,
+        "packet_pack_D2H_median_ms": 1070.490948855877
+      },
+      {
+        "implementation": "dense_fast/eager",
+        "bpv": 8.95226069859096,
+        "saving_from_bf16": 0.440483706338065,
+        "encode_ms": 63.65741968154907,
+        "decode_ms": 36.75808763504028,
+        "pair_ms": 100.68631267547607,
+        "packet_pack_D2H_median_ms": 1069.9274018406868
+      },
+      {
+        "implementation": "dense_fast/graph",
+        "bpv": 8.95226069859096,
+        "saving_from_bf16": 0.440483706338065,
+        "encode_ms": 63.42329978942871,
+        "decode_ms": 36.63252067565918,
+        "pair_ms": 100.43259811401367,
+        "packet_pack_D2H_median_ms": 1066.209970973432
+      },
+      {
+        "implementation": "hbh_learned/eager",
+        "bpv": 8.22909266608102,
+        "saving_from_bf16": 0.4856817083699363,
+        "encode_ms": 112.58135986328125,
+        "decode_ms": 195.57537078857422,
+        "pair_ms": 315.8975296020508,
+        "packet_pack_D2H_median_ms": 994.3016190081835
+      },
+      {
+        "implementation": "hbh_learned/graph",
+        "bpv": 8.22909266608102,
+        "saving_from_bf16": 0.4856817083699363,
+        "encode_ms": 112.4257230758667,
+        "decode_ms": 193.34776306152344,
+        "pair_ms": 313.3325538635254,
+        "packet_pack_D2H_median_ms": 980.8288337662816
+      }
+    ]
+  },
+  "workflow_rows": [
+    {
+      "variant": "dense_cached",
+      "execution": "eager",
+      "case": "test_text",
+      "values": 4096,
+      "packet_sha256": "078911daf0fe3dbe64a089ae77d0d3e054666d746d7bc704b63988401e8ea9cd",
+      "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+      "bit_exact": true,
+      "matches_reference_packet": true
+    },
+    {
+      "variant": "dense_fast",
+      "execution": "eager",
+      "case": "test_text",
+      "values": 4096,
+      "packet_sha256": "078911daf0fe3dbe64a089ae77d0d3e054666d746d7bc704b63988401e8ea9cd",
+      "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+      "bit_exact": true,
+      "matches_reference_packet": true
+    }
+  ],
+  "source_manifest": [
+    {
+      "path": "kv_compare/fast_dense_encode.py",
+      "sha256": "801866f3d6e7f7713904fcb1e6fa7b0bdd74dc8bdf9d2ab3b2aa180a88e7e591"
+    },
+    {
+      "path": "kv_compare/fast_dense_checks.py",
+      "sha256": "da0d604b43557ec0249f707da3fa881335f53aaa75f3dc9cfa86f0bb575dec3a"
+    },
+    {
+      "path": "kv_compare/test_t_speed.py",
+      "sha256": "f5897d2a233fe69aaf66d35603f0efc22a03e059aec62344639a3e740a4b76f2"
+    },
+    {
+      "path": "scripts/bench_t_speed.py",
+      "sha256": "8c896baa9a5fa8a65a36639be2d5af9b4857160242a884c3a201d7404dbdc110"
+    },
+    {
+      "path": "docs/t_frozen_speed_comparison.md",
+      "sha256": "2a5f04a41271b2a783d8b9de3c77a17695b5282efff43fb7046ba5e722920960"
+    }
+  ]
+}

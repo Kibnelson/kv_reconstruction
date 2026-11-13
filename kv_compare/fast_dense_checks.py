@@ -9,7 +9,7 @@ import os
 def check(device, all_patterns=False):
     import math
     import torch
-    from .fast_dense_encode import FastDenseEncode
+    from .fast_dense_encode import FastDenseEncode, CachedFusedDense
     from . import layerwise as lw, fused as fu
 
     if device.type == "cuda" and (not torch.cuda.is_available() or os.environ.get("TRITON_INTERPRET", "0") != "0"):
@@ -33,20 +33,27 @@ def check(device, all_patterns=False):
         words[0,0,:5] = torch.tensor([0,-32768,32640,32705,-128],dtype=torch.int16,device=device)
     original = lw.LayerwiseOneStep(k,C,hd,tokens_per_program=8)
     fast = FastDenseEncode(k,C,hd,tokens_per_program=8)
+    cached = CachedFusedDense(k,C,hd,tokens_per_program=8)
     a, p = original.model(words)
     b, q = fast.model(words)
     if not torch.equal(a[:-1],b[:-1]) or not torch.equal(p,q):
         raise AssertionError("cuBLAS forward changed an encoder feature or prior")
+    c, r = cached.model(words)
+    if not torch.equal(a,c) or not torch.equal(p,r):
+        raise AssertionError("cached original forward changed features or priors")
     segments,cap=original.layout(T)
     bo,bs=original.encode(words,a,p,out=torch.zeros(segments*cap,dtype=torch.int16,device=device))
-    fo,fs=fast.encode(words,out=torch.zeros_like(bo))
-    if not torch.equal(bs,fs) or not torch.equal(bo,fo):
-        raise AssertionError("fast dense encoder changed original stream bytes")
-    if not torch.equal(original.decode(fo,fs,T),words):
-        raise AssertionError("the original decoder failed on the fast encoder's stream")
+    for name,codec in [("fast",fast),("cached",cached)]:
+        fo,fs=codec.encode(words,out=torch.zeros_like(bo))
+        if not torch.equal(bs,fs) or not torch.equal(bo,fo):
+            raise AssertionError(name+" dense encoder changed original stream bytes")
+        if not torch.equal(original.decode(fo,fs,T),words):
+            raise AssertionError("the original decoder failed on the "+name+" encoder's stream")
     return dict(device=str(device),gpu_executed=device.type=="cuda",values=words.numel(),
         all_patterns=all_patterns,features_and_priors_exact=True,original_stream_bytes_exact=True,
-        original_decoder_exact=True,decoder_method_unchanged=FastDenseEncode.decode is lw.LayerwiseOneStep.decode)
+        cached_features_and_priors_exact=True,cached_original_stream_bytes_exact=True,
+        original_decoder_exact=True,decoder_method_unchanged=FastDenseEncode.decode is lw.LayerwiseOneStep.decode
+            and CachedFusedDense.decode is lw.LayerwiseOneStep.decode)
 
 
 def main():

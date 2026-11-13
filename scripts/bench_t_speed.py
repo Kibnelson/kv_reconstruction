@@ -25,10 +25,15 @@ from scripts.bench_head_spread import (check_base, file_sha, flattened_tensors,
 
 SPECS = {
     "dense_original": ("dense", "legacy_global", "original"),
+    "dense_cached": ("dense", "legacy_global", "cached"),
     "dense_fast": ("dense", "legacy_global", "fast"),
     "dense_learned": ("dense", "learned_selected", "head"),
     "hbh_original": ("hbh", "legacy_global", "original"),
     "hbh_learned": ("hbh", "learned_selected", "head"),
+}
+
+GRAPH_OMISSIONS = {
+    "dense_original": "The unchanged original rebuilds CPU probability tables during encode; use dense_cached for the same fused computation with setup outside capture."
 }
 
 
@@ -87,16 +92,22 @@ def decision(result):
     table = result["aggregate"]
     eligible = result["gpu_executed"] and result["full_reference_coverage"] and result["arguments"]["rounds"] >= 3
     original, fast = table.get("dense_original/eager"), table.get("dense_fast/eager")
+    cached = table.get("dense_cached/eager")
     hbh_eager, hbh_graph = table.get("hbh_learned/eager"), table.get("hbh_learned/graph")
-    dense_candidate = bool(eligible and original and fast and original["complete"] and fast["complete"]
-        and fast["all_exact"] and fast["packet_bytes"] == original["packet_bytes"]
-        and fast["encode_ms"] <= 0.95 * original["encode_ms"] and fast["pair_ms"] < original["pair_ms"])
+    def faster(a, b):
+        return bool(eligible and a and b and a["complete"] and b["complete"] and a["all_exact"]
+            and a["packet_bytes"] == b["packet_bytes"] and a["encode_ms"] <= 0.95*b["encode_ms"]
+            and a["pair_ms"] < b["pair_ms"])
+    dense_candidate = faster(fast, cached)
     graph_candidate = bool(eligible and hbh_graph and hbh_eager and hbh_graph["complete"] and hbh_eager["complete"]
         and hbh_graph["all_exact"] and hbh_graph["graph_input_change_test_passed"]
         and hbh_graph["packet_bytes"] == hbh_eager["packet_bytes"] and hbh_graph["pair_ms"] <= 0.95 * hbh_eager["pair_ms"])
     return {"fast_dense_candidate_for_review": dense_candidate,
+            "fast_dense_vs_uncached_original_gain": faster(fast, original),
+            "cached_dense_candidate_for_review": faster(cached, original),
+            "cached_original_control_present": cached is not None,
             "hbh_graph_candidate_for_review": graph_candidate, "automatic_merge": False,
-            "criterion": "actual GPU, all reference windows, >=3 rounds, identical packets, >=5% relevant speed gain"}
+            "criterion": "actual GPU, all reference windows, >=3 rounds, identical packets, >=5% relevant speed gain; fast dense is compared to cached original"}
 
 
 def summary(result):
@@ -132,17 +143,21 @@ def summary(result):
         lines += ["Failure: " + result["error"], ""]
     if result.get("graph_errors"):
         lines += [f"Graph capture/replay errors: {len(result['graph_errors'])}. They are not relabeled as eager results.", ""]
+    if result.get("graph_omissions"):
+        lines += ["Original dense is intentionally eager-only: its per-call CPU table construction is not capturable. "
+            "dense_cached preserves the original fused computation with that setup done once. "
+            "Expected omissions are recorded separately from unexpected graph errors.", ""]
     return "\n".join(lines) + "\n"
 
 
 def make_codec(spec, state, tokens):
-    from kv_compare.fast_dense_encode import FastDenseEncode
+    from kv_compare.fast_dense_encode import FastDenseEncode, CachedFusedDense
     from kv_compare.head_spread import HeadSpreadCodec
     from kv_compare.layerwise import LayerwiseOneStep
     kind = SPECS[spec][2]
     constants = dict(state["consts"])
     constants["cos"], constants["sin"] = constants["cos"][:tokens], constants["sin"][:tokens]
-    cls = {"original": LayerwiseOneStep, "fast": FastDenseEncode, "head": HeadSpreadCodec}[kind]
+    cls = {"original": LayerwiseOneStep, "cached": CachedFusedDense, "fast": FastDenseEncode, "head": HeadSpreadCodec}[kind]
     kwargs = dict(tokens_per_program=state["TB"], mode=state["mode"])
     if kind == "head":
         kwargs["policy"] = state["loaded_policy"]
@@ -262,7 +277,11 @@ def benchmark(args, output, report, log):
                 expected = reference_rows[(mode, source, case)]
                 if source_hash != expected["source_words_sha256"]:
                     raise ValueError("source words differ from the frozen reference")
+                setup_begin = time.perf_counter()
                 codec = make_codec(spec, state, tokens)
+                if device.type == "cuda":
+                    torch.cuda.synchronize(device)
+                codec_setup_ms = 1000*(time.perf_counter()-setup_begin)
                 segments, capacity = codec.layout(tokens)
                 arena = torch.zeros(segments * capacity, dtype=torch.int16, device=device)
                 decoded = torch.empty_like(words)
@@ -281,7 +300,11 @@ def benchmark(args, output, report, log):
                     raise AssertionError("warmup decode changed BF16 words")
                 replays, graph_setup, graph_error = [], None, None
                 graph_live = False
-                if "graph" in args.executions:
+                if "graph" in args.executions and spec in GRAPH_OMISSIONS:
+                    report["graph_omissions"].append(dict(variant=spec,case=case,round=round_index,
+                        reason=GRAPH_OMISSIONS[spec]))
+                    log("graph intentionally omitted for " + spec + "; cached original is a separate control")
+                if "graph" in args.executions and spec not in GRAPH_OMISSIONS:
                     try:
                         eg = CudaReplay(lambda: codec.encode(words, out=arena), device)
                         replays.append(eg)
@@ -348,6 +371,9 @@ def benchmark(args, output, report, log):
                             graph_setup=graph_setup if execution == "graph" else None,
                             extra_policy_tensor_bytes=codec.policy.array_bytes,
                             shared_predictor_tensor_bytes=tensors_bytes(codec.k.values()),
+                            static_coder_table_bytes=tensors_bytes(codec.tables.values()),
+                            cached_forward_table_bytes=tensors_bytes(codec.forward.tables.values()) if hasattr(codec,"forward") else 0,
+                            codec_setup_ms=codec_setup_ms,
                             serialized_state_bytes=state_path.stat().st_size,
                             preallocated_decode_scratch_bytes=tensors_bytes(flattened_tensors(bufs)),
                             stream_arena_bytes=arena.numel()*arena.element_size(), decoded_output_bytes=decoded.numel()*2,
@@ -406,6 +432,8 @@ def main(argv=None):
             or not set(args.executions) <= {"eager", "graph"} or len(set(args.executions)) != len(args.executions)
             or min(args.rounds, args.repeats, args.threads) < 1 or args.warmup < 0):
         parser.error("invalid variants, executions, rounds or repetitions")
+    if args.executions == ["graph"] and all(v in GRAPH_OMISSIONS for v in args.variants):
+        parser.error("the unchanged original dense path is eager-only; choose dense_cached for graph execution")
     output, reference = Path(args.output).resolve(), Path(args.reference_run).resolve()
     if output == reference or output.is_relative_to(reference) or reference.is_relative_to(output):
         parser.error("output must be separate from the frozen reference run")
@@ -426,7 +454,7 @@ def main(argv=None):
         with (output / "run.log").open("a") as stream:
             stream.write(line + "\n")
     report = dict(format="t_frozen_speed_v1", status="running", arguments=vars(args),
-        gpu_executed=False, rows=[], graph_errors=[], packet_proofs={}, aggregate={})
+        gpu_executed=False, rows=[], graph_errors=[], graph_omissions=[], packet_proofs={}, aggregate={})
     try:
         benchmark(args, output, report, log)
         report["status"] = "completed_with_graph_errors" if report["graph_errors"] else "completed"

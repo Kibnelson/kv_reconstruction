@@ -21,12 +21,19 @@ These earlier times are warm CUDA event measurements, not network timings.
 | Benchmark name | Probability policy | Encoder | Decoder |
 |---|---|---|---|
 | `dense_original` | Frozen dense global | Original fused forward pass | Original |
+| `dense_cached` | Same frozen dense global | Same original fused forward, initialized once | Original, unchanged method |
 | `dense_fast` | Same frozen dense global | cuBLAS forward statistics | Original, unchanged method |
 | `dense_learned` | Frozen dense learned, alpha 0.75 | Existing experimental forward pass | Existing learned-width decoder |
 | `hbh_original` | Frozen head-by-head global | Original grouped forward pass | Original grouped decoder |
 | `hbh_learned` | Frozen head-by-head learned, alpha 0.75 | Existing experimental forward pass | Existing learned-width grouped decoder |
 
-Both ordinary execution (`eager`) and CUDA graph replay (`graph`) are timed.
+Both ordinary execution (`eager`) and CUDA graph replay (`graph`) are timed
+for capture-compatible implementations. `dense_original` is intentionally
+eager-only: its constructor creates CPU probability tables during every
+forward call. This causes an unpinned CPU-to-GPU copy inside capture. That
+specific omission is recorded separately from unexpected graph failures.
+`dense_cached` keeps the same original fused forward object alive and performs
+its setup once before any warm measurement or capture.
 Graphs test whether reducing Python/driver launch overhead makes the grouped
 version faster, while preserving its 48.5682% saving. A graph result is accepted
 only if it reconstructs deliberately changed input and then the restored input.
@@ -36,6 +43,20 @@ Capture/setup time and graph memory are recorded separately from warm replay.
 surprise and global-prior kernels with exact int8-to-int32 cuBLAS products.
 It inherits `LayerwiseOneStep.encode` and `decode` without overriding either.
 No new rANS kernel, numerical approximation, predictor or quantizer is added.
+`CachedFusedDense` also inherits those same entropy encoder/decoder methods;
+it changes only the lifetime of the original forward object.
+
+The completed speed run at `20261113T164400Z` reproduced all reference packets
+in 108 measured GPU cases and 20 independent decoder processes. Dense encode
+took 87.475 ms original versus 63.657 ms fast. The learned head-by-head pair
+took 315.898 ms eager versus 313.333 ms graph: only 0.812% less time. The
+12 errors belonged exclusively to attempting capture of `dense_original`.
+See [the checked findings](../benchmark_results/t_frozen_speed_nuc_20261113T164400Z/review.md).
+
+The original constructor work is included in its per-call time. The cached
+control is necessary to distinguish eliminating repeated setup from changing
+the forward computation. No speed for this new control is claimed until its
+GPU run. Reports expose constructor time and the extra cached table bytes.
 
 ## Exact matching and measurement
 
@@ -89,9 +110,26 @@ input/output references and separate private pools, following the
 One side stream is reused per device to avoid accumulating cuBLAS workspace
 caches across repeated captures; graph-private memory pools remain separate.
 Each input shape requires its own captured graph. Unsupported capture/replay is
-reported as an error, never relabeled as a graph speed measurement.
+reported as an error, never relabeled as a graph speed measurement. The known
+unchanged-original omission above is explicit and has no graph timing row.
 
 ## Run on the NUC
+
+After the completed speed run, the focused next comparison is original dense,
+cached-original dense, and cuBLAS dense. It reuses the same frozen state and
+does not repeat the already completed head-by-head comparison:
+
+```bash
+cd ~/kv_t_head_spread_v1
+git pull --ff-only origin experiment/t-head-aware-spread-v1
+unset TRITON_INTERPRET
+VARIANTS=dense_original,dense_cached,dense_fast KV_HOME=~/kv_a5000 \
+  SMOKE=1 bash scripts/run_t_speed_nuc.sh
+```
+
+After that passes, use the same `VARIANTS` without `SMOKE=1` for three rounds
+over all four windows. A default run without `VARIANTS` includes all six
+implementations. Original source files and every previous run stay intact.
 
 Use the existing **test worktree**, without changing the original checkout:
 
@@ -128,7 +166,10 @@ proof passes. No run script commits, pushes or merges anything.
 
 Candidate flags require an actual GPU, all reference windows, at least three
 rounds, unchanged packets and at least a 5% relevant speed improvement. The
-dense candidate must also reduce pair time; the grouped graph candidate must
+dense candidate must also reduce pair time. The cuBLAS forward candidate is
+now compared against `dense_cached`, and setup-caching improvement against
+`dense_original` has its own flag. Missing the cached control cannot validate
+a forward-computation speedup. The grouped graph candidate must
 pass the changed-input test. These are experiment review gates, not adoption.
 The full original compression/speed results remain visible even when a gate
 fails. An absolute serving SLO still needs a serving benchmark.
@@ -143,4 +184,6 @@ The suite runs a small explicit CPU Triton interpreter subprocess to verify
 forward-prior parity, exact streams and decoding with the original decoder.
 It also checks unchanged coder methods, CPU rejection for graph replay,
 bandwidth units, round accounting and incomplete-result/GPU review gates.
+Cached-original stream parity and a regression check that its forward object
+is initialized only once cover the capture failure's cause.
 Local software validation cannot establish A4500 speed or CUDA graph support.

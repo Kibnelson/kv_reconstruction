@@ -11,14 +11,19 @@ import time
 import torch
 
 from . import layerwise as lw
+from . import fused as fu
+
+
+def _require_global_dense(consts, kwargs):
+    if (int(consts.get("groups", 1)) != 1 or kwargs.get("rank") is not None
+            or kwargs.get("fuse", False) or kwargs.get("split_streams", False)
+            or kwargs.get("chunks", 1) != 1 or kwargs.get("product", "cublas") != "cublas"):
+        raise ValueError("dense v1 requires the fixed dense, unfused, single-stream predictor")
 
 
 class FastDenseEncode(lw.LayerwiseOneStep):
     def __init__(self, consts, C, hd, **kwargs):
-        if (int(consts.get("groups", 1)) != 1 or kwargs.get("rank") is not None
-                or kwargs.get("fuse", False) or kwargs.get("split_streams", False)
-                or kwargs.get("chunks", 1) != 1 or kwargs.get("product", "cublas") != "cublas"):
-            raise ValueError("fast dense v1 requires the fixed dense, unfused, single-stream predictor")
+        _require_global_dense(consts, kwargs)
         super().__init__(consts, C, hd, **kwargs)
 
     def model(self, words):
@@ -46,6 +51,25 @@ class FastDenseEncode(lw.LayerwiseOneStep):
             self._launch(lw._lprior_kernel, (lw.triton.cdiv(T, 256),), sums, prior[layer + 1],
                 T, self.G, self.prior_scale, BLOCK=256, warps=4)
         return xall, prior
+
+
+class CachedFusedDense(lw.LayerwiseOneStep):
+    """Original fused forward computation, initialized once outside capture.
+
+    LayerwiseOneStep.model constructs FusedOneStep every call. That constructor
+    builds static probability tables on the CPU and copies them to the GPU,
+    even though its forward model does not use those tables. Keeping the same
+    object alive removes repeated setup and its non-capturable CPU transfers.
+    No original codec file or kernel is modified.
+    """
+    def __init__(self, consts, C, hd, **kwargs):
+        _require_global_dense(consts, kwargs)
+        super().__init__(consts, C, hd, **kwargs)
+        self.forward = fu.FusedOneStep(self.k, self.C, self.hd,
+            tokens_per_program=32, rows=4, warps=4)
+
+    def model(self, words):
+        return self.forward.model(words)
 
 
 class CudaReplay:
