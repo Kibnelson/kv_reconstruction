@@ -767,8 +767,18 @@ def stage_compare(args, res, device, out):
     skip = {s for s in (args.compare_skip or "").split(",") if s}
     todo = [d for d in st.tests if not r["docs"].get(d.name, {}).get("baselines_done")]
     if todo:
-        study_b, consts_b, rc, grouped, books, sz, exans, w16, extras = B.lossless_codecs(
-            bargs, Path(args.run), dev, "compare", Doc(cap, "wtrain0"))
+        said, blog = [], B.log                       # the benchmark logs a baseline that did not load; kept for the report
+
+        def keep(message):
+            said.append(str(message))
+            blog(message)
+        B.log = keep
+        try:
+            study_b, consts_b, rc, grouped, books, sz, exans, w16, extras = B.lossless_codecs(
+                bargs, Path(args.run), dev, "compare", Doc(cap, "wtrain0"))
+        finally:
+            B.log = blog
+        r["unavailable"] = [s.strip() for s in said if "not available" in s]
         want = B.wanted_methods(bargs, rc, books, sz, exans, extras, bounds)
         want = {m for m in want if not any(s in m for s in skip)}
         r["skipped_methods"] = sorted(skip)
@@ -1312,7 +1322,8 @@ def compare_report(res, verdicts):
         enc = None if computed else float(np.mean([x["encode_ms"] + x.get("pick_ms", 0.0) for x in vals.values()]))
         values = float(np.mean([x["values"] for x in vals.values()]))
         by[m] = {"bits": bits, "mean": mean_bits, "decode": dec, "encode": enc, "values": values,
-                 "computed": computed, "complete": len(vals) == len(docs)}
+                 "computed": computed, "complete": len(vals) == len(docs),
+                 "encoder": next((x["encoder"] for x in vals.values() if x.get("encoder")), None)}
     if not by:
         return []
     values = float(np.mean([v["values"] for v in by.values()]))
@@ -1367,6 +1378,11 @@ def compare_report(res, verdicts):
     if bad or c.get("skipped_methods"):
         out += ["Not in the tables: " + "; ".join(f"{m} on {d} ({e})" for d, m, e in bad)
                 + ("; skipped: " + ", ".join(c["skipped_methods"]) if c.get("skipped_methods") else ""), ""]
+    if c.get("unavailable"):
+        out += ["Baselines that did not load on this machine (no rows): " + "; ".join(c["unavailable"]), ""]
+    slow = ", ".join(f"{m} ({by[m]['encoder']})" for m in order if by[m].get("encoder"))
+    if slow:
+        out += [f"Encoder not optimised: {slow}; its encode time is not a codec's cost.", ""]
     t2 = [m for m in by if m.startswith("T2,") and by[m]["complete"]]
     base = [m for m in by if not m.startswith(("T2,", "T,")) and not by[m]["computed"] and by[m]["complete"]
             and not by[m].get("reference")]

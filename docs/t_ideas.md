@@ -228,6 +228,7 @@ torch reference equal the kernel's (8.8627).
 | 6b unseen text | weak | Mixed-all without the dataset's source saves 0.054 bits/value over the five (rule: 0.088). On the four non-WikiText datasets it saves 0.137 (1.5%) against T's WikiText constants; WikiText itself loses 0.275 when WikiText leaves the mix. The big gain needs the request's kind of text among the sets |
 | 7 T2 | works | Dense, layer 0 recomputed in all 5 windows (the sender's check passed), every round trip bit-exact. Real streams: WikiText 8.98 to 8.62 (-4.0%), HumanEval 9.57 to 8.63 (-9.9%), GSM8K 9.28 to 8.16 (-12.1%), MMLU 9.33 to 8.38 (-10.1%), PTB 9.24 to 8.44 (-8.7%); mean 9.28 to 8.45 (-9.0%). Decode time unchanged (30-31 ms), plus the receiver's 9.8 ms recompute. Every mode bit-exact on HumanEval: dense -9.9%, keys then values -10.9%, 4 groups -11.4%, head by head -11.6% (9.01 to 7.96), rank 256 -8.7% (9.82 to 8.97). The sender's pick: 104 ms on layers 1-4 of all tokens, 59 ms on layers 1-2 of the first 1,024 tokens, the same set in 5 of 5 windows either way; overhead-bound, so a cheaper form is the next step (`benchmark_results/llama32_3b_tideas_rtxa4500_20261113_1011`) |
 | 3 coding kernel | refocus | Dense and rank 256 code at 2.4x their memory floor (15.9 vs 6.7 ms). Head by head, the smallest mode (8.29 vs 8.98 bits/value), takes 108 ms because each layer's 16 head groups run one after another: one kernel per layer over all its groups is the prize |
+| 8 T2 against the baselines | smallest; most requests per link up to 100 Gb/s | Best T2 mode (head by head) 7.80 bits/value (2.05x) against ExANS 10.87 (1.47x), the smallest bit-exact baseline, lower on every dataset; T2 dense 8.45 (1.89x). The cheap pick takes 11.4 ms per request and chose the full pick's set in 5 of 5 windows. Per 8K request, pick and recompute included: T2 dense encode 92 ms, decode 31 ms; rank 256 52 / 23 ms. One link: T2 carries the most requests per second from 1 to 100 Gb/s (head by head 6.8/s at 25 Gb/s; dense 25.2/s at 100 Gb/s against ExANS 19.6 and raw BF16 13.3). At 400 Gb/s AdaCode (74.9/s) and SplitZip (70.6/s) lead; T2 rank 256 is decode-bound at 43.6/s, below raw BF16 (53.2/s). nvCOMP had no rows (a harness bug: its child process got a GPU without an index; fixed after this run) and IBP is not built on the NUC (`benchmark_results/llama32_3b_tideas_rtxa4500_20261113_1151`) |
 
 ## T2: the winning ideas as a separate codec
 
@@ -246,7 +247,8 @@ torch reference equal the kernel's (8.8627).
 - **Constant sets.** The codec holds T's constants for several calibration sets, and the header carries the
   chosen set's name.
   - `pick`: code layers 1-4 with each set and keep the cheapest. It took 104 ms per 8K request.
-  - `pick_fast`: rank the sets by T's int8 product on 1,024 sampled tokens of layers 1-2, in plain torch.
+  - `pick_fast`: rank the sets by T's int8 product on 1,024 sampled tokens of layers 1-2, in plain torch, batched
+    over the sets in float32. It takes 11.4 ms and chose the same set as `pick` in 5 of 5 windows.
 - **Not yet:**
   - PD wiring (the bundle with several sets, the header, the sender's step sizes for layer 0);
   - coding a mismatched layer 0 against the recompute rather than falling back to T.

@@ -1013,6 +1013,51 @@ class SpanStandIn:
 class IsolatedCodecTests(unittest.TestCase):
     """kv_compare.more_baselines.IsolatedCodec: a codec in a child process, so a native crash costs a row."""
 
+    def test_the_gpu_gets_an_index(self):
+        """torch.cuda.set_device refuses a plain "cuda": the child is given the parent's current GPU."""
+        from unittest import mock
+        from kv_compare import more_baselines as mb
+        with mock.patch.object(torch.cuda, "current_device", return_value=3):
+            self.assertEqual(mb._indexed("cuda"), torch.device("cuda", 3))
+            self.assertEqual(mb._indexed(torch.device("cuda")), torch.device("cuda", 3))
+        self.assertEqual(mb._indexed("cuda:1"), torch.device("cuda", 1))
+        self.assertEqual(mb._indexed("cpu"), torch.device("cpu"))
+        with self.assertRaises(ValueError):           # what the child hit on every GPU run before
+            torch.cuda.set_device(torch.device("cuda"))
+
+    def test_a_setup_failure_comes_back_with_its_message(self):
+        """The child's own setup (the GPU, the factory) fails inside the reply, not as a bare exit 1."""
+        from kv_compare import more_baselines as mb
+
+        class Conn:
+            sent = []
+
+            def send(self, m):
+                self.sent.append(m)
+        conn = Conn()
+        mb._codec_worker(conn, "kv_compare.test_kv_compare:SpanStandIn", {}, "cuda", 0, 1)   # "cuda": no index
+        self.assertEqual(len(conn.sent), 1)
+        self.assertEqual(conn.sent[0][0], "error")
+        self.assertIn("Error", conn.sent[0][1])
+        conn.sent.clear()
+        mb._codec_worker(conn, "kv_compare.test_kv_compare:NoSuchCodec", {}, "cpu", 0, 1)
+        self.assertEqual(conn.sent[0][0], "error")
+        self.assertIn("NoSuchCodec", conn.sent[0][1])
+
+    @unittest.skipUnless(torch is not None and torch.cuda.is_available(), "needs a GPU")
+    def test_on_the_gpu(self):
+        """The child starts on a GPU given as plain "cuda" (as the drivers pass it) and codes a stream there."""
+        from kv_compare import more_baselines as mb
+        c = mb.IsolatedCodec("kv_compare.test_kv_compare:SpanStandIn", "cuda", log=lambda m: None, timeout=300)
+        try:
+            self.assertEqual(c.device.index, torch.cuda.current_device())
+            words = torch.arange(2 * 32 * 8, dtype=torch.int16, device="cuda").view(2, 32, 8)
+            r = c.measure("copy", words, [(0, 32)])
+            self.assertTrue(r["bit_exact"])
+            self.assertEqual(r["bits"], 8.0)
+        finally:
+            c.close()
+
     def test_a_crash_costs_a_row_not_the_run(self):
         from kv_compare import more_baselines as mb, context_sweep as cs
         tmp = Path(tempfile.mkdtemp())

@@ -295,10 +295,13 @@ class TIdeasTests(unittest.TestCase):
                        "rows": [row("ours, per layer, dense", 8.98 + shift),
                                 row("SplitZip (authors' codec)", 10.9 + shift, enc=5.0, dec=4.0),
                                 row("nvCOMP ANS", 12.0, enc=3.0, dec=2.0),
+                                row("ours, SplitZip format, rank 256", 10.1 + shift, enc=1000.0, dec=17.0,
+                                    encoder="PyTorch packer (not optimised)"),
                                 {"method": "exponent coders' floor: 8 + exponent entropy", "bits": 10.5, "computed": True,
                                  "values": n},
                                 {"method": "ExANS (authors' codec)", "error": "crashed", "crashed": True}]}
-        res = {"compare": {"docs": docs, "crashed": {}}}
+        res = {"compare": {"docs": docs, "crashed": {},
+                           "unavailable": ["extra baseline ibp not available (ModuleNotFoundError(\"No module named 'ibp'\"))"]}}
         verdicts = []
         lines = drv.compare_report(res, verdicts)
         text = "\n".join(lines)
@@ -313,6 +316,8 @@ class TIdeasTests(unittest.TestCase):
         self.assertEqual(verdicts[0][0], "8 T2 against the baselines")
         self.assertTrue(verdicts[0][1])
         self.assertIn("| 400 Gb/s |", text)
+        self.assertIn("did not load on this machine (no rows): extra baseline ibp not available", text)
+        self.assertIn("Encoder not optimised: T, SplitZip format, rank 256 (PyTorch packer (not optimised))", text)
 
     def test_ulp_coder(self):
         from kv_compare.t_ideas import ulp_bits, ulp_table

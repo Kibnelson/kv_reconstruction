@@ -75,11 +75,14 @@ fi
 echo "== commit $(git log --oneline -1); run folder $RUN; output $OUT; GPU $GPU"
 nvidia-smi --query-gpu=index,name,memory.used,memory.total --format=csv,noheader
 # a baseline's native code can take the process down: the next attempt records it (crash_marker.json) and goes on
+# the whole terminal (a child process's traceback, native code's messages) besides the driver's own console.log
+mkdir -p "$OUT"
+: > "$OUT/terminal.log"
 STATUS=0
 for ATTEMPT in 1 2 3 4; do
     STATUS=0
     # shellcheck disable=SC2086
-    python scripts/t_ideas.py "${ARGS[@]}" ${EXTRA:-} || STATUS=$?
+    python -u scripts/t_ideas.py "${ARGS[@]}" ${EXTRA:-} 2>&1 | tee -a "$OUT/terminal.log" || STATUS=$?
     if [ "$STATUS" != 0 ] && [ -s "$OUT/crash_marker.json" ]; then
         echo "== attempt $ATTEMPT: a codec crashed the process ($(cat "$OUT/crash_marker.json")); recording it, going on"
         continue
@@ -96,6 +99,11 @@ DEST=benchmark_results/${TAG}_tideas_${GPU}_${STAMP}
 mkdir -p "$DEST"
 cp "$OUT/t_ideas.json" "$OUT/summary.md" "$DEST/"
 gzip -c "$OUT/console.log" > "$DEST/console.log.gz"
+gzip -c "$OUT/terminal.log" > "$DEST/terminal.log.gz"
+# IBP's build log from scripts/a5000_setup.sh, when IBP did not build (why it has no rows)
+if [ -s "$KV_HOME/ibp_build.log" ] && ! python -c "import torch, ibp" 2>/dev/null; then
+    tail -n 200 "$KV_HOME/ibp_build.log" | gzip -c > "$DEST/ibp_build_tail.log.gz"
+fi
 python -m pip freeze > "$DEST/pip_freeze.txt"
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv > "$DEST/gpu.csv"
 git add "$DEST"
