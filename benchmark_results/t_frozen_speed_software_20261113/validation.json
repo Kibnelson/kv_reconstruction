@@ -1,0 +1,70 @@
+{
+  "format": "t_frozen_speed_software_validation_v1",
+  "date": "2026-11-13",
+  "base_experiment_commit": "2b46bf92130f4eb725e99b8c069fe194f0e469e9",
+  "gpu_executed": false,
+  "cuda_graph_support": "PENDING NUC",
+  "new_GPU_speed_measurement": "PENDING NUC",
+  "unit_tests_passed": 7,
+  "independent_packet_decodes_passed": 3,
+  "fixture": "synthetic-functional-fixture",
+  "benchmark_cases": [
+    {
+      "variant": "dense_original",
+      "execution": "eager",
+      "case": "test_text",
+      "values": 4096,
+      "packet_sha256": "078911daf0fe3dbe64a089ae77d0d3e054666d746d7bc704b63988401e8ea9cd",
+      "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+      "bit_exact": true,
+      "matches_reference_packet": true
+    },
+    {
+      "variant": "dense_fast",
+      "execution": "eager",
+      "case": "test_text",
+      "values": 4096,
+      "packet_sha256": "078911daf0fe3dbe64a089ae77d0d3e054666d746d7bc704b63988401e8ea9cd",
+      "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+      "bit_exact": true,
+      "matches_reference_packet": true
+    },
+    {
+      "variant": "hbh_learned",
+      "execution": "eager",
+      "case": "test_text",
+      "values": 4096,
+      "packet_sha256": "b160d8bcc9c89ec28994105fd89296c336e4dbd3c65176d0894866f9f05a98f9",
+      "source_words_sha256": "1afbc1ce1d33317406777070a29de48ef03d99d79dca9a41e0dff835813f1605",
+      "bit_exact": true,
+      "matches_reference_packet": true
+    }
+  ],
+  "all_CPU_review_candidates_false": true,
+  "source_manifest": [
+    {
+      "path": "kv_compare/fast_dense_encode.py",
+      "sha256": "bd018985eb03aded3bf1de3a122c9a20bbe065f3280fa7da556c597ca71e6d18"
+    },
+    {
+      "path": "kv_compare/fast_dense_checks.py",
+      "sha256": "55de46752204a300361183d77362d053a64a6a220a1fd56ecad4834f1a1de5e4"
+    },
+    {
+      "path": "kv_compare/test_t_speed.py",
+      "sha256": "5afc6eac08a42fc5f441ff690b9a67f97a2eadb9f80221eda7513cd9ce20f262"
+    },
+    {
+      "path": "scripts/bench_t_speed.py",
+      "sha256": "961cd62366f66fbc53059df4c737d08a4be123914e26989fe33a1d65b822d49f"
+    },
+    {
+      "path": "scripts/run_t_speed_nuc.sh",
+      "sha256": "4022ebdeb39a96e5001a58dfed5377e253b118c6ba55dff6fa16c01b3337f14f"
+    },
+    {
+      "path": "docs/t_frozen_speed_comparison.md",
+      "sha256": "58bd9e49a6eb59852cdc3d09bd460a30cb061bc3f3df8958a6e26592fa1c4556"
+    }
+  ]
+}
