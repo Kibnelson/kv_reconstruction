@@ -265,11 +265,52 @@ class CardTests(unittest.TestCase):
         self.assertIn("not the pin: a new campaign starts from its head", r.stderr)
         self.assertEqual(self.jobs(), [])
 
+    def test_real_filtered_clone_and_failed_campaign_publish(self):
+        # file:// uses upload-pack filtering; a plain local clone silently ignores --filter.
+        fixture=self.home/'benchmark_fixtures'/'team_transfer_smol_replay_v1'/'README.md'
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('excluded fixture blob for partial clone regression\n')
+        self.g(self.home,'add',str(fixture))
+        self.g(self.home,'commit','-qm','excluded fixture')
+        self.g(self.home,'push','-q','origin','HEAD:pd-baselines')
+        self.pin=self.g(self.home,'rev-parse','HEAD')
+        missing=self.g(self.home,'rev-parse','HEAD:benchmark_fixtures/team_transfer_smol_replay_v1/README.md')
+        self.g(self.origin,'config','uploadpack.allowFilter','true')
+        self.home.rename(self.home.with_name('full_fixture'))
+        r=subprocess.run(['git','clone','-q','--filter=blob:none','--single-branch','--no-checkout',
+            '--branch','pd-baselines',self.origin.as_uri(),str(self.home)],env=self.genv,capture_output=True,text=True)
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.g(self.home,'sparse-checkout','init','--no-cone')
+        self.g(self.home,'sparse-checkout','set','--no-cone','/*','!/benchmark_results/',
+            '!/benchmark_fixtures/team_transfer_smol_replay_v1/')
+        self.g(self.home,'checkout','-q','--detach',self.pin)
+        self.g(self.home,'config','user.name','t');self.g(self.home,'config','user.email','t@t')
+        self.assertIn('?'+missing,self.g(self.home,'rev-list','--objects','--all','--missing=print'))
+        r=self.card('create',RUNS='SMOKE=1 LAYOUT=1p3d CODECS=raw')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.assertNotIn('invalid object',r.stdout+r.stderr)
+        repo=self.node/'kvpd-evidence'/self.tag/'repo'
+        tools=self.node/'kvpd-tools'/self.pin
+        for path in (tools,repo):
+            self.assertEqual(self.g(path,'config','--bool','remote.origin.promisor'),'true')
+            self.assertEqual(self.g(path,'config','remote.origin.partialclonefilter'),'blob:none')
+            self.g(path,'write-tree')
+        r=self.card('run',KVPD_NEED_SCALE='1',KVPD_MARGIN_GB='100000')
+        self.assertEqual(r.returncode,2,r.stdout+r.stderr)
+        self.assertIn('KVPD_STOP_REASON=disk:',r.stdout)
+        for stage in ('cleanup','verify-cleanup','review','publish'):
+            r=self.card(stage)
+            self.assertEqual(r.returncode,0,stage+r.stdout+r.stderr)
+            self.assertNotIn('invalid object',r.stdout+r.stderr)
+        self.assertIn('PUBLISHED evidence/',r.stdout)
+        self.assertEqual(self.g(self.origin,'rev-parse','pd-baselines'),self.pin)
+
     def test_a_run_that_stops_on_the_disk_check_is_closed_out(self):
         self.assertEqual(self.card("create", RUNS="SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,ibp").returncode, 0)
         r = self.card("run", KVPD_NEED_SCALE="1", KVPD_MARGIN_GB="100000")
         self.assertEqual(r.returncode, 2)
         self.assertIn("KVPD_RUN_STATUS=stopped", r.stdout)
+        self.assertIn('KVPD_STOP_REASON=disk:',r.stdout)
         ev = self.node / "kvpd-evidence" / self.tag / "repo" / "benchmark_results" / "pd_card" / self.tag
         plan = json.loads((ev / "disk_plan.json").read_text())
         self.assertTrue(plan["ibp_wanted"])

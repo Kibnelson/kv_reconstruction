@@ -101,6 +101,11 @@ if [[ "$KVPD_STAGE" = create ]]; then
         git clone -q --shared --no-checkout "$KVPD_HOME_REPO" "$KVPD_TOOLS"
         chmod 700 "$KVPD_TOOLS"
         git -C "$KVPD_TOOLS" remote set-url origin "$(git -C "$KVPD_HOME_REPO" remote get-url origin)"
+        if [ "$(git -C "$KVPD_HOME_REPO" config --bool --get remote.origin.promisor || true)" = true ]; then
+            # --shared copies object access, not the partial clone's lazy-fetch configuration.
+            git -C "$KVPD_TOOLS" config remote.origin.promisor true
+            git -C "$KVPD_TOOLS" config remote.origin.partialclonefilter blob:none
+        fi
         git -C "$KVPD_TOOLS" fetch -q --no-tags origin "refs/heads/$KVPD_BRANCH"
         test "$(git -C "$KVPD_TOOLS" rev-parse FETCH_HEAD)" = "$KVPD_PIN"
         git -C "$KVPD_TOOLS" sparse-checkout init --no-cone

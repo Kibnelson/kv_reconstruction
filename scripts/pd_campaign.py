@@ -237,6 +237,10 @@ def stage_create(p, a, job):
     git(p.campaign, "clone", "-q", "--shared", "--no-checkout", home, p.repo)
     p.repo.chmod(0o700)
     git(p.repo, "remote", "set-url", "origin", origin)
+    if git(home, 'config', '--bool', '--get', 'remote.origin.promisor', check=False) == 'true':
+        # A shared clone must also know where omitted blobs can be fetched.
+        git(p.repo, 'config', 'remote.origin.promisor', 'true')
+        git(p.repo, 'config', 'remote.origin.partialclonefilter', 'blob:none')
     git(p.repo, "fetch", "-q", "--no-tags", "origin", f"refs/heads/{a.branch}")
     require(git(p.repo, "rev-parse", "FETCH_HEAD") == a.pin, f"GitHub's {a.branch} is not the pin")
     git(p.repo, "sparse-checkout", "init", "--no-cone")
@@ -442,6 +446,8 @@ def stage_run(p, a, job):
         write_json(ev / "run.json", rec)
         log(f"KVPD_RUN_JOB={job}")
         log(f"KVPD_RUN_STATUS={status}")
+        if extra.get('reason'):
+            log('KVPD_STOP_REASON=' + str(extra['reason']))
         log("next: cleanup, then verify-cleanup (each in its own allocation)")
         return code
 

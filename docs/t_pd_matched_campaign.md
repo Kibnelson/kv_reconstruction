@@ -83,6 +83,14 @@ The launcher prints `STATE=...` and `LOG=...`, and keeps a `status.txt` beside t
 
 Send the `PUBLISHED evidence/experiment/t-pd-matched-campaign-v1/...` line for review. Publication adds only the campaign evidence in a new results branch. The source branch is unchanged by measured runs.
 
+## Preflight stops and older filtered clones
+
+A `KVPD_RUN_STATUS=stopped` result precedes model setup and serving. The exact reason is saved in the campaign's `run.json`; current code also prints `KVPD_STOP_REASON=...`. Driver, uv and disk preflights remain enforced. Inspect the recorded reason before choosing a new run tag.
+
+The node-local code and evidence clones now inherit the home clone's promisor configuration before checkout. A real filtered-clone regression reproduces the earlier missing-object error and exercises create, a deliberate disk stop, cleanup, review and publication. Git's [partial-clone documentation](https://git-scm.com/docs/partial-clone) explains why omitted objects need a configured remote. The home checkout remains sparse.
+
+For a campaign already stopped at an older pin, keep that checkout at its saved pin while closing it out. Source its printed `state.sh`. In a small CPU allocation on its `KVPD_NODE`, set `remote.origin.promisor=true` and `remote.origin.partialclonefilter=blob:none` in its two existing repositories: `$KVPD_ROOT/kvpd-tools/$KVPD_PIN` and `$KVPD_ROOT/kvpd-evidence/$KVPD_TAG/repo`. This repairs repository metadata without editing the pinned source. Read `$KVPD_ROOT/kvpd-evidence/$KVPD_TAG/repo/benchmark_results/pd_card/$KVPD_TAG/run.json` and `disk_plan.json` if present. Then use the saved pin for `cleanup`, `verify-cleanup`, `review` and `publish`. Update the home checkout only after closeout; the next campaign uses a new tag and the updated branch head.
+
 ## Interpretation limits
 
 The ring link is paced shared host memory, not a measured NIC. Its configured rate is per prefill: 2P has two links, so equal per-link rates do not mean equal aggregate network budgets across layouts. GPU IPC measures the local PCIe path; the peer-access survey identifies hardware support. The CPU tier measures DRAM storage/reload, not SSD. Codecs sharing one engine also share its configured cache capacity and loaded constant sets; NIXL/nvCOMP/LMCache have separate engine runs. Record actual memory and allocation differences before drawing serving-capacity conclusions. Cross-branch numeric claims require matching hardware, model revision, prompt/text hashes, runtime versions, cache policy, seeds, load and measured link capacity; rerunning the original methods inside this campaign supplies the primary controls.
