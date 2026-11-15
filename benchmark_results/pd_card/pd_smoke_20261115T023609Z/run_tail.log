@@ -1,0 +1,400 @@
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3075.45it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+{"out": "/tmp/nbore/kvpd/30176/runs/llama32_3b/pd/prompts_2048_check_1000_3000_5000_8192", "datasets": ["wikitext2", "humaneval", "gsm8k", "mmlu", "ptb"], "tokens": "2048", "per_length": 8}
+   ports 28000-28453 free
+   prefill1 on GPU 0 (visible 0), port 28101 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2146_1p3d_tkv_ring/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 28201 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2146_1p3d_tkv_ring/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 28202 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2146_1p3d_tkv_ring/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 28203 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2146_1p3d_tkv_ring/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=4089741) INFO 11-14 21:47:41 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4089726) INFO 11-14 21:47:41 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4089739) INFO 11-14 21:47:41 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4089727) INFO 11-14 21:47:41 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+21:48:11 == check
+PD RUN STOPPED at line 379 (exit 124)
+STOP: the bench ran past RUN_TIMEOUT_S=1200 s; packaged as _partial
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix/llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261114_2146_smoke_partial
+==== run 1 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 2 of 7: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp
+== PD run /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2208_1p3d_tkv_ring: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit 7731196 Card smoke 30170: compiled engines stopped compiling FlashInfer's sampler (no ninja, no CUDA 13 nvcc)
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3595.63it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 28000-28453 free
+   prefill1 on GPU 0 (visible 0), port 28101 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2208_1p3d_tkv_ring/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 28201 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2208_1p3d_tkv_ring/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 28202 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2208_1p3d_tkv_ring/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 28203 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2208_1p3d_tkv_ring/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=4091293) INFO 11-14 22:08:50 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4091300) INFO 11-14 22:08:50 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4091286) INFO 11-14 22:08:50 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4091307) INFO 11-14 22:08:50 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+22:09:04 == check
+PD RUN STOPPED at line 379 (exit 124)
+STOP: the bench ran past RUN_TIMEOUT_S=1200 s; packaged as _partial
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix/llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261114_2208_smoke_partial
+==== run 2 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 3 of 7: SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh
+== PD run /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2229_2p2d_tkv_p2p: 2p2d (2 prefill on GPUs 0 1, 2 decode on 2 3), connector tkv, transport p2p, eager 0; job GPUs 0 1 2 3; commit 7731196 Card smoke 30170: compiled engines stopped compiling FlashInfer's sampler (no ninja, no CUDA 13 nvcc)
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4125.00it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 28000-28452 free
+   prefill1 on GPU 0 (visible 0,1,2,3), port 28101 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2229_2p2d_tkv_p2p/engine_prefill1.log)
+   prefill2 on GPU 1 (visible 1,0,2,3), port 28102 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2229_2p2d_tkv_p2p/engine_prefill2.log)
+   decode1 on GPU 2 (visible 2,0,1,3), port 28201 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2229_2p2d_tkv_p2p/engine_decode1.log)
+   decode2 on GPU 3 (visible 3,0,1,2), port 28202 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2229_2p2d_tkv_p2p/engine_decode2.log)
+== waiting for the engines
+   (EngineCore pid=4092712) INFO 11-14 22:29:44 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4092728) INFO 11-14 22:29:44 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4092719) INFO 11-14 22:29:44 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4092735) INFO 11-14 22:29:44 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+22:30:03 == check
+PD RUN STOPPED at line 379 (exit 124)
+STOP: the bench ran past RUN_TIMEOUT_S=1200 s; packaged as _partial
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix/llama32_3b_pd_2p2d_tkv_p2p_rtxa5000x4_20261114_2229_smoke_partial
+==== run 3 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 4 of 7: SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl
+== PD run /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2250_2p2d_nixl: 2p2d (2 prefill on GPUs 0 1, 2 decode on 2 3), connector nixl, transport ring, eager 0; job GPUs 0 1 2 3; commit 7731196 Card smoke 30170: compiled engines stopped compiling FlashInfer's sampler (no ninja, no CUDA 13 nvcc)
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4148.67it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 28000-28452 free
+   prefill1 on GPU 0 (visible 0), port 28101 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2250_2p2d_nixl/engine_prefill1.log)
+   prefill2 on GPU 1 (visible 1), port 28102 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2250_2p2d_nixl/engine_prefill2.log)
+   decode1 on GPU 2 (visible 2), port 28201 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2250_2p2d_nixl/engine_decode1.log)
+   decode2 on GPU 3 (visible 3), port 28202 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2250_2p2d_nixl/engine_decode2.log)
+== waiting for the engines
+   (EngineCore pid=4094293) INFO 11-14 22:50:53 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4094224) INFO 11-14 22:50:53 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4094231) INFO 11-14 22:50:52 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4094238) INFO 11-14 22:50:52 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+22:51:07 == check
+22:51:14 check nixl: OK - 0/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits -
+22:51:14 == sweep
+22:51:32 sweep_nixl_nativegbps_rinf: exit 0, 1.27 req/s, TTFT p50 4734 / p99 4756 ms, goodput 0.00
+22:51:32 == report
+22:51:32 report: /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2250_2p2d_nixl/summary.md
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix/llama32_3b_pd_2p2d_nixl_rtxa5000x4_20261114_2250_smoke
+
+==== run 5 of 7: SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh
+== PD run /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2251_colo4_tkv: colo4 (0 prefill on GPUs none, 4 colocated on 0 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit 7731196 Card smoke 30170: compiled engines stopped compiling FlashInfer's sampler (no ninja, no CUDA 13 nvcc)
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4052.08it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 28000-28454 free
+   engine1 on GPU 0 (visible 0), port 28201 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2251_colo4_tkv/engine_engine1.log)
+   engine2 on GPU 1 (visible 1), port 28202 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2251_colo4_tkv/engine_engine2.log)
+   engine3 on GPU 2 (visible 2), port 28203 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2251_colo4_tkv/engine_engine3.log)
+   engine4 on GPU 3 (visible 3), port 28204 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2251_colo4_tkv/engine_engine4.log)
+== waiting for the engines
+   (EngineCore pid=4095590) INFO 11-14 22:52:11 [kv_cache_utils.py:2327] GPU KV cache size: 32,768 tokens, Maximum concurrency for 16,384 tokens per request: 2.00x
+   pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+   (EngineCore pid=4095576) INFO 11-14 22:52:11 [kv_cache_utils.py:2327] GPU KV cache size: 32,768 tokens, Maximum concurrency for 16,384 tokens per request: 2.00x
+   pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+   (EngineCore pid=4095569) INFO 11-14 22:52:11 [kv_cache_utils.py:2327] GPU KV cache size: 32,768 tokens, Maximum concurrency for 16,384 tokens per request: 2.00x
+   pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+   (EngineCore pid=4095583) INFO 11-14 22:52:11 [kv_cache_utils.py:2327] GPU KV cache size: 32,768 tokens, Maximum concurrency for 16,384 tokens per request: 2.00x
+   pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+22:52:30 == tier
+22:52:30 ibp: skipped (ModuleNotFoundError("No module named 'ibp'"))
+22:52:43 tier_raw_c4: exit 0, 12 requests, 2.87 req/s, TTFT p50 117 / p99 237 ms; tier 0 loads (0 tokens, - ms each, bits -), 45 chunks stored
+22:52:56 tier_exans_c4: exit 0, 12 requests, 2.98 req/s, TTFT p50 96 / p99 226 ms; tier 0 loads (0 tokens, - ms each, bits -), 44 chunks stored
+22:53:10 tier_ours-hbh_c4: exit 0, 12 requests, 3.04 req/s, TTFT p50 95 / p99 189 ms; tier 0 loads (0 tokens, - ms each, bits -), 43 chunks stored
+22:53:23 tier_t2-hbh_c4: exit 0, 12 requests, 2.94 req/s, TTFT p50 89 / p99 192 ms; tier 0 loads (0 tokens, - ms each, bits -), 43 chunks stored
+22:53:23 == report
+22:53:23 report: /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2251_colo4_tkv/summary.md
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix/llama32_3b_pd_colo4_tkv_rtxa5000x4_20261114_2251_smoke
+
+==== run 6 of 7: SMOKE=1 LAYOUT=colo4 CONNECTOR=lmcache
+== PD run /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache: colo4 (0 prefill on GPUs none, 4 colocated on 0 1 2 3), connector lmcache, transport ring, eager 0; job GPUs 0 1 2 3; commit 7731196 Card smoke 30170: compiled engines stopped compiling FlashInfer's sampler (no ninja, no CUDA 13 nvcc)
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4067.80it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 28000-28454 free
+   engine1 on GPU 0 (visible 0), port 28201 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache/engine_engine1.log)
+   engine2 on GPU 1 (visible 1), port 28202 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache/engine_engine2.log)
+   engine3 on GPU 2 (visible 2), port 28203 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache/engine_engine3.log)
+   engine4 on GPU 3 (visible 3), port 28204 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache/engine_engine4.log)
+== waiting for the engines
+STOP: the engines did not all come up (port 28201); the first error of each log:
+---- /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache/engine_engine1.log
+92:(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510] ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+141:ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+208:RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+  (first traceback, line 51)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510] Traceback (most recent call last):
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1482, in run_engine_core
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1194, in __init__
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     super().__init__(
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 157, in __init__
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     kv_cache_config = self._initialize_kv_caches(vllm_config)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 377, in _initialize_kv_caches
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     self.model_executor.initialize_from_config(kv_cache_configs)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/abstract.py", line 137, in initialize_from_config
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     self.collective_rpc("initialize_from_config", args=(kv_cache_configs,))
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/uniproc_executor.py", line 103, in collective_rpc
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     result = run_method(self.driver_worker, method, args, kwargs)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/serial_utils.py", line 508, in run_method
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/worker_base.py", line 344, in initialize_from_config
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     self.worker.initialize_from_config(kv_cache_config)  # type: ignore
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/gpu_worker.py", line 874, in initialize_from_config
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     ensure_kv_transfer_initialized(self.vllm_config, kv_cache_config)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_transfer_state.py", line 88, in ensure_kv_transfer_initialized
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     _KV_CONNECTOR_AGENT = KVConnectorFactory.create_connector(
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_connector/factory.py", line 75, in create_connector
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     return connector_cls(config, role, kv_cache_config)
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py", line 102, in __init__
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510]     from lmcache.integration.vllm.vllm_v1_adapter import (
+(EngineCore pid=4097046) ERROR 11-14 22:54:07 [core.py:1510] ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+Process EngineCore:
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+---- /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache/engine_engine2.log
+92:(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510] ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+141:ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+208:RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+  (first traceback, line 51)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510] Traceback (most recent call last):
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1482, in run_engine_core
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1194, in __init__
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     super().__init__(
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 157, in __init__
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     kv_cache_config = self._initialize_kv_caches(vllm_config)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 377, in _initialize_kv_caches
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     self.model_executor.initialize_from_config(kv_cache_configs)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/abstract.py", line 137, in initialize_from_config
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     self.collective_rpc("initialize_from_config", args=(kv_cache_configs,))
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/uniproc_executor.py", line 103, in collective_rpc
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     result = run_method(self.driver_worker, method, args, kwargs)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/serial_utils.py", line 508, in run_method
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/worker_base.py", line 344, in initialize_from_config
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     self.worker.initialize_from_config(kv_cache_config)  # type: ignore
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/gpu_worker.py", line 874, in initialize_from_config
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     ensure_kv_transfer_initialized(self.vllm_config, kv_cache_config)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_transfer_state.py", line 88, in ensure_kv_transfer_initialized
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     _KV_CONNECTOR_AGENT = KVConnectorFactory.create_connector(
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_connector/factory.py", line 75, in create_connector
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     return connector_cls(config, role, kv_cache_config)
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py", line 102, in __init__
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510]     from lmcache.integration.vllm.vllm_v1_adapter import (
+(EngineCore pid=4097039) ERROR 11-14 22:54:07 [core.py:1510] ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+Process EngineCore:
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+---- /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache/engine_engine3.log
+92:(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510] ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+141:ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+208:RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+  (first traceback, line 51)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510] Traceback (most recent call last):
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1482, in run_engine_core
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1194, in __init__
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     super().__init__(
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 157, in __init__
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     kv_cache_config = self._initialize_kv_caches(vllm_config)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 377, in _initialize_kv_caches
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     self.model_executor.initialize_from_config(kv_cache_configs)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/abstract.py", line 137, in initialize_from_config
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     self.collective_rpc("initialize_from_config", args=(kv_cache_configs,))
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/uniproc_executor.py", line 103, in collective_rpc
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     result = run_method(self.driver_worker, method, args, kwargs)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/serial_utils.py", line 508, in run_method
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/worker_base.py", line 344, in initialize_from_config
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     self.worker.initialize_from_config(kv_cache_config)  # type: ignore
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/gpu_worker.py", line 874, in initialize_from_config
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     ensure_kv_transfer_initialized(self.vllm_config, kv_cache_config)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_transfer_state.py", line 88, in ensure_kv_transfer_initialized
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     _KV_CONNECTOR_AGENT = KVConnectorFactory.create_connector(
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_connector/factory.py", line 75, in create_connector
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     return connector_cls(config, role, kv_cache_config)
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py", line 102, in __init__
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510]     from lmcache.integration.vllm.vllm_v1_adapter import (
+(EngineCore pid=4097025) ERROR 11-14 22:54:07 [core.py:1510] ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+Process EngineCore:
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+---- /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2253_colo4_lmcache/engine_engine4.log
+92:(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510] ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+141:ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+208:RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+  (first traceback, line 51)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510] Traceback (most recent call last):
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1482, in run_engine_core
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1194, in __init__
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     super().__init__(
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 157, in __init__
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     kv_cache_config = self._initialize_kv_caches(vllm_config)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 377, in _initialize_kv_caches
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     self.model_executor.initialize_from_config(kv_cache_configs)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/abstract.py", line 137, in initialize_from_config
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     self.collective_rpc("initialize_from_config", args=(kv_cache_configs,))
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/uniproc_executor.py", line 103, in collective_rpc
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     result = run_method(self.driver_worker, method, args, kwargs)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/serial_utils.py", line 508, in run_method
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/worker_base.py", line 344, in initialize_from_config
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     self.worker.initialize_from_config(kv_cache_config)  # type: ignore
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     return func(*args, **kwargs)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/gpu_worker.py", line 874, in initialize_from_config
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     ensure_kv_transfer_initialized(self.vllm_config, kv_cache_config)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_transfer_state.py", line 88, in ensure_kv_transfer_initialized
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     _KV_CONNECTOR_AGENT = KVConnectorFactory.create_connector(
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_connector/factory.py", line 75, in create_connector
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     return connector_cls(config, role, kv_cache_config)
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]   File "/tmp/nbore/kvpd/30176/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py", line 102, in __init__
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510]     from lmcache.integration.vllm.vllm_v1_adapter import (
+(EngineCore pid=4097032) ERROR 11-14 22:54:07 [core.py:1510] ModuleNotFoundError: No module named 'lmcache.integration.vllm.vllm_v1_adapter'
+Process EngineCore:
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix/llama32_3b_pd_colo4_lmcache_rtxa5000x4_20261114_2253_smoke_partial
+==== run 6 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 7 of 7: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256
+== PD run /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2254_1p3d_tkv_ring_eager: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 1; job GPUs 0 1 2 3; commit 7731196 Card smoke 30170: compiled engines stopped compiling FlashInfer's sampler (no ninja, no CUDA 13 nvcc)
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4022.93it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 28000-28453 free
+   prefill1 on GPU 0 (visible 0), port 28101 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2254_1p3d_tkv_ring_eager/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 28201 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2254_1p3d_tkv_ring_eager/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 28202 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2254_1p3d_tkv_ring_eager/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 28203 (log /tmp/nbore/kvpd/30176/runs/llama32_3b/pd/20261114_2254_1p3d_tkv_ring_eager/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=4098178) INFO 11-14 22:54:47 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4098155) INFO 11-14 22:54:47 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4098162) INFO 11-14 22:54:47 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4098171) INFO 11-14 22:54:47 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+22:55:01 == check
+scripts/run_pd_vllm.sh: line 385: 4097937 Aborted                 (core dumped) env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 PATH="$ENV_DIR/bin:$PATH" VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}" "$@" nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1
+PD RUN STOPPED at line 379 (exit 124)
+STOP: the bench ran past RUN_TIMEOUT_S=1200 s; packaged as _partial
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix/llama32_3b_pd_1p3d_tkv_ring_eager_rtxa5000x4_20261114_2254_smoke_partial
+==== run 7 did not finish (its results, if any, are kept as _partial); going on
+wrote /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix/pd_matrix_smoke_rtxa5000_20261114_2146/summary.md
+PD MATRIX smoke: 7 runs (5 not finished); results in /tmp/nbore/kvpd-evidence/pd_smoke_20261115T023609Z/repo/benchmark_results/pd_card/pd_smoke_20261115T023609Z/matrix
