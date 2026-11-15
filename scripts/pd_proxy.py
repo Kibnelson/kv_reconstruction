@@ -17,6 +17,8 @@ Control (the benchmark driver):  POST /t/config {"codec": "ours-hbh", "verify": 
   mode nixl: vLLM's own NixlConnector (its toy proxy's flow): the prefill engine first (max_tokens 1,
   do_remote_decode), then the decode engine with the kv_transfer_params the prefill returned (it pulls the KV).
 Several --prefill engines: each request goes to the one with the fewest requests in flight (each has its own link).
+A request may name its engines ("t_prefill": j, "t_decode": i; taken out before it is passed on): the benchmark
+driver's warm-up sends one request over every prefill-decode pair.
 """
 from __future__ import annotations
 
@@ -67,14 +69,18 @@ class Proxy:
             self.conv[conv] = i
         return i
 
+    def _prefill_done(self, j):
+        self.p_inflight[j] -= 1
+
     def pick_prefill(self):
         return min(range(len(self.prefills)), key=lambda j: (self.p_inflight[j], j))
 
     async def handle(self, raw: Request, path: str):
         body = await raw.json()
         conv = body.pop("conversation_id", None)
+        pin_p, pin_d = body.pop("t_prefill", None), body.pop("t_decode", None)   # the bench's warm-up of each pair
         key = uuid.uuid4().hex
-        i = self.pick(conv)
+        i = int(pin_d) % len(self.decodes) if pin_d is not None else self.pick(conv)
         durl, kvaddr = self.decodes[i]
         cfg = dict(self.cfg)
         rec = {"key": key, "dest": i, "codec": cfg["codec"], "mode": cfg["mode"], "conv": conv, "t_in": time.time()}
@@ -82,7 +88,7 @@ class Proxy:
         d_body = dict(body)
         p_task = None
         if cfg["mode"] == "nixl":
-            j = self.pick_prefill()
+            j = self.pick_prefill() if pin_p is None else int(pin_p) % len(self.prefills)
             rec["prefill"] = j
             p_body = dict(body, max_tokens=1, stream=False)
             p_body.pop("stream_options", None)
@@ -108,7 +114,7 @@ class Proxy:
                 d_body["kv_transfer_params"] = ktp
         self.inflight[i] += 1
         if cfg["mode"] == "pd":
-            j = self.pick_prefill()
+            j = self.pick_prefill() if pin_p is None else int(pin_p) % len(self.prefills)
             rec["prefill"] = j
             p_body = dict(body, max_tokens=1, stream=False)
             p_body.pop("stream_options", None)
@@ -117,18 +123,19 @@ class Proxy:
             p_body["kv_transfer_params"] = {"t_send": True, "t_key": key, "t_dest": kvaddr, "t_codec": cfg["codec"],
                                             "t_verify": bool(cfg["verify"]), "t_conv": conv}
             d_body["kv_transfer_params"] = {"t_recv": True, "t_key": key}
+            # counted at the pick, not when the task first runs: requests that arrive together all picked the same
+            # engine before any task had run (job 30210, 2p2d: 7 of 8 prompts on one prefill engine)
+            self.p_inflight[j] += 1
 
             async def prefill(j=j):
-                self.p_inflight[j] += 1
-                try:
-                    async with self.session.post(self.prefills[j] + path, json=p_body, headers=headers) as r:
-                        txt = await r.read()
-                        rec["t_prefill_done"] = time.time()
-                        if r.status != 200:
-                            raise RuntimeError(f"prefill engine {r.status}: {txt[:300]!r}")
-                finally:
-                    self.p_inflight[j] -= 1
+                async with self.session.post(self.prefills[j] + path, json=p_body, headers=headers) as r:
+                    txt = await r.read()
+                    rec["t_prefill_done"] = time.time()
+                    if r.status != 200:
+                        raise RuntimeError(f"prefill engine {r.status}: {txt[:300]!r}")
             p_task = asyncio.create_task(prefill())
+            # also when the task is cancelled before it ran (a failed decode request)
+            p_task.add_done_callback(lambda _t, j=j: self._prefill_done(j))
 
         resp = await self.session.post(durl + path, json=d_body, headers=headers)
         if resp.status != 200:

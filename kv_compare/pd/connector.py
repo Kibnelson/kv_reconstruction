@@ -211,6 +211,21 @@ class TKVConnector(KVConnectorBase_V1):
         return True
 
 
+def _retry_once(fn, device, rec):
+    """fn(), and once more after PyTorch gives its cached GPU memory back: nvCOMP and ExANS allocate their scratch
+    outside PyTorch, and next to vLLM's KV cache that can fail only because PyTorch's cache holds the free memory
+    (job 30210: nvCOMP out of memory at 8K tokens, ExANS's handle for 3K tokens not made)."""
+    try:
+        return fn()
+    except Exception as exc:
+        if getattr(device, "type", None) != "cuda":
+            raise
+        rec["retried"] = repr(exc)[:200]
+        torch.cuda.synchronize(device)
+        torch.cuda.empty_cache()
+        return fn()
+
+
 def _tier_of(cfg):
     t = cfg.get("tier")
     if not t:
@@ -314,6 +329,7 @@ class _SchedulerSide:
         self.sending.add(rid)
         self.log.write({"event": "prefill_done", "key": spec.key, "conv": spec.conv, "dest": spec.dest,
                         "codec": spec.codec, "tokens": T, "t0": t0, "time": spec.finished_at,
+                        "steps": [list(x) for x in (steps or [])][:16],
                         "blocks": block_hashes(prompt[:T], self.bs)})
         return True, {"t_key": spec.key, "t_tokens": T}
 
@@ -545,8 +561,8 @@ class _WorkerSide:
             check = word_checksum(words) if spec.verify else None
             t = time.perf_counter()
             ctx = self._ctx(codec, spec.prompt, spec.steps)
-            parts, meta = (codec.encode(words, pos0=spec.t0, ctx=ctx) if ctx is not None
-                           else codec.encode(words, pos0=spec.t0))
+            parts, meta = _retry_once(lambda w=words, c=ctx: (codec.encode(w, pos0=spec.t0, ctx=c) if c is not None
+                                                             else codec.encode(w, pos0=spec.t0)), self.device, rec)
             header, blob = bundle(parts, dict(meta, checksum=check, key=spec.key, t0=spec.t0, sent_at=time.time()))
             for k in ("set", "layer0", "layer0_check"):
                 if k in meta:
@@ -578,6 +594,10 @@ class _WorkerSide:
             rec["error"] = repr(exc)[:300]
             self.log.write(rec)
             logger.warning("TKVConnector: send of %s failed: %s", spec.key, rec["error"])
+            try:                                       # the decode engine fails it now, not at its timeout
+                self.sender.abort(spec.dest, spec.key, rec["error"])
+            except Exception as exc2:
+                logger.warning("TKVConnector: could not tell %s: %r", spec.dest, exc2)
 
     # ------------------------------------------------------------------------------------------------- decode
     def _install(self, spec: RecvSpec, got):
@@ -596,21 +616,25 @@ class _WorkerSide:
             a, b = spec.t0 - st0, spec.t1 - st0      # the part this engine does not have yet
             blk, off = self.paged.slots(spec.block_ids, spec.t0, spec.t1)
             want = meta.get("checksum")
-            ck = Checksum() if want is not None else None
-
-            def sink(l, w):
-                if ck is not None:
-                    ck.add(w)
-                self.paged.scatter_layer(l, w[a:b], blk, off)
             sync = torch.cuda.synchronize if self.device.type == "cuda" else (lambda *x: None)
             t = time.perf_counter()
             ctx = self._ctx(codec, spec.prompt)
-            with torch.inference_mode():
-                if ctx is not None:
-                    codec.decode(parts, meta, sink, ctx=ctx)
-                else:
-                    codec.decode(parts, meta, sink)
-            sync(self.device)
+
+            def run():
+                ck = Checksum() if want is not None else None
+
+                def sink(l, w):
+                    if ck is not None:
+                        ck.add(w)
+                    self.paged.scatter_layer(l, w[a:b], blk, off)
+                with torch.inference_mode():
+                    if ctx is not None:
+                        codec.decode(parts, meta, sink, ctx=ctx)
+                    else:
+                        codec.decode(parts, meta, sink)
+                sync(self.device)
+                return ck
+            ck = _retry_once(run, self.device, rec)
             for k in ("set", "layer0"):
                 if k in meta:
                     rec[k] = meta[k]
@@ -619,10 +643,9 @@ class _WorkerSide:
             if rec["exact"] is False:
                 raise ValueError("checksum mismatch: the installed KV differs from the sender's")
             self.recv_ok.add(spec.req_id)
-        except Exception as exc:
+        except Exception as exc:                     # for the request only (see results: vLLM asserts otherwise)
             rec["error"] = repr(exc)[:300]
             self.recv_failed.add(spec.req_id)
-            self.failed_blocks.update(spec.block_ids[spec.t0 // self.bs:])
             logger.warning("TKVConnector: install of %s failed: %s", spec.key, rec["error"])
         finally:
             if self.receiver is not None:

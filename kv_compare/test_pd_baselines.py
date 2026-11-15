@@ -349,6 +349,8 @@ class ProxyBaselineTests(unittest.TestCase):
                     await asyncio.sleep(0.3)
                     return web.json_response({"choices": [{"text": "x"}],
                                               "kv_transfer_params": {"remote_engine_id": name, "remote_block_ids": [1]}})
+                if body.get("prompt") == "fail":
+                    return web.json_response({"error": "no"}, status=500)
                 return web.json_response({"choices": [{"text": "decoded"}]})
             return h
 
@@ -411,10 +413,108 @@ class ProxyBaselineTests(unittest.TestCase):
         st = json.loads(urllib.request.urlopen(url + "/t/status", timeout=5).read())
         self.assertEqual(len(st["prefills"]), 2)
         self.assertEqual(st["prefill_inflight"], [0, 0])
+        # our connector's flow: eight at once spread over both prefill engines (job 30210 had 7 on one)
+        req({"mode": "pd", "codec": "raw"}, "/t/config")
+        before = {n: len(seen[n]) for n in ("p1", "p2")}
+        go = threading.Barrier(8)
+
+        def at_once(i):
+            go.wait()
+            req({"model": "m", "prompt": f"y{i}", "max_tokens": 3})
+        ts = [threading.Thread(target=at_once, args=(i,)) for i in range(8)]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+        got = {n: [b for b in seen[n][before[n]:] if b.get("kv_transfer_params", {}).get("t_send")] for n in ("p1", "p2")}
+        self.assertEqual((len(got["p1"]), len(got["p2"])), (4, 4))
+        with self.assertRaises(Exception):                  # a failed decode request: its prefill is let go
+            req({"model": "m", "prompt": "fail", "max_tokens": 3})
+        for _ in range(50):
+            st = json.loads(urllib.request.urlopen(url + "/t/status", timeout=5).read())
+            if st["prefill_inflight"] == [0, 0] and st["inflight"] == [0]:
+                break
+            time.sleep(0.1)
+        self.assertEqual((st["prefill_inflight"], st["inflight"]), ([0, 0], [0]))
         bad = urllib.request.Request(url + "/t/config", data=b'{"mode": "nope"}',
                                      headers={"Content-Type": "application/json"})
         with self.assertRaises(Exception):
             urllib.request.urlopen(bad, timeout=5)
+
+
+class ProxyBurstTests(unittest.TestCase):
+    def test_requests_in_one_burst_spread_over_the_prefills(self):
+        """Requests that arrive in one event-loop turn: each is counted on its prefill engine when picked (job
+        30210: 7 of 8 went to one engine, as the count waited for the prefill task to run)."""
+        import asyncio
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_proxy
+        px = pd_proxy.Proxy(["http://p1", "http://p2"], [("http://d", "127.0.0.1:1")], "round_robin", "raw", None)
+        sent = []
+
+        class Resp:
+            status = 200
+            headers = {}
+
+            def __init__(self):
+                self.content = self
+
+            async def iter_any(self):
+                yield b"{}"
+
+            async def read(self):
+                await asyncio.sleep(0.05)
+                return b"{}"
+
+            def release(self):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            def __await__(self):
+                async def now():
+                    return self
+                return now().__await__()
+
+        bodies = []
+
+        class Session:
+            def post(self, url, json=None, headers=None):
+                sent.append(url)
+                bodies.append(json)
+                return Resp()
+
+        class Req:
+            def __init__(self, **extra):
+                self.extra = extra
+
+            async def json(self):
+                return dict({"model": "m", "prompt": "x", "max_tokens": 2}, **self.extra)
+
+        px.session = Session()
+
+        async def burst():
+            outs = await asyncio.gather(*(px.handle(Req(), "/v1/completions") for _ in range(8)))
+            for o in outs:                              # the client reads each stream to its end
+                async for _ in o.body_iterator:
+                    pass
+        asyncio.run(burst())
+        self.assertEqual((sent.count("http://p1/v1/completions"), sent.count("http://p2/v1/completions")), (4, 4))
+        self.assertEqual(px.p_inflight, [0, 0])
+        del sent[:], bodies[:]                          # the warm-up's pinned pair, its fields not passed on
+
+        async def pinned():
+            o = await px.handle(Req(t_prefill=1, t_decode=0), "/v1/completions")
+            async for _ in o.body_iterator:
+                pass
+        asyncio.run(pinned())
+        self.assertIn("http://p2/v1/completions", sent)
+        self.assertNotIn("http://p1/v1/completions", sent)
+        self.assertFalse(any("t_prefill" in b or "t_decode" in b for b in bodies))
 
 
 class BenchAndReportTests(unittest.TestCase):

@@ -404,6 +404,16 @@ class Sender:
             return
         d.queue.put((key, header, blob, on_done, dict(info or {}), time.time()))
 
+    def abort(self, dest, key, error):
+        """Tell dest that key will not come (its encode failed): its decode fails now (queued in order behind the
+        transfers already queued to dest)."""
+        try:
+            d = self._dest(dest)
+        except OSError as exc:
+            self.log(f"tkv sender: cannot reach {dest} to abort {key} ({exc!r})")
+            return
+        d.queue.put(("__abort__", key, str(error)[:300]))
+
     def _ring_space(self, d, n):
         """Wait until n more bytes fit in the ring; acknowledgements that already arrived are read on the way (they
         must not pile up in the socket while the ring has room)."""
@@ -427,6 +437,12 @@ class Sender:
             item = d.queue.get()
             if item is None:
                 return
+            if item[0] == "__abort__":
+                try:
+                    _send_msg(d.sock, {"op": "abort", "key": item[1], "error": item[2]})
+                except OSError:
+                    pass
+                continue
             key, header, blob, on_done, info, queued = item
             total = int(blob.numel())
             rec = dict(info, key=key, dest=addr, bytes=total, queued=queued, send_begin=time.time(), mode=d.mode)

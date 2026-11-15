@@ -28,8 +28,14 @@ NUC, so a crash there costs that run only.
 ## Layouts and paths
 
 - **1 prefill + 3 decode** and **2 prefill + 2 decode** (`LAYOUT=1p3d | 2p2d`). Each prefill engine has its own
-  link; the proxy sends each request to the prefill engine with the fewest requests in flight. The QoS
+  link; the proxy sends each request to the prefill engine with the fewest requests in flight, counted when it
+  picks (until job 30210 the count waited for the request's task to run, and a burst went to one engine: 7 of 8
+  prompts in that smoke's 2p2d runs of our connector, so those TTFTs are not comparable with NIXL's). The QoS
   `research12h` allows 4 GPUs at a time, so these are the two layouts there are.
+- **Every point starts cold.** Before each codec's check and each sweep or multi-turn point, every engine's prefix
+  cache is emptied (`POST /reset_prefix_cache`). The points use the same prompts, so before job 30210's fix a
+  later codec's prefill hit its own cache (TTFT without the prefill; T2 without steps for layer 0) and the
+  decode engines already held most of a prompt (8 or 16 tokens moved of 2048).
 - **Through host memory at set link speeds** (`TRANSPORT=ring`, 3/10/25/100 Gb/s): the transport of
   `pd-vllm-protocol`, a paced virtual link over pinned host memory.
 - **GPU to GPU directly** (`TRANSPORT=p2p`, unpaced). The receiver's landing ring is in its GPU memory, shared with
@@ -45,6 +51,7 @@ NUC, so a crash there costs that run only.
     blocks. Each chunk is checked against a checksum taken when it was stored.
   - The budget (`TIER_GB`, 8 GB) limits the coded bytes, so a smaller format keeps more conversations.
   - The engines' GPU cache is limited (`GPU_BLOCKS` 2048, 32K tokens each) so that the conversations outgrow it.
+    The smoke has 16 conversations of 4 prompts, about 4 an engine, in 450 blocks (7.2K tokens) at a 7K context.
   - The workload is vLLM's multi-turn benchmark on fresh conversations at each point, with conversation routing.
   - LMCache's CPU offload (`CONNECTOR=lmcache`) is the reference, with the same chunk size and budget.
 

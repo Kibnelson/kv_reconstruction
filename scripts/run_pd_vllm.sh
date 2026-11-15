@@ -85,6 +85,10 @@ ENV_DIR=$KV_HOME/venv_vllm
 [ "$CONNECTOR" = lmcache ] && ENV_DIR=$KV_HOME/venv_lmcache
 VPY=$ENV_DIR/bin/python
 [ -x "$VPY" ] || { echo "STOP: no $ENV_DIR: run scripts/pd_setup.sh first"; exit 1; }
+# the client side (prompts, proxy, bench) is the same for every connector: vLLM's env, which has the benchmarks'
+# packages (the LMCache env has no pandas, so vLLM's multi-turn benchmark exited 1 there: job 30210)
+CPY=$KV_HOME/venv_vllm/bin/python
+[ -x "$CPY" ] || { echo "STOP: no $KV_HOME/venv_vllm: run scripts/pd_setup.sh first"; exit 1; }
 [ "$CONNECTOR" != tkv ] || [ -s "$RUN/pd_codecs.pt" ] || { echo "STOP: no $RUN/pd_codecs.pt: run scripts/pd_setup.sh first"; exit 1; }
 if [ "$CONNECTOR" = nixl ] && ! "$VPY" -c "import torch; from nixl._api import nixl_agent" 2>/dev/null; then
     echo "STOP: NIXL does not import in $ENV_DIR (scripts/pd_setup.sh):"
@@ -173,12 +177,15 @@ if [ "${SMOKE:-0}" = 1 ]; then
     NUM_PROMPTS=${NUM_PROMPTS:-8}
     PROMPT_TOKENS=${PROMPT_TOKENS:-2048}
     TIER_CODECS=${TIER_CODECS:-raw,ours-hbh}
-    TIER_CLIENTS=${TIER_CLIENTS:-4}
-    TIER_CONVERSATIONS=${TIER_CONVERSATIONS:-8}
-    TIER_MAX_TURNS=${TIER_MAX_TURNS:-4}
-    # few conversations fit in 2048 GPU blocks (32K tokens), so the tier was never asked (job 30176: 0 loads);
-    # 1100 blocks hold one longest request (16K tokens) and not two conversations' worth
-    GPU_BLOCKS=${GPU_BLOCKS:-1100}
+    # the tier was never asked in jobs 30176 and 30210 (0 loads): 8 conversations of 2 prompts each (--max-turns
+    # counts replies too) over 4 engines are 2 conversations an engine, which its GPU cache held. Now 16 conversations,
+    # all active (8 clients x 2), 4 prompts each: about 4 an engine. vLLM's multi-turn config starts a conversation
+    # at 500 shared + up to 5000 own tokens and adds 200-280 a prompt, so the longest request stays under 6.7K: tier
+    # engines get a 7K context and 450 blocks (7.2K tokens), which hold it but not 4 conversations (about 2K each)
+    TIER_CLIENTS=${TIER_CLIENTS:-8}
+    TIER_CONVERSATIONS=${TIER_CONVERSATIONS:-16}
+    TIER_MAX_TURNS=${TIER_MAX_TURNS:-8}
+    if [ "$COLO" = 1 ]; then GPU_BLOCKS=${GPU_BLOCKS:-450}; MAXLEN=${MAXLEN:-7168}; MAXBT=${MAXBT:-7168}; fi
 fi
 case "$CONNECTOR" in
     nixl) CODECS=nixl; DEFAULT_STAGES=check,sweep,report; LINKS=native ;;
@@ -207,7 +214,9 @@ if [ "${SHARE_GPU:-0}" = 1 ]; then
     P_MEM=${P_MEM:-0.44}; D_MEM=${D_MEM:-0.44}; MAXLEN=${MAXLEN:-4096}; MAXBT=${MAXBT:-2048}
     SEND_BUDGET=$((256 << 20)); RECV_BUDGET=$((256 << 20)); ENGINE_ARGS=(--enforce-eager)
 else
-    P_MEM=${P_MEM:-0.72}; D_MEM=${D_MEM:-0.72}; MAXLEN=${MAXLEN:-16384}; MAXBT=${MAXBT:-16384}
+    # 0.65 of each GPU for vLLM: nvCOMP and ExANS allocate their scratch outside PyTorch, and at 0.72 they ran out
+    # of memory beside PyTorch's cache (job 30210); the same share for every connector, NIXL and LMCache included
+    P_MEM=${P_MEM:-0.65}; D_MEM=${D_MEM:-0.65}; MAXLEN=${MAXLEN:-16384}; MAXBT=${MAXBT:-16384}
     SEND_BUDGET=$((1 << 30)); RECV_BUDGET=$((1536 << 20)); ENGINE_ARGS=()
     [ "$EAGER" = 1 ] && ENGINE_ARGS+=(--enforce-eager)
 fi
@@ -217,7 +226,7 @@ CHECK_LENGTHS=${CHECK_LENGTHS:-1000,3000,5000,8192}
 [ "${SHARE_GPU:-0}" = 1 ] && CHECK_LENGTHS=${CHECK_LENGTHS_SHARED:-500,1000,1777,3000}
 PROMPTS=$RUN/pd/prompts_${PROMPT_TOKENS//,/_}_check_${CHECK_LENGTHS//,/_}
 if [ ! -s "$PROMPTS/check.jsonl" ]; then
-    "$VPY" scripts/pd_prompts.py --texts "$KV_RUNS/dataset_texts" --model "$MP" --tokens "$PROMPT_TOKENS" \
+    "$CPY" scripts/pd_prompts.py --texts "$KV_RUNS/dataset_texts" --model "$MP" --tokens "$PROMPT_TOKENS" \
         --per-length "$NUM_PROMPTS" --output-len "$OUTPUT_LEN" --check-lengths "$CHECK_LENGTHS" --out "$PROMPTS"
 fi
 LINKFILE=$OUT/link.json
@@ -356,7 +365,7 @@ done
 if [ "$ENGINES_UP" = 1 ]; then
 grep -h "TKVConnector worker ready\|GPU KV cache size\|not available\|failed its warm-up" "$OUT"/engine_*.log | sed 's/^/   /' || true
 PROXY=http://127.0.0.1:$PORT_BASE
-nohup "$VPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_ARGS[@]}" \
+nohup "$CPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_ARGS[@]}" \
     --log "$OUT/proxy.jsonl" > "$OUT/proxy.log" 2>&1 &
 PIDS+=($!)
 for _ in $(seq 1 30); do curl -sf "$PROXY/health" >/dev/null && break; sleep 1; done
@@ -376,7 +385,7 @@ json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sy
 EOF
 set +e
 PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
-    "$VPY" -u scripts/pd_bench.py --proxy "$PROXY" --model "$MP" --out "$OUT" --prompts "$PROMPTS" \
+    "$CPY" -u scripts/pd_bench.py --proxy "$PROXY" --model "$MP" --out "$OUT" --prompts "$PROMPTS" \
     --texts "$KV_RUNS/dataset_texts" --log-dir "$LOGS" --link-control "$LINKFILE" --codecs "$CODECS" --links "$LINKS" \
     --rates "$RATES" --num-prompts "$NUM_PROMPTS" --output-len "$OUTPUT_LEN" --ttft-slo-ms "${TTFT_SLO_MS:-2000}" \
     --stages "$STAGES" --vllm-source "$KV_HOME/sources/vllm" --env "$OUT/env.json" \
@@ -400,12 +409,12 @@ mkdir -p "$DEST/runs" "$DEST/connector"
 for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json; do
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
-cp "$OUT"/runs/*.json "$DEST/runs/" 2>/dev/null || true
+cp "$OUT"/runs/*.json "$OUT"/runs/*.log "$DEST/runs/" 2>/dev/null || true   # the logs: 60 KB at most each
 for f in "$OUT"/engine_*.log; do      # whole when small (a failed start), else its start and its end
     if [ "$(stat -c %s "$f")" -lt 4000000 ]; then cp "$f" "$DEST/"
     else { head -n 300 "$f"; echo "[... $(wc -l < "$f") lines in all ...]"; tail -n 400 "$f"; } > "$DEST/$(basename "$f")"; fi
 done
-gzip -c "$OUT/proxy.jsonl" > "$DEST/proxy.jsonl.gz" 2>/dev/null || true
+[ -s "$OUT/proxy.jsonl" ] && { gzip -c "$OUT/proxy.jsonl" > "$DEST/proxy.jsonl.gz" || true; }
 for f in "$LOGS"/*.jsonl; do [ -f "$f" ] && gzip -c "$f" > "$DEST/connector/$(basename "$f").gz"; done
 cp "$RUN"/pd_selftest*.json "$DEST/" 2>/dev/null || true
 if [ "$PD_CARD" = 1 ]; then echo "RESULTS $DEST"; exit "$STATUS"; fi

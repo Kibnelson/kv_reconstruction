@@ -63,6 +63,52 @@ def wait_idle(proxy, timeout=1800):
     return False
 
 
+def reset_caches(a, tries=30):
+    """Every engine's prefix cache emptied (vLLM's POST /reset_prefix_cache; the engines run with
+    VLLM_SERVER_DEV_MODE=1), so each codec and rate starts cold: with the same prompts, a later codec's prefill
+    otherwise hit its own cache (T2 then has no steps for layer 0) and the decode engines held most prompts already
+    (job 30210: t2-rank256 moved 8 or 16 tokens of 2048). A reset fails while an engine still holds blocks (a
+    transfer finishing), so it is tried again for a while."""
+    st = get(a.proxy + "/t/status")
+    urls = list(dict.fromkeys(list(st.get("prefills") or []) + [d[0] for d in st["decodes"]]))
+    out = {}
+    for u in urls:
+        r = None
+        for _ in range(tries):
+            try:
+                r = post(u + "/reset_prefix_cache", {}, timeout=120)
+            except Exception as exc:
+                r = {"error": repr(exc)[:200]}
+            if isinstance(r, dict) and r.get("success", True) is not False and "error" not in r:
+                break
+            time.sleep(1)
+        out[u] = r
+    bad = {u: r for u, r in out.items() if not (isinstance(r, dict) and r.get("success", True) is not False
+                                                and "error" not in r)}
+    if bad:
+        log(f"prefix caches not reset: {bad}")
+    return {"engines": len(out), "failed": bad}
+
+
+def warm_pairs(a):
+    """One short request over every prefill-decode pair in the current mode, before a sweep point's caches are
+    emptied: a pair's first transfer opens its path (CUDA IPC handles, NIXL's handshake; 0.2-0.5 s in job 30210),
+    and the check stage, one request at a time, uses the first prefill engine only."""
+    st = get(a.proxy + "/t/status")
+    n = 0
+    for j in range(len(st.get("prefills") or [None])):
+        for i in range(len(st["decodes"])):
+            try:
+                post(a.proxy + "/v1/completions", {"model": a.served_name, "prompt": "warm up " * 40 + str(n),
+                                                   "max_tokens": 2, "temperature": 0.0,
+                                                   "t_prefill": j, "t_decode": i}, timeout=600)
+            except Exception as exc:
+                log(f"warm-up of prefill {j} -> decode {i} failed: {exc!r}"[:300])
+            n += 1
+    wait_idle(a.proxy)
+    return n
+
+
 def records(log_dir, t0, t1):
     """Connector records (send: prefill, install/timeout: decode) whose time falls in [t0, t1]."""
     out = []
@@ -177,10 +223,13 @@ def stage_check(a, res):
     out = {}
     ref = None
     post(a.proxy + "/t/config", {"mode": "local"})
+    reset_caches(a)
     ref = [completion(a, r["prompt"], r["output_tokens"]) for r in rows]
     for codec in usable(a, res, a.codecs):
         post(a.proxy + "/t/config", {"mode": "nixl"} if codec == "nixl" else {"mode": "pd", "codec": codec,
                                                                                 "verify": True})
+        wait_idle(a.proxy)
+        resets = reset_caches(a)
         t0 = time.time()
         got = []
         for r in rows:
@@ -198,7 +247,7 @@ def stage_check(a, res):
             ok = st["installs"] == len(rows) and st["exact"] == len(rows) and not st["install_errors"] and \
                 not any("error" in g for g in got)
         out[codec] = {"prompts": len(rows), "same_text_as_local": same, "transfers": st, "ok": ok,
-                      "errors": [g["error"] for g in got if "error" in g]}
+                      "errors": [g["error"] for g in got if "error" in g], "resets": resets}
         log(f"check {codec}: {'OK' if ok else 'FAILED'} - {st['exact']}/{len(rows)} transfers bit-exact, "
             f"{same}/{len(rows)} outputs equal to local prefill, bits {fmt(st['bits'])}")
     post(a.proxy + "/t/config", {"verify": False})
@@ -238,13 +287,16 @@ def stage_sweep(a, res, colocated=False):
                 if name in runs and not a.rerun:
                     continue
                 wait_idle(a.proxy)
+                if not colocated and rate == a.rates[0]:
+                    warm_pairs(a)
+                resets = reset_caches(a)
                 n = a.num_prompts if rate != "inf" else a.num_prompts
                 rc, r, t0, t1 = bench_serve(a, str(a.dataset), rate, n, out_dir, name)
                 wait_idle(a.proxy)
                 time.sleep(1)
                 st = transfer_stats(records(a.log_dir, t0, time.time())) if not colocated and codec != "nixl" else {}
                 runs[name] = {"link_gbps": link, "codec": codec, "rate": rate, "exit": rc,
-                              "bench": {k: r.get(k) for k in KEEP}, "transfers": st}
+                              "bench": {k: r.get(k) for k in KEEP}, "transfers": st, "resets": resets}
                 b = runs[name]["bench"]
                 log(f"{name}: exit {rc}, {fmt(b.get('request_throughput'), 2)} req/s, TTFT p50 "
                     f"{fmt(b.get('median_ttft_ms'), 0)} / p99 {fmt(b.get('p99_ttft_ms'), 0)} ms, goodput "
@@ -268,6 +320,8 @@ def stage_multiturn(a, res):
     out = {}
     for codec in a.mt_codecs:
         post(a.proxy + "/t/config", {"mode": "pd", "codec": codec, "policy": a.mt_policy, "reset_conversations": True})
+        wait_idle(a.proxy)
+        reset_caches(a)                            # the same conversations (seed 0) for every codec
         name = f"multiturn_{codec}_{a.mt_policy}"
         t0 = time.time()
         cmd = [sys.executable, str(src / "benchmark_serving_multi_turn.py"), "--model", a.model,
@@ -277,6 +331,8 @@ def stage_multiturn(a, res):
                "--stats-json-output", str(a.out / "runs" / (name + ".json"))]
         r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(src))
         (a.out / "runs" / (name + ".log")).write_text(r.stdout[-30000:] + "\n" + r.stderr[-30000:])
+        if r.returncode != 0:
+            log(f"{name}: the multi-turn benchmark exited {r.returncode}:\n" + tail_of(r.stderr or r.stdout))
         wait_idle(a.proxy)
         t1 = time.time()
         st = transfer_stats(records(a.log_dir, t0, t1))
@@ -289,6 +345,10 @@ def stage_multiturn(a, res):
                             (["--window", f"{v['t0']},{v['t1']}"] for v in out.values()), []),
                        capture_output=True, text=True)
     log(p.stdout[-3000:] + p.stderr[-2000:])
+
+
+def tail_of(text, n=12):
+    return "\n".join("   " + l for l in text.strip().splitlines()[-n:])
 
 
 def pct(xs, q):
@@ -359,6 +419,8 @@ def stage_tier(a, res):
             t0 = time.time()
             r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(src))
             (a.out / "runs" / (name + ".log")).write_text(r.stdout[-30000:] + "\n" + r.stderr[-30000:])
+            if r.returncode != 0:
+                log(f"{name}: the multi-turn benchmark exited {r.returncode}:\n" + tail_of(r.stderr or r.stdout))
             wait_idle(a.proxy)
             time.sleep(2)
             t1 = time.time()

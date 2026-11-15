@@ -184,6 +184,9 @@ class TransportTests(unittest.TestCase):
         self.assertLess(time.monotonic() - t, 10, "failed at once, not at the timeout")
         self.assertIn("the second chunk fails", rx.failure("k"))
         self.assertIsNone(rx.failure("k"), "reported once")
+        end = time.monotonic() + 5                      # the sender's record follows its abort message
+        while not recs and time.monotonic() < end:
+            time.sleep(0.01)
         self.assertIn("error", recs[0])
         tx.close()
         rx.close()
@@ -423,6 +426,32 @@ class ConnectorFlowTests(unittest.TestCase):
         self.assertEqual(r.finished_recving, {"d-3"})
         # the request only: vLLM 0.32 asserted when the same step also named its blocks (job 30176)
         self.assertEqual(Dw.get_block_ids_with_load_errors(), set())
+
+    def test_a_failed_encode_fails_the_decode_at_once(self):
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make()
+        Pw.w.codecs["raw"].encode = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("encode broke"))
+        prompt = list(range(100, 140))
+        dreq = SimpleNamespace(request_id="d-9", prompt_token_ids=prompt, num_computed_tokens=0,
+                               kv_transfer_params={"t_recv": True, "t_key": "K9"})
+        n, _ = Ds.get_num_new_matched_tokens(dreq, 0)
+        Ds.update_state_after_alloc(dreq, SimpleNamespace(get_block_ids=lambda: ([1, 7, 3],)), n)
+        self.step(Ds, Dw)
+        preq = SimpleNamespace(request_id="p-9", prompt_token_ids=prompt, num_computed_tokens=40,
+                               status=self.Status.FINISHED_LENGTH_CAPPED,
+                               kv_transfer_params={"t_send": True, "t_key": "K9", "t_dest": dest, "t_codec": "raw"})
+        Ps.request_finished(preq, [5, 2, 9])
+        r = self.step(Ps, Pw, finished={"p-9"})
+        self.assertEqual(r.finished_sending, {"p-9"}, "the prefill side lets its blocks go")
+        end = time.time() + 10
+        while time.time() < end:                      # the decode's timeout is 600 s: this is the abort
+            r = self.step(Ds, Dw)
+            if r.failed_recving:
+                break
+            time.sleep(0.02)
+        self.assertEqual(r.failed_recving, {"d-9"})
+        self.assertEqual(Dw.get_block_ids_with_load_errors(), set())
+        recs = [json.loads(l) for f in Path(log_dir).glob("tkv_*.jsonl") for l in f.read_text().splitlines()]
+        self.assertTrue(any(x.get("event") == "send_failed" and "encode broke" in x.get("error", "") for x in recs))
 
     def test_requests_without_our_params_are_left_alone(self):
         Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make()

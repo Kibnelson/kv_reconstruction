@@ -38,8 +38,18 @@ def find_model():
                         best = o
         except Exception:
             continue
-    if best is None:
-        raise RuntimeError("no model with .model.embed_tokens and .model.layers in this process")
+    if best is None:                                 # what there is, for the report
+        seen = {}
+        for o in gc.get_objects():
+            try:
+                if isinstance(o, torch.nn.Module) and (hasattr(o, "embed_tokens") or hasattr(o, "model") or
+                                                       hasattr(o, "layers")):
+                    seen[type(o).__module__ + "." + type(o).__name__] = sorted(
+                        k for k in ("model", "embed_tokens", "layers", "language_model") if hasattr(o, k))
+            except Exception:
+                continue
+        raise RuntimeError("no model with .model.embed_tokens and .model.layers in this process; modules seen: "
+                           + "; ".join(f"{k} {v}" for k, v in list(seen.items())[:8]))
     return best
 
 
@@ -134,7 +144,9 @@ class Layer0Context:
     def covers(self, pos0, T):
         ok = covered(self.steps, pos0, T) and pos0 + T <= len(self.tokens)
         if not ok:
-            self.last_check = "no steps for every token (a prefix-cache hit or a short prompt list)"
+            self.last_check = ("no steps for every token (a prefix-cache hit or a short prompt list): "
+                               f"{len(self.steps)} steps {self.steps[:3]}, tokens {pos0}..{pos0 + T}, "
+                               f"prompt {len(self.tokens)}")
         return ok
 
     def steps_for(self, pos0, T):
