@@ -70,7 +70,7 @@ The launcher checks your Git author identity before allocating GPUs. If it is mi
 | Saved state, login log and stage status | `~/.kvpd_t_matched/campaigns/<tag>/` |
 | Published results | `evidence/experiment/t-pd-matched-campaign-v1/...` |
 
-The launcher discards inherited campaign hooks, paths and benchmark overrides, then selects our matrix, root and settings explicitly. Code, model and package cache, runtime, logs, campaign tags and GPU allocation belong to this campaign. A physical cluster and its scheduler can still be shared. The smoke run requests four GPUs, 16 CPUs and 192 GB RAM for up to six hours; the other stages request their own small allocations. A first setup downloads into our own cache, and disk preflight still applies.
+The launcher discards inherited campaign hooks, paths and benchmark overrides, then selects our matrix, root and settings explicitly. Code, model and package cache, runtime, logs, campaign tags and GPU allocation belong to this campaign. A physical cluster and its scheduler can still be shared. Every node stage requests its own four-GPU allocation, including create, run, cleanup, verify-cleanup, review and publish. The smoke run uses 16 CPUs and 192 GB RAM for up to six hours; the other stages use smaller host-memory limits within their GPU allocations. A first setup downloads into our own cache, and disk preflight still applies.
 
 For user `nbore`, the default root is `/tmp/nbore/kvpd-t-matched-nbore`. `T_PD_ROOT` explicitly overrides it. Older campaigns retain the root in their saved `state.sh`; close them out using that recorded location. The default change applies to new campaigns and does not relocate existing records.
 
@@ -91,7 +91,7 @@ A `KVPD_RUN_STATUS=stopped` result precedes model setup and serving. The exact r
 
 The node-local code and evidence clones now inherit the home clone's promisor configuration before checkout. A real filtered-clone regression reproduces the earlier missing-object error and exercises create, a deliberate disk stop, cleanup, review and publication. Git's [partial-clone documentation](https://git-scm.com/docs/partial-clone) explains why omitted objects need a configured remote. The home checkout remains sparse.
 
-For a campaign already stopped at an older pin, keep that checkout at its saved pin while closing it out. Source its printed `state.sh`. In a small CPU allocation on its `KVPD_NODE`, set `remote.origin.promisor=true` and `remote.origin.partialclonefilter=blob:none` in its two existing repositories: `$KVPD_ROOT/kvpd-tools/$KVPD_PIN` and `$KVPD_ROOT/kvpd-evidence/$KVPD_TAG/repo`. This repairs repository metadata without editing the pinned source. Read `$KVPD_ROOT/kvpd-evidence/$KVPD_TAG/repo/benchmark_results/pd_card/$KVPD_TAG/run.json` and `disk_plan.json` if present. Then use the saved pin for `cleanup`, `verify-cleanup`, `review` and `publish`. Update the home checkout only after closeout; the next campaign uses a new tag and the updated branch head.
+For a campaign already stopped at an older pin, keep that checkout at its saved pin while closing it out. Source its printed `state.sh`. In a four-GPU allocation on its `KVPD_NODE`, set `remote.origin.promisor=true` and `remote.origin.partialclonefilter=blob:none` in its two existing repositories: `$KVPD_ROOT/kvpd-tools/$KVPD_PIN` and `$KVPD_ROOT/kvpd-evidence/$KVPD_TAG/repo`. This repairs repository metadata without editing the pinned source. Read `$KVPD_ROOT/kvpd-evidence/$KVPD_TAG/repo/benchmark_results/pd_card/$KVPD_TAG/run.json` and `disk_plan.json` if present. Then use the saved pin for `cleanup`, `verify-cleanup`, `review` and `publish`. Update the home checkout only after closeout; the next campaign uses a new tag and the updated branch head. Historical pinned launchers retain their original resource settings; the current four-GPU requirement applies to new campaigns and current follow-up commands.
 
 ## Engine build tools and failed link surveys
 
@@ -259,7 +259,6 @@ Relevant primary sources:
 - [CUDA 12.8 memory API reference](https://docs.nvidia.com/cuda/archive/12.8.2/cuda-runtime-api/group__CUDART__MEMORY.html)
   defines `cudaMemcpyPeer`. Its name alone is not proof of the physical path;
   this diagnostic explicitly enables peer access and records the controls.
-+
 
 ### Job 30224: destination retains the complete poison pattern
 
@@ -284,6 +283,11 @@ working transfer. If translated domains are reported, that warrants
 administrator investigation; causality still needs a controlled repair
 and exact retest. Do not change kernel parameters or PCI registers through
 this campaign. The full campaign's existing survey gate remains enforced.
+
+All node checks, including read-only configuration inspection, run inside
+four-GPU Slurm allocations as requested. The follow-up command in the linked
+review uses `--gpus=4` and validates the allocation before reading settings.
+The current campaign card applies the same GPU request to every stage.
 
 [Recorded observations and review](../benchmark_results/t_pd_gpu_job30224_20261115/review.md)
 are transcribed from the user's supplied output; the full `share.zip` has

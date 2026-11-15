@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Login-host card for one PD-baselines campaign on gpu-grad-01 (docs/pd_baselines.md, "On gpu-grad-01: the card").
-# Only checks run here. Every stage runs in its own Slurm allocation (scripts/pd_campaign.py on the node); the run
-# stage holds the 4 GPUs. Nothing is installed or run outside an allocation, and only the results are pushed, to
+# Only login coordination checks run here. Every node stage runs in its own four-GPU Slurm allocation
+# (scripts/pd_campaign.py on the node). Nothing is installed or run outside an allocation, and results are pushed to
 # their own branch.
 #
 #   bash scripts/pd_card.sh create|run|cleanup|verify-cleanup|review|publish PIN TAG
@@ -71,11 +71,11 @@ if type module >/dev/null 2>&1; then module load slurm; fi
 command -v srun >/dev/null || { echo "STOP: no srun (module load slurm)" >&2; exit 2; }
 export KVPD_TOOLS=$KVPD_ROOT/kvpd-tools/$KVPD_PIN
 
-SRUN=(srun -p "${KVPD_PARTITION:-all}" -A "${KVPD_ACCOUNT:-oana2026}" -q "${KVPD_QOS:-research12h}" -N 1 -w "$KVPD_NODE"
+SRUN=(srun -p "${KVPD_PARTITION:-all}" -A "${KVPD_ACCOUNT:-oana2026}" -q "${KVPD_QOS:-research12h}" -N 1 -w "$KVPD_NODE" --gpus=4
       --chdir=/tmp --export=ALL --propagate=NONE)
 if [ "$KVPD_STAGE" = run ]; then
     TIME=${KVPD_TIME:-$([ "$KVPD_MATRIX" = smoke ] && echo 06:00:00 || echo 12:00:00)}
-    SRUN+=(--gpus=4 -c 16 --mem=192G -t "$TIME")
+    SRUN+=(-c 16 --mem=192G -t "$TIME")
 else
     SRUN+=(-c 2 --mem=8G -t 01:00:00)
 fi
@@ -83,6 +83,10 @@ fi
 set -Eeuo pipefail
 umask 077
 test "$(hostname -s)" = "$KVPD_NODE"
+test -n "${SLURM_JOB_ID:-}" && test "${SLURM_GPUS_ON_NODE:-0}" = 4 || {
+    echo 'STOP: every campaign stage requires a four-GPU Slurm allocation' >&2
+    exit 2
+}
 if type module >/dev/null 2>&1; then module load slurm; fi
 export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 GIT_TERMINAL_PROMPT=0
 unset PYTHONPATH PYTHONHOME PYTHONOPTIMIZE

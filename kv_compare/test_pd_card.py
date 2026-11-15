@@ -173,6 +173,7 @@ class CardTests(unittest.TestCase):
         self.assertFalse((repo / "benchmark_results" / "old_run").exists())
         create_job = self.jobs()[-1]
         self.assertIn("-c 2 --mem=8G", (self.db / f"argv_{create_job}").read_text())
+        self.assertIn("--gpus=4", (self.db / f"argv_{create_job}").read_text())
         self.assertEqual(self.card("create").returncode, 2, "a tag is used once")
 
         # the run: 4 GPUs, its own runtime, the recorded runs (not the environment's), results into the campaign
@@ -240,6 +241,9 @@ class CardTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
         self.assertIn("(already)", r.stdout)
         self.assertEqual(self.g(self.origin, "rev-parse", branch), head)
+        for job in self.jobs():
+            self.assertIn("--gpus=4", (self.db / f"argv_{job}").read_text(),
+                          "every node stage must request a GPU allocation")
 
     def test_login_checks(self):
         # inside an allocation, a bad tag, a pin that is not the checkout's, uncommitted changes: no srun at all

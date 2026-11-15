@@ -64,8 +64,9 @@ was changed by this review.
 
 ## Read-only follow-up
 
-Run from the login host, outside an existing Slurm allocation. This requests
-one CPU, 1 GiB RAM and no GPU resources for up to five minutes. It reads
+Submit from the login host, outside an existing Slurm allocation. Every node
+check runs inside a GPU allocation as requested. This reserves four GPUs and
+4 GiB of host RAM for up to five minutes and verifies the allocation. It reads
 the current configuration, which is a follow-up allocation rather than a
 measurement from job 30224. The PCI IDs are resolved to their current groups
 instead of assuming that group numbers survived a reboot.
@@ -77,11 +78,13 @@ test -z "${SLURM_JOB_ID:-}"
 if type module >/dev/null 2>&1; then module load slurm; fi
 
 srun -p all -A oana2026 -q research12h \
-    -N 1 -w gpu-grad-01 -n 1 -c 1 --mem=1G --gres=none -t 00:05:00 \
+    -N 1 -w gpu-grad-01 -n 1 --gpus=4 --mem=4G -t 00:05:00 \
     --chdir=/tmp --export=ALL --propagate=NONE bash -s <<'NODE'
 set -Eeuo pipefail
 test "$(hostname -s)" = gpu-grad-01
-printf 'HOST=%s\n' "$(hostname -s)"
+test -n "${SLURM_JOB_ID:-}" && test "${SLURM_GPUS_ON_NODE:-0}" = 4
+printf 'JOB=%s HOST=%s GPUS=%s\n' "$SLURM_JOB_ID" "$(hostname -s)" "$SLURM_GPUS_ON_NODE"
+nvidia-smi -L
 for bdf in 0000:06:00.0 0000:45:00.0 0000:46:00.0 0000:47:00.0; do
     group_path=$(readlink -e "/sys/bus/pci/devices/$bdf/iommu_group" || true)
     domain=unavailable
