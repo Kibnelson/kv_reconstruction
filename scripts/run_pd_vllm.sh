@@ -270,12 +270,12 @@ visible() {   # the CUDA_VISIBLE_DEVICES of an engine on job GPU position $1
 serve() {   # name position port mem kv_transfer_config [VAR=value ...]
     local name=$1 pos=$2 port=$3 mem=$4 cfg=$5
     shift 5
-    # VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0: vLLM (since 0.21) captures CUDA graphs once while it sizes the KV
-    # cache, before the KV connector starts; on gpu-grad-01 (job 30163) every compiled engine with a connector that
-    # touches the GPU at start (ours, LMCache) then died, and the eager ones (no capture) came up. With 0 the
-    # graphs are captured after the connector, as eager engines see it; the KV cache is sized without that estimate.
+    # VLLM_USE_FLASHINFER_SAMPLER=0: compiled engines warm up top-k/top-p sampling, which with FlashInfer compiles
+    # its kernels at start (ninja and a CUDA 13 nvcc); there is no such toolkit on gpu-grad-01, and every compiled
+    # engine of job 30170 stopped there (FileNotFoundError: 'ninja'). vLLM's PyTorch sampler needs nothing compiled;
+    # the sampler is the same for every codec. The environment's bin/ comes first on PATH (its ninja and tools).
     env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 \
-        VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS="${VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS:-0}" "$@" \
+        PATH="$ENV_DIR/bin:$PATH" VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}" "$@" \
         nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" \
         --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" \
         --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" \

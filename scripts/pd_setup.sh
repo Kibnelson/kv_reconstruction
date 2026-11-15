@@ -63,6 +63,7 @@ VPY=$KV_HOME/venv_vllm/bin/python
 if ! "$VPY" -c "import vllm, sys; sys.exit(0 if vllm.__version__ == '0.32.0' else 1)" 2>/dev/null; then
     pip_in "$VPY" -q "vllm==0.32.0" "pandas>=2.0" "xlsxwriter>=3.2.1" "aiohttp>=3.10"
 fi
+"$VPY" -c "import ninja" 2>/dev/null || pip_in "$VPY" -q ninja     # what a kernel build at engine start calls
 # nvCOMP's CUDA 13 build (the baseline codecs nvcomp-<alg>) beside vLLM's torch, and NIXL (vLLM's NixlConnector)
 "$VPY" -c "from nvidia import nvcomp" 2>/dev/null || pip_in "$VPY" -q "nvidia-nvcomp-cu13==6.0.0.12" || \
     echo "WARNING: nvCOMP did not install in the vLLM environment; the nvcomp codecs are left out"
@@ -93,7 +94,7 @@ if [ "${LMCACHE:-1}" = 1 ]; then
     venv_create "$KV_HOME/venv_lmcache"
     LPY=$KV_HOME/venv_lmcache/bin/python
     if ! "$LPY" -c "import vllm, lmcache, sys; sys.exit(0 if vllm.__version__ == '0.32.0' else 1)" 2>/dev/null; then
-        pip_in "$LPY" -q "vllm==0.32.0" "lmcache==0.5.7.post1" "aiohttp>=3.10" || \
+        pip_in "$LPY" -q "vllm==0.32.0" "lmcache==0.5.7.post1" "aiohttp>=3.10" ninja || \
             echo "WARNING: vLLM 0.32.0 and LMCache 0.5.7.post1 did not install together; the LMCache reference is left out"
     fi
     "$LPY" -c "import vllm, lmcache; print(f'   vllm {vllm.__version__}, lmcache {lmcache.__version__}')" || \
