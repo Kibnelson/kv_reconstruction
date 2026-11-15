@@ -68,7 +68,8 @@ class IndependentLoginTests(unittest.TestCase):
             e=c['env']
             self.assertEqual(c['pin'],self.pin)
             self.assertEqual(e['KVPD_BRANCH'],BRANCH)
-            self.assertEqual(e['KVPD_ROOT'],f"/tmp/kvpd-t-matched-{pwd.getpwuid(os.getuid()).pw_name}")
+            username=pwd.getpwuid(os.getuid()).pw_name
+            self.assertEqual(e['KVPD_ROOT'],f"/tmp/{username}/kvpd-t-matched-{username}")
             self.assertNotIn('KVPD_SETUP_CMD',e)
             self.assertNotIn('RUNS',e);self.assertNotIn('CODECS',e)
             self.assertEqual((e['TRITON_INTERPRET'],e['PD_MATRIX_ROUNDS'],e['KVPD_SPECS']),('0','1','1'))

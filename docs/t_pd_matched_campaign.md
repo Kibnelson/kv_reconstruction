@@ -66,11 +66,13 @@ The launcher checks your Git author identity before allocating GPUs. If it is mi
 |---|---|
 | Source clone | `~/kv_t_pd_independent` |
 | tmux server / session | `kvpd-t-matched` / `smoke` |
-| Node-local code, runtime, package/model cache and evidence | `/tmp/kvpd-t-matched-$USER/` |
+| Node-local code, runtime, package/model cache and evidence | `/tmp/$USER/kvpd-t-matched-$USER/` |
 | Saved state, login log and stage status | `~/.kvpd_t_matched/campaigns/<tag>/` |
 | Published results | `evidence/experiment/t-pd-matched-campaign-v1/...` |
 
 The launcher discards inherited campaign hooks, paths and benchmark overrides, then selects our matrix, root and settings explicitly. Code, model and package cache, runtime, logs, campaign tags and GPU allocation belong to this campaign. A physical cluster and its scheduler can still be shared. The smoke run requests four GPUs, 16 CPUs and 192 GB RAM for up to six hours; the other stages request their own small allocations. A first setup downloads into our own cache, and disk preflight still applies.
+
+For user `nbore`, the default root is `/tmp/nbore/kvpd-t-matched-nbore`. `T_PD_ROOT` explicitly overrides it. Older campaigns retain the root in their saved `state.sh`; close them out using that recorded location. The default change applies to new campaigns and does not relocate existing records.
 
 To detach, press `Ctrl-b`, then `d`. To reconnect from your computer:
 
