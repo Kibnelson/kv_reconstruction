@@ -8,4 +8,4 @@ The six Fast T/head-width experiment modules are copied unchanged from `experime
 
 The allocation setup must pass captured GPU exact-word checks at 8,192 and 3,000 tokens, all-BF16-pattern compiled kernel checks, parity controls and four fresh GPU receiver processes. Actual vLLM engine startup, serving correctness, latency, throughput, goodput, compression and memory behavior remain unmeasured for this fork. A failed or skipped method cannot pass declared comparison coverage. Smoke cannot pass the full repeated-comparison gate.
 
-No original experiment or baseline branch is merged or overwritten. See `docs/t_pd_matched_campaign.md` for the separate-worktree login command and interpretation limits.
+No original experiment or baseline branch is merged or overwritten. See `docs/t_pd_matched_campaign.md` for our own SSH login, dedicated tmux server, standalone clone and separate runtime/cache command. The additional independent-launcher checks are recorded in `independent_login_validation.json` and `independent_login_tests.txt`.

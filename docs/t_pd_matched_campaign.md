@@ -1,8 +1,8 @@
-# Fast and Compact T in the other team's PD campaign
+# Fast and Compact T in our independent PD campaign
 
 Our isolated source branch is `experiment/t-pd-matched-campaign-v1`. It starts from the other team's `pd-baselines` commit `313bc6de96c750a4a297a1a2e7610b9ac464cd90`. The original NUC T results, T source branch, RTX setup branch, `pd-baselines` and `main` stay separate. This is a new GPU experiment; no live serving result is claimed before its campaign runs.
 
-## What is shared
+## What is matched
 
 The fork includes their engine-startup, NIXL import, nvCOMP stream, benchmark timeout and failed-log retention fixes through that pin. Their earlier job 30163 did not complete a serving comparison, so it is not a successful performance reference.
 
@@ -32,45 +32,56 @@ The added family gets freshly calibrated states, not the NUC's frozen state file
 - Correctness transfers verify reconstructed checksums and compare every installed paged-cache word against the decoded words. Timed serving sweeps retain the inherited verification setting; correctness checks and receiver proofs are separate evidence. The transfer logs also report aligned codec blob plus JSON header bytes, alongside the inherited payload-only bits. Control handshakes are separate from that codec frame.
 - `review/matched_comparison.json` checks required methods, actual installs, completed versus requested counts, failed requests, skips, metric fields and repeat coverage. Its companion `matched_comparison.md` aggregates the available repeats by median and keeps shared-codec and nvCOMP engine groups separate. Use this report for repeated comparisons; the inherited matrix renderer was designed for single-pass runs. A published failure remains a failure. Smoke never sets `full_repeated_comparison_validated` true. No result triggers a merge.
 
-## Login-host command
+## Our own login, tmux and checkout
 
-Run this in tmux on the same Slurm login host used by the other team. It creates a separate home worktree, so the other team's checkout stays at its own pin. The run stage requests four GPUs for up to six hours for smoke. Closeout stages use their existing small allocations. The cache is reused, while the code, campaign tag, runtime job ID and evidence branch are distinct.
+Start from your computer using your own SSH account. Replace `YOUR_USER@YOUR_LOGIN_HOST` with your cluster login address. This address has not been supplied here; no account or SSH login has been created or tested by this change. The account needs GitHub SSH access and permission to submit four-GPU Slurm jobs. The login host needs Git, tmux, Slurm and your own uv CLI. The default Slurm project is `oana2026` on `gpu-grad-01`; set `T_PD_ACCOUNT`, `T_PD_NODE`, `T_PD_PARTITION` and `T_PD_QOS` for your account if needed.
 
 ```bash
-bash <<'LOGIN'
-set -Eeuo pipefail
-umask 077
-trap 'printf "T PD CAMPAIGN STOPPED: line=%s exit=%s; output is kept\n" "$LINENO" "$?" >&2' ERR
-test -z "${SLURM_JOB_ID:-}"
-cd "$HOME/kv_reconstruction"
-export KVPD_BRANCH=experiment/t-pd-matched-campaign-v1
-git fetch -q --no-tags origin "$KVPD_BRANCH"
-export KVPD_PIN=$(git rev-parse FETCH_HEAD)
-WORKTREE="$HOME/kv_pd_t_matched_v1"
-if [ ! -e "$WORKTREE" ]; then
-    git worktree add --detach "$WORKTREE" "$KVPD_PIN"
-fi
-cd "$WORKTREE"
-test -z "$(git status --porcelain --untracked-files=normal)"
-git switch -q --detach "$KVPD_PIN"
-test "$(git ls-remote origin "refs/heads/$KVPD_BRANCH" | awk '{print $1}')" = "$KVPD_PIN"
-export KVPD_MATRIX=smoke
-export PD_MATRIX_ROUNDS=1 KVPD_SPECS=1
-unset RUNS
-export KVPD_TAG="pd_${KVPD_MATRIX}_tmatched_$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "$HOME/.kvpd_campaigns"
-STATE="$HOME/.kvpd_campaigns/$KVPD_TAG.sh"
-printf 'export KVPD_BRANCH=%q\nexport KVPD_PIN=%q\nexport KVPD_TAG=%q\n' \
-    "$KVPD_BRANCH" "$KVPD_PIN" "$KVPD_TAG" > "$STATE"
-printf 'PIN=%s\nTAG=%s\nSTATE=%s\n' "$KVPD_PIN" "$KVPD_TAG" "$STATE"
-for STAGE in create run cleanup verify-cleanup review publish; do
-    bash scripts/pd_card.sh "$STAGE" "$KVPD_PIN" "$KVPD_TAG"
-done
-echo "Campaign published; review/matched_comparison.json records its coverage and validation."
-LOGIN
+ssh -t YOUR_USER@YOUR_LOGIN_HOST
 ```
 
-Send the `PUBLISHED evidence/experiment/t-pd-matched-campaign-v1/...` line for review. Publication adds only the campaign evidence in a new results branch. The source branch is unchanged by measured runs. If a stage stops, retain its saved state and use the inherited closeout stages from this worktree at the saved pin. A later full comparison is a new tag and one selected matrix: `ring1p3d`, `ring2p2d`, `direct`, `tier` or `t2eager`.
+On that login, create our dedicated tmux server and session. Its socket is `kvpd-t-matched` and its session is `smoke`. GPU jobs keep running there when you disconnect.
+
+```bash
+tmux -L kvpd-t-matched -f /dev/null new-session -s smoke
+```
+
+Inside this new session, make our standalone clone and run our launcher. The sparse checkout keeps historical benchmark bundles out of the home directory. This is a fresh clone with its own Git metadata. The source tree is pinned before any allocation.
+
+```bash
+git clone --filter=blob:none --single-branch --no-checkout \
+    --branch experiment/t-pd-matched-campaign-v1 \
+    git@github.com:Kibnelson/kv_reconstruction.git "$HOME/kv_t_pd_independent" &&
+cd "$HOME/kv_t_pd_independent" &&
+git sparse-checkout init --no-cone &&
+git sparse-checkout set --no-cone '/*' '!/benchmark_results/' \
+    '!/benchmark_fixtures/team_transfer_smol_replay_v1/' &&
+git switch --detach HEAD &&
+bash scripts/run_t_pd_independent.sh smoke
+```
+
+The launcher checks your Git author identity before allocating GPUs. If it is missing, configure it in this clone with `git config user.name "Your Name"` and `git config user.email "your-real-email"`, then rerun `bash scripts/run_t_pd_independent.sh smoke`. If your uv executable is outside PATH and `~/.local/bin/uv`, set `T_PD_UV` to its absolute path. Models and Python environments are installed by our own allocated setup.
+
+| Component | Our location |
+|---|---|
+| Source clone | `~/kv_t_pd_independent` |
+| tmux server / session | `kvpd-t-matched` / `smoke` |
+| Node-local code, runtime, package/model cache and evidence | `/tmp/kvpd-t-matched-$USER/` |
+| Saved state, login log and stage status | `~/.kvpd_t_matched/campaigns/<tag>/` |
+| Published results | `evidence/experiment/t-pd-matched-campaign-v1/...` |
+
+The launcher discards inherited campaign hooks, paths and benchmark overrides, then selects our matrix, root and settings explicitly. Code, model and package cache, runtime, logs, campaign tags and GPU allocation belong to this campaign. A physical cluster and its scheduler can still be shared. The smoke run requests four GPUs, 16 CPUs and 192 GB RAM for up to six hours; the other stages request their own small allocations. A first setup downloads into our own cache, and disk preflight still applies.
+
+To detach, press `Ctrl-b`, then `d`. To reconnect from your computer:
+
+```bash
+ssh -t YOUR_USER@YOUR_LOGIN_HOST \
+    'tmux -L kvpd-t-matched attach-session -t smoke'
+```
+
+The launcher prints `STATE=...` and `LOG=...`, and keeps a `status.txt` beside them. If a stage stops, those files remain. For closeout, source the printed state file in our session and use the saved pin, for example `bash scripts/pd_card.sh cleanup "$KVPD_PIN" "$KVPD_TAG"`, then `verify-cleanup`, `review` and `publish`. A run tag is single-use. A later full comparison uses a new tag and one selected matrix: `ring1p3d`, `ring2p2d`, `direct`, `tier` or `t2eager`; choose `T_PD_ROUNDS=3` only after smoke establishes an allocation that fits.
+
+Send the `PUBLISHED evidence/experiment/t-pd-matched-campaign-v1/...` line for review. Publication adds only the campaign evidence in a new results branch. The source branch is unchanged by measured runs.
 
 ## Interpretation limits
 
