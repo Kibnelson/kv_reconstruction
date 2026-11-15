@@ -259,3 +259,35 @@ Relevant primary sources:
 - [CUDA 12.8 memory API reference](https://docs.nvidia.com/cuda/archive/12.8.2/cuda-runtime-api/group__CUDART__MEMORY.html)
   defines `cudaMemcpyPeer`. Its name alone is not proof of the physical path;
   this diagnostic explicitly enables peer access and records the controls.
++
+
+### Job 30224: destination retains the complete poison pattern
+
+The supplied report for source `470cc96ef20b3a00ac30f5f574942d91ab3b9cd5`,
+job 30224, confirms that all four tested `cudart_peer` directions ended with
+all 67,108,864 destination bytes equal to the initial poison pattern. The
+source-preservation check passed in each case. Both peer-enable calls
+reported success, and the capability matrices reported OK. This is failed
+data-integrity evidence despite successful API/capability responses.
+
+The reported kernel is `6.8.0-124-generic`; the GPUs have IOMMU groups 55,
+30, 31 and 32. The report has no explicit relevant boot flags. Group presence
+and absent flags do not establish whether the GPUs use translated default
+domains or identity domains, nor do they establish the cause of the failure.
+
+The next check is read-only inspection of each GPU group's `type` on
+`gpu-grad-01`, plus whether the node is virtualized. The Linux ABI defines
+`DMA` and `DMA-FQ` as translated domains and `identity` as untranslated.
+NVIDIA documents limitations for Linux bare-metal PCIe P2P with IOMMU
+translation and explains that an OK capability matrix does not prove a
+working transfer. If translated domains are reported, that warrants
+administrator investigation; causality still needs a controlled repair
+and exact retest. Do not change kernel parameters or PCI registers through
+this campaign. The full campaign's existing survey gate remains enforced.
+
+[Recorded observations and review](../benchmark_results/t_pd_gpu_job30224_20261115/review.md)
+are transcribed from the user's supplied output; the full `share.zip` has
+not been independently retrieved. No codec, transport, gate or node setting
+was changed for this review.
+
+

@@ -1,0 +1,101 @@
+{
+  "format": "t_pd_gpu_copy_user_report_v1",
+  "evidence_origin": "user-supplied console output; full share.zip not independently retrieved",
+  "pin": "470cc96ef20b3a00ac30f5f574942d91ab3b9cd5",
+  "job": "30224",
+  "attempt": "links_20261115T170655Z_720208",
+  "status": "failed",
+  "kernel": "6.8.0-124-generic",
+  "relevant_boot_flags": [],
+  "iommu_group_count": 122,
+  "gpu_iommu_groups": [
+    {
+      "reported_pci_row_order": 0,
+      "pci_bus_id": "0000:06:00.0",
+      "iommu_group": "55",
+      "domain_type": "not yet read"
+    },
+    {
+      "reported_pci_row_order": 1,
+      "pci_bus_id": "0000:45:00.0",
+      "iommu_group": "30",
+      "domain_type": "not yet read"
+    },
+    {
+      "reported_pci_row_order": 2,
+      "pci_bus_id": "0000:46:00.0",
+      "iommu_group": "31",
+      "domain_type": "not yet read"
+    },
+    {
+      "reported_pci_row_order": 3,
+      "pci_bus_id": "0000:47:00.0",
+      "iommu_group": "32",
+      "domain_type": "not yet read"
+    }
+  ],
+  "p2p_read_capability_all_off_diagonal_ok": true,
+  "p2p_write_capability_all_off_diagonal_ok": true,
+  "cases": [
+    {
+      "src": 0,
+      "dst": 1,
+      "bytes": 67108864,
+      "mismatched_bytes": 67108864,
+      "untouched_poison_bytes": 67108864,
+      "first_expected": 207,
+      "first_received": 48,
+      "source_unchanged": true,
+      "peer_enable_both_directions": "enabled"
+    },
+    {
+      "src": 1,
+      "dst": 0,
+      "bytes": 67108864,
+      "mismatched_bytes": 67108864,
+      "untouched_poison_bytes": 67108864,
+      "first_expected": 167,
+      "first_received": 88,
+      "source_unchanged": true,
+      "peer_enable_both_directions": "enabled"
+    },
+    {
+      "src": 1,
+      "dst": 2,
+      "bytes": 67108864,
+      "mismatched_bytes": 67108864,
+      "untouched_poison_bytes": 67108864,
+      "first_expected": 154,
+      "first_received": 101,
+      "source_unchanged": true,
+      "peer_enable_both_directions": "enabled"
+    },
+    {
+      "src": 2,
+      "dst": 1,
+      "bytes": 67108864,
+      "mismatched_bytes": 67108864,
+      "untouched_poison_bytes": 67108864,
+      "first_expected": 64,
+      "first_received": 191,
+      "source_unchanged": true,
+      "peer_enable_both_directions": "enabled"
+    }
+  ],
+  "interpretations": {
+    "destination_final_contents_match_initial_poison": true,
+    "api_success_did_not_establish_correct_copy": true,
+    "iommu_translation_mode_known": false,
+    "hardware_cause_established": false,
+    "direct_pd_validated": false,
+    "serving_or_codec_performance_validated": false
+  },
+  "changes": {
+    "system_settings": false,
+    "codecs": false,
+    "transports": false,
+    "campaign_gates": false
+  },
+  "assistant_executed_gpu_tests": false,
+  "logical_cuda_to_pci_mapping": "Not included in the supplied excerpt; PCI row order is not asserted to be logical CUDA order."
+}
