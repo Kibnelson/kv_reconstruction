@@ -514,6 +514,14 @@ if args[:2] == ["bench", "serve"]:
     sys.exit(0)
 assert args[0] == "serve", args
 port = int(args[args.index("--port") + 1])
+if os.environ.get("FAKE_DIE"):
+    print("INFO starting")
+    print("Traceback (most recent call last):")
+    print('  File "core.py", line 1, in <module>')
+    print("ValueError: the root cause of the stand-in")
+    print("Traceback (most recent call last):")
+    print("RuntimeError: Engine core initialization failed. See root cause above.")
+    sys.exit(1)
 cfg = json.loads(args[args.index("--kv-transfer-config") + 1])
 log = os.environ.get("FAKE_LOG")
 with open(log, "a") as f:
@@ -591,7 +599,9 @@ class RunnerDryRunTests(unittest.TestCase):
             (b / "python").write_text(f'#!/usr/bin/env bash\nPYTHONPATH="{stub}:${{PYTHONPATH:-}}" exec {sys.executable} "$@"\n')
             (b / "vllm").write_text(FAKE_VLLM.replace("#!/usr/bin/env python3", f"#!{sys.executable}"))
         (self.kv / "venv_vllm" / "lib").mkdir()
-        (stub / "nixl.py").write_text("")
+        (stub / "nixl").mkdir()                    # NIXL's module as vLLM imports it: nixl._api.nixl_agent
+        (stub / "nixl" / "__init__.py").write_text("")
+        (stub / "nixl" / "_api.py").write_text("nixl_agent = object\n")
         for f in list(bindir.iterdir()) + list((self.kv / "venv_vllm" / "bin").iterdir()) + \
                 list((self.kv / "venv_lmcache" / "bin").iterdir()):
             f.chmod(0o755)
@@ -658,6 +668,14 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertEqual(eng[0]["env"]["LMCACHE_MAX_LOCAL_CPU_SIZE"], "8")
         r, _ = self.run_pd(LAYOUT="colo4", CONNECTOR="nixl")
         self.assertIn("NIXL needs prefill and decode engines", r.stdout)
+
+    def test_an_engine_that_dies_at_start_is_packaged(self):
+        r, _ = self.run_pd(LAYOUT="1p3d", CODECS="raw", FAKE_DIE="1")
+        self.assertIn("did not all come up", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
+        self.assertIn("ValueError: the root cause of the stand-in", r.stdout)
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_*_partial"))
+        self.assertEqual(len(out), 1)
+        self.assertIn("the root cause", (out[0] / "engine_prefill1.log").read_text())
 
     def test_matrix_runs_each_and_reports_once(self):
         import os

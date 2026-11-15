@@ -86,7 +86,11 @@ ENV_DIR=$KV_HOME/venv_vllm
 VPY=$ENV_DIR/bin/python
 [ -x "$VPY" ] || { echo "STOP: no $ENV_DIR: run scripts/pd_setup.sh first"; exit 1; }
 [ "$CONNECTOR" != tkv ] || [ -s "$RUN/pd_codecs.pt" ] || { echo "STOP: no $RUN/pd_codecs.pt: run scripts/pd_setup.sh first"; exit 1; }
-[ "$CONNECTOR" != nixl ] || "$VPY" -c "import nixl" 2>/dev/null || { echo "STOP: no NIXL in $ENV_DIR (scripts/pd_setup.sh)"; exit 1; }
+if [ "$CONNECTOR" = nixl ] && ! "$VPY" -c "import torch; from nixl._api import nixl_agent" 2>/dev/null; then
+    echo "STOP: NIXL does not import in $ENV_DIR (scripts/pd_setup.sh):"
+    "$VPY" -c "import torch; from nixl._api import nixl_agent" 2>&1 | tail -n 3 || true
+    exit 1
+fi
 # the GPUs this job may use, in Slurm's order: CUDA_VISIBLE_DEVICES as Slurm set it (0..N-1 where the node confines
 # jobs to their devices, as gpu-grad-01 does; the physical ids elsewhere), else every GPU nvidia-smi lists. Engine i
 # gets the i-th of them, never a bare index that could be another job's card.
@@ -314,15 +318,30 @@ echo "== waiting for the engines"
 ENGINE_PORTS=()
 for ((i = 1; i <= NUM_PREFILL; i++)); do ENGINE_PORTS+=($((PORT_BASE + 100 + i))); done
 for ((i = 1; i <= NUM_DECODE; i++)); do ENGINE_PORTS+=($((PORT_BASE + 200 + i))); done
+root_cause() {   # the first error of an engine log: vLLM's last traceback only says "See root cause above"
+    local f=$1 first
+    echo "---- $f"
+    grep -n -E "^(ERROR|CRITICAL)|Error:|Exception:|Fatal Python error|Segmentation fault|out of memory" "$f" | head -n 12 || true
+    first=$(grep -n -m 1 "Traceback (most recent call last)" "$f" | cut -d: -f1 || true)
+    if [ -n "$first" ]; then echo "  (first traceback, line $first)"; sed -n "${first},$((first + 45))p" "$f"; fi
+}
+ENGINES_UP=1
 for port in "${ENGINE_PORTS[@]}"; do
     for _ in $(seq 1 180); do
         curl -sf "http://127.0.0.1:$port/health" >/dev/null && break
-        for p in "${PIDS[@]}"; do kill -0 "$p" 2>/dev/null || { echo "STOP: an engine exited; tail of its logs:";
-            tail -n 40 "$OUT"/engine_*.log; exit 1; }; done
+        dead=0
+        for p in "${PIDS[@]}"; do kill -0 "$p" 2>/dev/null || dead=1; done
+        [ "$dead" = 1 ] && break
         sleep 5
     done
-    curl -sf "http://127.0.0.1:$port/health" >/dev/null || { echo "STOP: engine on port $port not up in 15 min"; exit 1; }
+    if ! curl -sf "http://127.0.0.1:$port/health" >/dev/null; then
+        ENGINES_UP=0
+        echo "STOP: the engines did not all come up (port $port); the first error of each log:"
+        for f in "$OUT"/engine_*.log; do root_cause "$f"; done
+        break
+    fi
 done
+if [ "$ENGINES_UP" = 1 ]; then
 grep -h "TKVConnector worker ready\|GPU KV cache size\|not available\|failed its warm-up" "$OUT"/engine_*.log | sed 's/^/   /' || true
 PROXY=http://127.0.0.1:$PORT_BASE
 nohup "$VPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_ARGS[@]}" \
@@ -352,6 +371,9 @@ PYTHONPATH=$REPO "$VPY" -u scripts/pd_bench.py --proxy "$PROXY" --model "$MP" --
     --tier-max-turns "$TIER_MAX_TURNS" --tier-control "$TIERFILE" 2>&1 | tee "$OUT/bench.log"
 STATUS=${PIPESTATUS[0]}
 set -e
+else
+    STATUS=1                       # packaged below all the same: the engine logs are the evidence
+fi
 cleanup
 trap - EXIT
 
@@ -365,7 +387,10 @@ for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_ma
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
 cp "$OUT"/runs/*.json "$DEST/runs/" 2>/dev/null || true
-for f in "$OUT"/engine_*.log; do tail -n 400 "$f" > "$DEST/$(basename "$f")"; done
+for f in "$OUT"/engine_*.log; do      # whole when small (a failed start), else its start and its end
+    if [ "$(stat -c %s "$f")" -lt 4000000 ]; then cp "$f" "$DEST/"
+    else { head -n 300 "$f"; echo "[... $(wc -l < "$f") lines in all ...]"; tail -n 400 "$f"; } > "$DEST/$(basename "$f")"; fi
+done
 gzip -c "$OUT/proxy.jsonl" > "$DEST/proxy.jsonl.gz" 2>/dev/null || true
 for f in "$LOGS"/*.jsonl; do [ -f "$f" ] && gzip -c "$f" > "$DEST/connector/$(basename "$f").gz"; done
 cp "$RUN"/pd_selftest*.json "$DEST/" 2>/dev/null || true

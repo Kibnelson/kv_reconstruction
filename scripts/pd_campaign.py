@@ -480,6 +480,7 @@ def stage_run(p, a, job):
         "TORCH_EXTENSIONS_DIR": str(home / "cache" / "torch_extensions"),
         "VLLM_CONFIG_ROOT": str(home / "config" / "vllm"), "VLLM_NO_USAGE_STATS": "1", "DO_NOT_TRACK": "1",
         "HF_HUB_DISABLE_TELEMETRY": "1", "MPLCONFIGDIR": str(home / "mpl"),
+        "PYTHONFAULTHANDLER": "1",          # a native crash (nvCOMP's, ExANS's) prints where it happened
         "FLASHINFER_WORKSPACE_BASE": str(home / "cache"), "PD_CARD": "1", "RESULTS_ROOT": str(ev / "matrix"),
         "MATRIX": a.matrix, "RUNS": ";".join(m["runs"]),     # exactly the runs create recorded
     }
@@ -502,6 +503,8 @@ def stage_run(p, a, job):
     # what the node is while this campaign runs (other jobs share it): GPUs, PCIe, every link measured
     specs = os.environ.get("KVPD_SPECS_CMD", "python3 -u scripts/node_specs.py --output "
                            f"{sh_quote(ev / 'node_specs')} --kv-home \"$KV_HOME\"")
+    if os.environ.get("KVPD_SPECS", "1") == "0":
+        specs = "echo 'KVPD_SPECS=0: no node specs this run'"
     matrix = os.environ.get("KVPD_MATRIX_CMD", "bash scripts/pd_matrix.sh")
     for name, cmd in (("setup", setup), ("specs", specs), ("matrix", matrix)):
         write_text(ev / f"node_{name}.sh", f"set -Eeuo pipefail\numask 077\ncd {sh_quote(p.tools)}\n{cmd}\n")
@@ -553,7 +556,7 @@ def collect(p, runtime, ev):
             rel = f.relative_to(runtime)
             dst = out / "__".join(rel.parts)
             shutil.copyfile(f, dst)
-    for f in home.glob("ibp*_build.log"):
+    for f in home.glob("*.log"):              # the builds' and installers' logs (IBP, the CUDA 13 toolkit)
         lines = f.read_text(errors="replace").splitlines()[-300:]
         write_text(out / f"{f.stem}_tail.log", "\n".join(lines) + "\n")
     sizes = du_bytes([p.cache / "uv", p.cache / "python", p.cache / "hf", p.cache / "cuda13", runtime])

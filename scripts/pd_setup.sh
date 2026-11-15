@@ -66,9 +66,12 @@ fi
 # nvCOMP's CUDA 13 build (the baseline codecs nvcomp-<alg>) beside vLLM's torch, and NIXL (vLLM's NixlConnector)
 "$VPY" -c "from nvidia import nvcomp" 2>/dev/null || pip_in "$VPY" -q "nvidia-nvcomp-cu13==6.0.0.12" || \
     echo "WARNING: nvCOMP did not install in the vLLM environment; the nvcomp codecs are left out"
-if [ "${NIXL:-1}" = 1 ] && ! "$VPY" -c "import nixl" 2>/dev/null; then
-    pip_in "$VPY" -q "nixl-cu13==1.5.2" || pip_in "$VPY" -q "nixl==1.5.2" || \
-        echo "WARNING: NIXL did not install; the NIXL reference runs are left out"
+# NIXL 1.5.2 is two wheels: nixl-cu13 (the library, module nixl_cu13) and nixl (the module vLLM imports, which picks
+# nixl_cuXX by torch's CUDA). The nixl wheel requires nixl-cu12 too: --no-deps keeps CUDA 12's copy out.
+if [ "${NIXL:-1}" = 1 ] && ! "$VPY" -c "from nixl._api import nixl_agent" 2>/dev/null; then
+    pip_in "$VPY" -q "nixl-cu13==1.5.2" && pip_in "$VPY" -q --no-deps "nixl==1.5.2" || true
+    "$VPY" -c "import torch; from nixl._api import nixl_agent; print('   NIXL 1.5.2 (nixl_cu13)')" 2>&1 | tail -n 3 || \
+        echo "WARNING: NIXL does not import (above); the NIXL reference runs are left out"
 fi
 "$VPY" - <<'EOF'
 import torch, triton, vllm, transformers
@@ -121,8 +124,14 @@ if [ "${IBP:-1}" = 1 ]; then
                 find "$TK13"/ -name 'lib*_static*.a' ! -name 'libcudart_static.a' -delete 2>/dev/null || true
                 du -sh "$TK13" | sed 's/^/   CUDA 13 toolkit: /'
             else
-                echo "   WARNING: the CUDA 13 toolkit did not install"
+                echo "   WARNING: the CUDA 13 toolkit did not install (its log: $KV_HOME/cuda13_installer.log)"
                 rm -rf "$TK13"
+            fi
+            # the installer logs to /tmp/cuda-installer.log whatever --tmpdir says: kept with ours, and not left in /tmp
+            if [ -f /tmp/cuda-installer.log ] && [ -O /tmp/cuda-installer.log ]; then
+                cp /tmp/cuda-installer.log "$KV_HOME/cuda13_installer.log" && rm -f /tmp/cuda-installer.log
+                grep -i -E "error|fail|cannot|not enough|unsupported" "$KV_HOME/cuda13_installer.log" | tail -n 8 | \
+                    sed 's/^/   installer: /' || true
             fi
             rm -rf "$KV_HOME/tmp/cuda13.run" "$KV_HOME"/tmp/cuda-installer* "$KV_HOME"/tmp/cuda_* 2>/dev/null || true
         fi

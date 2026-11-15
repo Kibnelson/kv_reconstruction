@@ -120,7 +120,9 @@ class CardTests(unittest.TestCase):
         stub = self.tmp / "stub"
         (stub / "vllm").mkdir(parents=True)
         (stub / "vllm" / "__init__.py").write_text("__version__ = '0.32.0'\n")
-        (stub / "nixl.py").write_text("")
+        (stub / "nixl").mkdir()                    # NIXL's module as vLLM imports it: nixl._api.nixl_agent
+        (stub / "nixl" / "__init__.py").write_text("")
+        (stub / "nixl" / "_api.py").write_text("nixl_agent = object\n")
         vllm = FAKE_VLLM.replace("#!/usr/bin/env python3", f"#!{sys.executable}")
         for name, text in (("srun", FAKE_SRUN), ("sacct", FAKE_SACCT), ("nvidia-smi", FAKE_SMI), ("vllm", vllm),
                            ("uv", "#!/usr/bin/env bash\necho 'uv 0.0.0 (stand-in)'\n"), ("fake_setup", FAKE_SETUP)):

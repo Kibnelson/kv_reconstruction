@@ -340,19 +340,40 @@ class Nvcomp:
                                   cuda_stream=self.stream.cuda_stream, **opts)
         self.version = getattr(nvcomp, "__version__", None)
 
+    # nvCOMP works on its own stream (self.stream, fixed when the Codec is made) and owns its output arrays: the
+    # input is ready on the caller's stream before nvCOMP reads it, and every output is copied into a tensor of our
+    # own, after nvCOMP's stream finished and while nvCOMP's array is still referenced (a view of a freed nvCOMP
+    # buffer is what a crash in a later copy looks like).
+    def _enter(self):
+        self.stream.wait_stream(torch.cuda.current_stream(self.device))
+
+    def _leave(self):
+        torch.cuda.current_stream(self.device).wait_stream(self.stream)
+
     def encode(self, words, pos0=0):
         L, T, W = words.shape
         raw = words.contiguous().view(torch.uint8).reshape(-1)
-        enc = self.codec.encode(self.nv.as_array(raw, cuda_stream=self.stream.cuda_stream))
+        self._enter()
+        arr = self.nv.as_array(raw, cuda_stream=self.stream.cuda_stream)
+        enc = self.codec.encode(arr)
         size = getattr(enc, "buffer_size", None)
         n = int(size if size is not None else enc.size * enc.item_size)
-        coded = torch.from_dlpack(enc).reshape(-1).view(torch.uint8)[:n].clone()
+        self._leave()
+        view = torch.from_dlpack(enc).reshape(-1).view(torch.uint8)
+        coded = view[:n].clone()
+        del view, enc, arr
         return {"coded": coded}, {"codec": self.name, "T": int(T), "L": int(L), "W": int(W), "nvcomp": self.version}
 
     def decode(self, parts, meta, sink):
         L, T, W = int(meta["L"]), int(meta["T"]), int(meta["W"])
-        arr = self.nv.as_array(parts["coded"].contiguous(), cuda_stream=self.stream.cuda_stream)
-        dec = torch.from_dlpack(self.codec.decode(arr)).contiguous().reshape(-1).view(torch.uint8)
+        src = parts["coded"].contiguous()
+        self._enter()
+        arr = self.nv.as_array(src, cuda_stream=self.stream.cuda_stream)
+        out = self.codec.decode(arr)
+        self._leave()
+        view = torch.from_dlpack(out)
+        dec = view.contiguous().reshape(-1).view(torch.uint8).clone()
+        del view, out, arr
         if dec.numel() != L * T * W * 2:
             raise ValueError(f"nvCOMP decoded {dec.numel()} bytes, expected {L * T * W * 2}")
         w = dec.view(torch.int16).view(L, T, W)
