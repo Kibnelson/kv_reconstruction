@@ -42,10 +42,11 @@ KIND = "kvpd_campaign"
 MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager")
 # Disk (GB) on the node's root file system, which /tmp is: the shared cache's parts when missing, then a job's peak.
 # Measured sizes go into disk_after.json; these only decide whether to start.
-NEED_GB = {"uv": 18.0, "python": 0.2, "hf": 7.0}
+NEED_GB = {"uv": 17.0, "python": 0.2, "hf": 6.6}   # measured on gpu-grad-01 (job 30170): 16.7, 0.1, 6.5
 CUDA13_GB = 4.0            # the CUDA 13 toolkit (IBP's build), pruned
 CUDA13_INSTALL_GB = 11.0   # its download and the installer's unpacking, while it installs
-JOB_PEAK_GB = 16.0         # captures (7 GB) and one T2 set's windows (4 GB), environments' own files, caches, logs
+JOB_PEAK_GB = 14.0         # captures without queries (6.6 GB), one T2 set's windows (3.5 GB), the environments' own
+                           # files and caches (5 GB at cleanup, job 30176)
 MARGIN_GB = 10.0           # left free: /tmp is the node's system disk, shared with everyone
 MODEL_DIR = "hub/models--unsloth--Llama-3.2-3B"
 CUDA12_CANDIDATES = ("/usr/local/pkgs/cuda/cuda-12.6", "/usr/local/pkgs/cuda/12.6", "/usr/local/cuda-12.6",

@@ -303,9 +303,9 @@ class DiskPlanTests(unittest.TestCase):
             shutil.disk_usage = orig
 
     def test_choices(self):
-        # nothing cached: 18 + 0.2 + 7 GB, then the job's 16 (with IBP's toolkit: 4 + max(11, 16)); 10 GB stay free
+        # nothing cached: 17 + 0.2 + 6.6 GB, then the job's 14 (with IBP's toolkit: 4 + max(11, 14)); 10 GB stay free
         self.assertTrue(self.plan(58, True)["ibp"])
-        p = self.plan(52, True)
+        p = self.plan(50, True)
         self.assertFalse(p["ibp"])
         self.assertIn("IBP left out", p["note"])
         self.assertIsNone(self.plan(40, False)["ibp"])

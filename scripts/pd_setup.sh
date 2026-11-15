@@ -181,7 +181,8 @@ if [ ! -s "$RUN/captures/wtrain0_K_bits.npy" ] || [ ! -s "$RUN/captures/meta.jso
     [ -s "$KV_HOME/cuda_home" ] && CUDA_HOME_ARG=(--cuda-home "$(cat "$KV_HOME/cuda_home")")
     "$KV_HOME/venv/bin/python" -u scripts/bench_llama_compare.py --device cuda --model "$MODEL_ID" \
         ${REVISION:+--revision "$REVISION"} --output "$RUN" --train-set wikitext \
-        --train-text "$TEXTS/wikitext2_train.txt" --eval-text "$TEXTS/wikitext2.txt" --stages calcap "${CUDA_HOME_ARG[@]}"
+        --train-text "$TEXTS/wikitext2_train.txt" --eval-text "$TEXTS/wikitext2.txt" --stages calcap \
+        --no-queries "${CUDA_HOME_ARG[@]}"   # the queries serve only the lossy fits: 8.5 of the 15 GB (job 30176)
 fi
 
 T2_SETS=${T2_SETS-wikitext,code,math,exam,news}
