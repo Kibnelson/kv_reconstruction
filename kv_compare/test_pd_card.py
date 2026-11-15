@@ -269,6 +269,7 @@ class CardTests(unittest.TestCase):
         r = self.card("run", KVPD_NEED_SCALE="1", KVPD_MARGIN_GB="100000")
         self.assertEqual(r.returncode, 2)
         self.assertIn("KVPD_RUN_STATUS=stopped", r.stdout)
+        self.assertIn("why: disk:", r.stdout)
         ev = self.node / "kvpd-evidence" / self.tag / "repo" / "benchmark_results" / "pd_card" / self.tag
         plan = json.loads((ev / "disk_plan.json").read_text())
         self.assertTrue(plan["ibp_wanted"])

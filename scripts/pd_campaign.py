@@ -436,6 +436,10 @@ def stage_run(p, a, job):
         write_json(ev / "run.json", rec)
         log(f"KVPD_RUN_JOB={job}")
         log(f"KVPD_RUN_STATUS={status}")
+        if extra.get("reason"):
+            log(f"   why: {extra['reason']}")
+        for size, path in extra.get("largest_under_root") or []:
+            log(f"   {size:>8}  {path}")
         log("next: cleanup, then verify-cleanup (each in its own allocation)")
         return code
 
