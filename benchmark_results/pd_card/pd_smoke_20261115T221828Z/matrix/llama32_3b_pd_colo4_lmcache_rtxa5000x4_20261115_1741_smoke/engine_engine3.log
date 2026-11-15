@@ -1,0 +1,927 @@
+(APIServer pid=4159351) INFO 11-15 17:42:18 [api_utils.py:347] 
+(APIServer pid=4159351) INFO 11-15 17:42:18 [api_utils.py:347]        █     █     █▄   ▄█
+(APIServer pid=4159351) INFO 11-15 17:42:18 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.32.0
+(APIServer pid=4159351) INFO 11-15 17:42:18 [api_utils.py:347]   █▄█▀ █     █     █     █  model   /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+(APIServer pid=4159351) INFO 11-15 17:42:18 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=4159351) INFO 11-15 17:42:18 [api_utils.py:347] 
+(APIServer pid=4159351) INFO 11-15 17:42:18 [api_utils.py:286] non-default args: {'model_tag': '/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', 'chat_template': '/tmp/nbore/kvpd-tools/99f47fc2e0b3e3501176134e0ee2c85bd1ba9b3c/scripts/pd_chat_template.jinja', 'host': '127.0.0.1', 'port': 26203, 'model': '/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', 'max_model_len': 4096, 'served_model_name': ['llama'], 'distributed_executor_backend': 'uni', 'block_size': 16, 'gpu_memory_utilization': 0.65, 'num_gpu_blocks_override': 300, 'max_num_batched_tokens': 4096, 'kv_transfer_config': KVTransferConfig(kv_connector='LMCacheConnectorV1Dynamic', engine_id='5066e8ac-b588-4506-a35c-7cbbe057b285', kv_buffer_device='cuda', kv_role='kv_both', kv_port=14579, kv_connector_extra_config={}, kv_connector_module_path='lmcache.integration.vllm.lmcache_connector_v1', enable_permute_local_kv=False, kv_load_failure_policy='fail')}
+(APIServer pid=4159351) INFO 11-15 17:42:18 [model.py:733] Resolved architecture: LlamaForCausalLM
+(APIServer pid=4159351) INFO 11-15 17:42:18 [model.py:2152] Using max model len 4096
+(APIServer pid=4159351) INFO 11-15 17:42:18 [scheduler.py:307] Chunked prefill is enabled with max_num_batched_tokens=4096.
+(APIServer pid=4159351) INFO 11-15 17:42:18 [kernel.py:467] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+[32;20m[2026-11-15 17:42:18,406] LMCache INFO:[0m torch_dev=<module 'torch.cuda' from '/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/torch/cuda/__init__.py'>, torch_device_type=cuda [3m(_device_detect.py:311:lmcache.v1.platform._device_detect)[0m
+[32;20m[2026-11-15 17:42:18,407] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[33;20m[2026-11-15 17:42:18,408] LMCache WARNING:[0m lmcache.cuda_ops compiled extension not found; CudaDeviceOps stays on the torch baseline for all ops. [3m(device_ops.py:128:lmcache.v1.platform.devices.cuda.device_ops)[0m
+[32;20m[2026-11-15 17:42:18,551] LMCache INFO:[0m Discovered API module: env_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,571] LMCache INFO:[0m Discovered API module: loglevel_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,571] LMCache INFO:[0m Discovered API module: metrics_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,573] LMCache INFO:[0m Discovered API module: periodic_thread_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,574] LMCache INFO:[0m Discovered API module: run_script_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,575] LMCache INFO:[0m Discovered API module: thread_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,579] LMCache INFO:[0m Discovered API module: backend_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,580] LMCache INFO:[0m Discovered API module: bypass_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,583] LMCache INFO:[0m Discovered API module: cache_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,588] LMCache INFO:[0m Discovered API module: chunk_statistics_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,589] LMCache INFO:[0m Discovered API module: conf_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,590] LMCache INFO:[0m Discovered API module: freeze_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,591] LMCache INFO:[0m Discovered API module: hot_cache_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,591] LMCache INFO:[0m Discovered API module: inference_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,593] LMCache INFO:[0m Discovered API module: load_fs_chunks_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,594] LMCache INFO:[0m Discovered API module: lookup_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,600] LMCache INFO:[0m Discovered API module: key_stats_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:18,601] LMCache INFO:[0m Discovered API module: worker_info_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+(APIServer pid=4159351) WARNING 11-15 17:42:18 [vllm.py:2179] Turning off hybrid kv cache manager because `--kv-transfer-config` selects a KV connector that does not support it. Impact: hybrid SSM models (e.g. Jamba, Bamba) require HMA and will fail at startup without it; models with sliding window attention will run with reduced performance. To add HMA support to a KV connector, subclass `SupportsHMA` defined in kv_connector/v1/base.py (for MultiConnector, all child connectors must support HMA).
+(EngineCore pid=4159628) INFO 11-15 17:42:28 [core.py:133] Initializing a V1 LLM engine (v0.32.0) with config: model='/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', speculative_config=None, tokenizer='/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=4096, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=llama, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::qwen4_exp_ple_short_conv', 'vllm::qwen4_exp_qsa_with_output', 'vllm::qwen4_exp_qsa_prepare_with_output', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::qwen_gdn_attention_core_fused_norm_packed', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'cudagraph_decoder_replay': True, 'decoder_replay_cudagraph_capture_sizes': [], 'decoder_replay_trim_threshold': 768, 'compile_sizes': [], 'compile_ranges_endpoints': [4096], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_rocm_segmented_attn_autotune=False, enable_cutedsl_warmup=True, enable_jit_warmup=True, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=4159628) INFO 11-15 17:42:29 [parallel_state.py:1906] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/nbore/kvpd/30252/home/tmp/vllm_dist_200b15a1ce8a4e3a84fd32ca4c1fdb2f backend=nccl
+(EngineCore pid=4159628) INFO 11-15 17:42:29 [parallel_state.py:2350] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, ETP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=4159628) INFO 11-15 17:42:29 [gpu_worker.py:518] Using V2 Model Runner
+(EngineCore pid=4159628) INFO 11-15 17:42:30 [model_runner.py:392] Loading model from scratch...
+(EngineCore pid=4159628) INFO 11-15 17:42:32 [cuda.py:506] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+(EngineCore pid=4159628) INFO 11-15 17:42:32 [flash_attn.py:1117] Using FlashAttention version 2
+(EngineCore pid=4159628) INFO 11-15 17:42:32 [base_loader.py:82] Initializing model took 2.093751 seconds
+(EngineCore pid=4159628) INFO 11-15 17:42:32 [weight_utils.py:1108] Filesystem type for checkpoints: EXT4. Checkpoint size: 5.98 GiB. Available RAM: 465.43 GiB.
+(EngineCore pid=4159628) INFO 11-15 17:42:32 [weight_utils.py:1131] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:00<00:00,  1.18it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.78it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.65it/s]
+
+(EngineCore pid=4159628) INFO 11-15 17:42:34 [default_loader.py:501] Loading weights took 1.25 seconds
+(EngineCore pid=4159628) INFO 11-15 17:42:35 [model_runner.py:424] Model loading took 6.04 GiB memory and 5.223260 seconds
+(EngineCore pid=4159628) INFO 11-15 17:42:35 [topk_topp_sampler.py:96] FlashInfer top-p/top-k sampling disabled via VLLM_USE_FLASHINFER_SAMPLER=0.
+(EngineCore pid=4159628) INFO 11-15 17:42:35 [torch_utils.py:295] Reducing Torch threads from 16 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
+[32;20m[2026-11-15 17:42:35,740] LMCache INFO:[0m torch_dev=<module 'torch.cuda' from '/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/torch/cuda/__init__.py'>, torch_device_type=cuda [3m(_device_detect.py:311:lmcache.v1.platform._device_detect)[0m
+[32;20m[2026-11-15 17:42:35,740] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[33;20m[2026-11-15 17:42:35,741] LMCache WARNING:[0m lmcache.cuda_ops compiled extension not found; CudaDeviceOps stays on the torch baseline for all ops. [3m(device_ops.py:128:lmcache.v1.platform.devices.cuda.device_ops)[0m
+[32;20m[2026-11-15 17:42:35,889] LMCache INFO:[0m Discovered API module: env_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,907] LMCache INFO:[0m Discovered API module: loglevel_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,907] LMCache INFO:[0m Discovered API module: metrics_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,909] LMCache INFO:[0m Discovered API module: periodic_thread_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,910] LMCache INFO:[0m Discovered API module: run_script_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,910] LMCache INFO:[0m Discovered API module: thread_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,914] LMCache INFO:[0m Discovered API module: backend_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,914] LMCache INFO:[0m Discovered API module: bypass_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,919] LMCache INFO:[0m Discovered API module: cache_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,924] LMCache INFO:[0m Discovered API module: chunk_statistics_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,925] LMCache INFO:[0m Discovered API module: conf_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,926] LMCache INFO:[0m Discovered API module: freeze_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,926] LMCache INFO:[0m Discovered API module: hot_cache_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,927] LMCache INFO:[0m Discovered API module: inference_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,929] LMCache INFO:[0m Discovered API module: load_fs_chunks_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,930] LMCache INFO:[0m Discovered API module: lookup_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,936] LMCache INFO:[0m Discovered API module: key_stats_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+[32;20m[2026-11-15 17:42:35,937] LMCache INFO:[0m Discovered API module: worker_info_api [3m(router_discovery.py:53:lmcache.v1.utils.router_discovery)[0m
+(EngineCore pid=4159628) INFO 11-15 17:42:35 [utils.py:347] Using LBNHC KV cache layout.
+(EngineCore pid=4159628) INFO 11-15 17:42:36 [caching.py:342] reconstructed serializable fn from standalone compile artifacts. num_artifacts=3 num_submods=29
+(EngineCore pid=4159628) INFO 11-15 17:42:36 [decorators.py:319] [backbone] Directly load AOT compilation from path /tmp/nbore/kvpd/30252/home/cache/vllm/torch_compile_cache/torch_aot_compile/69a224124af536f7bc3972897679b1d0b89cc95beefe3b8ab324b25912d8fc3b/rank_0_0/model
+(EngineCore pid=4159628) INFO 11-15 17:42:36 [monitor.py:62] [backbone] torch.compile took 0.16 s in total
+(EngineCore pid=4159628) INFO 11-15 17:42:37 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.15 s
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 10.78it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 11.17it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:03, 11.27it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.36it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 11.67it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:03, 11.91it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:03, 12.12it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.24it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:01<00:02, 13.78it/s]Capturing CUDA graphs (PIECEWISE):  39%|███▉      | 20/51 [00:01<00:02, 15.14it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:01<00:01, 16.18it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:01<00:01, 17.05it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:01<00:01, 18.22it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:02<00:01, 18.90it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:02<00:01, 18.70it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:02<00:00, 19.51it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:02<00:00, 19.34it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:02<00:00, 19.15it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:02<00:00, 19.05it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:02<00:00, 19.25it/s]Capturing CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:02<00:00, 19.81it/s]Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:03<00:00, 20.82it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:03<00:00, 16.45it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00, 27.26it/s]
+(EngineCore pid=4159628) INFO 11-15 17:42:42 [model_runner.py:1127] Graph capturing finished in 4 secs, took 0.31 GiB
+(EngineCore pid=4159628) INFO 11-15 17:42:43 [gpu_worker.py:759] Available KV cache memory: 8.42 GiB
+(EngineCore pid=4159628) INFO 11-15 17:42:43 [gpu_worker.py:774] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.6500 is equivalent to --gpu-memory-utilization=0.6347 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.6653. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=4159628) INFO 11-15 17:42:43 [kv_cache_utils.py:2619] Overriding num_gpu_blocks=4928 with num_gpu_blocks_override=300
+(EngineCore pid=4159628) INFO 11-15 17:42:43 [kv_cache_utils.py:2327] GPU KV cache size: 4,800 tokens, Maximum concurrency for 4,096 tokens per request: 1.17x
+(EngineCore pid=4159628) INFO 11-15 17:42:43 [factory.py:62] Creating v1 connector with name: LMCacheConnectorV1Dynamic and engine_id: 5066e8ac-b588-4506-a35c-7cbbe057b285
+(EngineCore pid=4159628) WARNING 11-15 17:42:43 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+[33;20m[2026-11-15 17:42:43,061] LMCache WARNING:[0m No LMCache configuration file is set. Trying to read configurations from environment variables. [3m(utils.py:54:lmcache.inprocess.integration.vllm.utils)[0m
+[32;20m[2026-11-15 17:42:43,061] LMCache INFO:[0m num_layer: 28, chunk_size: 256, num_kv_head (per gpu): 8, head_size: 128, hidden_dim (D) for KV (per gpu): 1024, use mla: False, kv shape: (28, 2, 256, 8, 128), num_draft_layers: 0 [3m(vllm_service_factory.py:115:lmcache.inprocess.integration.vllm.vllm_service_factory)[0m
+[32;20m[2026-11-15 17:42:43,062] LMCache INFO:[0m Creating LMCacheEngine instance vllm-instance [3m(cache_engine.py:2132:lmcache.inprocess.v1.cache_engine)[0m
+[32;20m[2026-11-15 17:42:43,062] LMCache INFO:[0m NUMA mapping for instance vllm-instance: None [3m(cache_engine.py:2135:lmcache.inprocess.v1.cache_engine)[0m
+[33;20m[2026-11-15 17:42:43,062] LMCache WARNING:[0m Could not load 'builtin' from vLLM. Using builtin hash. This may cause inconsistencies in distributed caching. [3m(token_database.py:162:lmcache.inprocess.v1.token_database)[0m
+[33;20m[2026-11-15 17:42:43,062] LMCache WARNING:[0m Using builtin hash without PYTHONHASHSEED set. For production environments (non-testing scenarios), you MUST set PYTHONHASHSEED to ensure consistent hashing across processes. Example: export PYTHONHASHSEED=0 [3m(token_database.py:170:lmcache.inprocess.v1.token_database)[0m
+[32;20m[2026-11-15 17:42:43,063] LMCache INFO:[0m Initialized NONE_HASH=-1381912970413702423 from vLLM (>= PR#20511) [3m(token_database.py:100:lmcache.inprocess.v1.token_database)[0m
+[32;20m[2026-11-15 17:42:43,063] LMCache INFO:[0m Using hash algorithm: builtin [3m(token_database.py:110:lmcache.inprocess.v1.token_database)[0m
+[32;20m[2026-11-15 17:42:43,065] LMCache INFO:[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'local_cpu_use_hugepages': False, 'reserve_local_cpu_size': 0.0, 'local_disk': None, 'local_disk_path_sharding': 'by_gpu', 'max_local_disk_size': 0.0, 'remote_url': None, 'remote_serde': 'naive', 'use_layerwise': False, 'save_decode_cache': False, 'pre_caching_hash_algorithm': 'builtin', 'enable_blending': False, 'blend_recompute_ratios': None, 'blend_thresholds': None, 'blend_check_layers': None, 'blend_min_tokens': 256, 'blend_special_str': ' # # ', 'retrieve_locations': None, 'store_location': None, 'enable_p2p': False, 'p2p_host': None, 'p2p_init_ports': None, 'p2p_lookup_ports': None, 'mp_host': None, 'mp_port': 5555, 'enable_controller': False, 'lmcache_instance_id': 'lmcacheengineconfig_5b9e210b99d8472796a1ca487a138803', 'controller_pull_url': None, 'controller_reply_url': None, 'lmcache_worker_ports': None, 'lmcache_worker_ids': None, 'lmcache_worker_heartbeat_delay_time': 10, 'lmcache_worker_heartbeat_time': None, 'enable_pd': False, 'pd_role': None, 'pd_buffer_size': None, 'pd_buffer_device': None, 'pd_peer_host': None, 'pd_peer_init_port': None, 'pd_peer_alloc_port': None, 'pd_peer_query_port': None, 'pd_proxy_host': None, 'pd_proxy_port': None, 'pd_allocation_timeout_sec': inf, 'pd_shutdown_timeout_sec': 5.0, 'pd_condition_poll_interval_sec': 0.005, 'pd_max_prefill_len': 0, 'pd_backend_mode': 'async', 'pd_skip_proxy_notification': False, 'pd_bidirectional': False, 'transfer_channel': None, 'nixl_backends': None, 'nixl_buffer_size': None, 'nixl_buffer_device': None, 'gds_path': None, 'gds_path_sharding': 'by_gpu', 'gds_buffer_size': None, 'maru_path': None, 'maru_pool_size': 4.0, 'use_gds': True, 'gds_backend': 'cufile', 'audit_actual_remote_url': None, 'internal_api_server_host': '127.0.0.1', 'extra_config': None, 'save_unfull_chunk': False, 'blocking_timeout_secs': 10, 'external_lookup_client': None, 'py_enable_gc': True, 'cache_policy': 'LRU', 'numa_mode': None, 'enable_async_loading': False, 'internal_api_server_enabled': False, 'internal_api_server_port_start': 6999, 'priority_limit': None, 'internal_api_server_include_index_list': None, 'internal_api_server_socket_path_prefix': None, 'runtime_plugin_locations': None, 'storage_plugins': None, 'remote_storage_plugins': None, 'lookup_timeout_ms': 3000, 'min_retrieve_tokens': 0, 'hit_miss_ratio': None, 'lookup_server_worker_ids': None, 'enable_scheduler_bypass_lookup': False, 'script_allowed_imports': None, 'run_script_api_enabled': False, 'enable_lazy_memory_allocator': False, 'lazy_memory_initial_ratio': 0.2, 'lazy_memory_expand_trigger_ratio': 0.5, 'lazy_memory_step_ratio': 0.1, 'lazy_memory_safe_size': 0.0, 'enable_chunk_statistics': False, 'chunk_statistics_auto_start_statistics': False, 'chunk_statistics_auto_exit_timeout_hours': 0.0, 'chunk_statistics_auto_exit_target_unique_chunks': 0, 'chunk_statistics_strategy': 'memory_bloom_filter', 'enable_kv_events': False, 'use_gpu_connector_v3': False, 'remote_config_url': None, 'app_id': None, 'enable_hidden_state_cache': False, 'max_hidden_state_cpu_size': 2.0, 'hidden_state_layers': None, 'hidden_states_retrieve_mode': 'prefix_strict'} [3m(cache_engine.py:110:lmcache.inprocess.v1.cache_engine)[0m
+[32;20m[2026-11-15 17:42:43,065] LMCache INFO:[0m LMCacheWorker is not initialized (related configs: enable_controller: False, role: worker, worker_id: 0, worker_ids: [0]). [3m(cache_engine.py:160:lmcache.inprocess.v1.cache_engine)[0m
+[32;20m[2026-11-15 17:42:43,065] LMCache INFO:[0m KV events are disabled. [3m(cache_engine.py:189:lmcache.inprocess.v1.cache_engine)[0m
+[33;20m[2026-11-15 17:42:43,502] LMCache WARNING:[0m IPC socket path (108 bytes) exceeds the 107-byte sockaddr_un limit; using shortened path '/tmp/nbore/kvpd/30252/home/tmp/lmcache_rpc_d4852eb65e9fb72d' instead of '/tmp/nbore/kvpd/30252/home/tmp/engine_5066e8ac-b588-4506-a35c-7cbbe057b285_service_lookup_lmcache_rpc_port_0'. [3m(rpc_utils.py:210:lmcache.inprocess.v1.rpc_utils)[0m
+[32;20m[2026-11-15 17:42:43,503] LMCache INFO:[0m lmcache lookup server started [3m(lmcache_lookup_client.py:270:lmcache.inprocess.v1.lookup_client.lmcache_lookup_client)[0m
+[33;20m[2026-11-15 17:42:43,503] LMCache WARNING:[0m IPC socket path (111 bytes) exceeds the 107-byte sockaddr_un limit; using shortened path '/tmp/nbore/kvpd/30252/home/tmp/lmcache_rpc_54409035f3ed9637' instead of '/tmp/nbore/kvpd/30252/home/tmp/engine_5066e8ac-b588-4506-a35c-7cbbe057b285_service_offload_lmcache_rpc_port_100'. [3m(rpc_utils.py:210:lmcache.inprocess.v1.rpc_utils)[0m
+[32;20m[2026-11-15 17:42:43,504] LMCache INFO:[0m Internal API server disabled. internal_api_server_enabled=False, port_offset=1, port=7000, socket_path=None, include_index_list=None [3m(api_server.py:67:lmcache.inprocess.v1.internal_api_server.api_server)[0m
+[32;20m[2026-11-15 17:42:43,504] LMCache INFO:[0m LMCache initialized for role KVConnectorRole.WORKER with version 0.5.7.post1-g1181bea5, vllm version 0.32.0, lmcache cache_engine metadata: LMCacheMetadata(model_name='/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', world_size=1, local_world_size=1, worker_id=0, local_worker_id=0, kv_dtype=torch.bfloat16, kv_shape=(28, 2, 256, 8, 128), use_mla=False, role='worker', served_model_name='llama', chunk_size=256, kv_layer_groups_manager=None, engine_id='5066e8ac-b588-4506-a35c-7cbbe057b285', kv_connector_extra_config={}) [3m(vllm_v1_adapter.py:487:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:42:43,507] LMCache INFO:[0m Registering KV caches [3m(vllm_v1_adapter.py:750:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:42:43,507] LMCache INFO:[0m Post initializing LMCacheEngine [3m(cache_engine.py:302:lmcache.inprocess.v1.cache_engine)[0m
+[32;20m[2026-11-15 17:42:43,507] LMCache INFO:[0m Initialize storage manager on rank 0, use layerwise: False,save only first rank: False [3m(cache_engine.py:314:lmcache.inprocess.v1.cache_engine)[0m
+[32;20m[2026-11-15 17:42:43,509] LMCache INFO:[0m Initializing LRUCachePolicy [3m(lru.py:25:lmcache.inprocess.v1.storage_backend.cache_policy.lru)[0m
+[32;20m[2026-11-15 17:42:43,509] LMCache INFO:[0m NUMA mapping None [3m(local_cpu_backend.py:403:lmcache.inprocess.v1.storage_backend.local_cpu_backend)[0m
+[33;20m[2026-11-15 17:42:55,802] LMCache WARNING:[0m Controller message sender is not initialized [3m(local_cpu_backend.py:109:lmcache.inprocess.v1.storage_backend.local_cpu_backend)[0m
+[32;20m[2026-11-15 17:42:55,802] LMCache INFO:[0m Created backend: LocalCPUBackend (LocalCPUBackend) [3m(storage_manager.py:1300:lmcache.inprocess.v1.storage_backend.storage_manager)[0m
+[32;20m[2026-11-15 17:42:55,804] LMCache INFO:[0m No active health checks to monitor, skipping monitor thread [3m(base.py:510:lmcache.inprocess.v1.health_monitor.base)[0m
+[32;20m[2026-11-15 17:42:55,804] LMCache INFO:[0m Health monitor initialized and started [3m(base_service_factory.py:128:lmcache.inprocess.integration.base_service_factory)[0m
+(EngineCore pid=4159628) INFO 11-15 17:42:55 [kernel_warmup.py:176] JIT kernel warmup starting.
+(EngineCore pid=4159628) INFO 11-15 17:42:55 [kernel_warmup.py:189] JIT kernel warmup finished in 0.00s.
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 10.37it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 10.77it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:04, 10.91it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.06it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 11.60it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:03, 11.98it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:03, 12.28it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.46it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:01<00:02, 14.88it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:01<00:01, 16.59it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:01<00:01, 17.90it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 28/51 [00:01<00:01, 19.04it/s]Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:02<00:00, 20.12it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:02<00:00, 21.10it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:02<00:00, 22.09it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 40/51 [00:02<00:00, 22.97it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:02<00:00, 24.03it/s]Capturing CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:02<00:00, 24.88it/s]Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:02<00:00, 25.88it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 18.07it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/35 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):   9%|▊         | 3/35 [00:00<00:01, 29.97it/s]Capturing CUDA graphs (FULL):  20%|██        | 7/35 [00:00<00:00, 30.05it/s]Capturing CUDA graphs (FULL):  31%|███▏      | 11/35 [00:00<00:00, 31.58it/s]Capturing CUDA graphs (FULL):  43%|████▎     | 15/35 [00:00<00:00, 33.20it/s]Capturing CUDA graphs (FULL):  54%|█████▍    | 19/35 [00:00<00:00, 35.12it/s]Capturing CUDA graphs (FULL):  69%|██████▊   | 24/35 [00:00<00:00, 37.96it/s]Capturing CUDA graphs (FULL):  83%|████████▎ | 29/35 [00:00<00:00, 41.12it/s]Capturing CUDA graphs (FULL):  97%|█████████▋| 34/35 [00:00<00:00, 43.54it/s]Capturing CUDA graphs (FULL): 100%|██████████| 35/35 [00:00<00:00, 38.56it/s]
+(EngineCore pid=4159628) INFO 11-15 17:43:00 [model_runner.py:1127] Graph capturing finished in 4 secs, took 0.22 GiB
+(EngineCore pid=4159628) INFO 11-15 17:43:00 [gpu_worker.py:971] CUDA graph pool memory: 0.22 GiB (actual), 0.36 GiB (estimated), difference: 0.14 GiB (65.8%).
+(EngineCore pid=4159628) INFO 11-15 17:43:00 [gpu_worker.py:1034] Free memory on device (23.34/23.55 GiB) on startup. Desired GPU memory utilization is (0.65, 15.31 GiB). Actual usage is 6.25 GiB for consumed memory (weights + non-torch), 0.63 GiB for peak activation, and 0.22 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=8653118772` (8.06 GiB) to fit into requested memory, or `--kv-cache-memory=17279805952` (16.09 GiB) to fully utilize gpu memory. Current kv cache memory in use is 8.42 GiB.
+(EngineCore pid=4159628) INFO 11-15 17:43:01 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=4159628) INFO 11-15 17:43:01 [core.py:395] init engine (profile, create kv cache, warmup model) took 25.88 s (compilation: 0.16 s)
+(EngineCore pid=4159628) INFO 11-15 17:43:02 [factory.py:62] Creating v1 connector with name: LMCacheConnectorV1Dynamic and engine_id: 5066e8ac-b588-4506-a35c-7cbbe057b285
+(EngineCore pid=4159628) WARNING 11-15 17:43:02 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+
+ _     __  __    ____           _          
+| |   |  \/  |  / ___|__ _  ___| |__   ___      LMCache v0.5.7.post1 (g1181bea5)
+| |   | |\/| | | |   / _` |/ __| '_ \ / _ \     Website:  https://lmcache.ai/
+| |___| |  | | | |__| (_| | (__| | | |  __/     Recipes:  https://docs.lmcache.ai/recipes
+|_____|_|  |_|  \____\__,_|\___|_| |_|\___|     LinkedIn: https://www.linkedin.com/company/lmcache-lab
+Set LMCACHE_DISABLE_BANNER=1 to hide this banner.
+
+[32;20m[2026-11-15 17:43:02,488] LMCache INFO:[0m num_layer: 28, chunk_size: 256, num_kv_head (per gpu): 8, head_size: 128, hidden_dim (D) for KV (per gpu): 1024, use mla: False, kv shape: (28, 2, 256, 8, 128), num_draft_layers: 0 [3m(vllm_service_factory.py:115:lmcache.inprocess.integration.vllm.vllm_service_factory)[0m
+[33;20m[2026-11-15 17:43:02,489] LMCache WARNING:[0m IPC socket path (108 bytes) exceeds the 107-byte sockaddr_un limit; using shortened path '/tmp/nbore/kvpd/30252/home/tmp/lmcache_rpc_d4852eb65e9fb72d' instead of '/tmp/nbore/kvpd/30252/home/tmp/engine_5066e8ac-b588-4506-a35c-7cbbe057b285_service_lookup_lmcache_rpc_port_0'. [3m(rpc_utils.py:210:lmcache.inprocess.v1.rpc_utils)[0m
+[32;20m[2026-11-15 17:43:02,489] LMCache INFO:[0m Transport connecting to rank 0 with socket path /tmp/nbore/kvpd/30252/home/tmp/lmcache_rpc_d4852eb65e9fb72d [3m(zmq_transport.py:53:lmcache.inprocess.v1.rpc.zmq_transport)[0m
+[33;20m[2026-11-15 17:43:02,489] LMCache WARNING:[0m Could not load 'builtin' from vLLM. Using builtin hash. This may cause inconsistencies in distributed caching. [3m(token_database.py:162:lmcache.inprocess.v1.token_database)[0m
+[33;20m[2026-11-15 17:43:02,489] LMCache WARNING:[0m Using builtin hash without PYTHONHASHSEED set. For production environments (non-testing scenarios), you MUST set PYTHONHASHSEED to ensure consistent hashing across processes. Example: export PYTHONHASHSEED=0 [3m(token_database.py:170:lmcache.inprocess.v1.token_database)[0m
+[32;20m[2026-11-15 17:43:02,489] LMCache INFO:[0m Initialized NONE_HASH=-1381912970413702423 from vLLM (>= PR#20511) [3m(token_database.py:100:lmcache.inprocess.v1.token_database)[0m
+[32;20m[2026-11-15 17:43:02,489] LMCache INFO:[0m Using hash algorithm: builtin [3m(token_database.py:110:lmcache.inprocess.v1.token_database)[0m
+[32;20m[2026-11-15 17:43:02,489] LMCache INFO:[0m Internal API server disabled. internal_api_server_enabled=False, port_offset=0, port=6999, socket_path=None, include_index_list=None [3m(api_server.py:67:lmcache.inprocess.v1.internal_api_server.api_server)[0m
+[32;20m[2026-11-15 17:43:02,489] LMCache INFO:[0m LMCache initialized for role KVConnectorRole.SCHEDULER with version 0.5.7.post1-g1181bea5, vllm version 0.32.0, lmcache cache_engine metadata: None [3m(vllm_v1_adapter.py:487:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+(EngineCore pid=4159628) INFO 11-15 17:43:02 [kernel.py:467] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=4159351) INFO 11-15 17:43:02 [entry.py:136] Supported tasks: ['generate']
+(APIServer pid=4159351) WARNING 11-15 17:43:02 [__init__.py:44] SECURITY WARNING: Development endpoints are enabled! This should NOT be used in production!
+(APIServer pid=4159351) INFO 11-15 17:43:02 [factories.py:89] Scale-out endpoints are disabled. Restart vllm serve with --enable-scale-out to enable them.
+(APIServer pid=4159351) INFO 11-15 17:43:02 [hf.py:648] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=4159351) WARNING 11-15 17:43:02 [model.py:1893] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 0.6, 'top_p': 0.9}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=4159351) INFO 11-15 17:43:02 [entry.py:140] Starting vLLM server on http://127.0.0.1:26203
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:186] Available routes are:
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /openapi.json, Methods: GET, HEAD
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /docs, Methods: GET, HEAD
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /docs/oauth2-redirect, Methods: GET, HEAD
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /redoc, Methods: GET, HEAD
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /load, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /version, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /kv_event_sources, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /health, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /metrics, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /tokenize, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /detokenize, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/models, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/systemone, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /ping, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /ping, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /invocations, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /reset_prefix_cache, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /reset_mm_cache, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /reset_encoder_cache, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /collective_rpc, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /server_info, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /sleep, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /release_kv_cache_memory, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /wake_up, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /is_sleeping, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /pause, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /resume, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /abort_requests, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /is_paused, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /init_weight_transfer_engine, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /shutdown_weight_transfer_engine, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /start_weight_update, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /start_draft_weight_update, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /update_weights, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /finish_weight_update, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /update_weight_version, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /weight_info, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /weight_checker, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /get_world_size, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/chat/completions, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/chat/completions/batch, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/responses, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/responses/{response_id}, Methods: GET
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/responses/{response_id}/cancel, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/completions, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/messages, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/messages/count_tokens, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /generative_scoring, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /scale_elastic_ep, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /is_scaling_elastic_ep, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/chat/completions/render, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/messages/render, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/completions/render, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/responses/render, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/chat/completions/derender, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /v1/completions/derender, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /inference/v1/generate, Methods: POST
+(APIServer pid=4159351) INFO 11-15 17:43:02 [launcher.py:195] Route: /inference/v1/abort_requests, Methods: POST
+INFO:     Started server process [4159351]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:55332 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55346 - "GET /health HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:11,507] LMCache INFO:[0m Reqid: cmpl-34353f3022ac434e988522d556d36665-0-8d56a89f, Total tokens 152, Inference Engine computed tokens: 0, LMCache hit tokens: 0, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+(EngineCore pid=4159628) WARNING 11-15 17:43:11 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=4159628) WARNING 11-15 17:43:11 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=4159628) WARNING 11-15 17:43:11 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+[32;20m[2026-11-15 17:43:11,532] LMCache INFO:[0m Reqid: cmpl-9fefdf7a59194e56a6c7f0ba936a6384-0-87f8a175, Total tokens 152, Inference Engine computed tokens: 0, LMCache hit tokens: 0, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:11,532] LMCache INFO:[0m Reqid: cmpl-06a3161f252b4832a29c276a43f84dcf-0-b70ceb96, Total tokens 152, Inference Engine computed tokens: 0, LMCache hit tokens: 0, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:11,532] LMCache INFO:[0m Reqid: cmpl-8713393fc17f43c3828f2ce65bf93572-0-b5268b8b, Total tokens 152, Inference Engine computed tokens: 0, LMCache hit tokens: 0, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+INFO:     127.0.0.1:41888 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41894 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41910 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41916 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=4159351) INFO 11-15 17:43:12 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=4159628) INFO 11-15 17:43:12 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:41918 - "POST /reset_prefix_cache?reset_external=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41932 - "GET /metrics HTTP/1.1" 200 OK
+(APIServer pid=4159351) INFO 11-15 17:43:12 [loggers.py:335] Engine 000: Avg prompt throughput: 57.9 tokens/s, Avg generation throughput: 3.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 0.0%
+INFO:     127.0.0.1:41948 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:18,767] LMCache INFO:[0m Reqid: chatcmpl-74ad393a260d4b4a86464c75b73dc6b9-85b1b965, Total tokens 704, Inference Engine computed tokens: 0, LMCache hit tokens: 0, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+INFO:     127.0.0.1:41954 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:18,828] LMCache INFO:[0m Engine KV Format: EngineKVFormat.NL_X_NB_BS_NH_CS NL x [NB, BS, NH, CS] [3m(detection.py:69:lmcache.v1.gpu_connector.kv_format.detection)[0m
+[32;20m[2026-11-15 17:43:18,828] LMCache INFO:[0m Group 0 first-layer tensor: layer_idx=0 shape=(300, 16, 8, 256) stride=(32768, 2048, 256, 1) is_contiguous=True dtype=torch.bfloat16 device=cuda:0 storage_offset=0 numel=9830400 storage_nbytes=550502400 padding_per_block=0 [3m(utils.py:642:lmcache.v1.gpu_connector.utils)[0m
+[32;20m[2026-11-15 17:43:18,834] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,835] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,835] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,835] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,835] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,835] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,836] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,836] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,836] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,836] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,836] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,836] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,837] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,837] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,837] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,837] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,837] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,837] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,837] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,838] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,838] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,838] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,838] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,838] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,838] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,838] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,839] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,839] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,840] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,841] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,841] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,841] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,841] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,841] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,841] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,841] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,842] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,842] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,842] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,842] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,842] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,842] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,842] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,843] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,843] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,843] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,843] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,843] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,843] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,844] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,844] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,844] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,844] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,844] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,844] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,844] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,846] LMCache INFO:[0m [req_id=chatcmpl-74ad393a260d4b4a86464c75b73dc6b9-85b1b965] Stored 512 out of total 512 tokens. size: 0.0547 GB, cost 18.4938 ms, throughput: 2.9571 GB/s; offload_time: 18.4265 ms, put_time: 0.0385 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+[32;20m[2026-11-15 17:43:18,846] LMCache INFO:[0m Reqid: chatcmpl-4d6179dd34dd467da599382f4d69c23e-8d973a2b, Total tokens 922, Inference Engine computed tokens: 496, LMCache hit tokens: 256, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:18,890] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,891] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,891] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,891] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,891] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,891] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,891] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,892] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,892] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,892] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,892] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,892] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,892] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,893] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,893] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,893] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,893] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,893] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,893] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,894] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,894] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,894] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,894] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,894] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,894] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,895] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,895] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,895] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,896] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,897] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,897] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,897] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,897] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,897] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,897] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,898] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,898] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,898] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,898] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,898] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,898] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,899] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,899] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,899] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,899] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,899] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,899] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,899] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,900] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,900] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,900] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,900] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,900] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,900] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,901] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,901] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:18,902] LMCache INFO:[0m [req_id=chatcmpl-4d6179dd34dd467da599382f4d69c23e-8d973a2b] Stored 512 out of total 512 tokens. size: 0.0547 GB, cost 12.2786 ms, throughput: 4.4539 GB/s; offload_time: 12.2313 ms, put_time: 0.0226 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:41954 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:20,175] LMCache INFO:[0m Reqid: chatcmpl-e4c9c62b63e24a7ca092618d9fd1d294-a4738625, Total tokens 1194, Inference Engine computed tokens: 496, LMCache hit tokens: 256, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:20,246] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,247] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,247] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,247] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,247] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,247] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,247] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,248] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,248] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,248] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,248] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,248] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,248] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,248] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,249] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,249] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,249] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,249] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,249] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,249] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,249] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,250] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,250] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,250] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,250] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,250] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,250] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,250] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,252] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,252] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,252] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,253] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,253] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,253] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,253] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,253] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,253] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,253] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,254] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,254] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,254] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,254] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,254] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,254] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,255] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,255] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,255] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,255] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,255] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,255] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,255] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,256] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,256] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,256] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,256] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,256] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,258] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,258] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,258] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,258] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,258] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,259] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,259] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,259] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,259] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,259] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,259] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,260] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,260] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,260] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,260] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,260] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,260] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,260] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,261] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,261] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,261] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,261] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,261] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,261] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,261] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,262] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,262] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,262] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,263] LMCache INFO:[0m [req_id=chatcmpl-e4c9c62b63e24a7ca092618d9fd1d294-a4738625] Stored 768 out of total 768 tokens. size: 0.0820 GB, cost 17.7709 ms, throughput: 4.6160 GB/s; offload_time: 17.7215 ms, put_time: 0.0245 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:41948 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:20,310] LMCache INFO:[0m Reqid: chatcmpl-5562863c01a144658787f3507e57e1c4-a7f1a71c, Total tokens 1034, Inference Engine computed tokens: 496, LMCache hit tokens: 256, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:20,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,373] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,373] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,373] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,373] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,373] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,373] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,373] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,374] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,374] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,374] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,374] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,376] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,376] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,376] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,376] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,376] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,376] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,377] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,377] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,377] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,377] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,377] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,377] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,377] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,378] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,378] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,378] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,378] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,378] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,378] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,378] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,379] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,379] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,379] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,379] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,379] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,379] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,379] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,380] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,381] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,381] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,381] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,382] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,382] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,382] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,382] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,382] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,382] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,383] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,383] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,383] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,383] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,383] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,383] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,383] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,384] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,384] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,384] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,384] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,384] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,384] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,384] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,385] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,385] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,385] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,385] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,385] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:20,386] LMCache INFO:[0m [req_id=chatcmpl-5562863c01a144658787f3507e57e1c4-a7f1a71c] Stored 768 out of total 768 tokens. size: 0.0820 GB, cost 17.3336 ms, throughput: 4.7325 GB/s; offload_time: 17.2886 ms, put_time: 0.0211 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:41954 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:21,486] LMCache INFO:[0m Reqid: chatcmpl-e57d301924d14cfb8a66f4b2ac72e963-87116928, Total tokens 957, Inference Engine computed tokens: 704, LMCache hit tokens: 512, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:21,514] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,515] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,515] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,516] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,516] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,516] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,517] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,517] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,517] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,518] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,518] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,518] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,519] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,519] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,519] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,520] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,520] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,520] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,521] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,521] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,521] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,522] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,522] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,523] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,523] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,523] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,524] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,524] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,525] LMCache INFO:[0m [req_id=chatcmpl-e57d301924d14cfb8a66f4b2ac72e963-87116928] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 12.1270 ms, throughput: 2.2548 GB/s; offload_time: 12.0452 ms, put_time: 0.0393 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:41948 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:21,638] LMCache INFO:[0m Reqid: chatcmpl-70995e8ba6584a5991e46760724f681d-a001f405, Total tokens 1189, Inference Engine computed tokens: 912, LMCache hit tokens: 768, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:21,683] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,683] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,684] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,684] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,684] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,684] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,685] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,685] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,685] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,685] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,685] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,686] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,686] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,686] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,686] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,686] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,686] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,687] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,687] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,687] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,687] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,687] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,687] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,687] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,688] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,688] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,688] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,688] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:21,689] LMCache INFO:[0m [req_id=chatcmpl-70995e8ba6584a5991e46760724f681d-a001f405] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 7.3479 ms, throughput: 3.7213 GB/s; offload_time: 7.2938 ms, put_time: 0.0230 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:52728 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:22,564] LMCache INFO:[0m Reqid: chatcmpl-2a355d2907d44d7f9edd1c5ccb63c5bb-b9973a1c, Total tokens 1434, Inference Engine computed tokens: 1184, LMCache hit tokens: 1024, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:22,599] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,600] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,600] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,600] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,601] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,601] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,601] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,601] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,602] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,602] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,602] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,602] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,602] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,603] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,603] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,603] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,603] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,604] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,604] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,604] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,604] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,605] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,605] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,605] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,605] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,606] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,606] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,606] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,607] LMCache INFO:[0m [req_id=chatcmpl-2a355d2907d44d7f9edd1c5ccb63c5bb-b9973a1c] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 9.0348 ms, throughput: 3.0265 GB/s; offload_time: 8.9757 ms, put_time: 0.0273 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:41954 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:22,702] LMCache INFO:[0m Reqid: chatcmpl-6345b86b672341ffb35a1cb12e75e413-bce13749, Total tokens 1270, Inference Engine computed tokens: 1024, LMCache hit tokens: 1024, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+INFO:     127.0.0.1:41948 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:22,771] LMCache INFO:[0m Reqid: chatcmpl-e68498f159774afcb90f55b99734ebfc-9af375cb, Total tokens 1194, Inference Engine computed tokens: 944, LMCache hit tokens: 768, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:22,807] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,808] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,808] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,808] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,809] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,809] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,809] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,809] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,809] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,810] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,810] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,810] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,810] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,811] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,811] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,811] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,811] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,812] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,812] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,812] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,812] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,812] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,813] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,813] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,813] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,813] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,814] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,814] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:22,815] LMCache INFO:[0m [req_id=chatcmpl-e68498f159774afcb90f55b99734ebfc-9af375cb] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 8.8864 ms, throughput: 3.0770 GB/s; offload_time: 8.8160 ms, put_time: 0.0283 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+(APIServer pid=4159351) INFO 11-15 17:43:22 [loggers.py:335] Engine 000: Avg prompt throughput: 364.2 tokens/s, Avg generation throughput: 65.6 tokens/s, Running: 2 reqs, Waiting: 0 reqs, GPU KV cache usage: 45.8%, Prefix cache hit rate: 63.2%, External prefix cache hit rate: 0.0%
+INFO:     127.0.0.1:41954 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:24,002] LMCache INFO:[0m Reqid: chatcmpl-43090d6b482a4165971cc55da49afc8d-a3d5eb60, Total tokens 1429, Inference Engine computed tokens: 1264, LMCache hit tokens: 1024, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:24,026] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,027] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,027] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,027] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,028] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,028] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,028] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,029] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,029] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,029] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,030] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,030] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,030] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,031] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,031] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,031] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,032] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,032] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,033] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,033] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,033] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,034] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,034] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,034] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,035] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,035] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,035] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,036] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,037] LMCache INFO:[0m [req_id=chatcmpl-43090d6b482a4165971cc55da49afc8d-a3d5eb60] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 12.0340 ms, throughput: 2.2722 GB/s; offload_time: 11.9585 ms, put_time: 0.0363 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:52728 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:24,051] LMCache INFO:[0m Reqid: chatcmpl-099cb27b0eb049da913591ca285a76a0-9e6f6642, Total tokens 1417, Inference Engine computed tokens: 1184, LMCache hit tokens: 1024, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:24,085] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,085] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,086] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,086] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,086] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,087] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,087] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,087] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,087] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,088] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,088] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,088] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,088] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,089] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,089] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,089] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,089] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,089] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,089] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,089] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,090] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,090] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,090] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,090] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,090] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,090] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,090] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,091] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,092] LMCache INFO:[0m [req_id=chatcmpl-099cb27b0eb049da913591ca285a76a0-9e6f6642] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 7.9859 ms, throughput: 3.4240 GB/s; offload_time: 7.9331 ms, put_time: 0.0213 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:41948 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:24,672] LMCache INFO:[0m Reqid: chatcmpl-5ce41faa405b423aa9a357672c2f39ed-888c102b, Total tokens 1677, Inference Engine computed tokens: 1424, LMCache hit tokens: 1280, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:24,708] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,709] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,709] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,709] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,710] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,710] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,710] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,710] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,711] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,711] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,711] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,711] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,712] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,712] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,712] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,712] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,713] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,713] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,713] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,713] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,713] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,714] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,714] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,714] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,714] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,715] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,715] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,715] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:24,717] LMCache INFO:[0m [req_id=chatcmpl-5ce41faa405b423aa9a357672c2f39ed-888c102b] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 9.1899 ms, throughput: 2.9754 GB/s; offload_time: 9.1273 ms, put_time: 0.0286 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:52728 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:25,331] LMCache INFO:[0m Reqid: chatcmpl-aff8c0eb3c7242518e7195bdcad79afa-81526c50, Total tokens 1438, Inference Engine computed tokens: 1184, LMCache hit tokens: 1024, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:25,366] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,367] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,367] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,367] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,368] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,368] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,368] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,368] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,368] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,369] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,369] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,369] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,369] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,370] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,371] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,372] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,373] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:25,374] LMCache INFO:[0m [req_id=chatcmpl-aff8c0eb3c7242518e7195bdcad79afa-81526c50] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 8.8086 ms, throughput: 3.1042 GB/s; offload_time: 8.7453 ms, put_time: 0.0293 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:41954 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2026-11-15 17:43:26,300] LMCache INFO:[0m Reqid: chatcmpl-cb4013e4c3cb48d59b65b5d943b1899a-8981a6f5, Total tokens 1646, Inference Engine computed tokens: 1408, LMCache hit tokens: 1280, need to load: 0 [3m(vllm_v1_adapter.py:1478:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:26,335] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,335] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,335] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,336] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,336] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,336] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,336] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,337] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,337] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,337] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,337] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,338] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,338] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,338] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,338] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,338] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,339] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,339] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,339] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,339] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,340] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,340] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,340] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,340] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,341] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,341] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,341] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,341] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[32;20m[2026-11-15 17:43:26,343] LMCache INFO:[0m [req_id=chatcmpl-cb4013e4c3cb48d59b65b5d943b1899a-8981a6f5] Stored 256 out of total 256 tokens. size: 0.0273 GB, cost 8.8773 ms, throughput: 3.0802 GB/s; offload_time: 8.8153 ms, put_time: 0.0285 ms [3m(cache_engine.py:587:lmcache.inprocess.v1.cache_engine)[0m
+INFO:     127.0.0.1:41398 - "GET /metrics HTTP/1.1" 200 OK
+(APIServer pid=4159351) INFO 11-15 17:43:31 [launcher.py:254] [shutdown] API server: shutdown triggered
+(APIServer pid=4159351) INFO 11-15 17:43:31 [launcher.py:270] [shutdown] API server: stopping engine client mode=abort timeout=0s
+(APIServer pid=4159351) INFO 11-15 17:43:31 [core_client.py:770] [shutdown] MPClient: start timeout=0s
+(APIServer pid=4159351) INFO 11-15 17:43:31 [core_client.py:772] [shutdown] MPClient: stopping engine manager
+(APIServer pid=4159351) INFO 11-15 17:43:31 [utils.py:628] [shutdown] Process manager: send sigterm to process EngineCore
+(APIServer pid=4159351) WARNING 11-15 17:43:31 [utils.py:648] [shutdown] Process manager: force killing remaining processes count=1
+(APIServer pid=4159351) WARNING 11-15 17:43:31 [utils.py:653] [shutdown] Process manager: force killing remaining process EngineCore pid 4159628
+(EngineCore pid=4159628) INFO 11-15 17:43:31 [core.py:1454] [shutdown] EngineCore: trigger received signal=SIGTERM
+(EngineCore pid=4159628) INFO 11-15 17:43:31 [core.py:1635] [shutdown] EngineCore: start mode=abort timeout=0s
+(EngineCore pid=4159628) INFO 11-15 17:43:31 [core.py:1666] [shutdown] EngineCore: request processing complete; starting resource teardown
+(EngineCore pid=4159628) INFO 11-15 17:43:31 [core.py:1499] [shutdown] EngineCore: exiting busy loop
+[32;20m[2026-11-15 17:43:31,448] LMCache INFO:[0m Starting LMCacheConnector shutdown... [3m(vllm_v1_adapter.py:1354:lmcache.inprocess.integration.vllm.vllm_v1_adapter)[0m
+[32;20m[2026-11-15 17:43:31,448] LMCache INFO:[0m Stopping LMCacheManager services... [3m(manager.py:245:lmcache.inprocess.v1.manager)[0m
+[32;20m[2026-11-15 17:43:31,448] LMCache INFO:[0m Closing health_monitor... [3m(manager.py:252:lmcache.inprocess.v1.manager)[0m
+[32;20m[2026-11-15 17:43:31,449] LMCache INFO:[0m health_monitor closed successfully [3m(manager.py:257:lmcache.inprocess.v1.manager)[0m
+[32;20m[2026-11-15 17:43:31,449] LMCache INFO:[0m Closing offload_server... [3m(manager.py:252:lmcache.inprocess.v1.manager)[0m
+[32;20m[2026-11-15 17:43:31,454] LMCache INFO:[0m Closing ZMQOffloadServer... [3m(zmq_server.py:98:lmcache.inprocess.v1.offload_server.zmq_server)[0m
+[32;20m[2026-11-15 17:43:31,454] LMCache INFO:[0m ZMQ socket closed [3m(zmq_server.py:104:lmcache.inprocess.v1.offload_server.zmq_server)[0m
+[32;20m[2026-11-15 17:43:31,454] LMCache INFO:[0m Waiting for offload server thread to finish... [3m(zmq_server.py:110:lmcache.inprocess.v1.offload_server.zmq_server)[0m
+Assertion failed: pfd.revents & POLLIN (src/signaler.cpp:238)
+Fatal Python error: Aborted
+
+Thread 0x00000ad9301ff6c0 (most recent call first):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1169 in _wait_for_tstate_lock
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1153 in join
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/inprocess/v1/offload_server/zmq_server.py", line 111 in close
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/concurrent/futures/thread.py", line 59 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/concurrent/futures/thread.py", line 93 in _worker
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1012 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Thread 0x00000ad682cfc6c0 (most recent call first):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 355 in wait
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/queue.py", line 171 in get
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1968 in process_output_sockets
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1012 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Thread 0x00000ad6832ff6c0 (most recent call first):
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/zmq/sugar/poll.py", line 106 in poll
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1888 in process_input_sockets
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1012 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Thread 0x00000ad6946fa6c0 (most recent call first):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/selectors.py", line 468 in select
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/base_events.py", line 1961 in _run_once
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/base_events.py", line 645 in run_forever
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/utils.py", line 895 in start_loop_in_thread_with_exceptions
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1012 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Current thread 0x00000ad6948fb6c0 (most recent call first):
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/inprocess/v1/offload_server/zmq_server.py", line 54 in process_request
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1012 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Thread 0x00000ad694efe6c0 (most recent call first):
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/zmq/sugar/socket.py", line 813 in recv_multipart
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/inprocess/v1/rpc/zmq_transport.py", line 191 in recv_request
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/inprocess/v1/lookup_client/lmcache_lookup_client.py", line 200 in process_request
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1012 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Thread 0x00000ad691ffe6c0 (most recent call first):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 359 in wait
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 655 in wait
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/inprocess/observability.py", line 1958 in log_worker
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1012 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Thread 0x00000ad92ccfe6c0 (most recent call first):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 359 in wait
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 655 in wait
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Thread 0x00000ad92c9fd6c0 (most recent call first):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 359 in wait
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 655 in wait
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1075 in _bootstrap_inner
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 1032 in _bootstrap
+
+Thread 0x00000adb4c092740 (most recent call first):
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/threading.py", line 359 in wait
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py", line 451 in result
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/inprocess/v1/manager.py", line 256 in _safe_close
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/inprocess/v1/manager.py", line 276 in stop_services
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/inprocess/integration/vllm/vllm_v1_adapter.py", line 1355 in shutdown
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/lmcache/integration/vllm/lmcache_connector_v1.py", line 146 in shutdown
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/vllm/distributed/kv_transfer/kv_transfer_state.py", line 98 in ensure_kv_transfer_shutdown
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/gpu_worker.py", line 1611 in shutdown
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/worker/worker_base.py", line 250 in shutdown
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/executor/uniproc_executor.py", line 154 in shutdown
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 828 in shutdown
+  File "/tmp/nbore/kvpd/30252/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1521 in run_engine_core
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/process.py", line 108 in run
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/process.py", line 314 in _bootstrap
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/spawn.py", line 135 in _main
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/spawn.py", line 122 in spawn_main
+  File "<string>", line 1 in <module>
+
+Extension modules: numpy._core._multiarray_umath, numpy.linalg._umath_linalg, torch._C, torch._C._dynamo.autograd_compiler, torch._C._dynamo.eval_frame, torch._C._dynamo.guards, torch._C._dynamo.utils, torch._C._fft, torch._C._linalg, torch._C._nested, torch._C._nn, torch._C._sparse, torch._C._special, cuda.bindings._internal.utils, cuda.bindings._internal.driver, cuda.bindings.cydriver, cuda.bindings.driver, cuda.bindings._internal.runtime_ptds, cuda.bindings._internal.runtime, cuda.bindings.cyruntime, cuda.bindings.runtime, regex._regex, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._mt19937, numpy.random.mtrand, numpy.random._philox, numpy.random._pcg64, numpy.random._sfc64, numpy.random._generator, psutil._psutil_linux, markupsafe._speedups, msgspec._core, zmq.backend.cython._zmq, PIL._imaging, yaml._yaml, PIL._imagingft, multidict._multidict, yarl._quoting_c, propcache._helpers_c, aiohttp._http_writer, aiohttp._http_parser, aiohttp._websocket.mask, aiohttp._websocket.reader_c, frozenlist._frozenlist, charset_normalizer.md, charset_normalizer.cd, requests.packages.charset_normalizer.md, requests.packages.chardet.md, requests.packages.charset_normalizer.cd, requests.packages.chardet.cd, pybase64._pybase64, uvloop.loop, grpc._cython.cygrpc, google._upb._message, tvm_ffi.core, setproctitle._setproctitle, cuda.bindings._internal.nvrtc, cuda.bindings.cynvrtc, cuda.bindings.nvrtc, numba.core.typeconv._typeconv, numba._helperlib, numba._dynfunc, numba._dispatcher, numba.core.runtime._nrt_python, numba.np.ufunc._internal, numba.experimental.jitclass._box, nvtx._lib.lib, nvtx._lib.profiler, _cffi_backend, cuda_utils, tilelang_cython_wrapper (total: 73)
+(APIServer pid=4159351) INFO 11-15 17:43:31 [core_client.py:774] [shutdown] MPClient: engine manager stopped
+(APIServer pid=4159351) INFO 11-15 17:43:31 [core_client.py:775] [shutdown] MPClient: cleaning up background resources
+(APIServer pid=4159351) INFO 11-15 17:43:31 [core_client.py:777] [shutdown] MPClient: complete
+(APIServer pid=4159351) INFO 11-15 17:43:31 [launcher.py:279] [shutdown] API server: engine client stopped
+(APIServer pid=4159351) INFO 11-15 17:43:31 [launcher.py:282] [shutdown] API server: signalling HTTP server shutdown
+(APIServer pid=4159351) INFO 11-15 17:43:31 [launcher.py:304] [shutdown] API server: shutting down FastAPI HTTP server
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

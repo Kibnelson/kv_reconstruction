@@ -1,0 +1,303 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 1,
+  "decodes": 3,
+  "layout": "1p3d",
+  "connector": "tkv",
+  "transport": "ring",
+  "eager": true,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "raw": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 7.81597476452589,
+    "encode_ms": 2.4783858098089695,
+    "link_ms": 40.853270795196295,
+    "queue_ms": 0.2499222755432129,
+    "achieved_gbps": 95.18104964814273,
+    "install_ms": 24.05081642791629,
+    "wait_ms": 1060.8203411102295,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "t2-hbh": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.188592239416213,
+    "gather_ms": 7.324601523578167,
+    "encode_ms": 96.28424886614084,
+    "link_ms": 20.38824651390314,
+    "queue_ms": 0.25981664657592773,
+    "achieved_gbps": 94.53119014778561,
+    "install_ms": 486.5801874548197,
+    "wait_ms": 998.414158821106,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 4,
+    "layer0_coded": 0,
+    "layer0_checks": [
+     "equal"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "t2-rank256": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 9.199482172066825,
+    "gather_ms": 7.420297712087631,
+    "encode_ms": 51.68542545288801,
+    "link_ms": 23.05456157773733,
+    "queue_ms": 0.23734569549560547,
+    "achieved_gbps": 94.27989815261702,
+    "install_ms": 164.72413344308734,
+    "wait_ms": 634.6455812454224,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 4,
+    "layer0_coded": 0,
+    "layer0_checks": [
+     "equal"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  }
+ },
+ "sweep": {
+  "sweep_raw_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "raw",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 4.296984273940325,
+    "request_throughput": 1.8617708350754605,
+    "request_goodput": 0.6981640631532977,
+    "output_throughput": 238.30666688965894,
+    "total_token_throughput": 4051.213337124202,
+    "mean_ttft_ms": 2279.421442653984,
+    "median_ttft_ms": 2381.961694918573,
+    "p90_ttft_ms": 2755.8871963992715,
+    "p99_ttft_ms": 2790.296664927155,
+    "mean_tpot_ms": 11.911789589656854,
+    "median_tpot_ms": 11.908530169643287,
+    "p99_tpot_ms": 12.24242909334776,
+    "mean_e2el_ms": 3792.2187205404043,
+    "p99_e2el_ms": 4292.349704541266,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 59.00538805872202,
+    "encode_ms": 1.1120340786874294,
+    "link_ms": 463.10383337549865,
+    "queue_ms": 309.82711911201477,
+    "achieved_gbps": 3.8756460738119554,
+    "install_ms": 2.578339073807001,
+    "wait_ms": 2207.27875828743,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 4,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794782690.209366,
+   "t1": 1794782703.6671932
+  },
+  "sweep_t2-hbh_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-hbh",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.9861979484558105,
+    "request_throughput": 2.006924920298821,
+    "request_goodput": 1.0034624601494104,
+    "output_throughput": 256.88638979824907,
+    "total_token_throughput": 4367.068626570233,
+    "mean_ttft_ms": 1971.8222573865205,
+    "median_ttft_ms": 1985.333644784987,
+    "p90_ttft_ms": 2196.609355509281,
+    "p99_ttft_ms": 2221.8877824023366,
+    "mean_tpot_ms": 14.175641132283985,
+    "median_tpot_ms": 14.231447570436583,
+    "p99_tpot_ms": 15.993531781769407,
+    "mean_e2el_ms": 3772.1286811865866,
+    "p99_e2el_ms": 3977.9160545393825,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 7.859630039760045,
+    "gather_ms": 3.780481405556202,
+    "encode_ms": 43.8764113932848,
+    "link_ms": 203.01985321566463,
+    "queue_ms": 73.01431894302368,
+    "achieved_gbps": 3.9171051741430696,
+    "install_ms": 148.3986305538565,
+    "wait_ms": 1912.652313709259,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 8,
+    "layer0_coded": 0,
+    "layer0_checks": [
+     "equal"
+    ],
+    "sets": {
+     "code": 2,
+     "news": 1,
+     "wikitext": 2,
+     "math": 2,
+     "exam": 1
+    }
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794782706.5909615,
+   "t1": 1794782720.2791822
+  },
+  "sweep_t2-rank256_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-rank256",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.6951461508870125,
+    "request_throughput": 2.16500232286607,
+    "request_goodput": 1.3531264517912938,
+    "output_throughput": 277.120297326857,
+    "total_token_throughput": 4711.045054556568,
+    "mean_ttft_ms": 1873.40022996068,
+    "median_ttft_ms": 1895.8030939102173,
+    "p90_ttft_ms": 2130.7266145944595,
+    "p99_ttft_ms": 2169.6932294964786,
+    "mean_tpot_ms": 12.088949942418676,
+    "median_tpot_ms": 12.093730226863087,
+    "p99_tpot_ms": 12.407266219975206,
+    "mean_e2el_ms": 3408.6968726478517,
+    "p99_e2el_ms": 3689.293394498527,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.866541590009417,
+    "gather_ms": 132.96983228065073,
+    "encode_ms": 31.27062157727778,
+    "link_ms": 233.3963557612151,
+    "queue_ms": 135.3878676891327,
+    "achieved_gbps": 3.9564236268095505,
+    "install_ms": 22.428974276408553,
+    "wait_ms": 1808.3410859107971,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 8,
+    "layer0_coded": 0,
+    "layer0_checks": [
+     "equal"
+    ],
+    "sets": {
+     "math": 2,
+     "code": 2,
+     "wikitext": 2,
+     "news": 1,
+     "exam": 1
+    }
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794782722.3463,
+   "t1": 1794782735.193428
+  }
+ },
+ "jit": []
+}
