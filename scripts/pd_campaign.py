@@ -811,25 +811,27 @@ def stage_review(p, a, job):
     res = ev / "matrix"
     mats = sorted(res.glob("pd_matrix_*/matrix.json")) if res.is_dir() else []
     mj = json.loads(mats[-1].read_text()) if mats else {"runs": [], "failed": [], "folders": []}
+    if not mats and res.is_dir():           # the matrix never ended (cancelled, out of time): what it packaged
+        mj["folders"] = sorted(d.name for d in res.iterdir() if d.is_dir())
     folders = [f for f in mj.get("folders", []) if not f.startswith("pd_matrix_") and (res / f).is_dir()]
+    status = run.get("status")
+    if status == "started":                         # killed before it could write its end: Slurm's record says how
+        row = (ev / "run_job_sacct.psv").read_text().strip() if (ev / "run_job_sacct.psv").is_file() else ""
+        status = f"ended without a final status (Slurm: {row.split('|')[1] if row.count('|') else 'unknown'})"
     if folders:
         call(sys.executable, "-I", "-B", p.tools / "scripts" / "pd_matrix_report.py", "--runs", ",".join(folders),
              "--root", res, "--title", f"PD matrix {a.matrix} on {run.get('node')}, job {run['run_job']} "
-             f"({run.get('status')}), reviewed from the kept results", "--failed",
+             f"({status}), reviewed from the kept results", "--failed",
              "".join(f + ";" for f in mj.get("failed", [])), "--output", rv / "summary.md")
     else:
         write_text(rv / "summary.md", f"# PD matrix {a.matrix}, job {run['run_job']}: no run results\n\n"
-                   f"Status: {run.get('status')}. {run.get('reason', '')}\nSee run_tail.log and setup/.\n")
+                   f"Status: {status}. {run.get('reason', '')}\nSee run_tail.log, salvaged/ and setup/.\n")
     inv = inventory(ev)
     write_json(rv / "inventory.json", inv, once=True)
     write_json(rv / "review.json", {
         "schema": SCHEMA, "review_job": job, "run_job": str(run["run_job"]), "status": run.get("status"),
         "runs": mj.get("runs", []), "failed": mj.get("failed", []), "folders": folders, "files": len(inv),
         "bytes": sum(f["bytes"] for f in inv), "when": now()}, once=True)
-    status = run.get("status")
-    if status == "started":                         # killed before it could write its end: Slurm's record says how
-        row = (ev / "run_job_sacct.psv").read_text().strip() if (ev / "run_job_sacct.psv").is_file() else ""
-        status = f"ended without a final status (Slurm: {row.split('|')[1] if row.count('|') else 'unknown'})"
     log(f"KVPD REVIEW: {len(folders)} run folders, {len(inv)} files, {sum(f['bytes'] for f in inv) / 1e6:.1f} MB; "
         f"run status {status}")
     show(rv / "summary.md")

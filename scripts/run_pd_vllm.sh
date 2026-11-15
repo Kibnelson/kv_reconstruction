@@ -176,6 +176,9 @@ if [ "${SMOKE:-0}" = 1 ]; then
     TIER_CLIENTS=${TIER_CLIENTS:-4}
     TIER_CONVERSATIONS=${TIER_CONVERSATIONS:-8}
     TIER_MAX_TURNS=${TIER_MAX_TURNS:-4}
+    # few conversations fit in 2048 GPU blocks (32K tokens), so the tier was never asked (job 30176: 0 loads);
+    # 1100 blocks hold one longest request (16K tokens) and not two conversations' worth
+    GPU_BLOCKS=${GPU_BLOCKS:-1100}
 fi
 case "$CONNECTOR" in
     nixl) CODECS=nixl; DEFAULT_STAGES=check,sweep,report; LINKS=native ;;
@@ -307,7 +310,9 @@ for ((i = 1; i <= NUM_DECODE; i++)); do
         case "$CONNECTOR" in
             tkv) serve "engine$i" "$pos" "$port" "$D_MEM" \
                      "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{$COMMON,\"tier\":{\"budget_gb\":$TIER_GB,\"chunk\":$TIER_CHUNK,\"control\":\"$TIERFILE\",\"codec\":\"raw\"}}}" ;;
-            lmcache) serve "engine$i" "$pos" "$port" "$D_MEM" '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
+            # LMCache 0.5.7 ships its own connector class for vLLM; vLLM 0.32's built-in LMCacheConnectorV1 imports
+            # lmcache.integration.vllm.vllm_v1_adapter, which 0.5.7 moved (job 30176: ModuleNotFoundError)
+            lmcache) serve "engine$i" "$pos" "$port" "$D_MEM" '{"kv_connector":"LMCacheConnectorV1Dynamic","kv_connector_module_path":"lmcache.integration.vllm.lmcache_connector_v1","kv_role":"kv_both"}' \
                          LMCACHE_CHUNK_SIZE="$TIER_CHUNK" LMCACHE_LOCAL_CPU=True LMCACHE_MAX_LOCAL_CPU_SIZE="$TIER_GB" ;;
         esac
     else

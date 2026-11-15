@@ -160,6 +160,7 @@ class Receiver:
         self.log = log
         self.done = {}                               # key -> (header, blob, record)
         self.dropped = set()                         # keys to discard on arrival
+        self.failed = {}                             # key -> the sender's error (the transfer will not come)
         self.cv = threading.Condition()
         self.gpu_budget = gpu_budget                 # bytes of GPU blobs at once before falling back to host
         self.gpu_bytes = 0
@@ -211,6 +212,12 @@ class Receiver:
                 self.gpu_bytes -= blob.numel()
 
     def _serve(self, conn, tag):
+        # vLLM runs its forward pass (where blobs are made and later read) in inference mode; tensors made or
+        # updated here are too, so each side may update what the other made
+        with torch.inference_mode():
+            self._serve_inner(conn, tag)
+
+    def _serve_inner(self, conn, tag):
         ring = None
         try:
             hello = _recv_msg(conn)
@@ -254,6 +261,14 @@ class Receiver:
                         _send_msg(conn, {"op": "ack", "pos": m["pos"], "n": n})
                 elif op == "skip":
                     _send_msg(conn, {"op": "ack", "n": m["n"]})
+                elif op == "abort":                  # the sender failed mid-transfer: the decode fails now, not
+                    got = cur.pop(m["key"], None)    # at its timeout
+                    if got is not None:
+                        self.release(got[1])
+                    with self.cv:
+                        self.dropped.discard(m["key"])
+                        self.failed[m["key"]] = m.get("error", "the sender failed")
+                        self.cv.notify_all()
                 elif op == "end":
                     header, blob, rec = cur.pop(m["key"])
                     rec.update(recv_end=time.time(), **{k: m[k] for k in m if k not in ("op", "key")})
@@ -281,10 +296,17 @@ class Receiver:
         with self.cv:
             return self.done.pop(key, None)
 
+    def failure(self, key):
+        """The sender's error for `key` if it aborted the transfer (once), else None."""
+        with self.cv:
+            return self.failed.pop(key, None)
+
     def wait(self, key, timeout):
         end = time.monotonic() + timeout
         with self.cv:
             while key not in self.done:
+                if key in self.failed:
+                    return None
                 left = end - time.monotonic()
                 if left <= 0:
                     return None
@@ -397,6 +419,10 @@ class Sender:
                 d.acked += m["n"]
 
     def _run(self, d, addr):
+        with torch.inference_mode():               # see Receiver._serve: blobs come from vLLM's inference mode
+            self._run_inner(d, addr)
+
+    def _run_inner(self, d, addr):
         while True:
             item = d.queue.get()
             if item is None:
@@ -444,6 +470,10 @@ class Sender:
             except Exception as exc:
                 rec.update(error=repr(exc)[:300])
                 self.log(f"tkv sender: transfer {key} to {addr} failed ({exc!r})")
+                try:                                  # tell the receiver, so its decode fails now
+                    _send_msg(d.sock, {"op": "abort", "key": key, "error": rec["error"]})
+                except OSError:
+                    pass
             if on_done is not None:
                 try:
                     on_done(rec)

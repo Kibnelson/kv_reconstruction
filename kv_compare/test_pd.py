@@ -143,6 +143,51 @@ class TransportTests(unittest.TestCase):
     def tearDown(self):
         self.tr.CHUNK = self.chunk
 
+    def test_blobs_made_in_inference_mode(self):
+        # job 30176: vLLM makes the blob, and the sender its ring, in inference mode; the sender thread then
+        # failed ("Inplace update to inference tensor outside InferenceMode") and every decode waited 600 s
+        tr = self.tr
+        for mode in ("ring", "tcp"):
+            rx = tr.Receiver("127.0.0.1", 0, "cpu", ring_bytes=1 << 16)
+            tx = tr.Sender(tr.Link(), "cpu", mode=mode)
+            recs = []
+            with torch.inference_mode():
+                blob = torch.randint(0, 255, (50000,), dtype=torch.uint8)
+                tx.send(f"127.0.0.1:{rx.port}", "k", {"meta": {}}, blob, on_done=recs.append)
+            got = rx.wait("k", 30)
+            tx.close()
+            rx.close()
+            self.assertIsNotNone(got, (mode, recs))
+            self.assertTrue(torch.equal(got[1], blob), mode)
+            with torch.inference_mode():          # and what arrived is usable where vLLM reads it
+                self.assertEqual(int(got[1].add(0).sum()), int(blob.sum()))
+
+    def test_a_failed_send_fails_the_receiver_now(self):
+        tr = self.tr
+        rx = tr.Receiver("127.0.0.1", 0, "cpu", ring_bytes=1 << 16)
+        link = tr.Link()
+        calls = []
+
+        def reserve(n):
+            calls.append(n)
+            if len(calls) == 2:
+                raise RuntimeError("the second chunk fails")
+            return 0.0, 0.0
+
+        link.reserve = reserve
+        tx = tr.Sender(link, "cpu", mode="ring")
+        recs = []
+        t = time.monotonic()
+        tx.send(f"127.0.0.1:{rx.port}", "k", {"meta": {}}, torch.zeros(50000, dtype=torch.uint8),
+                on_done=recs.append)
+        self.assertIsNone(rx.wait("k", 30))
+        self.assertLess(time.monotonic() - t, 10, "failed at once, not at the timeout")
+        self.assertIn("the second chunk fails", rx.failure("k"))
+        self.assertIsNone(rx.failure("k"), "reported once")
+        self.assertIn("error", recs[0])
+        tx.close()
+        rx.close()
+
     def _run(self, mode, gbps, nbytes=60000, k=3, ring=1 << 16):
         tr = self.tr
         rx = tr.Receiver("127.0.0.1", 0, "cpu", ring_bytes=ring)
@@ -287,10 +332,11 @@ class ConnectorFlowTests(unittest.TestCase):
         return Ps, Pw, Ds, Dw, pc, dc, dest, log_dir
 
     def step(self, sched, worker, finished=()):
-        worker.bind_connector_metadata(sched.build_connector_meta(None))
-        worker.start_load_kv(None)
-        r = worker.get_transfer_results(set(finished))
-        worker.clear_connector_metadata()
+        with torch.inference_mode():                  # where vLLM's model runner calls the worker side
+            worker.bind_connector_metadata(sched.build_connector_meta(None))
+            worker.start_load_kv(None)
+            r = worker.get_transfer_results(set(finished))
+            worker.clear_connector_metadata()
         sched.update_connector_output(SimpleNamespace(finished_sending=r.finished_sending,
                                                       finished_recving=r.finished_recving,
                                                       failed_recving=r.failed_recving))
@@ -375,7 +421,8 @@ class ConnectorFlowTests(unittest.TestCase):
         r = self.step(Ds, Dw)
         self.assertEqual(r.failed_recving, {"d-3"})
         self.assertEqual(r.finished_recving, {"d-3"})
-        self.assertEqual(Dw.get_block_ids_with_load_errors(), {4, 6})
+        # the request only: vLLM 0.32 asserted when the same step also named its blocks (job 30176)
+        self.assertEqual(Dw.get_block_ids_with_load_errors(), set())
 
     def test_requests_without_our_params_are_left_alone(self):
         Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make()

@@ -664,7 +664,9 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertIn("--num-gpu-blocks-override", eng[0]["argv"])
         r, eng = self.run_pd(LAYOUT="colo4", CONNECTOR="lmcache")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
-        self.assertTrue(all(e["cfg"]["kv_connector"] == "LMCacheConnectorV1" for e in eng))
+        self.assertTrue(all(e["cfg"]["kv_connector"] == "LMCacheConnectorV1Dynamic" and
+                            e["cfg"]["kv_connector_module_path"] == "lmcache.integration.vllm.lmcache_connector_v1"
+                            for e in eng))
         self.assertEqual(eng[0]["env"]["LMCACHE_MAX_LOCAL_CPU_SIZE"], "8")
         r, _ = self.run_pd(LAYOUT="colo4", CONNECTOR="nixl")
         self.assertIn("NIXL needs prefill and decode engines", r.stdout)

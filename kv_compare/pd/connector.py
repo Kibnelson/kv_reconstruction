@@ -821,14 +821,23 @@ class _WorkerSide:
             now = time.time()
             for rid, spec in list(self.pending.items()):
                 got = self.receiver.take(spec.key)
+                err = None if got is not None else self.receiver.failure(spec.key)
                 if got is not None:
                     del self.pending[rid]
                     self._install(spec, got)
+                # a failed transfer is reported for the request only (failed_recving, with finished_recving), not
+                # also as invalid blocks in the same step: vLLM 0.32 then failed the request on the blocks and
+                # asserted on the finished one (job 30176, scheduler _update_from_kv_xfer_finished), killing the
+                # engine; NIXL's invalid blocks reach the scheduler a step later, after the request is gone
+                elif err is not None:                 # the prefill side could not send it
+                    del self.pending[rid]
+                    self.recv_failed.add(rid)
+                    self.log.write({"event": "send_failed", "key": spec.key, "req": rid, "error": err, "time": now})
+                    logger.warning("TKVConnector: the transfer of %s failed at the sender: %s", spec.key, err)
                 elif now - spec.admitted_at > self.timeout:
                     del self.pending[rid]
                     self.receiver.drop(spec.key)
                     self.recv_failed.add(rid)
-                    self.failed_blocks.update(spec.block_ids[spec.t0 // self.bs:])
                     self.log.write({"event": "timeout", "key": spec.key, "req": rid, "time": now})
             if now - self._last_expire > 30:          # transfers whose decode request never came (aborted)
                 self._last_expire = now

@@ -95,22 +95,28 @@ def main(argv=None):
     tr_rows = []
     if built:
         name = next((n for n in ("ours-dense", "raw") if n in built), next(iter(built)))
-        parts, m = built[name].encode(words)
-        header, blob = bundle(parts, m)
+        # as in vLLM: the blob is made, sent and read back in inference mode (the forward pass's)
+        with torch.inference_mode():
+            parts, m = built[name].encode(words)
+            header, blob = bundle(parts, m)
         for mode in ("ring", "tcp"):
             rx = Receiver("127.0.0.1", 0, dev, ring_bytes=256 << 20)
             tx = Sender(Link(gbps=a.gbps), dev, mode=mode)
             recs = []
             t = time.perf_counter()
-            tx.send(f"127.0.0.1:{rx.port}", "selftest", header, blob, on_done=recs.append)
+            with torch.inference_mode():
+                tx.send(f"127.0.0.1:{rx.port}", "selftest", header, blob, on_done=recs.append)
             got = rx.wait("selftest", 600)
             wall = time.perf_counter() - t
             ok = got is not None
+            if not ok and recs and recs[0].get("error"):
+                errors[f"transport-{mode}"] = recs[0]["error"]
             if ok:
-                back = torch.empty_like(words)
-                p2, m2 = unbundle(got[0], got[1] if got[1].device == dev else got[1].to(dev))
-                built[name].decode(p2, m2, lambda l, w: back[l].copy_(w))
-                ok = bool(torch.equal(back, words))
+                with torch.inference_mode():
+                    back = torch.empty_like(words)
+                    p2, m2 = unbundle(got[0], got[1] if got[1].device == dev else got[1].to(dev))
+                    built[name].decode(p2, m2, lambda l, w: back[l].copy_(w))
+                    ok = bool(torch.equal(back, words))
             r = {"transport": mode, "codec": name, "bytes": int(blob.numel()), "gbps_set": a.gbps, "exact": ok,
                  "wall_s": wall, "achieved_gbps": 8 * blob.numel() / wall / 1e9,
                  "link_s": recs[0].get("link_s") if recs else None}
