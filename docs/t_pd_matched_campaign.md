@@ -136,9 +136,10 @@ git merge --ff-only FETCH_HEAD &&
 bash scripts/run_t_pd_diagnostics.sh
 ```
 
-It requests four GPUs, four CPUs and 16 GiB for up to 45 minutes, uses the
-campaign's own uv/package cache to make a minimal pinned Torch 2.11.0+cu128
-environment, and runs no model download, calibration or vLLM engines. Source
+It requests four GPUs, four CPUs and 16 GiB for up to 45 minutes, copies your
+account's uv into a private runtime and uses the campaign's own package cache
+to make a minimal pinned Torch 2.11.0+cu128 environment. It runs no model
+download, calibration or vLLM engines. Source
 files are extracted from the recorded Git pin inside the allocation. Its runtime
 is separate under `/tmp/$USER/kvpd-t-matched-$USER/kvpd-diagnostics/<tag>` and is
 kept for inspection; it does not delete old runs or the reusable cache.
@@ -181,3 +182,29 @@ including `DIAG_STAGE` and `DIAG_NODE_STOP` so the actual setup failure can be
 resolved. If it reaches a copy failure, inspect its per-route report instead.
 This logging change does not establish that the earlier setup or CUDA failure
 is fixed and does not start the serving matrix.
+
+### Missing cached uv in job 30222
+
+The next attempt, `links_20261115T162649Z_705458` at source `c1a7a2c`,
+identified the setup failure: job 30222 stopped at `cached_uv` because
+`/tmp/nbore/kvpd-t-matched-nbore/kvpd-cache/bin/uv` was unavailable.
+It reached no GPU-copy test. This does not explain the separate CUDA launch
+failure in job 30196.
+
+The diagnostic no longer requires a tool left by an earlier campaign. Before
+requesting GPUs, it selects `T_PD_UV`, then an executable on PATH, then
+`~/.local/bin/uv`, verifies the selected executable runs, and makes a private
+temporary snapshot on shared home. The allocation copies that snapshot into
+`<diagnostic-runtime>/bin/uv` and verifies its SHA-256 before running it. The
+original source may be a symlink or disappear after submission without
+breaking the allocated job. Only the temporary home snapshot is removed on
+launcher exit; the node runtime and reports remain.
+
+Missing package/Python cache directories are created under our own root.
+An empty cache still needs the managed Python and pinned packages downloaded.
+The source path, hash and version are saved as `uv_provenance.txt` and
+`uv_version.txt`; executables are outside the report bundle. If no usable
+account tool exists, the launcher stops before allocating GPUs and requests
+an account install or an explicit `T_PD_UV=/absolute/path/to/uv` setting.
+Update the standalone checkout and rerun the same diagnostic command above;
+there is no need to edit or repopulate an old campaign by hand.

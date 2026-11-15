@@ -1,0 +1,42 @@
+{
+  "source_parent": "c1a7a2c28efdbe588b9f451ead8cb01b679d6806",
+  "observed_job": "30222",
+  "observed_attempt": "links_20261115T162649Z_705458",
+  "observed_stage": "cached_uv",
+  "observed_exit": 1,
+  "observed_cause": "expected node-local cached uv executable unavailable",
+  "test_command": "python3 -m unittest -v kv_compare.test_pd_gpu_diagnostics",
+  "test_count": 7,
+  "tests_passed": true,
+  "checks": [
+    "bash -n scripts/run_t_pd_diagnostics.sh",
+    "python3 -m py_compile kv_compare/test_pd_gpu_diagnostics.py"
+  ],
+  "bootstrap_cases": [
+    "no node root or prior cache",
+    "explicit T_PD_UV",
+    "PATH selection",
+    "home fallback",
+    "original symlink target removed before node entry",
+    "snapshot hash mismatch stops before use",
+    "missing/nonexecutable tool stops before allocation",
+    "installer failures retain exact stage and exit",
+    "temporary snapshot cleaned; executable excluded from bundle"
+  ],
+  "real_uv_cli_check": {
+    "source": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/uv",
+    "uv_version": "uv 0.13.6 (x86_64-unknown-linux-gnu)",
+    "copied_sha256": "23803452c0fbe125033054cd9ff245f1d649fb65b4b73f68429f4abda432436d",
+    "snapshot_name_supported": true,
+    "copy_runs_after_snapshot_removed": true,
+    "offline_explicit_local_python_environment_created": true,
+    "gpu_executed": false,
+    "pinned_gpu_packages_installed": false
+  },
+  "gpu_executed": false,
+  "pinned_gpu_environment_installed_locally": false,
+  "cuda_failure_fixed": false,
+  "serving_validated": false,
+  "performance_validated": false,
+  "automatic_merge": false
+}

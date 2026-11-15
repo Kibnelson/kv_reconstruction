@@ -1,5 +1,6 @@
 """CPU orchestration contracts; fixtures are not actual GPU validation."""
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 
@@ -102,7 +104,7 @@ class GPUDiagnosticTests(unittest.TestCase):
         self.assertNotIn('pd_setup.sh', text)
         self.assertNotIn('rm -rf', text)
 
-    def test_login_launcher_archives_its_pin_and_reuses_only_own_cache(self):
+    def test_login_launcher_bootstraps_fresh_node_and_preserves_failure_evidence(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             repo, node, binaries = root / 'repo', root / 'node', root / 'bin'
@@ -133,26 +135,36 @@ print('CPU fixture only; no GPU execution')
             origin = root / 'origin.git'
             subprocess.run(['git', 'clone', '-q', '--bare', str(repo), str(origin)], check=True)
             git('remote', 'add', 'origin', str(origin))
-            uv = node / 'kvpd-cache/bin/uv'
+            # No node root or package cache exists. Only the account's uv exists.
+            uv = root / 'home/.local/bin/uv'
             uv.parent.mkdir(parents=True)
-            uv.write_text('#!' + sys.executable + '''
+            uv_content = '#!' + sys.executable + '''
 import os,sys
 from pathlib import Path
-if sys.argv[1]=='venv':
+if sys.argv[1]=='--version':print('uv CPU-fixture')
+elif sys.argv[1]=='venv':
  if os.environ.get('FIXTURE_FAIL_STAGE')=='create_environment':raise SystemExit(9)
  d=Path(sys.argv[-1])/'bin';d.mkdir(parents=True);os.symlink(sys.executable,d/'python')
 elif 'install' in sys.argv and os.environ.get('FIXTURE_FAIL_STAGE')=='install_packages':raise SystemExit(9)
 elif 'freeze' in sys.argv:print('CPU fixture packages')
-''')
+'''
+            uv.write_text(uv_content)
             uv.chmod(0o755)
-            (binaries / 'srun').write_text('#!/bin/bash\nexport SLURM_JOB_ID=cpu-fixture\nexec "${@: -2:1}" "${@: -1}"\n')
+            (binaries / 'srun').write_text('''#!/bin/bash
+if [ "${FIXTURE_REMOVE_UV_SOURCE:-0}" = 1 ]; then rm -f -- "$T_PD_DIAG_UV_SOURCE"; fi
+if [ "${FIXTURE_MUTATE_UV_SNAPSHOT:-0}" = 1 ]; then printf '\\n# changed\\n' >> "$T_PD_DIAG_UV_SNAPSHOT"; fi
+export SLURM_JOB_ID=cpu-fixture
+exec "${@: -2:1}" "${@: -1}"
+''')
             (binaries / 'nvidia-smi').write_text('#!/bin/sh\necho CPU-fixture-no-GPU\n')
             for file in binaries.iterdir():
                 file.chmod(0o755)
             env = {k:v for k,v in os.environ.items() if not k.startswith(('SLURM_', 'T_PD_', 'KVPD_'))}
-            env.update(PATH=str(binaries) + ':' + os.environ['PATH'], T_PD_ROOT=str(node),
+            env.update(PATH=str(binaries) + ':/usr/bin:/bin', HOME=str(root/'home'),
+                       T_PD_UV=str(uv), T_PD_ROOT=str(node),
                        T_PD_NODE=socket.gethostname().split('.')[0], T_PD_STATE_HOME=str(root / 'state'),
                        T_PD_DIAG_PAIRS='0-1', KVPD_ROOT='/tmp/do-not-use-other-project')
+            self.assertFalse(node.exists())
             result = subprocess.run(['bash', str(repo / 'scripts/run_t_pd_diagnostics.sh')],
                                     env=env, capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -164,6 +176,49 @@ elif 'freeze' in sys.argv:print('CPU fixture packages')
             self.assertTrue(next((node / 'kvpd-diagnostics').glob('*/code/scripts/pd_link_probe.py')).is_file())
             self.assertIn('DIAG_JOB=cpu-fixture', result.stdout)
             self.assertEqual((report_path.parent/'node_status.txt').read_text().strip(), 'stage=complete exit=0 job=cpu-fixture')
+            runtime_uv = next((node/'kvpd-diagnostics').glob('*/bin/uv'))
+            self.assertEqual(runtime_uv.read_bytes(), uv.read_bytes())
+            self.assertFalse((node/'kvpd-cache/bin/uv').exists())
+            self.assertTrue((node/'kvpd-cache/uv').is_dir())
+            self.assertTrue((node/'kvpd-cache/python').is_dir())
+            digest = hashlib.sha256(uv.read_bytes()).hexdigest()
+            self.assertIn(f'sha256={digest}', (report_path.parent/'uv_provenance.txt').read_text())
+            self.assertEqual((report_path.parent/'uv_version.txt').read_text(), 'uv CPU-fixture\n')
+            self.assertFalse(list((root/'state/diagnostics').glob('uv-diagnostic.*')))
+            with zipfile.ZipFile(report_path.parent/'share.zip') as bundle:
+                self.assertIn('uv_provenance.txt', bundle.namelist())
+                self.assertFalse(any('uv-diagnostic.' in name or name.endswith('/bin/uv') for name in bundle.namelist()))
+            # PATH takes precedence over the home fallback when no override is set.
+            fallback_env = {k:v for k,v in env.items() if k != 'T_PD_UV'}
+            for use_path in (True, False):
+                with self.subTest(use_path=use_path):
+                    if use_path:
+                        shutil.copyfile(uv, binaries/'uv')
+                        (binaries/'uv').chmod(0o755)
+                    else:
+                        (binaries/'uv').unlink()
+                    selected = binaries/'uv' if use_path else uv
+                    launched = subprocess.run(['bash', str(repo/'scripts/run_t_pd_diagnostics.sh')],
+                                              env=fallback_env, capture_output=True, text=True, timeout=30)
+                    self.assertEqual(launched.returncode, 0, launched.stdout+launched.stderr)
+                    self.assertIn(f'DIAG_UV_SOURCE={selected}', launched.stdout)
+            # The allocation uses the snapshot even if a symlink target vanishes.
+            link = root/'uv-link'
+            link.symlink_to(uv)
+            launched = subprocess.run(['bash', str(repo/'scripts/run_t_pd_diagnostics.sh')],
+                                      env=dict(env, T_PD_UV=str(link), FIXTURE_REMOVE_UV_SOURCE='1'),
+                                      capture_output=True, text=True, timeout=30)
+            self.assertEqual(launched.returncode, 0, launched.stdout+launched.stderr)
+            self.assertFalse(uv.exists())
+            uv.write_text(uv_content)
+            uv.chmod(0o755)
+            failed = subprocess.run(['bash', str(repo/'scripts/run_t_pd_diagnostics.sh')],
+                                    env=dict(env, FIXTURE_MUTATE_UV_SNAPSHOT='1'),
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(failed.returncode, 1, failed.stdout+failed.stderr)
+            self.assertIn('DIAG_NODE_STOP stage=prepare_uv', failed.stdout+failed.stderr)
+            self.assertIn('does not match the login snapshot SHA-256', failed.stdout+failed.stderr)
+            self.assertNotIn('DIAG_BEGIN pair=', failed.stdout)
             # Quiet installer exits used to produce only srun's generic exit.
             for stage in ('create_environment', 'install_packages'):
                 with self.subTest(stage=stage):
@@ -180,10 +235,17 @@ elif 'freeze' in sys.argv:print('CPU fixture packages')
             failed = subprocess.run(['bash', str(repo / 'scripts/run_t_pd_diagnostics.sh')],
                                     env=env, capture_output=True, text=True, timeout=30)
             self.assertEqual(failed.returncode, 1, failed.stdout+failed.stderr)
-            self.assertIn('DIAG_NODE_STOP stage=cached_uv', failed.stdout+failed.stderr)
-            self.assertIn(f'cached uv executable is unavailable: {uv}', failed.stdout+failed.stderr)
+            self.assertIn('DIAG_LOGIN_STOP stage=uv_preflight', failed.stdout+failed.stderr)
+            self.assertIn(f'uv source is not a readable executable: {uv}', failed.stdout+failed.stderr)
+            self.assertNotIn('DIAG_JOB=', failed.stdout)
             self.assertNotIn('DIAG_BEGIN pair=', failed.stdout)
             uv.chmod(0o755)
+            failed = subprocess.run(['bash', str(repo/'scripts/run_t_pd_diagnostics.sh')],
+                                    env=dict(fallback_env, HOME=str(root/'missing-home')),
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(failed.returncode, 1, failed.stdout+failed.stderr)
+            self.assertIn('install uv in your own account or set T_PD_UV', failed.stdout+failed.stderr)
+            self.assertNotIn('DIAG_JOB=', failed.stdout)
             node.chmod(0o777)
             failed = subprocess.run(['bash', str(repo / 'scripts/run_t_pd_diagnostics.sh')],
                                     env=env, capture_output=True, text=True, timeout=30)
@@ -191,6 +253,7 @@ elif 'freeze' in sys.argv:print('CPU fixture packages')
             self.assertIn('DIAG_NODE_STOP stage=private_root', failed.stdout+failed.stderr)
             self.assertIn('mode=777', failed.stdout+failed.stderr)
             node.chmod(0o700)
+            self.assertFalse(list((root/'state/diagnostics').glob('uv-diagnostic.*')))
             self.assertEqual(git('status', '--porcelain'), '')
 
 

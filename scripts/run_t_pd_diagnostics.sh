@@ -3,7 +3,9 @@
 set -Eeuo pipefail
 umask 077
 diag_stage=login_preflight
+diag_uv_snapshot=
 trap 'diag_rc=$?; printf "DIAG_LOGIN_STOP stage=%s line=%s exit=%s\n" "$diag_stage" "$LINENO" "$diag_rc" >&2; exit "$diag_rc"' ERR
+trap 'diag_rc=$?; if [ -n "$diag_uv_snapshot" ]; then rm -f -- "$diag_uv_snapshot"; fi; exit "$diag_rc"' EXIT
 test -z "${SLURM_JOB_ID:-}"
 export USER=$(id -un)
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -27,6 +29,37 @@ for task_key in T_PD_DIAG_PIN T_PD_DIAG_ROOT T_PD_DIAG_NODE T_PD_DIAG_MIB T_PD_D
 done
 exec > >(tee -a "$T_PD_DIAG_OUT/login.log") 2>&1
 printf 'PIN=%s\nDIAG_TAG=%s\nOUTPUT=%s\n' "$T_PD_DIAG_PIN" "$T_PD_DIAG_TAG" "$T_PD_DIAG_OUT"
+diag_stage=uv_preflight
+printf 'DIAG_STAGE=%s\n' "$diag_stage"
+if [ -n "${T_PD_UV:-}" ]; then
+    uv_source=$T_PD_UV
+elif type -P uv >/dev/null 2>&1; then
+    uv_source=$(type -P uv)
+elif [ -x "$HOME/.local/bin/uv" ]; then
+    uv_source=$HOME/.local/bin/uv
+else
+    printf 'STOP: install uv in your own account or set T_PD_UV to its executable; no allocation was requested.\n' >&2
+    false
+fi
+if [ ! -f "$uv_source" ] || [ ! -r "$uv_source" ] || [ ! -x "$uv_source" ]; then
+    printf 'STOP: diagnostic uv source is not a readable executable: %s; no allocation was requested.\n' "$uv_source" >&2
+    false
+fi
+T_PD_DIAG_UV_SOURCE=$(readlink -f -- "$uv_source")
+export T_PD_DIAG_UV_SOURCE
+# Snapshot on shared home before allocating: the source may be a symlink into
+# login-local /tmp. The node must not depend on that original path or old runs.
+diag_uv_snapshot=$(mktemp "$T_PD_DIAG_OUT/../uv-diagnostic.XXXXXXXX")
+install -m 700 -- "$T_PD_DIAG_UV_SOURCE" "$diag_uv_snapshot"
+export T_PD_DIAG_UV_SNAPSHOT=$diag_uv_snapshot
+T_PD_DIAG_UV_SHA256=$(sha256sum -- "$diag_uv_snapshot" | awk '{print $1}')
+export T_PD_DIAG_UV_SHA256
+printf 'source=%s\nsha256=%s\n' "$T_PD_DIAG_UV_SOURCE" "$T_PD_DIAG_UV_SHA256" > "$T_PD_DIAG_OUT/uv_provenance.txt"
+printf 'DIAG_UV_SOURCE=%s\nDIAG_UV_SHA256=%s\n' "$T_PD_DIAG_UV_SOURCE" "$T_PD_DIAG_UV_SHA256"
+"$diag_uv_snapshot" --version | tee "$T_PD_DIAG_OUT/uv_version.txt"
+for task_key in T_PD_DIAG_UV_SOURCE T_PD_DIAG_UV_SHA256; do
+    printf 'export %s=%q\n' "$task_key" "${!task_key}" >> "$T_PD_DIAG_OUT/state.sh"
+done
 diag_stage=allocation
 if type module >/dev/null 2>&1; then module load slurm; fi
 srun -p "${T_PD_PARTITION:-all}" -A "${T_PD_ACCOUNT:-oana2026}" -q "${T_PD_QOS:-research12h}" \
@@ -60,7 +93,7 @@ private_dir "$T_PD_DIAG_ROOT/kvpd-diagnostics"
 runtime=$T_PD_DIAG_ROOT/kvpd-diagnostics/$T_PD_DIAG_TAG
 test ! -e "$runtime" && test ! -L "$runtime"
 mkdir -m 700 "$runtime"
-mkdir -m 700 "$runtime/code" "$runtime/tmp" "$runtime/cache"
+mkdir -m 700 "$runtime/code" "$runtime/tmp" "$runtime/cache" "$runtime/bin"
 printf 'DIAG_RUNTIME=%s\n' "$runtime"
 diag_stage=source_archive
 printf 'DIAG_STAGE=%s\n' "$diag_stage"
@@ -79,13 +112,18 @@ for task_key in PATH LD_LIBRARY_PATH; do
     printf -v "$task_key" '%s' "$(IFS=:; echo "${clean[*]}")"
     export "$task_key"
 done
-export KV_UV=$T_PD_DIAG_ROOT/kvpd-cache/bin/uv KV_UV_PYTHON=3.12.14
-diag_stage=cached_uv
+export KV_UV=$runtime/bin/uv KV_UV_PYTHON=3.12.14
+diag_stage=prepare_uv
 printf 'DIAG_STAGE=%s\n' "$diag_stage"
-if [ ! -x "$KV_UV" ]; then
-    printf 'STOP: our cached uv executable is unavailable: %s\n' "$KV_UV" >&2
+private_dir "$T_PD_DIAG_ROOT/kvpd-cache"
+private_dir "$T_PD_DIAG_ROOT/kvpd-cache/uv"
+private_dir "$T_PD_DIAG_ROOT/kvpd-cache/python"
+install -m 700 -- "$T_PD_DIAG_UV_SNAPSHOT" "$KV_UV"
+if [ "$(sha256sum -- "$KV_UV" | awk '{print $1}')" != "$T_PD_DIAG_UV_SHA256" ]; then
+    printf 'STOP: runtime uv does not match the login snapshot SHA-256: %s\n' "$KV_UV" >&2
     false
 fi
+printf 'runtime=%s\n' "$KV_UV" >> "$T_PD_DIAG_OUT/uv_provenance.txt"
 "$KV_UV" --version
 export UV_CACHE_DIR=$T_PD_DIAG_ROOT/kvpd-cache/uv UV_LINK_MODE=hardlink
 export UV_PYTHON_INSTALL_DIR=$T_PD_DIAG_ROOT/kvpd-cache/python UV_PYTHON_PREFERENCE=only-managed UV_NO_CONFIG=1
