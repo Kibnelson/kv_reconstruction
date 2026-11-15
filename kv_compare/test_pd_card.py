@@ -337,6 +337,33 @@ echo "$UV_INDEX_STRATEGY $UV_NO_CONFIG"
         self.assertIn("not an executable uv", r.stdout)
 
 
+class SalvageTests(unittest.TestCase):
+    """cleanup keeps the logs of the runs that ended before packaging them (and only those)."""
+
+    def test_salvage(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_campaign as c
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        root, ev = tmp / "rt", tmp / "ev"
+        for name in ("20261114_2011_1p3d_tkv_ring", "20261114_2016_1p3d_tkv_ring_eager", "prompts_2048_check_1"):
+            d = root / "runs" / "llama32_3b" / "pd" / name
+            (d / "connector").mkdir(parents=True)
+            (d / "engine_prefill1.log").write_text("Traceback\nValueError: x\n")
+            (d / "connector" / "Pw.jsonl").write_text('{"event": "ready"}\n')
+        (root / "home").mkdir()
+        (root / "home" / "cuda13_installer.log").write_text("[ERROR]: something\n")
+        (ev / "matrix" / "llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261114_2011_smoke_partial").mkdir(parents=True)
+        (ev / "run.log").write_text("the run's output\n")
+        got = c.salvage(root, ev)
+        self.assertIn("salvaged/20261114_2016_1p3d_tkv_ring_eager/engine_prefill1.log", got)
+        self.assertIn("salvaged/20261114_2016_1p3d_tkv_ring_eager/connector/Pw.jsonl.gz", got)
+        self.assertFalse(any("20261114_2011_" in g for g in got), "a packaged run is not copied twice")
+        self.assertFalse(any("prompts_" in g for g in got))
+        self.assertIn("salvaged/home/cuda13_installer.log", got)
+        self.assertTrue((ev / "run.log.gz").is_file() and not (ev / "run.log").exists())
+
+
 class DropWindowsTests(unittest.TestCase):
     """scripts/pd_export_codecs.py's --drop-cal-captures: a set's calibration windows go once it is fitted, unless a
     later set uses them; the main captures stay."""

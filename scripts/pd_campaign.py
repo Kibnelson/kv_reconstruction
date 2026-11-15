@@ -636,6 +636,54 @@ def process_refs(path):
     return hits
 
 
+def capped_copy(src, dst, limit=4_000_000):
+    """src to dst whole when small, else its first 300 and last 400 lines."""
+    if src.stat().st_size < limit:
+        shutil.copyfile(src, dst)
+        return
+    lines = src.read_text(errors="replace").splitlines()
+    write_text(dst, "\n".join(lines[:300] + [f"[... {len(lines)} lines in all ...]"] + lines[-400:]) + "\n")
+
+
+def salvage(root, ev):
+    """Before the runtime goes: the logs of every PD run folder (engines, bench, proxy, connector) and of the
+    setup, for runs that ended before packaging them (killed, cancelled, out of time). Small files only."""
+    out, got = ev / "salvaged", []
+    names = ("engine_*.log", "bench.log", "proxy.log", "connector/*.jsonl", "results.json", "env.json")
+    packaged = [d.name for d in (ev / "matrix").iterdir()] if (ev / "matrix").is_dir() else []
+    for run in sorted((root / "runs").glob("*/pd/*")):
+        if not run.is_dir() or run.name.startswith("prompts_"):
+            continue
+        parts = run.name.split("_", 2)             # <date>_<time>_<run tag>, packaged as ..._pd_<run tag>_..._<date>_<time>
+        if len(parts) == 3 and any(f"_pd_{parts[2]}_" in d and f"_{parts[0]}_{parts[1]}" in d for d in packaged):
+            continue
+        for pat in names:
+            for f in sorted(run.glob(pat)):
+                if not f.is_file() or f.is_symlink():
+                    continue
+                dst = out / run.name / f.relative_to(run)
+                dst.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                if f.suffix == ".jsonl":
+                    dst = dst.with_name(dst.name + ".gz")
+                    with open(f, "rb") as src, gzip.open(dst, "wb") as g:
+                        shutil.copyfileobj(src, g)
+                else:
+                    capped_copy(f, dst)
+                got.append(str(dst.relative_to(ev)))
+    for f in sorted((root / "home").glob("*.log")):
+        if f.is_file() and not f.is_symlink():
+            (out / "home").mkdir(mode=0o700, parents=True, exist_ok=True)
+            capped_copy(f, out / "home" / f.name)
+            got.append(f"salvaged/home/{f.name}")
+    if (ev / "run.log").is_file():                 # the run stage ended before compressing its log
+        data = (ev / "run.log").read_bytes()
+        with gzip.open(ev / "run.log.gz", "wb") as g:
+            g.write(data)
+        (ev / "run.log").unlink()
+        got.append("run.log.gz")
+    return got
+
+
 def stage_cleanup(p, a, job):
     check_tools(p, a.pin)
     check_campaign(p, a.pin, a.tag, a.matrix)
@@ -652,6 +700,7 @@ def stage_cleanup(p, a, job):
     require(Path(run["runtime"]) == root, "the run's runtime path differs")
     existed = root.exists() or root.is_symlink()
     before = after = []
+    salvaged = []
     listed = 0
     free0 = shutil.disk_usage(p.root).free
     if existed:
@@ -660,6 +709,7 @@ def stage_cleanup(p, a, job):
         require(root.parent == p.runtimes and root.name == rj, "not the run's runtime")
         before = process_refs(root)
         require(not before, f"processes {before[:10]} still use {root}")
+        salvaged = salvage(root, ev)
         for dirpath, dirnames, filenames in os.walk(root):
             for n in filenames:
                 try:
@@ -687,9 +737,11 @@ def stage_cleanup(p, a, job):
         "schema": SCHEMA, "kind": "kvpd_runtime_cleanup", "pin": a.pin, "tag": a.tag, "run_job": rj,
         "cleanup_job": job, "runtime": str(root), "existed": existed, "removed": existed and gone,
         "absent_after": gone, "process_refs_before": len(before), "process_refs_after": len(after),
-        "listed_bytes": listed, "freed_bytes": max(0, free1 - free0), "when": now(),
+        "listed_bytes": listed, "freed_bytes": max(0, free1 - free0), "when": now(), "salvaged": salvaged,
         "own_dev_shm_files": shm[:50],
     }, once=True)
+    if salvaged:
+        log(f"   kept {len(salvaged)} log(s) of runs that did not package them: salvaged/ in the campaign")
     log(f"KVPD CLEANUP: {root} {'removed' if existed else 'was never made'}; {listed / 1e9:.1f} GB listed, "
         f"{max(0, free1 - free0) / 1e9:.1f} GB freed (files hard-linked into the cache stay there)")
     if shm:
@@ -774,8 +826,12 @@ def stage_review(p, a, job):
         "schema": SCHEMA, "review_job": job, "run_job": str(run["run_job"]), "status": run.get("status"),
         "runs": mj.get("runs", []), "failed": mj.get("failed", []), "folders": folders, "files": len(inv),
         "bytes": sum(f["bytes"] for f in inv), "when": now()}, once=True)
+    status = run.get("status")
+    if status == "started":                         # killed before it could write its end: Slurm's record says how
+        row = (ev / "run_job_sacct.psv").read_text().strip() if (ev / "run_job_sacct.psv").is_file() else ""
+        status = f"ended without a final status (Slurm: {row.split('|')[1] if row.count('|') else 'unknown'})"
     log(f"KVPD REVIEW: {len(folders)} run folders, {len(inv)} files, {sum(f['bytes'] for f in inv) / 1e6:.1f} MB; "
-        f"run status {run.get('status')}")
+        f"run status {status}")
     show(rv / "summary.md")
     return 0
 

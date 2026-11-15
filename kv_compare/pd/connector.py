@@ -440,7 +440,7 @@ class _WorkerSide:
             raise ValueError(f"{len(caches)} attention layers, the codec constants have {self.meta['L']}")
         self.paged = Paged(caches, self.bs, heads, hd)
         self.device = device
-        warm = self.warm_up()
+        warm = self._warm_up_apart()
         self.log.write({"event": "ready", "role": "P" if self.producer else "D", "codecs": sorted(self.codecs),
                         "codec_errors": errors, "layers": len(caches), "view": list(caches[0].shape),
                         "block_size": self.bs, "warm_up": warm, "time": time.time()})
@@ -462,6 +462,31 @@ class _WorkerSide:
                                      gpu_ring_bytes=int(self.cfg.get("gpu_ring_bytes", 512 << 20)))
         logger.info("TKVConnector worker ready: %s codecs %s", "prefill" if self.producer else "decode",
                     sorted(self.codecs))
+
+    def _warm_up_apart(self):
+        """warm_up in a thread of its own, on a stream of its own: what it launches does not depend on the stream
+        state vLLM leaves on its own thread while it starts (the current stream is per thread)."""
+        res = {}
+
+        def work():
+            try:
+                if self.device.type == "cuda":
+                    torch.cuda.set_device(self.device)
+                    stream = torch.cuda.Stream(self.device)
+                    with torch.cuda.stream(stream):
+                        res["out"] = self.warm_up()
+                    stream.synchronize()
+                else:
+                    res["out"] = self.warm_up()
+            except BaseException as exc:            # re-raised in vLLM's thread
+                res["err"] = exc
+
+        t = threading.Thread(target=work, name="tkv-warm-up", daemon=True)
+        t.start()
+        t.join()
+        if "err" in res:
+            raise res["err"]
+        return res["out"]
 
     def warm_up(self):
         """Compile every codec's kernels once (a 256-token round trip of random words) and check exactness."""

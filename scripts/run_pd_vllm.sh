@@ -164,6 +164,8 @@ print(snapshot_download('$MODEL_ID', revision=$REVPY))")}
 echo "   model folder $MP"
 
 # ---------------------------------------------------------------------------------------------- what to run
+# a run that hangs (a transfer that never arrives) ends here instead of taking the allocation: seconds for the bench
+RUN_TIMEOUT_S=${RUN_TIMEOUT_S:-$([ "${SMOKE:-0}" = 1 ] && echo 1200 || echo 10800)}
 if [ "${SMOKE:-0}" = 1 ]; then
     CODECS=${CODECS:-raw,splitzip,ours-hbh,t2-hbh}
     LINKS=${LINKS:-$([ "$TRANSPORT" = p2p ] && echo native || echo 10)}
@@ -268,7 +270,12 @@ visible() {   # the CUDA_VISIBLE_DEVICES of an engine on job GPU position $1
 serve() {   # name position port mem kv_transfer_config [VAR=value ...]
     local name=$1 pos=$2 port=$3 mem=$4 cfg=$5
     shift 5
-    env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 "$@" \
+    # VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0: vLLM (since 0.21) captures CUDA graphs once while it sizes the KV
+    # cache, before the KV connector starts; on gpu-grad-01 (job 30163) every compiled engine with a connector that
+    # touches the GPU at start (ours, LMCache) then died, and the eager ones (no capture) came up. With 0 the
+    # graphs are captured after the connector, as eager engines see it; the KV cache is sized without that estimate.
+    env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 \
+        VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS="${VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS:-0}" "$@" \
         nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" \
         --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" \
         --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" \
@@ -363,7 +370,8 @@ json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sy
           open(sys.argv[1], "w"))
 EOF
 set +e
-PYTHONPATH=$REPO "$VPY" -u scripts/pd_bench.py --proxy "$PROXY" --model "$MP" --out "$OUT" --prompts "$PROMPTS" \
+PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
+    "$VPY" -u scripts/pd_bench.py --proxy "$PROXY" --model "$MP" --out "$OUT" --prompts "$PROMPTS" \
     --texts "$KV_RUNS/dataset_texts" --log-dir "$LOGS" --link-control "$LINKFILE" --codecs "$CODECS" --links "$LINKS" \
     --rates "$RATES" --num-prompts "$NUM_PROMPTS" --output-len "$OUTPUT_LEN" --ttft-slo-ms "${TTFT_SLO_MS:-2000}" \
     --stages "$STAGES" --vllm-source "$KV_HOME/sources/vllm" --env "$OUT/env.json" \
@@ -371,6 +379,7 @@ PYTHONPATH=$REPO "$VPY" -u scripts/pd_bench.py --proxy "$PROXY" --model "$MP" --
     --tier-max-turns "$TIER_MAX_TURNS" --tier-control "$TIERFILE" 2>&1 | tee "$OUT/bench.log"
 STATUS=${PIPESTATUS[0]}
 set -e
+if [ "$STATUS" = 124 ]; then echo "STOP: the bench ran past RUN_TIMEOUT_S=$RUN_TIMEOUT_S s; packaged as _partial"; fi
 else
     STATUS=1                       # packaged below all the same: the engine logs are the evidence
 fi
