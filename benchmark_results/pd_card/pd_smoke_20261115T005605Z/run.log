@@ -1,0 +1,1257 @@
+== allocation: job 30163 on gpu-grad-01.cs.mcgill.ca, CUDA_VISIBLE_DEVICES=0,1,2,3
+0, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+NOTE: 4 GPUs visible; the runs use the first one (cuda:0)
+== network from this node (the runs download models, datasets and the baselines' sources)
+  ok  https://pypi.org/simple/
+  ok  https://download.pytorch.org/whl/cu128/
+  ok  https://huggingface.co
+  ok  https://github.com
+  ok  https://raw.githubusercontent.com/wojzaremba/lstm/master/data/ptb.test.txt
+== disk under /tmp/nbore/kvpd/30163/home
+/dev/mapper/ubuntu--vg-ubuntu--lv  197G  130G   58G  70% /
+== python 3.12.14 (/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu)
+== torch 2.11.0+cu128 (CUDA 12.8), triton 3.6.0, transformers 4.57.6
+   GPU: NVIDIA RTX A5000
+   a Triton kernel compiled and ran
+== the authors' codecs at the pinned commits
+   SplitZip 42c7431 in /tmp/nbore/kvpd/30163/home/sources/splitzip
+   ExANS (openlake) de6c38b in /tmp/nbore/kvpd/30163/home/sources/exans; the runs build it from source
+== the other bit-exact codecs (docs/lossless_related_work.md) at their pinned commits
+   adacode d46cf6c in /tmp/nbore/kvpd/30163/home/sources/adacode
+   exactkv d90376b in /tmp/nbore/kvpd/30163/home/sources/exactkv
+   ibp b2f7100 in /tmp/nbore/kvpd/30163/home/sources/ibp
+   nvCOMP (Python) 5.3.0
+== CUDA toolkit with nvcc (ExANS is built from source)
+Cuda compilation tools, release 12.6, V12.6.68
+Build cuda_12.6.r12.6/compiler.34714021_0
+   CUDA_HOME for the runs: /usr/local/pkgs/cuda/12.6
+SETUP DONE: KV_HOME=/tmp/nbore/kvpd/30163/home (python /tmp/nbore/kvpd/30163/home/venv/bin/python)
+0, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+== vLLM environment /tmp/nbore/kvpd/30163/home/venv_vllm
+   vllm 0.32.0, torch 2.13.0+cu130 (CUDA 13.0), triton 3.7.1, transformers 5.19.0
+== vLLM source (benchmarks/multi_turn)
+Note: switching to '5df63a7203cdb9328d824a27b682e77c7b9928be'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+== LMCache environment /tmp/nbore/kvpd/30163/home/venv_lmcache (the CPU-tier reference)
+[32;20m[2026-11-14 19:57:47,294] LMCache INFO:[0m torch_dev=<module 'torch.cuda' from '/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/torch/cuda/__init__.py'>, torch_device_type=cuda [3m(_device_detect.py:311:lmcache.v1.platform._device_detect)[0m
+[32;20m[2026-11-14 19:57:47,295] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[33;20m[2026-11-14 19:57:47,296] LMCache WARNING:[0m lmcache.cuda_ops compiled extension not found; CudaDeviceOps stays on the torch baseline for all ops. [3m(device_ops.py:128:lmcache.v1.platform.devices.cuda.device_ops)[0m
+   vllm 0.32.0, lmcache 0.5.7.post1
+== IBP in the vLLM environment (/tmp/nbore/kvpd/30163/home/ibp_vllm_build.log)
+   the CUDA 13 toolkit from https://developer.download.nvidia.com/compute/cuda/13.2.0/local_installers/cuda_13.2.0_595.45.04_linux.run into /tmp/nbore/kvpd-cache/cuda13
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 4150M    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  3 4150M    3  146M    0     0   133M      0  0:00:31  0:00:01  0:00:30  133M  8 4150M    8  370M    0     0   176M      0  0:00:23  0:00:02  0:00:21  176M 14 4150M   14  607M    0     0   196M      0  0:00:21  0:00:03  0:00:18  196M 22 4150M   22  936M    0     0   228M      0  0:00:18  0:00:04  0:00:14  228M 29 4150M   29 1229M    0     0   241M      0  0:00:17  0:00:05  0:00:12  261M 37 4150M   37 1554M    0     0   255M      0  0:00:16  0:00:06  0:00:10  281M 44 4150M   44 1838M    0     0   259M      0  0:00:16  0:00:07  0:00:09  293M 52 4150M   52 2168M    0     0   267M      0  0:00:15  0:00:08  0:00:07  312M 60 4150M   60 2512M    0     0   276M      0  0:00:15  0:00:09  0:00:06  315M 68 4150M   68 2839M    0     0   281M      0  0:00:14  0:00:10  0:00:04  322M 77 4150M   77 3198M    0     0   288M      0  0:00:14  0:00:11  0:00:03  328M 85 4150M   85 3530M    0     0   291M      0  0:00:14  0:00:12  0:00:02  338M 93 4150M   93 3863M    0     0   295M      0  0:00:14  0:00:13  0:00:01  339M100 4150M  100 4150M    0     0   299M      0  0:00:13  0:00:13 --:--:--  344M
+ Installation failed. See log at /tmp/cuda-installer.log for details.
+   WARNING: the CUDA 13 toolkit did not install
+   WARNING: IBP did not build (tail of /tmp/nbore/kvpd/30163/home/ibp_vllm_build.log below); the tier runs leave it out
+== ExANS (the authors' library, CUDA 12.8 toolkit, codec environment)
+  $ cmake -S /tmp/nbore/kvpd/30163/runs/llama32_3b/exans/src -B /tmp/nbore/kvpd/30163/runs/llama32_3b/exans/build -DOPENLAKE_EXPANS_BUILD=ON -DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DNVCOMP_ROOT=/tmp/nbore/kvpd/30163/home/venv/lib/python3.12/site-packages/nvidia/libnvcomp -Dnvcomp_DIR=/tmp/nbore/kvpd/30163/home/venv/lib/python3.12/site-packages/nvidia/libnvcomp/lib64/cmake/nvcomp -DCUDAToolkit_ROOT=/usr/local/pkgs/cuda/12.6 -DCMAKE_BUILD_TYPE=Release
+  $ cmake --build /tmp/nbore/kvpd/30163/runs/llama32_3b/exans/build --target openlake_expans openlake_expans_test -j 4
+  $ /tmp/nbore/kvpd/30163/runs/llama32_3b/exans/build/openlake_expans_test
+  the authors' ExANS test passed
+   ExANS built: /tmp/nbore/kvpd/30163/runs/llama32_3b/exans/build/libopenlake_expans.so
+== calibration captures in /tmp/nbore/kvpd/30163/runs/llama32_3b
+wikitext2: 4358 rows, 1,294,336 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/wikitext2.txt
+wikitext2_train: 36718 rows, 10,966,424 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/wikitext2_train.txt
+humaneval: 164 rows, 103,886 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/humaneval.txt
+gsm8k: 1319 rows, 730,397 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/gsm8k.txt
+mmlu: 14042 rows, 7,589,641 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/mmlu.txt
+ptb: 3761 rows, 442,422 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/ptb.txt
+wrote /tmp/nbore/kvpd/30163/runs/dataset_texts/manifest.json
+19:59:57 run started: stages ['calcap']; NVIDIA RTX A5000; branch HEAD, commit badb38842369fb8445d4c86500212169bbee0ed0; torch 2.11.0+cu128, triton 3.6.0
+19:59:57 GPU memory free 23.3 of 23.5 GB at start
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files:  50%|█████     | 1/2 [00:09<00:09,  9.39s/it]Fetching 2 files: 100%|██████████| 2/2 [00:27<00:00, 13.57s/it]Fetching 2 files: 100%|██████████| 2/2 [00:27<00:00, 13.57s/it]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 94.69it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (2436213 > 131072). Running this sequence through the model will result in indexing errors
+20:00:48 calcap: captured wtrain0 (WikiText-2 train tokens 0-8190)
+20:00:58 calcap: captured wtrain1 (WikiText-2 train tokens 8191-16381)
+20:01:06 calcap: captured wtrain2 (WikiText-2 train tokens 16382-24572)
+20:01:14 calcap: captured wtrain3 (WikiText-2 train tokens 24573-32763)
+20:01:22 calcap: captured wtrain4 (WikiText-2 train tokens 32764-40954)
+20:01:30 calcap: captured wtrain5 (WikiText-2 train tokens 40955-49145)
+20:01:33 calcap: captured wtables (WikiText-2 train tokens 49146-57336)
+20:01:33 calcap: unsloth/Llama-3.2-3B (28 layers, 8 KV heads x 128, 24 query heads)
+20:01:34 run finished in 98 s
+20:01:34 share it: python scripts/package_llama_compare.py /tmp/nbore/kvpd/30163/runs/llama32_3b --destination benchmark_results/<name>
+cal_code: 974 rows, 251,822 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/cal_code.txt
+cal_math: 7473 rows, 4,057,858 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/cal_math.txt
+cal_exam: 1816 rows, 969,320 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/cal_exam.txt
+cal_news: 42068 rows, 5,017,481 characters -> /tmp/nbore/kvpd/30163/runs/dataset_texts/cal_news.txt
+wrote /tmp/nbore/kvpd/30163/runs/dataset_texts/cal_manifest.json
+== codec constants /tmp/nbore/kvpd/30163/runs/llama32_3b/pd_codecs.pt (codec environment)
+  fused one-step predictor prepared for 28 layers
+  reduced-rank one-step predictor (rank 256) prepared for 28 layers
+  head-group predictor (2 groups of 8 heads) prepared for 28 layers
+  head-group predictor (4 groups of 4 heads) prepared for 28 layers
+  head-group predictor (16 groups of 1 heads) prepared for 28 layers
+SplitZip code book from wtrain0: top-16 coverage 99.91%
+T2 set wikitext: the main constants
+[20:03:23] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 170.42it/s]
+[20:03:29] calib: captured cal_code_0
+[20:03:33] calib: captured cal_code_1
+[20:03:36] calib: captured cal_code_2
+[20:03:40] calib: captured cal_code_3
+T2 set code: captured 4 calibration windows
+T2 set code: 3 calibration documents (MBPP, all splits (Python problems and solutions; HumanEval's kind of text))
+   deleted 3.5 GiB of calibration windows
+[20:05:03] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 167.03it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (1212753 > 131072). Running this sequence through the model will result in indexing errors
+[20:05:10] calib: captured cal_math_0
+[20:05:13] calib: captured cal_math_1
+[20:05:17] calib: captured cal_math_2
+[20:05:20] calib: captured cal_math_3
+T2 set math: captured 4 calibration windows
+T2 set math: 3 calibration documents (GSM8K train)
+   deleted 3.5 GiB of calibration windows
+[20:06:36] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 167.34it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (212985 > 131072). Running this sequence through the model will result in indexing errors
+[20:06:41] calib: captured cal_exam_0
+[20:06:45] calib: captured cal_exam_1
+[20:06:48] calib: captured cal_exam_2
+[20:06:51] calib: captured cal_exam_3
+T2 set exam: captured 4 calibration windows
+T2 set exam: 3 calibration documents (MMLU dev and validation (MMLU's prompt format))
+   deleted 3.5 GiB of calibration windows
+[20:08:07] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 168.43it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (1061071 > 131072). Running this sequence through the model will result in indexing errors
+[20:08:16] calib: captured cal_news_0
+[20:08:19] calib: captured cal_news_1
+[20:08:22] calib: captured cal_news_2
+[20:08:25] calib: captured cal_news_3
+T2 set news: captured 4 calibration windows
+T2 set news: 3 calibration documents (Penn Treebank train)
+   deleted 3.5 GiB of calibration windows
+{
+ "written": "/tmp/nbore/kvpd/30163/runs/llama32_3b/pd_codecs.pt",
+ "model": "unsloth/Llama-3.2-3B",
+ "revision": "d4446454d87d51aa42e1fb174f25acc5f8762331",
+ "train_set": "wikitext",
+ "calibration": [
+  "wtrain0",
+  "wtrain1",
+  "wtrain2",
+  "wtrain3",
+  "wtrain4",
+  "wtrain5"
+ ],
+ "splitzip_book_from": "wtrain0",
+ "L": 28,
+ "W": 2048,
+ "C": 1024,
+ "hd": 128,
+ "rank": 256,
+ "groups": [
+  2,
+  4,
+  16
+ ],
+ "max_positions": 32768,
+ "t2_sets": [
+  "wikitext",
+  "code",
+  "math",
+  "exam",
+  "news"
+ ]
+}
+== self-test in the vLLM environment (every codec through the paced transport)
+pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+{"codec": "raw", "tokens": 8192, "encode_ms": 0.023419037461280823, "bits": 16.0, "decode_ms": 2.842061221599579, "exact": true}
+{"codec": "ours-dense", "tokens": 8192, "encode_ms": 88.58660236001015, "bits": 8.745545251028878, "decode_ms": 58.24431590735912, "exact": true}
+{"codec": "ours-kv", "tokens": 8192, "encode_ms": 117.76425875723362, "bits": 8.380765642438616, "decode_ms": 67.78271496295929, "exact": true}
+{"codec": "ours-4g", "tokens": 8192, "encode_ms": 117.8856510668993, "bits": 8.145614079066686, "decode_ms": 77.72663980722427, "exact": true}
+{"codec": "ours-hbh", "tokens": 8192, "encode_ms": 118.01830306649208, "bits": 8.009789875575475, "decode_ms": 182.90318734943867, "exact": true}
+{"codec": "ours-rank256", "tokens": 8192, "encode_ms": 67.18515790998936, "bits": 9.219076974051339, "decode_ms": 54.91887591779232, "exact": true}
+{"codec": "t2-dense", "tokens": 8192, "encode_ms": 101.22603550553322, "bits": 8.745545251028878, "set": "wikitext", "layer0": "coded", "decode_ms": 61.60275638103485, "exact": true}
+{"codec": "t2-hbh", "tokens": 8192, "encode_ms": 128.72494012117386, "bits": 8.009789875575475, "set": "wikitext", "layer0": "coded", "decode_ms": 183.87207947671413, "exact": true}
+{"codec": "t2-rank256", "tokens": 8192, "encode_ms": 77.42993533611298, "bits": 9.219076974051339, "set": "wikitext", "layer0": "coded", "decode_ms": 55.803319439291954, "exact": true}
+{"codec": "splitzip", "tokens": 8192, "encode_ms": 7.521392777562141, "bits": 12.049286961555481, "decode_ms": 5.441170185804367, "exact": true}
+{"codec": "adacode", "tokens": 8192, "encode_ms": 23.217780515551567, "bits": 11.37075240271432, "decode_ms": 8.274391293525696, "exact": true}
+{"codec": "exactkv", "tokens": 8192, "encode_ms": 17.945963889360428, "bits": 12.575496128627233, "decode_ms": 26.15746669471264, "exact": true}
+{"codec": "exans", "tokens": 8192, "encode_ms": 176.11924558877945, "bits": 10.872940744672503, "decode_ms": 27.16366946697235, "exact": true}
+{"codec": "raw", "tokens": 3000, "encode_ms": 0.017311424016952515, "bits": 16.0, "decode_ms": 1.0849088430404663, "exact": true}
+{"codec": "ours-dense", "tokens": 3000, "encode_ms": 36.0269695520401, "bits": 9.269865327380952, "decode_ms": 25.813890621066093, "exact": true}
+{"codec": "ours-kv", "tokens": 3000, "encode_ms": 46.85446806252003, "bits": 8.90550669642857, "decode_ms": 30.60917928814888, "exact": true}
+{"codec": "ours-4g", "tokens": 3000, "encode_ms": 46.57133296132088, "bits": 8.668667410714285, "decode_ms": 38.949642330408096, "exact": true}
+{"codec": "ours-hbh", "tokens": 3000, "encode_ms": 46.80212028324604, "bits": 8.531450892857142, "decode_ms": 164.0970315784216, "exact": true}
+{"codec": "ours-rank256", "tokens": 3000, "encode_ms": 27.44591422379017, "bits": 9.74771800595238, "decode_ms": 22.84603752195835, "exact": true}
+{"codec": "t2-dense", "tokens": 3000, "encode_ms": 45.32475583255291, "bits": 9.269865327380952, "set": "wikitext", "layer0": "coded", "decode_ms": 25.853492319583893, "exact": true}
+{"codec": "t2-hbh", "tokens": 3000, "encode_ms": 56.69722333550453, "bits": 8.531450892857142, "set": "wikitext", "layer0": "coded", "decode_ms": 163.38142938911915, "exact": true}
+{"codec": "t2-rank256", "tokens": 3000, "encode_ms": 37.243228405714035, "bits": 9.74771800595238, "set": "wikitext", "layer0": "coded", "decode_ms": 22.786945104599, "exact": true}
+{"codec": "splitzip", "tokens": 3000, "encode_ms": 3.559812903404236, "bits": 12.04319921875, "decode_ms": 2.11518257856369, "exact": true}
+{"codec": "adacode", "tokens": 3000, "encode_ms": 13.280333951115608, "bits": 11.372570824032739, "decode_ms": 3.254557028412819, "exact": true}
+{"codec": "exactkv", "tokens": 3000, "encode_ms": 13.582739979028702, "bits": 12.612559523809523, "decode_ms": 9.122015908360481, "exact": true}
+{"codec": "exans", "tokens": 3000, "encode_ms": 64.6028071641922, "bits": 10.885275948660714, "decode_ms": 9.926384314894676, "exact": true}
+{"transport": "ring", "codec": "ours-dense", "bytes": 199339184, "gbps_set": 100.0, "exact": true, "wall_s": 0.20896559953689575, "achieved_gbps": 7.6314641047816645, "link_s": 0.016386965289711952}
+{"transport": "tcp", "codec": "ours-dense", "bytes": 199339184, "gbps_set": 100.0, "exact": true, "wall_s": 0.17482027597725391, "achieved_gbps": 9.122016671610163, "link_s": 0.14963489025831223}
+SELFTEST OK (26 codec runs, errors: {'ibp': 'ModuleNotFoundError("No module named \'ibp\'")'})
+scripts/pd_setup.sh: line 211: 4072213 Segmentation fault      (core dumped) PYTHONPATH=$REPO "$VPY" -m kv_compare.pd.selftest --codecs "$RUN/pd_codecs.pt" --captures "$RUN/captures" --doc "$DOC" --tokens 8192,3000 --splitzip-source "$KV_HOME/sources/splitzip" --adacode-source "$KV_HOME/sources/adacode" --exactkv-source "$KV_HOME/sources/exactkv" "${EXANS_INFO[@]}" --names "$NAMES" --output "$OUTF"
+WARNING: a codec failed the self-test (above, and /tmp/nbore/kvpd/30163/runs/llama32_3b/pd_selftest*.json); the runs leave it out
+   deleting the captures: 15G	/tmp/nbore/kvpd/30163/runs/llama32_3b/captures
+PD SETUP DONE
+== system
+== bandwidth with /tmp/nbore/kvpd/30163/home/venv/bin/python
+	[4mGPU0	GPU1	GPU2	GPU3	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	NODE	NODE	NODE	48-55,176-183	0		N/A
+GPU1	NODE	 X 	PIX	PIX		1		N/A
+GPU2	NODE	PIX	 X 	PIX		1		N/A
+GPU3	NODE	PIX	PIX	 X 		1		N/A
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+
+4 GPUs: NVIDIA RTX A5000, NVIDIA RTX A5000, NVIDIA RTX A5000, NVIDIA RTX A5000; torch 2.11.0+cu128, CUDA 12.8
+
+ GPU    to pinned  from pinned  to pageable  from pageable
+   0      27.1 GB/s      27.0 GB/s      21.4 GB/s      24.9 GB/s
+   1      27.1 GB/s      27.0 GB/s      21.1 GB/s      24.5 GB/s
+   2      27.1 GB/s      27.0 GB/s      20.7 GB/s      23.7 GB/s
+   3      27.1 GB/s      27.0 GB/s      21.4 GB/s      24.7 GB/s
+
+  pair  peer           direct             host        host_pipe
+  0->1   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  0->2   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  0->3   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  1->0   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  1->2   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  1->3   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  2->0   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  2->1   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  2->3   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  3->0   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  3->1   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+  3->2   True   26.4 GB/s  211Gb   13.5 GB/s  108Gb   26.0 GB/s  208Gb
+
+One 8K document of Llama-3.2-3B KV, wire time at the slowest / fastest measured pair (26.4 / 26.4 GB/s):
+  raw BF16                           896 MiB     35.6 ms /    35.6 ms
+  SplitZip                           675 MiB     26.8 ms /    26.8 ms
+  ours lossless                      504 MiB     20.0 ms /    20.0 ms
+  ours / AQUA-KV lossy, ~2 bits      117 MiB      4.7 ms /     4.6 ms
+wrote /tmp/nbore/kvpd/30163/tmp/link_probe_4072386.json
+
+concurrent patterns, 896 MiB per leg, best of 5:
+  1p3d, prefill GPU 0          direct 0->1 0->2 0->3           aggregate   26.4 GB/s, per leg  26.4  13.2   8.8
+  1p3d, prefill GPU 0          host   0->1 0->2 0->3           aggregate   26.3 GB/s, per leg  26.0  13.1   8.8
+  1p3d, prefill GPU 1          direct 1->0 1->2 1->3           aggregate   26.4 GB/s, per leg  26.3  13.2   8.8
+  1p3d, prefill GPU 1          host   1->0 1->2 1->3           aggregate   26.3 GB/s, per leg  25.4  13.1   8.8
+  1p3d, prefill GPU 2          direct 2->0 2->1 2->3           aggregate   26.4 GB/s, per leg  26.3  13.2   8.8
+  1p3d, prefill GPU 2          host   2->0 2->1 2->3           aggregate   26.2 GB/s, per leg  25.4  12.9   8.7
+  1p3d, prefill GPU 3          direct 3->0 3->1 3->2           aggregate   26.4 GB/s, per leg  26.4  13.2   8.8
+  1p3d, prefill GPU 3          host   3->0 3->1 3->2           aggregate   26.3 GB/s, per leg  26.0  13.1   8.8
+  2p2d, prefill 0,1            direct 0->2 1->3                aggregate   47.3 GB/s, per leg  23.7  23.7
+  2p2d, prefill 0,1            host   0->2 1->3                aggregate   45.7 GB/s, per leg  23.4  22.8
+  2p2d, prefill 0,1            direct 0->3 1->2                aggregate   47.3 GB/s, per leg  23.7  23.7
+  2p2d, prefill 0,1            host   0->3 1->2                aggregate   45.6 GB/s, per leg  23.4  22.8
+  2p2d, prefill 0,2            direct 0->1 2->3                aggregate   47.3 GB/s, per leg  23.7  23.7
+  2p2d, prefill 0,2            host   0->1 2->3                aggregate   45.7 GB/s, per leg  23.4  22.9
+  2p2d, prefill 0,2            direct 0->3 2->1                aggregate   46.0 GB/s, per leg  23.0  23.0
+  2p2d, prefill 0,2            host   0->3 2->1                aggregate   45.6 GB/s, per leg  23.5  22.8
+  2p2d, prefill 0,3            direct 0->1 3->2                aggregate   46.2 GB/s, per leg  23.1  23.1
+  2p2d, prefill 0,3            host   0->1 3->2                aggregate   45.8 GB/s, per leg  23.4  22.9
+  2p2d, prefill 0,3            direct 0->2 3->1                aggregate   47.4 GB/s, per leg  23.7  23.7
+  2p2d, prefill 0,3            host   0->2 3->1                aggregate   45.5 GB/s, per leg  23.4  22.7
+  2p2d, prefill 1,2            direct 1->0 2->3                aggregate   52.6 GB/s, per leg  26.3  26.3
+  2p2d, prefill 1,2            host   1->0 2->3                aggregate   33.6 GB/s, per leg  25.0  16.8
+  2p2d, prefill 1,2            direct 1->3 2->0                aggregate   52.6 GB/s, per leg  26.3  26.3
+  2p2d, prefill 1,2            host   1->3 2->0                aggregate   34.0 GB/s, per leg  17.0  17.0
+  2p2d, prefill 1,3            direct 1->0 3->2                aggregate   52.7 GB/s, per leg  26.4  26.3
+  2p2d, prefill 1,3            host   1->0 3->2                aggregate   33.7 GB/s, per leg  25.0  16.8
+  2p2d, prefill 1,3            direct 1->2 3->0                aggregate   52.7 GB/s, per leg  26.4  26.3
+  2p2d, prefill 1,3            host   1->2 3->0                aggregate   34.1 GB/s, per leg  17.0  17.0
+  2p2d, prefill 2,3            direct 2->0 3->1                aggregate   52.5 GB/s, per leg  26.4  26.3
+  2p2d, prefill 2,3            host   2->0 3->1                aggregate   33.7 GB/s, per leg  25.0  16.8
+  2p2d, prefill 2,3            direct 2->1 3->0                aggregate   52.6 GB/s, per leg  26.4  26.3
+  2p2d, prefill 2,3            host   2->1 3->0                aggregate   34.0 GB/s, per leg  17.0  17.0
+  cache reload to 1 GPU(s)     direct host->0                  aggregate   27.0 GB/s, per leg  27.0
+  cache reload to 2 GPU(s)     direct host->0 host->1          aggregate   54.0 GB/s, per leg  27.0  27.0
+  cache reload to 3 GPU(s)     direct host->0 host->1 host->2  aggregate   75.4 GB/s, per leg  27.0  25.1  25.1
+  cache reload to 4 GPU(s)     direct host->0 host->1 host->2 host->3 aggregate   66.6 GB/s, per leg  27.0  16.7  16.7  16.6
+  cache store from 4 GPU(s)    direct 0->host 1->host 2->host 3->host aggregate   70.9 GB/s, per leg  26.3  17.7  17.7  17.7
+wrote /tmp/nbore/kvpd-evidence/pd_smoke_20261115T005605Z/repo/benchmark_results/pd_card/pd_smoke_20261115T005605Z/node_specs/specs.json and summary.md
+
+==== run 1 of 7: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh
+== PD run /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit badb388 Card smoke 30157: uv's own Python and a copy of uv; git identity checked at login
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-1593dd02-947c-388d-92af-e2c750110f35, 1=GPU-88611c58-2112-8fb3-bf02-07f9c09112c7, 2=GPU-af3cc3a2-67fb-7ef9-25a9-2ffc86ce4740, 3=GPU-85f60b08-6ae2-0dda-ab48-fdf5060b65a4
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 118.50it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+{"out": "/tmp/nbore/kvpd/30163/runs/llama32_3b/pd/prompts_2048_check_1000_3000_5000_8192", "datasets": ["wikitext2", "humaneval", "gsm8k", "mmlu", "ptb"], "tokens": "2048", "per_length": 8}
+   ports 21500-21953 free
+   prefill1 on GPU 0 (visible 0), port 21601 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 21701 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 21702 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 21703 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring/engine_decode3.log)
+== waiting for the engines
+STOP: an engine exited; tail of its logs:
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring/engine_decode1.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring/engine_decode2.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring/engine_decode3.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2011_1p3d_tkv_ring/engine_prefill1.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+==== run 1 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 2 of 7: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp
+== PD run /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit badb388 Card smoke 30157: uv's own Python and a copy of uv; git identity checked at login
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-1593dd02-947c-388d-92af-e2c750110f35, 1=GPU-88611c58-2112-8fb3-bf02-07f9c09112c7, 2=GPU-af3cc3a2-67fb-7ef9-25a9-2ffc86ce4740, 3=GPU-85f60b08-6ae2-0dda-ab48-fdf5060b65a4
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4200.18it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 21500-21953 free
+   prefill1 on GPU 0 (visible 0), port 21601 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 21701 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 21702 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 21703 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring/engine_decode3.log)
+== waiting for the engines
+STOP: an engine exited; tail of its logs:
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring/engine_decode1.log <==
+(EngineCore pid=4074366) INFO 11-14 20:13:13 [monitor.py:62] [backbone] torch.compile took 0.14 s in total
+(EngineCore pid=4074366) INFO 11-14 20:13:13 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.12 s
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 10.94it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 11.29it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:03, 11.49it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.61it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 11.95it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:03, 12.24it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:02, 12.44it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.62it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:01<00:02, 14.13it/s]Capturing CUDA graphs (PIECEWISE):  39%|███▉      | 20/51 [00:01<00:01, 15.51it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:01<00:01, 16.64it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:01<00:01, 17.45it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 26/51 [00:01<00:01, 18.10it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 28/51 [00:01<00:01, 18.55it/s]Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:02<00:01, 19.33it/s]Capturing CUDA graphs (PIECEWISE):  65%|██████▍   | 33/51 [00:02<00:00, 19.16it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████   | 36/51 [00:02<00:00, 20.31it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:02<00:00, 21.11it/s]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 42/51 [00:02<00:00, 21.73it/s]Capturing CUDA graphs (PIECEWISE):  88%|████████▊ | 45/51 [00:02<00:00, 22.53it/s]Capturing CUDA graphs (PIECEWISE):  94%|█████████▍| 48/51 [00:02<00:00, 23.43it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 23.67it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 17.36it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00, 29.63it/s]
+(EngineCore pid=4074366) INFO 11-14 20:13:19 [model_runner.py:1127] Graph capturing finished in 4 secs, took 0.31 GiB
+(EngineCore pid=4074366) INFO 11-14 20:13:20 [gpu_worker.py:759] Available KV cache memory: 9.31 GiB
+(EngineCore pid=4074366) INFO 11-14 20:13:20 [gpu_worker.py:774] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.7047 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.7353. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=4074366) INFO 11-14 20:13:20 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+(EngineCore pid=4074366) INFO 11-14 20:13:20 [factory.py:62] Creating v1 connector with name: TKVConnector and engine_id: 349d7393-8c9c-409f-afb1-79fb4bdeb40c
+(EngineCore pid=4074366) WARNING 11-14 20:13:20 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+!!!!!!! Segfault encountered !!!!!!!
+  File "./signal/../sysdeps/unix/sysv/linux/x86_64/libc_sigaction.c", line 0, in 0x000013302904532f
+  File "<unknown>", line 0, in cuMemcpyDtoDAsync_v2
+  File "<unknown>", line 0, in cudaMemcpyAsync
+  File "<unknown>", line 0, in at::native::copy_device_to_device(at::TensorIterator&, bool, bool)
+  File "<unknown>", line 0, in at::native::copy_impl(at::Tensor&, at::Tensor const&, bool) [clone .isra.0]
+  File "<unknown>", line 0, in at::native::copy_(at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in c10::impl::wrap_kernel_functor_unboxed_<c10::impl::detail::WrapFunctionIntoFunctor_<c10::CompileTimeFunctionPointer<at::Tensor& (c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool), &torch::ADInplaceOrView::copy_>, at::Tensor&, c10::guts::typelist::typelist<c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool> >, at::Tensor& (c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)>::call(c10::OperatorKernel*, c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in torch::autograd::VariableType::(anonymous namespace)::copy_(c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in at::_ops::copy_::call(at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in torch::autograd::THPVariable_copy_(_object*, _object*, _object*)
+  File "<unknown>", line 0, in method_vectorcall_VARARGS_KEYWORDS.llvm.6329355676896561050
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in slot_tp_init
+  File "<unknown>", line 0, in type_call
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in method_vectorcall.llvm.16594251629052281811
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in slot_tp_init
+  File "<unknown>", line 0, in type_call
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in PyEval_EvalCode
+  File "<unknown>", line 0, in run_mod.llvm.12299203502527506867
+  File "<unknown>", line 0, in PyRun_SimpleStringFlags
+  File "<unknown>", line 0, in Py_RunMain.warm
+  File "<unknown>", line 0, in pymain_main.llvm.6346866814124365623
+  File "<unknown>", line 0, in main
+  File "<unknown>", line 0, in _start
+  File "<unknown>", line 0, in 0xffffffffffffffff
+
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring/engine_decode2.log <==
+(EngineCore pid=4074368) INFO 11-14 20:13:13 [monitor.py:62] [backbone] torch.compile took 0.14 s in total
+(EngineCore pid=4074368) INFO 11-14 20:13:14 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.12 s
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 11.08it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 11.49it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:03, 11.63it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.75it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 12.06it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:00<00:03, 12.34it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:02, 12.54it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.65it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:01<00:02, 14.19it/s]Capturing CUDA graphs (PIECEWISE):  39%|███▉      | 20/51 [00:01<00:01, 15.54it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:01<00:01, 16.62it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:01<00:01, 17.34it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:01<00:01, 18.27it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:02<00:01, 19.10it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:02<00:01, 18.90it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:02<00:00, 19.95it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:02<00:00, 20.82it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:02<00:00, 21.56it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:02<00:00, 22.26it/s]Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:02<00:00, 23.10it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:02<00:00, 23.98it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 17.45it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00, 29.59it/s]
+(EngineCore pid=4074368) INFO 11-14 20:13:19 [model_runner.py:1127] Graph capturing finished in 4 secs, took 0.31 GiB
+(EngineCore pid=4074368) INFO 11-14 20:13:20 [gpu_worker.py:759] Available KV cache memory: 9.31 GiB
+(EngineCore pid=4074368) INFO 11-14 20:13:20 [gpu_worker.py:774] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.7047 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.7353. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=4074368) INFO 11-14 20:13:20 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+(EngineCore pid=4074368) INFO 11-14 20:13:20 [factory.py:62] Creating v1 connector with name: TKVConnector and engine_id: 98c45fe7-f16d-4a7c-be13-47db55128698
+(EngineCore pid=4074368) WARNING 11-14 20:13:20 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+!!!!!!! Segfault encountered !!!!!!!
+  File "./signal/../sysdeps/unix/sysv/linux/x86_64/libc_sigaction.c", line 0, in 0x000007c93de4532f
+  File "<unknown>", line 0, in cuMemcpyDtoDAsync_v2
+  File "<unknown>", line 0, in cudaMemcpyAsync
+  File "<unknown>", line 0, in at::native::copy_device_to_device(at::TensorIterator&, bool, bool)
+  File "<unknown>", line 0, in at::native::copy_impl(at::Tensor&, at::Tensor const&, bool) [clone .isra.0]
+  File "<unknown>", line 0, in at::native::copy_(at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in c10::impl::wrap_kernel_functor_unboxed_<c10::impl::detail::WrapFunctionIntoFunctor_<c10::CompileTimeFunctionPointer<at::Tensor& (c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool), &torch::ADInplaceOrView::copy_>, at::Tensor&, c10::guts::typelist::typelist<c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool> >, at::Tensor& (c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)>::call(c10::OperatorKernel*, c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in torch::autograd::VariableType::(anonymous namespace)::copy_(c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in at::_ops::copy_::call(at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in torch::autograd::THPVariable_copy_(_object*, _object*, _object*)
+  File "<unknown>", line 0, in method_vectorcall_VARARGS_KEYWORDS.llvm.6329355676896561050
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in slot_tp_init
+  File "<unknown>", line 0, in type_call
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in method_vectorcall.llvm.16594251629052281811
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in slot_tp_init
+  File "<unknown>", line 0, in type_call
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in PyEval_EvalCode
+  File "<unknown>", line 0, in run_mod.llvm.12299203502527506867
+  File "<unknown>", line 0, in PyRun_SimpleStringFlags
+  File "<unknown>", line 0, in Py_RunMain.warm
+  File "<unknown>", line 0, in pymain_main.llvm.6346866814124365623
+  File "<unknown>", line 0, in main
+  File "<unknown>", line 0, in _start
+  File "<unknown>", line 0, in 0xffffffffffffffff
+
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring/engine_decode3.log <==
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2012_1p3d_tkv_ring/engine_prefill1.log <==
+(EngineCore pid=4074354) INFO 11-14 20:13:13 [monitor.py:62] [backbone] torch.compile took 0.14 s in total
+(EngineCore pid=4074354) INFO 11-14 20:13:14 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.12 s
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 11.07it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 11.41it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:03, 11.52it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.63it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 11.94it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:03, 12.17it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:03, 12.33it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.42it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:01<00:02, 13.87it/s]Capturing CUDA graphs (PIECEWISE):  39%|███▉      | 20/51 [00:01<00:02, 15.25it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:01<00:01, 16.28it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:01<00:01, 16.93it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 26/51 [00:01<00:01, 17.70it/s]Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 29/51 [00:01<00:01, 18.74it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:02<00:01, 18.75it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:02<00:00, 19.99it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:02<00:00, 21.00it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:02<00:00, 21.64it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:02<00:00, 22.59it/s]Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:02<00:00, 23.46it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:02<00:00, 24.53it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 17.38it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00, 28.70it/s]
+(EngineCore pid=4074354) INFO 11-14 20:13:20 [model_runner.py:1127] Graph capturing finished in 4 secs, took 0.31 GiB
+(EngineCore pid=4074354) INFO 11-14 20:13:20 [gpu_worker.py:759] Available KV cache memory: 9.31 GiB
+(EngineCore pid=4074354) INFO 11-14 20:13:20 [gpu_worker.py:774] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.7047 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.7353. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=4074354) INFO 11-14 20:13:20 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+(EngineCore pid=4074354) INFO 11-14 20:13:20 [factory.py:62] Creating v1 connector with name: TKVConnector and engine_id: a1bb7cdc-e4aa-4d01-b1b2-6559d97ceb40
+(EngineCore pid=4074354) WARNING 11-14 20:13:20 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+!!!!!!! Segfault encountered !!!!!!!
+  File "./signal/../sysdeps/unix/sysv/linux/x86_64/libc_sigaction.c", line 0, in 0x0000152743a4532f
+  File "<unknown>", line 0, in cuMemcpyDtoDAsync_v2
+  File "<unknown>", line 0, in cudaMemcpyAsync
+  File "<unknown>", line 0, in at::native::copy_device_to_device(at::TensorIterator&, bool, bool)
+  File "<unknown>", line 0, in at::native::copy_impl(at::Tensor&, at::Tensor const&, bool) [clone .isra.0]
+  File "<unknown>", line 0, in at::native::copy_(at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in c10::impl::wrap_kernel_functor_unboxed_<c10::impl::detail::WrapFunctionIntoFunctor_<c10::CompileTimeFunctionPointer<at::Tensor& (c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool), &torch::ADInplaceOrView::copy_>, at::Tensor&, c10::guts::typelist::typelist<c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool> >, at::Tensor& (c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)>::call(c10::OperatorKernel*, c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in torch::autograd::VariableType::(anonymous namespace)::copy_(c10::DispatchKeySet, at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in at::_ops::copy_::call(at::Tensor&, at::Tensor const&, bool)
+  File "<unknown>", line 0, in torch::autograd::THPVariable_copy_(_object*, _object*, _object*)
+  File "<unknown>", line 0, in method_vectorcall_VARARGS_KEYWORDS.llvm.6329355676896561050
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in slot_tp_init
+  File "<unknown>", line 0, in type_call
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in method_vectorcall.llvm.16594251629052281811
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in slot_tp_init
+  File "<unknown>", line 0, in type_call
+  File "<unknown>", line 0, in _PyEval_EvalFrameDefault
+  File "<unknown>", line 0, in PyEval_EvalCode
+  File "<unknown>", line 0, in run_mod.llvm.12299203502527506867
+  File "<unknown>", line 0, in PyRun_SimpleStringFlags
+  File "<unknown>", line 0, in Py_RunMain.warm
+  File "<unknown>", line 0, in pymain_main.llvm.6346866814124365623
+  File "<unknown>", line 0, in main
+  File "<unknown>", line 0, in _start
+  File "<unknown>", line 0, in 0xffffffffffffffff
+
+==== run 2 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 3 of 7: SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh
+== PD run /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p: 2p2d (2 prefill on GPUs 0 1, 2 decode on 2 3), connector tkv, transport p2p, eager 0; job GPUs 0 1 2 3; commit badb388 Card smoke 30157: uv's own Python and a copy of uv; git identity checked at login
+0, NVIDIA RTX A5000, 16627 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 16627 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-1593dd02-947c-388d-92af-e2c750110f35, 1=GPU-88611c58-2112-8fb3-bf02-07f9c09112c7, 2=GPU-af3cc3a2-67fb-7ef9-25a9-2ffc86ce4740, 3=GPU-85f60b08-6ae2-0dda-ab48-fdf5060b65a4
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4024.86it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 21500-21952 free
+   prefill1 on GPU 0 (visible 0,1,2,3), port 21601 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p/engine_prefill1.log)
+   prefill2 on GPU 1 (visible 1,0,2,3), port 21602 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p/engine_prefill2.log)
+   decode1 on GPU 2 (visible 2,0,1,3), port 21701 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p/engine_decode1.log)
+   decode2 on GPU 3 (visible 3,0,1,2), port 21702 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p/engine_decode2.log)
+== waiting for the engines
+STOP: an engine exited; tail of its logs:
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p/engine_decode1.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p/engine_decode2.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p/engine_prefill1.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2013_2p2d_tkv_p2p/engine_prefill2.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+==== run 3 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 4 of 7: SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl
+STOP: no NIXL in /tmp/nbore/kvpd/30163/home/venv_vllm (scripts/pd_setup.sh)
+==== run 4 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 5 of 7: SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh
+== PD run /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv: colo4 (0 prefill on GPUs none, 4 colocated on 0 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit badb388 Card smoke 30157: uv's own Python and a copy of uv; git identity checked at login
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-1593dd02-947c-388d-92af-e2c750110f35, 1=GPU-88611c58-2112-8fb3-bf02-07f9c09112c7, 2=GPU-af3cc3a2-67fb-7ef9-25a9-2ffc86ce4740, 3=GPU-85f60b08-6ae2-0dda-ab48-fdf5060b65a4
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3826.22it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 21500-21954 free
+   engine1 on GPU 0 (visible 0), port 21701 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv/engine_engine1.log)
+   engine2 on GPU 1 (visible 1), port 21702 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv/engine_engine2.log)
+   engine3 on GPU 2 (visible 2), port 21703 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv/engine_engine3.log)
+   engine4 on GPU 3 (visible 3), port 21704 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv/engine_engine4.log)
+== waiting for the engines
+STOP: an engine exited; tail of its logs:
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv/engine_engine1.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv/engine_engine2.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv/engine_engine3.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2014_colo4_tkv/engine_engine4.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_vllm/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+==== run 5 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 6 of 7: SMOKE=1 LAYOUT=colo4 CONNECTOR=lmcache
+== PD run /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache: colo4 (0 prefill on GPUs none, 4 colocated on 0 1 2 3), connector lmcache, transport ring, eager 0; job GPUs 0 1 2 3; commit badb388 Card smoke 30157: uv's own Python and a copy of uv; git identity checked at login
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-1593dd02-947c-388d-92af-e2c750110f35, 1=GPU-88611c58-2112-8fb3-bf02-07f9c09112c7, 2=GPU-af3cc3a2-67fb-7ef9-25a9-2ffc86ce4740, 3=GPU-85f60b08-6ae2-0dda-ab48-fdf5060b65a4
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4238.38it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 21500-21954 free
+   engine1 on GPU 0 (visible 0), port 21701 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache/engine_engine1.log)
+   engine2 on GPU 1 (visible 1), port 21702 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache/engine_engine2.log)
+   engine3 on GPU 2 (visible 2), port 21703 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache/engine_engine3.log)
+   engine4 on GPU 3 (visible 3), port 21704 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache/engine_engine4.log)
+== waiting for the engines
+STOP: an engine exited; tail of its logs:
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache/engine_engine1.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache/engine_engine2.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache/engine_engine3.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+
+==> /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2015_colo4_lmcache/engine_engine4.log <==
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 61, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/entrypoints/launchers/api_server/entry.py", line 95, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 255, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py", line 184, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 1120, in __init__
+    super().__init__(
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/core_client.py", line 682, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1351, in launch_core_engines
+    wait_for_engine_startup(
+  File "/tmp/nbore/kvpd/30163/home/venv_lmcache/lib/python3.12/site-packages/vllm/v1/engine/utils.py", line 1431, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+==== run 6 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 7 of 7: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256
+== PD run /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2016_1p3d_tkv_ring_eager: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 1; job GPUs 0 1 2 3; commit badb388 Card smoke 30157: uv's own Python and a copy of uv; git identity checked at login
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-1593dd02-947c-388d-92af-e2c750110f35, 1=GPU-88611c58-2112-8fb3-bf02-07f9c09112c7, 2=GPU-af3cc3a2-67fb-7ef9-25a9-2ffc86ce4740, 3=GPU-85f60b08-6ae2-0dda-ab48-fdf5060b65a4
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3776.61it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 21500-21953 free
+   prefill1 on GPU 0 (visible 0), port 21601 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2016_1p3d_tkv_ring_eager/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 21701 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2016_1p3d_tkv_ring_eager/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 21702 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2016_1p3d_tkv_ring_eager/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 21703 (log /tmp/nbore/kvpd/30163/runs/llama32_3b/pd/20261114_2016_1p3d_tkv_ring_eager/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=4078792) INFO 11-14 20:16:39 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4078785) INFO 11-14 20:16:40 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4078778) INFO 11-14 20:16:40 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4078771) INFO 11-14 20:16:39 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+20:16:53 == check
