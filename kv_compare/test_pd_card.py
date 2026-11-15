@@ -165,7 +165,8 @@ class CardTests(unittest.TestCase):
         for d in (self.node, self.node / "kvpd-tools", tools, repo.parent, repo):
             self.assertEqual(d.stat().st_mode & 0o777, 0o700, d)
         m = json.loads((ev / "campaign.json").read_text())
-        self.assertEqual((m["pin"], m["matrix"], m["runs"]), (self.pin, "smoke", [r.strip() for r in runs.split(";")]))
+        frozen=[r.strip()+' MATCHED_ROUND=0' for r in runs.split(';')]
+        self.assertEqual((m["pin"], m["matrix"], m["runs"]), (self.pin, "smoke", frozen))
         self.assertEqual(m["boot_id"], Path("/proc/sys/kernel/random/boot_id").read_text().strip())
         self.assertFalse((repo / "benchmark_results" / "old_run").exists())
         create_job = self.jobs()[-1]
@@ -183,7 +184,7 @@ class CardTests(unittest.TestCase):
         rec = json.loads((ev / "run.json").read_text())
         self.assertEqual(rec["run_job"], str(run_job))
         self.assertIn(rec["status"], ("completed", "completed with failures"), rec)
-        self.assertEqual(rec["environment"]["RUNS"], ";".join(x.strip() for x in runs.split(";")))
+        self.assertEqual(rec["environment"]["RUNS"], ";".join(frozen))
         self.assertEqual(rec["environment"]["UV_LINK_MODE"], "hardlink")
         self.assertTrue(rec["environment"]["UV_CACHE_DIR"].startswith(str(self.node / "kvpd-cache")))
         runtime = self.node / "kvpd" / str(run_job)
@@ -385,3 +386,4 @@ class DropWindowsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

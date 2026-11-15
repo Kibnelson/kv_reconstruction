@@ -22,20 +22,22 @@ trap 'echo "PD MATRIX STOPPED at line $LINENO (exit $?)" >&2' ERR
 cd "$(dirname "$0")/.."
 PD_CARD=${PD_CARD:-0}
 RESULTS_ROOT=${RESULTS_ROOT:-benchmark_results}
-MAIN=raw,splitzip,exans,adacode,exactkv,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256
+OURS=t-fast,t-dense-cached,t-compact,t-compact-global
+MAIN=raw,splitzip,exans,adacode,exactkv,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256,$OURS
 NV=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp
-TIERMAIN=raw,splitzip,exans,adacode,exactkv,ibp,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-rank256
-T2SET=raw,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256
+TIERMAIN=raw,splitzip,exans,adacode,exactkv,ibp,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-rank256,$OURS
+T2SET=raw,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256,$OURS
 MATRIX=${MATRIX:-smoke}
 if [ -z "${RUNS:-}" ]; then
     case "$MATRIX" in
-        smoke) RUNS="SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh;
+        smoke) RUNS="SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,ours-dense,t2-hbh,$OURS;
                      SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=$NV;
-                     SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh;
+                     SMOKE=1 LAYOUT=2p2d TRANSPORT=ring CODECS=raw,splitzip,exans,ours-hbh,ours-dense,$OURS;
+                     SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh,$OURS;
                      SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl;
-                     SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh;
+                     SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh,$OURS;
                      SMOKE=1 LAYOUT=colo4 CONNECTOR=lmcache;
-                     SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256" ;;
+                     SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256,$OURS" ;;
         ring1p3d) RUNS="LAYOUT=1p3d TRANSPORT=ring CODECS=$MAIN; LAYOUT=1p3d TRANSPORT=ring CODECS=$NV" ;;
         ring2p2d) RUNS="LAYOUT=2p2d TRANSPORT=ring CODECS=$MAIN; LAYOUT=2p2d TRANSPORT=ring CODECS=$NV" ;;
         direct) RUNS="LAYOUT=1p3d TRANSPORT=p2p CODECS=$MAIN; LAYOUT=1p3d TRANSPORT=p2p CODECS=$NV;
@@ -44,12 +46,25 @@ if [ -z "${RUNS:-}" ]; then
         tier) RUNS="LAYOUT=colo4 TIER_CODECS=$TIERMAIN; LAYOUT=colo4 TIER_CODECS=$NV; LAYOUT=colo4 CONNECTOR=lmcache" ;;
         t2eager) RUNS="LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=$T2SET LINKS=10,100;
                        LAYOUT=1p3d TRANSPORT=p2p ENGINE_EAGER=1 CODECS=$T2SET;
-                       LAYOUT=colo4 ENGINE_EAGER=1 TIER_CODECS=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256" ;;
+                       LAYOUT=colo4 ENGINE_EAGER=1 TIER_CODECS=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,$OURS" ;;
         *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier or t2eager (or set RUNS)"; exit 1 ;;
     esac
 fi
 IFS=';' read -r -a LIST <<< "$(echo "$RUNS" | tr '\n\t' '  ')"   # read stops at a newline: one line first
 for i in "${!LIST[@]}"; do LIST[$i]=$(echo "${LIST[$i]}" | tr -s ' \n\t' ' ' | sed 's/^ //; s/ $//'); done
+ROUNDS=${PD_MATRIX_ROUNDS:-1}
+[[ "$ROUNDS" =~ ^[1-9]$ ]] || { echo 'STOP: PD_MATRIX_ROUNDS must be 1..9'; exit 2; }
+EXPANDED=()
+for ((round=0; round<ROUNDS; round++)); do
+    for run in "${LIST[@]}"; do
+        [ -n "$run" ] || continue
+        if [[ " $run " == *' MATCHED_ROUND='* ]]; then
+            [ "$ROUNDS" = 1 ] || { echo 'STOP: recorded runs must use PD_MATRIX_ROUNDS=1'; exit 2; }
+            EXPANDED+=("$run")
+        else EXPANDED+=("$run MATCHED_ROUND=$round"); fi
+    done
+done
+LIST=("${EXPANDED[@]}")
 if [ "${PRINT_RUNS:-0}" = 1 ]; then
     for run in "${LIST[@]}"; do if [ -n "$run" ]; then echo "$run"; fi; done
     exit 0
@@ -117,3 +132,4 @@ for i in 1 2 3; do
 done
 echo "STOP: push failed; everything is committed locally (git push origin HEAD:$BRANCH later)"
 exit 1
+

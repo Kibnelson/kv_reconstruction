@@ -73,6 +73,9 @@ def main():
     b = make_bundle(study, consts, rc, groups, a.max_positions, splitzip=sz, adacode=ada,
                     meta={"model": meta.get("model"), "revision": meta.get("revision"), "train_set": a.train_set,
                           "calibration": [d.name for d in study.train], "splitzip_book_from": cal.name})
+    from kv_compare.pd.matched import fit_bundle
+    b['t_matched'] = fit_bundle(run/'captures',train,tables,a.device,b)
+    (run/'pd_matched_calibration.json').write_text(json.dumps(b['t_matched']['report'],indent=2,sort_keys=True)+'\n')
     names = [n for n in a.t2_sets.split(",") if n]
     if names:
         b["t2"] = t2_sets(a, run, names, b)
@@ -149,3 +152,4 @@ def drop_windows(cap, docs, later):
 
 if __name__ == "__main__":
     main()
+

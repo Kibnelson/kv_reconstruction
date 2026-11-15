@@ -1,0 +1,77 @@
+# Fast and Compact T in the other team's PD campaign
+
+Our isolated source branch is `experiment/t-pd-matched-campaign-v1`. It starts from the other team's `pd-baselines` commit `313bc6de96c750a4a297a1a2e7610b9ac464cd90`. The original NUC T results, T source branch, RTX setup branch, `pd-baselines` and `main` stay separate. This is a new GPU experiment; no live serving result is claimed before its campaign runs.
+
+## What is shared
+
+The fork includes their engine-startup, NIXL import, nvCOMP stream, benchmark timeout and failed-log retention fixes through that pin. Their earlier job 30163 did not complete a serving comparison, so it is not a successful performance reference.
+
+The campaign keeps their Slurm card, six-stage create/run/cleanup/verify-cleanup/review/publish lifecycle, node-local runtime, managed Python/uv cache, model revision, vLLM stack, original codecs, requests, metrics and transport implementations. Each run uses four allocated RTX A5000s on `gpu-grad-01` by default, 16 CPUs and 192 GB RAM. Other jobs can share CPU memory bandwidth and PCIe switches. The same-allocation node survey records the actual hardware and measured copy paths.
+
+The inherited methods are raw BF16, SplitZip, ExANS, AdaCode, exactkv, nvCOMP, original T and T2, with NIXL and LMCache references. IBP remains conditional on a successful build and available disk. Missing methods remain visible as skips and invalidate complete declared coverage. The smoke covers 1P+3D and 2P+2D host transfers, 2P+2D GPU IPC copies, a CPU tier, native connector references and eager T/T2. The full matrices retain both layouts and all methods.
+
+## Our added codecs and controls
+
+| Name | Behavior |
+|---|---|
+| `t-fast` | The NUC FastDenseEncode forward pass with original T coding/decoding; 128-token programs, one stream chunk. |
+| `t-dense-cached` | Original fused dense forward with cached static tables, using exactly the same predictor and stream geometry as `t-fast`. |
+| `t-compact` | Head-by-head prediction with a TRAIN-fitted head-width map and DEV-selected blend. |
+| `t-compact-global` | The same grouped predictor and stream geometry with the global prior; isolates the learned policy. |
+
+The six experiment modules are copied unchanged from T source commit `19b32be6744e2d12f39e615ff806da8fb7dc0744`. The common PD adapter handles page order, nonzero positions, padding, tails and the shared-state identity. It zeroes the unused alignment words after rANS states so that byte-parity checks compare canonical frames. It uses the other team's GPU blob/transport format for every method. The THSPRV01 host packet and the NUC pinned-buffer serializer are not the serving wire format of this experiment.
+
+The added family gets freshly calibrated states, not the NUC's frozen state files. Its predictor uses the same six WikiText-2 TRAIN captures, nominal spread uses the first half of the tables capture, and the second half selects the policy blend. Original baseline/T2 export is unchanged. Serving/test prompts never select the policy. The global prior is an eligible fallback. The policy arrays are shared state, and their byte count and frozen digest are recorded. The NUC's 44.05% and 48.57% savings are previous measurements; this campaign measures its own complete serving frames and latency.
+
+## Comparison checks
+
+- Fresh PD engines explicitly disable automatic prefix caching. This prevents an earlier codec's requests from populating a cache that bypasses later handoffs. CPU-tier runs retain prefix caching and reset it per point.
+- Tier workload seeds and source texts are fixed by client count and repeat for every codec. Fresh PD arrival seeds are fixed per repeat. Prompt/text hashes and model revision are recorded. Benchmark environment overrides are frozen at campaign creation.
+- Smoke uses one repeat and eight engine runs. Matrices default to one repeat, matching the other team's allocation budget; `PD_MATRIX_ROUNDS=3` requests three repeats after smoke timing establishes a scope that fits the allocation. The expanded run list is frozen at create and replayed once. Run names include seconds and process ID to avoid overwrite. A full repeated comparison requires at least three repeats; one-pass results remain preliminary. Full campaign durations are unmeasured, and all codecs/links at three repeats can exceed the 12-hour job limit.
+- Setup requires captured exact-word checks at 8,192 and 3,000 tokens for all four new methods, compiled all-BF16-pattern kernel checks, fast/cached and compact/global stream checks, and four fresh GPU receiver processes using only frame and shared state. Missing or failed added methods stop setup.
+- Correctness transfers verify reconstructed checksums and compare every installed paged-cache word against the decoded words. Timed serving sweeps retain the inherited verification setting; correctness checks and receiver proofs are separate evidence. The transfer logs also report aligned codec blob plus JSON header bytes, alongside the inherited payload-only bits. Control handshakes are separate from that codec frame.
+- `review/matched_comparison.json` checks required methods, actual installs, completed versus requested counts, failed requests, skips, metric fields and repeat coverage. Its companion `matched_comparison.md` aggregates the available repeats by median and keeps shared-codec and nvCOMP engine groups separate. Use this report for repeated comparisons; the inherited matrix renderer was designed for single-pass runs. A published failure remains a failure. Smoke never sets `full_repeated_comparison_validated` true. No result triggers a merge.
+
+## Login-host command
+
+Run this in tmux on the same Slurm login host used by the other team. It creates a separate home worktree, so the other team's checkout stays at its own pin. The run stage requests four GPUs for up to six hours for smoke. Closeout stages use their existing small allocations. The cache is reused, while the code, campaign tag, runtime job ID and evidence branch are distinct.
+
+```bash
+bash <<'LOGIN'
+set -Eeuo pipefail
+umask 077
+trap 'printf "T PD CAMPAIGN STOPPED: line=%s exit=%s; output is kept\n" "$LINENO" "$?" >&2' ERR
+test -z "${SLURM_JOB_ID:-}"
+cd "$HOME/kv_reconstruction"
+export KVPD_BRANCH=experiment/t-pd-matched-campaign-v1
+git fetch -q --no-tags origin "$KVPD_BRANCH"
+export KVPD_PIN=$(git rev-parse FETCH_HEAD)
+WORKTREE="$HOME/kv_pd_t_matched_v1"
+if [ ! -e "$WORKTREE" ]; then
+    git worktree add --detach "$WORKTREE" "$KVPD_PIN"
+fi
+cd "$WORKTREE"
+test -z "$(git status --porcelain --untracked-files=normal)"
+git switch -q --detach "$KVPD_PIN"
+test "$(git ls-remote origin "refs/heads/$KVPD_BRANCH" | awk '{print $1}')" = "$KVPD_PIN"
+export KVPD_MATRIX=smoke
+export PD_MATRIX_ROUNDS=1 KVPD_SPECS=1
+unset RUNS
+export KVPD_TAG="pd_${KVPD_MATRIX}_tmatched_$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$HOME/.kvpd_campaigns"
+STATE="$HOME/.kvpd_campaigns/$KVPD_TAG.sh"
+printf 'export KVPD_BRANCH=%q\nexport KVPD_PIN=%q\nexport KVPD_TAG=%q\n' \
+    "$KVPD_BRANCH" "$KVPD_PIN" "$KVPD_TAG" > "$STATE"
+printf 'PIN=%s\nTAG=%s\nSTATE=%s\n' "$KVPD_PIN" "$KVPD_TAG" "$STATE"
+for STAGE in create run cleanup verify-cleanup review publish; do
+    bash scripts/pd_card.sh "$STAGE" "$KVPD_PIN" "$KVPD_TAG"
+done
+echo "Campaign published; review/matched_comparison.json records its coverage and validation."
+LOGIN
+```
+
+Send the `PUBLISHED evidence/experiment/t-pd-matched-campaign-v1/...` line for review. Publication adds only the campaign evidence in a new results branch. The source branch is unchanged by measured runs. If a stage stops, retain its saved state and use the inherited closeout stages from this worktree at the saved pin. A later full comparison is a new tag and one selected matrix: `ring1p3d`, `ring2p2d`, `direct`, `tier` or `t2eager`.
+
+## Interpretation limits
+
+The ring link is paced shared host memory, not a measured NIC. Its configured rate is per prefill: 2P has two links, so equal per-link rates do not mean equal aggregate network budgets across layouts. GPU IPC measures the local PCIe path; the peer-access survey identifies hardware support. The CPU tier measures DRAM storage/reload, not SSD. Codecs sharing one engine also share its configured cache capacity and loaded constant sets; NIXL/nvCOMP/LMCache have separate engine runs. Record actual memory and allocation differences before drawing serving-capacity conclusions. Cross-branch numeric claims require matching hardware, model revision, prompt/text hashes, runtime versions, cache policy, seeds, load and measured link capacity; rerunning the original methods inside this campaign supplies the primary controls.

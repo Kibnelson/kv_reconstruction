@@ -40,6 +40,11 @@ import time
 SCHEMA = 1
 KIND = "kvpd_campaign"
 MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager")
+BENCHMARK_KNOBS = ('RATES','LINKS','NUM_PROMPTS','PROMPT_TOKENS','OUTPUT_LEN','TTFT_SLO_MS',
+    'TIER_CLIENTS','TIER_CONVERSATIONS','TIER_MAX_TURNS','TIER_GB','TIER_CHUNK','GPU_BLOCKS','CHECK_LENGTHS',
+    'MAXLEN','MAXBT','P_MEM','D_MEM','ENGINE_EAGER','PREFILL_GPUS','DECODE_GPUS',
+    'TRANSPORT','CONNECTOR','STAGES','TIER_CODECS','CODECS','MODEL','MODEL_ID','REVISION','SMOKE','T2_SETS',
+    'RUN_TIMEOUT_S','VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS')
 # Disk (GB) on the node's root file system, which /tmp is: the shared cache's parts when missing, then a job's peak.
 # Measured sizes go into disk_after.json; these only decide whether to start.
 NEED_GB = {"uv": 18.0, "python": 0.2, "hf": 7.0}
@@ -246,6 +251,7 @@ def stage_create(p, a, job):
         "origin": origin, "home_repo": str(home), "tools": str(p.tools), "repo": str(p.repo),
         "results": str(p.rel), "host": socket.gethostname().split(".")[0], "user": p.user,
         "owner_uid": os.getuid(), "boot_id": boot_id(), "create_job": job, "created": now(), "runs": runs,
+        'benchmark_overrides': {k:os.environ.get(k) for k in BENCHMARK_KNOBS},
         "card": git(p.tools, "rev-parse", f"{a.pin}:scripts/pd_card.sh"),
     }, once=True)
     write_json(p.ev / "disk_at_create.json", disk_survey(p))
@@ -480,14 +486,17 @@ def stage_run(p, a, job):
         "TORCH_EXTENSIONS_DIR": str(home / "cache" / "torch_extensions"),
         "VLLM_CONFIG_ROOT": str(home / "config" / "vllm"), "VLLM_NO_USAGE_STATS": "1", "DO_NOT_TRACK": "1",
         "HF_HUB_DISABLE_TELEMETRY": "1", "MPLCONFIGDIR": str(home / "mpl"),
-        "PYTHONFAULTHANDLER": "1",          # a native crash (nvCOMP's, ExANS's) prints where it happened
-        "FLASHINFER_WORKSPACE_BASE": str(home / "cache"), "PD_CARD": "1", "RESULTS_ROOT": str(ev / "matrix"),
-        "MATRIX": a.matrix, "RUNS": ";".join(m["runs"]),     # exactly the runs create recorded
+        "PYTHONFAULTHANDLER": "1",  # preserve native crash locations in campaign evidence
+        "FLASHINFER_WORKSPACE_BASE": str(home / "cache"), "PD_CARD": "1", "SHARE_GPU": "0", "TRITON_INTERPRET": "0", "RESULTS_ROOT": str(ev / "matrix"),
+        "MATRIX": a.matrix, "RUNS": ";".join(m["runs"]), "PD_MATRIX_ROUNDS": "1",  # already expanded at create
     }
     if cuda12:
         env_vars["CUDA12_HOME"] = cuda12
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME", "PYTHONOPTIMIZE")}
     env.update(env_vars)
+    for key,value in m.get('benchmark_overrides',{}).items():
+        if value is None:env.pop(key,None)
+        else:env[key]=value
     env.pop("PYTHONDONTWRITEBYTECODE", None)   # bytecode goes to the runtime's pycache, never into the code
     env.pop("CUDA_HOME", None)                 # the engines' torch is CUDA 13: no toolkit of another version for it
     dropped = []
@@ -548,7 +557,7 @@ def collect(p, runtime, ev):
     out = ev / "setup"
     out.mkdir(mode=0o700, exist_ok=True)
     home, runs = runtime / "home", runtime / "runs"
-    picks = list(home.glob("pip_freeze*.txt")) + list(runs.glob("*/pd_selftest*.json")) + \
+    picks = list(home.glob("pip_freeze*.txt")) + list(runs.glob("*/pd_selftest*.json")) + list(runs.glob("*/pd_matched*.json")) + \
         list(runs.glob("*/exans/exans_info.json")) + list(home.glob("venv*/pyvenv.cfg")) + \
         list(runs.glob("*/captures/meta.json"))
     for f in picks:
@@ -820,6 +829,10 @@ def stage_review(p, a, job):
     else:
         write_text(rv / "summary.md", f"# PD matrix {a.matrix}, job {run['run_job']}: no run results\n\n"
                    f"Status: {run.get('status')}. {run.get('reason', '')}\nSee run_tail.log and setup/.\n")
+    call(sys.executable,'-I','-B',p.tools/'scripts'/'pd_matched_review.py','--campaign',ev)
+    matched = read_json(rv/'matched_comparison.json')
+    log('MATCHED COMPARISON: coverage='+str(matched['declared_campaign_coverage_passed'])+
+        ', full repeated comparison='+str(matched['full_repeated_comparison_validated']))
     inv = inventory(ev)
     write_json(rv / "inventory.json", inv, once=True)
     write_json(rv / "review.json", {
@@ -933,7 +946,8 @@ def main(argv=None):
         require(mt, "the tag is pd_<matrix>_<name>")
         a.matrix = mt.group(1)
         a.branch = os.environ.get("KVPD_BRANCH") or "pd-baselines"
-        require(re.fullmatch(r"[A-Za-z0-9_.-]+", a.branch), "KVPD_BRANCH is not a plain branch name")
+        require(re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", a.branch), "KVPD_BRANCH is not a branch name")
+        call('git','check-ref-format','--branch',a.branch)
         job = check_node()
         p = Paths(a.pin, a.tag)
         home = Path(a.home_repo)
@@ -957,3 +971,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

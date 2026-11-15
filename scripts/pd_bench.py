@@ -133,6 +133,7 @@ def transfer_stats(recs):
     return {"sends": len(s), "send_errors": sum(1 for r in s if r.get("error")),
             "installs": len(d), "install_errors": sum(1 for r in d if r.get("error")), "timeouts": len(tmo),
             "bits": mean([r.get("bits") for r in s]), "gather_ms": mean([r.get("gather_ms") for r in s]),
+            "codec_frame_bits": mean([r.get('codec_frame_bits') for r in s]),
             "encode_ms": mean([r.get("encode_ms") for r in s]),
             "link_ms": mean([1e3 * r["link_s"] for r in s if r.get("link_s") is not None]),
             "queue_ms": mean([1e3 * (r["send_begin"] - r["queued"]) for r in s if r.get("send_begin")]),
@@ -154,7 +155,7 @@ def bench_serve(a, dataset, rate, n, out_dir, name):
            "--dataset-name", "custom", "--dataset-path", dataset, "--custom-output-len", str(a.output_len),
            "--skip-chat-template", "--num-prompts", str(n), "--request-rate", str(rate), "--ignore-eos",
            "--percentile-metrics", "ttft,tpot,itl,e2el", "--metric-percentiles", "50,90,99",
-           "--goodput", f"ttft:{a.ttft_slo_ms}", "--seed", "0", "--disable-tqdm",
+           "--goodput", f"ttft:{a.ttft_slo_ms}", "--seed", os.environ.get('MATCHED_ROUND','0'), "--disable-tqdm",
            "--save-result", "--result-dir", str(out_dir), "--result-filename", name + ".json"]
     t0 = time.time()
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -222,6 +223,8 @@ def stage_sweep(a, res, colocated=False):
     out_dir.mkdir(parents=True, exist_ok=True)
     links = [None] if colocated else a.links
     codecs = ["none"] if colocated else usable(a, res, a.codecs)
+    ri = int(os.environ.get('MATCHED_ROUND','0')) % max(1,len(codecs))
+    codecs = codecs[ri:]+codecs[:ri]
     for link in links:
         if link is not None:
             Path(a.link_control).write_text(json.dumps({"gbps": None if link == "native" else link}))
@@ -244,6 +247,7 @@ def stage_sweep(a, res, colocated=False):
                 time.sleep(1)
                 st = transfer_stats(records(a.log_dir, t0, time.time())) if not colocated and codec != "nixl" else {}
                 runs[name] = {"link_gbps": link, "codec": codec, "rate": rate, "exit": rc,
+                              'requested_num_prompts':n,
                               "bench": {k: r.get(k) for k in KEEP}, "transfers": st}
                 b = runs[name]["bench"]
                 log(f"{name}: exit {rc}, {fmt(b.get('request_throughput'), 2)} req/s, TTFT p50 "
@@ -354,7 +358,7 @@ def stage_tier(a, res):
             cmd = [sys.executable, str(src / "benchmark_serving_multi_turn.py"), "--model", a.model,
                    "--served-model-name", a.served_name, "--url", a.proxy, "--input-file", str(cfile),
                    "--num-clients", str(clients), "--max-active-conversations", str(2 * clients),
-                   "--send-conversation-id", "--seed", str(gen % 100000), "--max-turns", str(a.tier_max_turns),
+                   "--send-conversation-id", "--seed", str(1000*int(os.environ.get('MATCHED_ROUND','0'))+int(clients)), "--max-turns", str(a.tier_max_turns),
                    "--stats-json-output", str(out_json)]
             t0 = time.time()
             r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(src))
@@ -375,7 +379,8 @@ def stage_tier(a, res):
                      "input_tokens": mean([x.get("input_num_tokens") for x in stats])}
             st = tier_stats(records(a.log_dir, t0, t1))
             runs[name] = {"codec": codec, "clients": clients, "exit": r.returncode, "bench": bench, "tier": st,
-                          "resets": resets, "generation": gen}
+                          "resets": resets, "generation": gen,
+                          "workload_seed":1000*int(os.environ.get('MATCHED_ROUND','0'))+int(clients)}
             log(f"{name}: exit {r.returncode}, {bench['requests']} requests, {fmt(bench['request_throughput'], 2)} "
                 f"req/s, TTFT p50 {fmt(bench['median_ttft_ms'], 0)} / p99 {fmt(bench['p99_ttft_ms'], 0)} ms; tier "
                 f"{st['loads']} loads ({st['loaded_tokens']} tokens, {fmt(st['load_ms'], 1)} ms each, bits "
@@ -509,6 +514,8 @@ def main():
     if a.env:
         res["env"] = dict(json.loads(Path(a.env).read_text()), dataset=a.dataset.name)
     for stage in a.stages.split(","):
+        res['benchmark_parameters']=dict(links=a.links,rates=a.rates,codecs=a.codecs,
+            tier_codecs=a.tier_codecs,tier_clients=a.tier_clients,requested_num_prompts=a.num_prompts)
         log(f"== {stage}")
         if stage == "check":
             stage_check(a, res)
@@ -531,3 +538,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+

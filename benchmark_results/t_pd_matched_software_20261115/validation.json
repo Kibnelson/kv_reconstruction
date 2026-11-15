@@ -1,0 +1,105 @@
+{
+  "automatic_merge": false,
+  "compiled_gpu_executed": false,
+  "copied_modules": {
+    "kv_compare/fast_dense_checks.py": {
+      "git_blob": "0dceaf0d7447f771cebe3542898513ce40193e04",
+      "sha256": "da0d604b43557ec0249f707da3fa881335f53aaa75f3dc9cfa86f0bb575dec3a"
+    },
+    "kv_compare/fast_dense_encode.py": {
+      "git_blob": "84c3c9bd96a72be4c1b744d24de098a968fab899",
+      "sha256": "801866f3d6e7f7713904fcb1e6fa7b0bdd74dc8bdf9d2ab3b2aa180a88e7e591"
+    },
+    "kv_compare/head_spread.py": {
+      "git_blob": "8d7a750e4dd783442c42f007407b6b709f12ee31",
+      "sha256": "68920db90f555d90b7097f2c9789b8f97ed4fa721dcbc67f0b83e81d28e1d1a8"
+    },
+    "kv_compare/head_spread_checks.py": {
+      "git_blob": "17ee95bff1f5757183977071a12389e0dfd3b44b",
+      "sha256": "552f6bb8248f4babf1df45ff82645cd7e0e611495b6981fba27c4eb2cd0dd713"
+    },
+    "kv_compare/head_spread_kernels.py": {
+      "git_blob": "87da622a3f571e59c06cce3bf6af561798fc763b",
+      "sha256": "f1bc735fbe2faae988068245e9f80acc6356a7bf4264396c58e4989267b99285"
+    },
+    "kv_compare/head_spread_wire.py": {
+      "git_blob": "38643e4ad97c089ed4396e862a62e93e6ecdbc45",
+      "sha256": "a16861082a9075bafb9914baaf4c73edd229d05981f30f080f9001090e5f4828"
+    }
+  },
+  "cpu_frame_geometry": {
+    "columns": 64,
+    "head_dim": 16,
+    "layers": 2,
+    "pad_tokens": 32,
+    "position": 37,
+    "program_tokens": 8,
+    "test_tokens": 17
+  },
+  "deployment_validated": false,
+  "format": "t_pd_matched_software_validation_v1",
+  "full_repeated_comparison_validated": false,
+  "generated_utc": "2026-11-15T02:15:39.625085+00:00",
+  "limitations": [
+    "Software validation uses CPU Triton interpretation and fake Slurm/engines; it is not GPU performance evidence.",
+    "Production calibration and geometry must pass setup on actual GPUs.",
+    "Fresh matched-campaign states are fitted; NUC frozen state files are not imported.",
+    "Ring transport emulates paced host transfers; no NIC or SSD is measured.",
+    "Full repeated comparison requires at least three complete repeats for each declared point."
+  ],
+  "live_vllm_serving_executed": false,
+  "production_geometry": {
+    "pad_tokens": 256,
+    "program_tokens": 128
+  },
+  "python": "3.12.14",
+  "required_gpu_checks": [
+    "all four captured codecs at 8192 and 3000 tokens",
+    "compiled kernels across all 65536 BF16 patterns",
+    "fast/cached original stream parity",
+    "compact/global original stream parity",
+    "four independent receivers with only packet/shared state",
+    "live paged cache correctness before timed serving"
+  ],
+  "selected_software_suite": {
+    "command": "TRITON_INTERPRET=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m unittest kv_compare.test_pd.WireTests kv_compare.test_pd.TransportTests kv_compare.test_pd.PagedTests kv_compare.test_pd.ConnectorFlowTests kv_compare.test_pd.ProxyTests kv_compare.test_pd.BenchReportTests kv_compare.test_pd.OpportunityTests kv_compare.test_pd_baselines.TierTests kv_compare.test_pd_baselines.StepRecordTests kv_compare.test_pd_baselines.Layer0Tests kv_compare.test_pd_baselines.RunnerDryRunTests kv_compare.test_pd_card kv_compare.test_pd_matched -v",
+    "result": "passed",
+    "seconds": 160.214,
+    "tests": 40
+  },
+  "slash_branch_lifecycle": {
+    "detached_home_checkout": true,
+    "fake_slurm": true,
+    "local_bare_git_only": true,
+    "result": "passed",
+    "source_pin_unchanged": true,
+    "stages": [
+      "create",
+      "run",
+      "cleanup",
+      "verify-cleanup",
+      "review",
+      "publish"
+    ]
+  },
+  "slurm_jobs_submitted": false,
+  "software_checks_passed": true,
+  "source_branch": "experiment/t-pd-matched-campaign-v1",
+  "syntax_checks": {
+    "bash": "passed",
+    "python_compileall": "passed"
+  },
+  "t_source_pin": "19b32be6744e2d12f39e615ff806da8fb7dc0744",
+  "unchanged_upstream_blobs": {
+    "kv_compare/core.py": "05bd76c72f07d519d7c1f38667dff2fec3ed7c8e",
+    "kv_compare/fused.py": "711e78ca2a6277c02e45cce34f9aa9627d31fe33",
+    "kv_compare/gpu_coder.py": "f0f8976e235bf737cc661b9d2020be3cabbff618",
+    "kv_compare/grouped.py": "885e0399f3865311ff69c9ee4eaf0cecab9398e6",
+    "kv_compare/layerwise.py": "028acfea2de3cd0dc180bca576b739506c5d521a",
+    "kv_compare/predict.py": "baf19b141d18308420a80ea86037d37e235315b3",
+    "scripts/node_specs.py": "6dd7299b1dedf447b5388f1c9d7c01604cdad8a6",
+    "scripts/pd_card.sh": "605970dcf460e090e3a68b976e484c5e3dc6aaf3"
+  },
+  "upstream_branch": "pd-baselines",
+  "upstream_pin": "313bc6de96c750a4a297a1a2e7610b9ac464cd90"
+}

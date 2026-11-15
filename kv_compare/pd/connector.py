@@ -528,7 +528,7 @@ class _WorkerSide:
     def _send(self, spec: SendSpec):
         if spec.dest == "tier":
             return self._tier_gather(spec)
-        from .wire import bundle, payload_bytes, word_checksum
+        from .wire import bundle, payload_bytes, word_checksum, header_to_bytes
         rec = {"event": "send", "key": spec.key, "req": spec.req_id, "codec": spec.codec, "dest": spec.dest,
                "tokens": spec.t1 - spec.t0, "t0": spec.t0, "conv": spec.conv, "finished_at": spec.finished_at,
                "picked_at": time.time()}
@@ -556,6 +556,8 @@ class _WorkerSide:
             rec["raw_bytes"] = int(words.numel() * 2)
             rec["coded_bytes"] = int(payload_bytes(header))
             rec["blob_bytes"] = int(blob.numel())
+            rec['codec_frame_bytes'] = int(blob.numel())+len(header_to_bytes(header))
+            rec['codec_frame_bits'] = 8.0*rec['codec_frame_bytes']/words.numel()
             rec["bits"] = 8.0 * rec["coded_bytes"] / words.numel()
             del words, parts
             with self.qlock:
@@ -602,6 +604,13 @@ class _WorkerSide:
                 if ck is not None:
                     ck.add(w)
                 self.paged.scatter_layer(l, w[a:b], blk, off)
+                if ck is not None:
+                    actual = self.paged.caches[l][blk,:,off]
+                    C = self.paged.heads*self.paged.hd
+                    installed = torch.cat((actual[...,:self.paged.hd].reshape(b-a,C).view(torch.int16),
+                        actual[...,self.paged.hd:].reshape(b-a,C).view(torch.int16)),1)
+                    if not torch.equal(installed,w[a:b]):
+                        raise ValueError('installed paged KV words differ from decoded words')
             sync = torch.cuda.synchronize if self.device.type == "cuda" else (lambda *x: None)
             t = time.perf_counter()
             ctx = self._ctx(codec, spec.prompt)
@@ -854,3 +863,4 @@ class _WorkerSide:
                     x.close()
                 except Exception:
                     pass
+

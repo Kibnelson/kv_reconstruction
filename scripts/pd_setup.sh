@@ -189,6 +189,7 @@ if [ -n "$T2_SETS" ] && [ ! -s "$TEXTS/cal_manifest.json" ]; then
 fi
 echo "== codec constants $RUN/pd_codecs.pt (codec environment)"
 HAVE_T2=none
+HAVE_MATCHED=none
 if [ -s "$RUN/pd_codecs.pt" ]; then
     HAVE_T2=$("$KV_HOME/venv/bin/python" - "$RUN/pd_codecs.pt" <<'EOF' 2>/dev/null || echo none
 import sys, torch
@@ -197,7 +198,14 @@ print(",".join(b.get("t2", {}).get("order", [])) or "none")
 EOF
 )
 fi
-if [ ! -s "$RUN/pd_codecs.pt" ] || { [ -n "$T2_SETS" ] && [ "$HAVE_T2" != "$T2_SETS" ]; }; then
+if [ -s "$RUN/pd_codecs.pt" ]; then
+    HAVE_MATCHED=$("$KV_HOME/venv/bin/python" - "$RUN/pd_codecs.pt" <<'EOF' 2>/dev/null || echo none
+import sys,torch
+print(torch.load(sys.argv[1],map_location='cpu',weights_only=False).get('t_matched',{}).get('format','none'))
+EOF
+)
+fi
+if [ ! -s "$RUN/pd_codecs.pt" ] || [ "$HAVE_MATCHED" != t_pd_matched_v1 ] || { [ -n "$T2_SETS" ] && [ "$HAVE_T2" != "$T2_SETS" ]; }; then
     SZ=()
     [ -d "$KV_HOME/sources/splitzip" ] && SZ=(--splitzip-source "$KV_HOME/sources/splitzip")
     T2=()
@@ -219,7 +227,7 @@ EXANS_INFO=()
 SELFTEST_OK=1
 for part in main nvcomp; do
     if [ "$part" = main ]; then
-        NAMES=${SELFTEST_CODECS:-raw,ours-dense,ours-kv,ours-4g,ours-hbh,ours-rank256,t2-dense,t2-hbh,t2-rank256,splitzip,adacode,exactkv,exans,ibp}
+        NAMES=${SELFTEST_CODECS:-raw,ours-dense,ours-kv,ours-4g,ours-hbh,ours-rank256,t2-dense,t2-hbh,t2-rank256,splitzip,adacode,exactkv,exans,ibp,t-fast,t-dense-cached,t-compact,t-compact-global}
         OUTF=$RUN/pd_selftest.json
     else
         NAMES=${SELFTEST_NVCOMP:-nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp}
@@ -231,6 +239,8 @@ for part in main nvcomp; do
         --names "$NAMES" --output "$OUTF" || SELFTEST_OK=0
 done
 [ "$SELFTEST_OK" = 1 ] || echo "WARNING: a codec failed the self-test (above, and $RUN/pd_selftest*.json); the runs leave it out"
+PYTHONPATH=$REPO "$VPY" scripts/check_pd_matched.py --bundle "$RUN/pd_codecs.pt" \
+    --captures "$RUN/captures" --selftest "$RUN/pd_selftest.json" --output "$RUN/pd_matched_checks.json"
 pip_freeze "$VPY" > "$KV_HOME/pip_freeze_vllm.txt" || true
 [ -x "${LPY:-}" ] && { pip_freeze "$LPY" > "$KV_HOME/pip_freeze_lmcache.txt" || true; }
 if [ "${DROP_CAPTURES:-0}" = 1 ]; then
@@ -239,3 +249,4 @@ if [ "${DROP_CAPTURES:-0}" = 1 ]; then
     find "$RUN/captures" -maxdepth 1 -name '*.npy' -delete 2>/dev/null || true
 fi
 echo "PD SETUP DONE"
+

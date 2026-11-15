@@ -611,6 +611,9 @@ def build(bundle_path, device, names, splitzip_source=None, adacode_source=None,
         try:
             if n == "raw":
                 out[n] = Raw()
+            elif n in ('t-fast','t-dense-cached','t-compact','t-compact-global'):
+                from .matched import MatchedT
+                out[n] = MatchedT(bundle,n,device)
             elif n.startswith("ours-"):
                 out[n] = Ours(bundle, n[5:], device)
             elif n.startswith("t2-"):
@@ -635,3 +638,4 @@ def build(bundle_path, device, names, splitzip_source=None, adacode_source=None,
             errors[n] = repr(exc)[:300]
             log(f"pd codecs: {n} not available ({errors[n]})")
     return out, errors, (bundle["meta"] if bundle else {})
+

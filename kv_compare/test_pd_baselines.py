@@ -708,7 +708,8 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertEqual(len(rep), 1)
         text = rep[0].read_text()
         self.assertIn("2 runs:", text)
-        self.assertIn("`LAYOUT=colo4 CONNECTOR=nixl`", text)
+        self.assertIn("`LAYOUT=colo4 CONNECTOR=nixl MATCHED_ROUND=0`", text)
         log = subprocess.run(["git", "-C", str(self.repo), "log", "--oneline", "-5"], capture_output=True,
                              text=True).stdout
         self.assertIn("PD matrix smoke: 3 runs (2 not finished)", log)   # the stand-ins log no transfers: run 1 fails its check
+

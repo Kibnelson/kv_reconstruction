@@ -126,7 +126,7 @@ EAGER=${ENGINE_EAGER:-0}
 RUN_TAG=${LAYOUT}_${CONNECTOR}
 if [ "$CONNECTOR" = tkv ] && [ "$COLO" = 0 ]; then RUN_TAG=${RUN_TAG}_$TRANSPORT; fi
 if [ "$EAGER" = 1 ]; then RUN_TAG=${RUN_TAG}_eager; fi
-STAMP=$(date +%Y%m%d_%H%M)
+STAMP=$(date -u +%Y%m%d_%H%M%S)_$$
 OUT=$RUN/pd/${STAMP}_$RUN_TAG
 LOGS=$OUT/connector
 mkdir -p "$OUT" "$LOGS"
@@ -270,6 +270,9 @@ visible() {   # the CUDA_VISIBLE_DEVICES of an engine on job GPU position $1
 serve() {   # name position port mem kv_transfer_config [VAR=value ...]
     local name=$1 pos=$2 port=$3 mem=$4 cfg=$5
     shift 5
+    cfg=$("$VPY" -c 'import json,sys; d=json.loads(sys.argv[1]); d["kv_load_failure_policy"]="fail"; print(json.dumps(d,separators=(",",":")))' "$cfg")
+    local prefix_args=(--enable-prefix-caching)
+    [ "$COLO" = 1 ] || prefix_args=(--no-enable-prefix-caching)
     # VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0: vLLM (since 0.21) captures CUDA graphs once while it sizes the KV
     # cache, before the KV connector starts; on gpu-grad-01 (job 30163) every compiled engine with a connector that
     # touches the GPU at start (ours, LMCache) then died, and the eager ones (no capture) came up. With 0 the
@@ -279,7 +282,7 @@ serve() {   # name position port mem kv_transfer_config [VAR=value ...]
         nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" \
         --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" \
         --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" \
-        --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1 &
+        --kv-transfer-config "$cfg" "${prefix_args[@]}" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1 &
     PIDS+=($!)
     echo "   $name on GPU ${DEVS[$pos]} (visible $(visible "$pos")), port $port (log $OUT/engine_$name.log)"
 }
@@ -355,10 +358,19 @@ nohup "$VPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_AR
     --log "$OUT/proxy.jsonl" > "$OUT/proxy.log" 2>&1 &
 PIDS+=($!)
 for _ in $(seq 1 30); do curl -sf "$PROXY/health" >/dev/null && break; sleep 1; done
-"$VPY" - "$OUT/env.json" "$MODEL_ID" "$NUM_PREFILL" "$NUM_DECODE" "$LAYOUT" "$CONNECTOR" "$TRANSPORT" "$EAGER" <<'EOF'
-import json, subprocess, sys, torch, vllm
+"$VPY" - "$OUT/env.json" "$MODEL_ID" "$NUM_PREFILL" "$NUM_DECODE" "$LAYOUT" "$CONNECTOR" "$TRANSPORT" "$EAGER" "$PROMPTS" "$REVISION" "$KV_RUNS/dataset_texts" "$LOAD_CODECS" <<'EOF'
+import hashlib, json, os, subprocess, sys, torch, vllm
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
-extra = {}
+loaded=[n for n in sys.argv[12].split(',') if n]
+extra = {'matched_round': int(os.environ.get('MATCHED_ROUND','0')),
+         'memory_profiler_estimate_cudagraphs': os.environ.get('VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS','0'),
+         'requested_codecs':loaded,
+         'engine_group':'nvcomp' if any(n.startswith('nvcomp-') for n in loaded) else ('matched' if 't-fast' in loaded else sys.argv[6]),
+         'comparison_baseline_pin': '313bc6de96c750a4a297a1a2e7610b9ac464cd90',
+         'model_revision':sys.argv[10],
+         'fresh_PD_prefix_cache_disabled': sys.argv[5]!='colo4',
+         'prompt_sha256': {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in __import__('pathlib').Path(sys.argv[9]).glob('*.jsonl')},
+         'eval_text_sha256': {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in __import__('pathlib').Path(sys.argv[11]).glob('*.txt')}}
 for m in ("lmcache", "nixl"):
     try:
         extra[m] = getattr(__import__(m), "__version__", "?")
@@ -412,3 +424,4 @@ git rebase -q "origin/$BRANCH" || { git rebase --abort; echo "STOP: rebase faile
 git push -q origin "HEAD:$BRANCH"
 echo "PUSHED $DEST to $BRANCH"
 exit "$STATUS"
+

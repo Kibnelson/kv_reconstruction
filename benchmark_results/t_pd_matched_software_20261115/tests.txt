@@ -1,0 +1,87 @@
+Software-only validation. GPU executed: false. Live serving validated: false.
+
+TRITON_INTERPRET=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m unittest kv_compare.test_pd.WireTests kv_compare.test_pd.TransportTests kv_compare.test_pd.PagedTests kv_compare.test_pd.ConnectorFlowTests kv_compare.test_pd.ProxyTests kv_compare.test_pd.BenchReportTests kv_compare.test_pd.OpportunityTests kv_compare.test_pd_baselines.TierTests kv_compare.test_pd_baselines.StepRecordTests kv_compare.test_pd_baselines.Layer0Tests kv_compare.test_pd_baselines.RunnerDryRunTests kv_compare.test_pd_card kv_compare.test_pd_matched -v
+
+test_bundle_round_trip (kv_compare.test_pd.WireTests.test_bundle_round_trip) ... ok
+test_checksum_sees_one_flipped_word (kv_compare.test_pd.WireTests.test_checksum_sees_one_flipped_word) ... ok
+test_segment_tails_round_trip (kv_compare.test_pd.WireTests.test_segment_tails_round_trip) ... ok
+test_drop_discards_now_or_on_arrival (kv_compare.test_pd.TransportTests.test_drop_discards_now_or_on_arrival) ... ok
+test_link_paces_at_the_set_speed (kv_compare.test_pd.TransportTests.test_link_paces_at_the_set_speed) ... ok
+test_ring_and_tcp_deliver_exactly (kv_compare.test_pd.TransportTests.test_ring_and_tcp_deliver_exactly) ... ok
+test_ring_smaller_than_a_transfer_wraps_with_flow_control (kv_compare.test_pd.TransportTests.test_ring_smaller_than_a_transfer_wraps_with_flow_control) ... ok
+test_unclaimed_transfers_expire (kv_compare.test_pd.TransportTests.test_unclaimed_transfers_expire) ... ok
+test_unreachable_receiver_reports_instead_of_raising (kv_compare.test_pd.TransportTests.test_unreachable_receiver_reports_instead_of_raising) ... ok
+test_gather_scatter_and_kernel_blocks (kv_compare.test_pd.PagedTests.test_gather_scatter_and_kernel_blocks) ... ok
+test_aborted_decode_request_is_released_and_its_transfer_dropped (kv_compare.test_pd.ConnectorFlowTests.test_aborted_decode_request_is_released_and_its_transfer_dropped) ... ok
+test_only_the_missing_tokens_are_installed (kv_compare.test_pd.ConnectorFlowTests.test_only_the_missing_tokens_are_installed) ... ok
+test_requests_without_our_params_are_left_alone (kv_compare.test_pd.ConnectorFlowTests.test_requests_without_our_params_are_left_alone) ... ok
+test_transfer_that_never_comes_fails_after_the_timeout (kv_compare.test_pd.ConnectorFlowTests.test_transfer_that_never_comes_fails_after_the_timeout) ... ok
+test_whole_prompt_moves_exactly (kv_compare.test_pd.ConnectorFlowTests.test_whole_prompt_moves_exactly) ... ok
+test_failed_prefill_ends_the_decode_request (kv_compare.test_pd.ProxyTests.test_failed_prefill_ends_the_decode_request) ... ok
+test_push_routing_params_and_modes (kv_compare.test_pd.ProxyTests.test_push_routing_params_and_modes) ... ok
+test_transfer_stats_and_report (kv_compare.test_pd.BenchReportTests.test_transfer_stats_and_report) ... tkv sender: cannot reach 127.0.0.1:1 (ConnectionRefusedError(111, 'Connection refused'))
+21:12:27 report: /tmp/tmp28m382_e/summary.md
+ok
+test_categories_from_logs (kv_compare.test_pd.OpportunityTests.test_categories_from_logs) ... ok
+test_budget_prefix_hits_and_clear (kv_compare.test_pd_baselines.TierTests.test_budget_prefix_hits_and_clear) ... ok
+test_scheduler_records_each_step_rows (kv_compare.test_pd_baselines.StepRecordTests.test_scheduler_records_each_step_rows) ... ok
+test_rounded_row_counts_are_found (kv_compare.test_pd_baselines.Layer0Tests.test_rounded_row_counts_are_found)
+vLLM may pad a step to a CUDA graph size: the sender finds the padded count and sends it. ... ok
+test_steps_and_check (kv_compare.test_pd_baselines.Layer0Tests.test_steps_and_check) ... ok
+test_an_engine_that_dies_at_start_is_packaged (kv_compare.test_pd_baselines.RunnerDryRunTests.test_an_engine_that_dies_at_start_is_packaged) ... ok
+test_layouts_connectors_and_packaging (kv_compare.test_pd_baselines.RunnerDryRunTests.test_layouts_connectors_and_packaging) ... Error handling request from 127.0.0.1
+Traceback (most recent call last):
+  File "/workspace/scratch/928d5c418367/pd_campaign_test_deps/aiohttp/web_protocol.py", line 577, in _handle_request
+    resp = await request_handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/928d5c418367/pd_campaign_test_deps/aiohttp/web_app.py", line 563, in _handle
+    return await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/928d5c418367/pd_campaign_compare/kv_compare/test_pd.py", line 503, in h
+    await resp.write(f"data: {{\"i\": {i}}}\n\n".encode())
+  File "/workspace/scratch/928d5c418367/pd_campaign_test_deps/aiohttp/web_response.py", line 565, in write
+    await self._payload_writer.write(data)
+  File "/workspace/scratch/928d5c418367/pd_campaign_test_deps/aiohttp/http_writer.py", line 203, in write
+    self._write_chunked_payload(chunk)
+  File "/workspace/scratch/928d5c418367/pd_campaign_test_deps/aiohttp/http_writer.py", line 123, in _write_chunked_payload
+    self._writelines((chunk_len_pre, chunk, b"\r\n"))
+  File "/workspace/scratch/928d5c418367/pd_campaign_test_deps/aiohttp/http_writer.py", line 114, in _writelines
+    raise ClientConnectionResetError("Cannot write to closing transport")
+aiohttp.client_exceptions.ClientConnectionResetError: Cannot write to closing transport
+ok
+test_matrix_runs_each_and_reports_once (kv_compare.test_pd_baselines.RunnerDryRunTests.test_matrix_runs_each_and_reports_once) ... ok
+test_a_run_that_stops_on_the_disk_check_is_closed_out (kv_compare.test_pd_card.CardTests.test_a_run_that_stops_on_the_disk_check_is_closed_out) ... ok
+test_a_whole_campaign (kv_compare.test_pd_card.CardTests.test_a_whole_campaign) ... ok
+test_login_checks (kv_compare.test_pd_card.CardTests.test_login_checks) ... ok
+test_choices (kv_compare.test_pd_card.DiskPlanTests.test_choices) ... ok
+test_drop (kv_compare.test_pd_card.DropWindowsTests.test_drop) ... ok
+test_uv_helpers (kv_compare.test_pd_card.EnvHelperTests.test_uv_helpers) ... ok
+test_salvage (kv_compare.test_pd_card.SalvageTests.test_salvage) ... ok
+test_complete_fixture_passes_only_smoke_and_missing_row_fails (kv_compare.test_pd_matched.CampaignContracts.test_complete_fixture_passes_only_smoke_and_missing_row_fails) ... ok
+test_failed_or_missing_methods_do_not_validate (kv_compare.test_pd_matched.CampaignContracts.test_failed_or_missing_methods_do_not_validate) ... ok
+test_full_repeats_frozen_once (kv_compare.test_pd_matched.CampaignContracts.test_full_repeats_frozen_once) ... ok
+test_smoke_both_layouts_and_matched_controls (kv_compare.test_pd_matched.CampaignContracts.test_smoke_both_layouts_and_matched_controls) ... ok
+test_dev_selection_global_fallback_and_tie (kv_compare.test_pd_matched.MatchedFrames.test_dev_selection_global_fallback_and_tie) ... ok
+test_offset_tail_fresh_receiver_and_dense_stream_parity (kv_compare.test_pd_matched.MatchedFrames.test_offset_tail_fresh_receiver_and_dense_stream_parity) ...    deleted 0.0 GiB of calibration windows
+CPU frame check: t-fast
+CPU frame check: t-dense-cached
+CPU frame check: t-compact
+CPU frame check: t-compact-global
+ok
+test_rope_and_input_geometry_limits (kv_compare.test_pd_matched.MatchedFrames.test_rope_and_input_geometry_limits) ... ok
+
+----------------------------------------------------------------------
+Ran 40 tests in 160.214s
+
+OK
+
+Bash syntax and Python compileall: passed.
+
+Additional simulated campaign: experiment/t-pd-matched-campaign-v1, detached home checkout. Fake Slurm/engines and local bare Git only; no external publication.
+create: passed
+run: passed
+cleanup: passed
+verify-cleanup: passed
+review: passed
+publish: passed
+Slash-name source branch, detached home checkout, fresh evidence branch and unchanged source pin: passed

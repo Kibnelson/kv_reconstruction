@@ -1,0 +1,11 @@
+# Matched T PD campaign: software validation
+
+This prepares the isolated `experiment/t-pd-matched-campaign-v1` source branch. It is not a GPU benchmark or a serving result. The baseline source is `pd-baselines` at `313bc6de96c750a4a297a1a2e7610b9ac464cd90`, including the engine startup, NIXL, nvCOMP stream and failed-log retention fixes after job 30163.
+
+The six Fast T/head-width experiment modules are copied unchanged from `experiment/t-head-aware-spread-v1` at `19b32be6744e2d12f39e615ff806da8fb7dc0744`. The original T predictor/coder modules, Slurm card and node survey match the baseline source blobs. Added serving adapters and calibration are independent of the NUC frozen state files.
+
+`validation.json` records source hashes, geometry, checks and limitations. `tests.txt` records the selected final software suite: 40 tests passed. It covers CPU interpreter frame round trips for all four added codecs, nonzero positions and tails, wrong-state rejection, fast/cached byte parity, transport/page installation, frozen matrix repeats, review rejection of missing methods, and the campaign lifecycle with fake Slurm/engines and a local bare Git repository. The CPU frame tests use small geometry (8-token programs and padding to 32 tokens); production uses 128-token programs and padding to 256. They do not replace compiled GPU checks.
+
+The allocation setup must pass captured GPU exact-word checks at 8,192 and 3,000 tokens, all-BF16-pattern compiled kernel checks, parity controls and four fresh GPU receiver processes. Actual vLLM engine startup, serving correctness, latency, throughput, goodput, compression and memory behavior remain unmeasured for this fork. A failed or skipped method cannot pass declared comparison coverage. Smoke cannot pass the full repeated-comparison gate.
+
+No original experiment or baseline branch is merged or overwritten. See `docs/t_pd_matched_campaign.md` for the separate-worktree login command and interpretation limits.
