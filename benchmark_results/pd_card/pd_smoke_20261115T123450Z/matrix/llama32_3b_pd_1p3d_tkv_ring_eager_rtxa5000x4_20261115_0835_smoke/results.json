@@ -1,0 +1,272 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 1,
+  "decodes": 3,
+  "layout": "1p3d",
+  "connector": "tkv",
+  "transport": "ring",
+  "eager": true,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "raw": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 7.715753745287657,
+    "encode_ms": 2.473983447998762,
+    "link_ms": 41.00962169468403,
+    "queue_ms": 0.25397539138793945,
+    "achieved_gbps": 94.96847387892413,
+    "install_ms": 24.632491171360016,
+    "wait_ms": 1037.808120250702,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": []
+  },
+  "t2-hbh": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.489334934561594,
+    "gather_ms": 6.455609574913979,
+    "encode_ms": 99.2975221015513,
+    "link_ms": 21.352700423449278,
+    "queue_ms": 0.3002285957336426,
+    "achieved_gbps": 93.51578752581406,
+    "install_ms": 166.30383394658566,
+    "wait_ms": 344.55227851867676,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 4,
+    "layer0_checks": [
+     "no steps for every token (a prefix-cache hit or a short prompt list)"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": []
+  },
+  "t2-rank256": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 9.578003083328975,
+    "gather_ms": 6.547572091221809,
+    "encode_ms": 48.081109300255775,
+    "link_ms": 24.212342221289873,
+    "queue_ms": 0.2542734146118164,
+    "achieved_gbps": 93.23697059170138,
+    "install_ms": 53.74800879508257,
+    "wait_ms": 172.66130447387695,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 4,
+    "layer0_checks": [
+     "no steps for every token (a prefix-cache hit or a short prompt list)"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": []
+  }
+ },
+ "sweep": {
+  "sweep_raw_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "raw",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 4.322076290845871,
+    "request_throughput": 1.8509622370488803,
+    "request_goodput": 0.69411083889333,
+    "output_throughput": 236.92316634225668,
+    "total_token_throughput": 4027.6938278183634,
+    "mean_ttft_ms": 2309.1857384424657,
+    "median_ttft_ms": 2394.867368042469,
+    "p90_ttft_ms": 2803.4719651564956,
+    "p99_ttft_ms": 2815.5850596167147,
+    "mean_tpot_ms": 11.848105288176674,
+    "median_tpot_ms": 11.865347095831172,
+    "p99_tpot_ms": 11.9874344158947,
+    "mean_e2el_ms": 3813.895110040903,
+    "p99_e2el_ms": 4318.902893681079,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 4.007875686511397,
+    "encode_ms": 1.1012849863618612,
+    "link_ms": 469.762054271996,
+    "queue_ms": 318.4119164943695,
+    "achieved_gbps": 3.7493176143264972,
+    "install_ms": 2.57180561311543,
+    "wait_ms": 2228.793501853943,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 4,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   }
+  },
+  "sweep_t2-hbh_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-hbh",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 2.6128342002630234,
+    "request_throughput": 3.061809279438654,
+    "request_goodput": 3.061809279438654,
+    "output_throughput": 391.91158776814774,
+    "total_token_throughput": 6662.496992058512,
+    "mean_ttft_ms": 842.6180416718125,
+    "median_ttft_ms": 876.9138995558023,
+    "p90_ttft_ms": 1065.878844447434,
+    "p99_ttft_ms": 1079.1729061491787,
+    "mean_tpot_ms": 12.789385842423387,
+    "median_tpot_ms": 12.451076212771763,
+    "p99_tpot_ms": 14.230112742896624,
+    "mean_e2el_ms": 2466.8700436595827,
+    "p99_e2el_ms": 2609.8050256073475,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.145517757960729,
+    "gather_ms": 4.396824166178703,
+    "encode_ms": 40.65736453048885,
+    "link_ms": 207.22711575217545,
+    "queue_ms": 94.90665793418884,
+    "achieved_gbps": 4.039237535735435,
+    "install_ms": 147.52590120770037,
+    "wait_ms": 765.5653059482574,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 8,
+    "layer0_checks": [
+     "no steps for every token (a prefix-cache hit or a short prompt list)"
+    ],
+    "sets": {
+     "news": 1,
+     "code": 2,
+     "wikitext": 2,
+     "math": 2,
+     "exam": 1
+    }
+   }
+  },
+  "sweep_t2-rank256_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-rank256",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 2.5741538424044847,
+    "request_throughput": 3.107817360491283,
+    "request_goodput": 3.107817360491283,
+    "output_throughput": 397.8006221428842,
+    "total_token_throughput": 6762.610576429032,
+    "mean_ttft_ms": 755.2298870868981,
+    "median_ttft_ms": 778.2432185485959,
+    "p90_ttft_ms": 1046.8897014856339,
+    "p99_ttft_ms": 1050.886582173407,
+    "mean_tpot_ms": 12.0398257070727,
+    "median_tpot_ms": 12.050327272924381,
+    "p99_tpot_ms": 12.27622054605268,
+    "mean_e2el_ms": 2284.287751885131,
+    "p99_e2el_ms": 2572.0123129710555,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 9.230296816144671,
+    "gather_ms": 4.675910109654069,
+    "encode_ms": 28.294157469645143,
+    "link_ms": 250.8687141817063,
+    "queue_ms": 162.264883518219,
+    "achieved_gbps": 3.801105144637198,
+    "install_ms": 18.902659881860018,
+    "wait_ms": 683.8460266590118,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 1,
+    "layer0_recomputed": 0,
+    "layer0_coded": 8,
+    "layer0_checks": [
+     "no steps for every token (a prefix-cache hit or a short prompt list)"
+    ],
+    "sets": {
+     "news": 1,
+     "code": 2,
+     "wikitext": 2,
+     "math": 2,
+     "exam": 1
+    }
+   }
+  }
+ }
+}

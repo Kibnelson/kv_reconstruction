@@ -1,0 +1,400 @@
+  $ /tmp/nbore/kvpd/30210/runs/llama32_3b/exans/build/openlake_expans_test
+  the authors' ExANS test passed
+   ExANS built: /tmp/nbore/kvpd/30210/runs/llama32_3b/exans/build/libopenlake_expans.so
+== calibration captures in /tmp/nbore/kvpd/30210/runs/llama32_3b
+wikitext2: 4358 rows, 1,294,336 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/wikitext2.txt
+wikitext2_train: 36718 rows, 10,966,424 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/wikitext2_train.txt
+humaneval: 164 rows, 103,886 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/humaneval.txt
+gsm8k: 1319 rows, 730,397 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/gsm8k.txt
+mmlu: 14042 rows, 7,589,641 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/mmlu.txt
+ptb: 3761 rows, 442,422 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/ptb.txt
+wrote /tmp/nbore/kvpd/30210/runs/dataset_texts/manifest.json
+07:36:15 run started: stages ['calcap']; NVIDIA RTX A5000; branch HEAD, commit 7d42b833515309342861e3f2c7f83473d053d951; torch 2.11.0+cu128, triton 3.6.0
+07:36:15 GPU memory free 23.3 of 23.5 GB at start
+
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+Fetching 2 files:  50%|█████     | 1/2 [00:13<00:13, 13.16s/it]
+Fetching 2 files: 100%|██████████| 2/2 [00:23<00:00, 11.87s/it]
+Fetching 2 files: 100%|██████████| 2/2 [00:23<00:00, 11.87s/it]
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 91.20it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (2436213 > 131072). Running this sequence through the model will result in indexing errors
+07:36:53 calcap: captured wtrain0 (WikiText-2 train tokens 0-8190)
+07:36:56 calcap: captured wtrain1 (WikiText-2 train tokens 8191-16381)
+07:36:59 calcap: captured wtrain2 (WikiText-2 train tokens 16382-24572)
+07:37:03 calcap: captured wtrain3 (WikiText-2 train tokens 24573-32763)
+07:37:06 calcap: captured wtrain4 (WikiText-2 train tokens 32764-40954)
+07:37:09 calcap: captured wtrain5 (WikiText-2 train tokens 40955-49145)
+07:37:12 calcap: captured wtables (WikiText-2 train tokens 49146-57336)
+07:37:12 calcap: unsloth/Llama-3.2-3B (28 layers, 8 KV heads x 128, 24 query heads)
+07:37:13 run finished in 59 s
+07:37:13 share it: python scripts/package_llama_compare.py /tmp/nbore/kvpd/30210/runs/llama32_3b --destination benchmark_results/<name>
+cal_code: 974 rows, 251,822 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/cal_code.txt
+cal_math: 7473 rows, 4,057,858 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/cal_math.txt
+cal_exam: 1816 rows, 969,320 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/cal_exam.txt
+cal_news: 42068 rows, 5,017,481 characters -> /tmp/nbore/kvpd/30210/runs/dataset_texts/cal_news.txt
+wrote /tmp/nbore/kvpd/30210/runs/dataset_texts/cal_manifest.json
+== codec constants /tmp/nbore/kvpd/30210/runs/llama32_3b/pd_codecs.pt (codec environment)
+  fused one-step predictor prepared for 28 layers
+  reduced-rank one-step predictor (rank 256) prepared for 28 layers
+  head-group predictor (2 groups of 8 heads) prepared for 28 layers
+  head-group predictor (4 groups of 4 heads) prepared for 28 layers
+  head-group predictor (16 groups of 1 heads) prepared for 28 layers
+SplitZip code book from wtrain0: top-16 coverage 99.91%
+T2 set wikitext: the main constants
+[07:38:54] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 169.80it/s]
+[07:39:00] calib: captured cal_code_0
+[07:39:03] calib: captured cal_code_1
+[07:39:07] calib: captured cal_code_2
+[07:39:10] calib: captured cal_code_3
+T2 set code: captured 4 calibration windows
+T2 set code: 3 calibration documents (MBPP, all splits (Python problems and solutions; HumanEval's kind of text))
+   deleted 3.5 GiB of calibration windows
+[07:40:30] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 164.55it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (1212753 > 131072). Running this sequence through the model will result in indexing errors
+[07:40:37] calib: captured cal_math_0
+[07:40:40] calib: captured cal_math_1
+[07:40:43] calib: captured cal_math_2
+[07:40:46] calib: captured cal_math_3
+T2 set math: captured 4 calibration windows
+T2 set math: 3 calibration documents (GSM8K train)
+   deleted 3.5 GiB of calibration windows
+[07:42:02] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 163.67it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (212985 > 131072). Running this sequence through the model will result in indexing errors
+[07:42:06] calib: captured cal_exam_0
+[07:42:10] calib: captured cal_exam_1
+[07:42:13] calib: captured cal_exam_2
+[07:42:16] calib: captured cal_exam_3
+T2 set exam: captured 4 calibration windows
+T2 set exam: 3 calibration documents (MMLU dev and validation (MMLU's prompt format))
+   deleted 3.5 GiB of calibration windows
+[07:43:31] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 164.73it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (1061071 > 131072). Running this sequence through the model will result in indexing errors
+[07:43:38] calib: captured cal_news_0
+[07:43:41] calib: captured cal_news_1
+[07:43:44] calib: captured cal_news_2
+[07:43:47] calib: captured cal_news_3
+T2 set news: captured 4 calibration windows
+T2 set news: 3 calibration documents (Penn Treebank train)
+   deleted 3.5 GiB of calibration windows
+{
+ "written": "/tmp/nbore/kvpd/30210/runs/llama32_3b/pd_codecs.pt",
+ "model": "unsloth/Llama-3.2-3B",
+ "revision": "d4446454d87d51aa42e1fb174f25acc5f8762331",
+ "train_set": "wikitext",
+ "calibration": [
+  "wtrain0",
+  "wtrain1",
+  "wtrain2",
+  "wtrain3",
+  "wtrain4",
+  "wtrain5"
+ ],
+ "splitzip_book_from": "wtrain0",
+ "L": 28,
+ "W": 2048,
+ "C": 1024,
+ "hd": 128,
+ "rank": 256,
+ "groups": [
+  2,
+  4,
+  16
+ ],
+ "max_positions": 32768,
+ "t2_sets": [
+  "wikitext",
+  "code",
+  "math",
+  "exam",
+  "news"
+ ]
+}
+== self-test in the vLLM environment (every codec through the paced transport)
+pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+{"codec": "raw", "tokens": 8192, "encode_ms": 0.024592503905296326, "bits": 16.0, "decode_ms": 2.840602770447731, "exact": true}
+{"codec": "ours-dense", "tokens": 8192, "encode_ms": 92.15408004820347, "bits": 8.745545251028878, "decode_ms": 58.0973532050848, "exact": true}
+{"codec": "ours-kv", "tokens": 8192, "encode_ms": 117.51861870288849, "bits": 8.380765642438616, "decode_ms": 67.63671524822712, "exact": true}
+{"codec": "ours-4g", "tokens": 8192, "encode_ms": 116.60449393093586, "bits": 8.145614079066686, "decode_ms": 77.68937945365906, "exact": true}
+{"codec": "ours-hbh", "tokens": 8192, "encode_ms": 117.08814278244972, "bits": 8.009789875575475, "decode_ms": 185.67075952887535, "exact": true}
+{"codec": "ours-rank256", "tokens": 8192, "encode_ms": 66.71156734228134, "bits": 9.219076974051339, "decode_ms": 54.350920021533966, "exact": true}
+{"codec": "t2-dense", "tokens": 8192, "encode_ms": 101.69187001883984, "bits": 8.745545251028878, "set": "wikitext", "layer0": "coded", "decode_ms": 60.92270649969578, "exact": true}
+{"codec": "t2-hbh", "tokens": 8192, "encode_ms": 127.28049047291279, "bits": 8.009789875575475, "set": "wikitext", "layer0": "coded", "decode_ms": 180.03431893885136, "exact": true}
+{"codec": "t2-rank256", "tokens": 8192, "encode_ms": 76.83199644088745, "bits": 9.219076974051339, "set": "wikitext", "layer0": "coded", "decode_ms": 54.922280833125114, "exact": true}
+{"codec": "splitzip", "tokens": 8192, "encode_ms": 7.560981437563896, "bits": 12.049286961555481, "decode_ms": 5.45102171599865, "exact": true}
+{"codec": "adacode", "tokens": 8192, "encode_ms": 21.90220169723034, "bits": 11.37075240271432, "decode_ms": 8.269740268588066, "exact": true}
+{"codec": "exactkv", "tokens": 8192, "encode_ms": 17.751486971974373, "bits": 12.575496128627233, "decode_ms": 26.116617023944855, "exact": true}
+{"codec": "exans", "tokens": 8192, "encode_ms": 175.23456551134586, "bits": 10.872940744672503, "decode_ms": 27.12874487042427, "exact": true}
+{"codec": "raw", "tokens": 3000, "encode_ms": 0.01722201704978943, "bits": 16.0, "decode_ms": 1.0785739868879318, "exact": true}
+{"codec": "ours-dense", "tokens": 3000, "encode_ms": 33.74644182622433, "bits": 9.269865327380952, "decode_ms": 25.496119633316994, "exact": true}
+{"codec": "ours-kv", "tokens": 3000, "encode_ms": 46.239281073212624, "bits": 8.90550669642857, "decode_ms": 30.192160978913307, "exact": true}
+{"codec": "ours-4g", "tokens": 3000, "encode_ms": 46.102408319711685, "bits": 8.668667410714285, "decode_ms": 37.978531792759895, "exact": true}
+{"codec": "ours-hbh", "tokens": 3000, "encode_ms": 46.50561511516571, "bits": 8.531450892857142, "decode_ms": 162.24400140345097, "exact": true}
+{"codec": "ours-rank256", "tokens": 3000, "encode_ms": 27.156153693795204, "bits": 9.74771800595238, "decode_ms": 22.680051624774933, "exact": true}
+{"codec": "t2-dense", "tokens": 3000, "encode_ms": 44.48500834405422, "bits": 9.269865327380952, "set": "wikitext", "layer0": "coded", "decode_ms": 25.83218738436699, "exact": true}
+{"codec": "t2-hbh", "tokens": 3000, "encode_ms": 55.6676983833313, "bits": 8.531450892857142, "set": "wikitext", "layer0": "coded", "decode_ms": 161.7458313703537, "exact": true}
+{"codec": "t2-rank256", "tokens": 3000, "encode_ms": 36.76046431064606, "bits": 9.74771800595238, "set": "wikitext", "layer0": "coded", "decode_ms": 22.649608552455902, "exact": true}
+{"codec": "splitzip", "tokens": 3000, "encode_ms": 3.5512521862983704, "bits": 12.04319921875, "decode_ms": 2.119559794664383, "exact": true}
+{"codec": "adacode", "tokens": 3000, "encode_ms": 11.57904788851738, "bits": 11.372570824032739, "decode_ms": 3.248468041419983, "exact": true}
+{"codec": "exactkv", "tokens": 3000, "encode_ms": 17.461223527789116, "bits": 12.612559523809523, "decode_ms": 9.089639410376549, "exact": true}
+{"codec": "exans", "tokens": 3000, "encode_ms": 64.46529552340508, "bits": 10.885275948660714, "decode_ms": 9.901503100991249, "exact": true}
+{"transport": "ring", "codec": "ours-dense", "bytes": 199339184, "gbps_set": 100.0, "exact": true, "wall_s": 0.22181406617164612, "achieved_gbps": 7.189415439352547, "link_s": 0.016366422176361084}
+{"transport": "tcp", "codec": "ours-dense", "bytes": 199339184, "gbps_set": 100.0, "exact": true, "wall_s": 0.17265117913484573, "achieved_gbps": 9.236620798022358, "link_s": 0.14783217385411263}
+SELFTEST OK (26 codec runs, errors: {'ibp': 'ModuleNotFoundError("No module named \'ibp\'")'})
+{"codec": "nvcomp-ans", "tokens": 8192, "encode_ms": 73.52641969919205, "bits": 13.359210695539202, "decode_ms": 34.673143178224564, "exact": true}
+{"codec": "nvcomp-zstd", "tokens": 8192, "encode_ms": 561.2379796802998, "bits": 12.903550522668022, "decode_ms": 88.53336609899998, "exact": true}
+{"codec": "nvcomp-bitcomp", "tokens": 8192, "encode_ms": 59.92197245359421, "bits": 13.793124743870326, "decode_ms": 36.88051551580429, "exact": true}
+{"codec": "nvcomp-ans", "tokens": 3000, "encode_ms": 27.155054733157158, "bits": 13.349636625744047, "decode_ms": 13.27844150364399, "exact": true}
+{"codec": "nvcomp-zstd", "tokens": 3000, "encode_ms": 206.88318833708763, "bits": 12.900035714285714, "decode_ms": 33.07159058749676, "exact": true}
+{"codec": "nvcomp-bitcomp", "tokens": 3000, "encode_ms": 22.747911512851715, "bits": 13.77543712797619, "decode_ms": 14.189494773745537, "exact": true}
+{"transport": "ring", "codec": "nvcomp-ans", "bytes": 287070592, "gbps_set": 100.0, "exact": true, "wall_s": 0.23084627650678158, "achieved_gbps": 9.948459081741063, "link_s": 0.023634159937500954}
+{"transport": "tcp", "codec": "nvcomp-ans", "bytes": 287070592, "gbps_set": 100.0, "exact": true, "wall_s": 0.24907216243445873, "achieved_gbps": 9.22047937253655, "link_s": 0.23256615176796913}
+SELFTEST OK (6 codec runs, errors: none)
+   deleting the captures: 6.2G	/tmp/nbore/kvpd/30210/runs/llama32_3b/captures
+PD SETUP DONE
+KVPD_SPECS=0: no node specs this run
+
+==== run 1 of 7: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh
+== PD run /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0745_1p3d_tkv_ring: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit 7d42b83 Card disk: calibration captures without queries; the plan's sizes from gpu-grad-01's measurements
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 219.73it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+{"out": "/tmp/nbore/kvpd/30210/runs/llama32_3b/pd/prompts_2048_check_1000_3000_5000_8192", "datasets": ["wikitext2", "humaneval", "gsm8k", "mmlu", "ptb"], "tokens": "2048", "per_length": 8}
+   ports 45000-45453 free
+   prefill1 on GPU 0 (visible 0), port 45101 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0745_1p3d_tkv_ring/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 45201 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0745_1p3d_tkv_ring/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 45202 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0745_1p3d_tkv_ring/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 45203 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0745_1p3d_tkv_ring/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=4119502) INFO 11-15 07:47:09 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4119495) INFO 11-15 07:47:09 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4119481) INFO 11-15 07:47:09 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4119488) INFO 11-15 07:47:09 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+07:47:39 == check
+07:47:48 check raw: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 16.000
+07:47:51 check splitzip: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 12.044
+PD RUN STOPPED at line 384 (exit 124)
+STOP: the bench ran past RUN_TIMEOUT_S=1200 s; packaged as _partial
+scripts/run_pd_vllm.sh: line 395: 4120480 Killed                  nohup "$VPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_ARGS[@]}" --log "$OUT/proxy.jsonl" > "$OUT/proxy.log" 2>&1
+scripts/run_pd_vllm.sh: line 409: 4119058 Killed                  env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 PATH="$ENV_DIR/bin:$PATH" VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}" "$@" nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix/llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261115_0745_smoke_partial
+==== run 1 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 2 of 7: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp
+== PD run /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0807_1p3d_tkv_ring: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit 7d42b83 Card disk: calibration captures without queries; the plan's sizes from gpu-grad-01's measurements
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3899.50it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 45000-45453 free
+   prefill1 on GPU 0 (visible 0), port 45101 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0807_1p3d_tkv_ring/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 45201 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0807_1p3d_tkv_ring/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 45202 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0807_1p3d_tkv_ring/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 45203 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0807_1p3d_tkv_ring/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=4121065) INFO 11-15 08:08:18 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4121058) INFO 11-15 08:08:18 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4121079) INFO 11-15 08:08:18 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4121072) INFO 11-15 08:08:18 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+08:08:32 == check
+08:08:41 check raw: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 16.000
+08:18:44 check nvcomp-ans: FAILED - 3/4 transfers bit-exact, 3/4 outputs equal to local prefill, bits 13.367
+PD RUN STOPPED at line 384 (exit 124)
+STOP: the bench ran past RUN_TIMEOUT_S=1200 s; packaged as _partial
+scripts/run_pd_vllm.sh: line 395: 4121856 Killed                  nohup "$VPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_ARGS[@]}" --log "$OUT/proxy.jsonl" > "$OUT/proxy.log" 2>&1
+scripts/run_pd_vllm.sh: line 409: 4120837 Killed                  env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 PATH="$ENV_DIR/bin:$PATH" VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}" "$@" nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix/llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261115_0807_smoke_partial
+==== run 2 did not finish (its results, if any, are kept as _partial); going on
+
+==== run 3 of 7: SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh
+== PD run /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0828_2p2d_tkv_p2p: 2p2d (2 prefill on GPUs 0 1, 2 decode on 2 3), connector tkv, transport p2p, eager 0; job GPUs 0 1 2 3; commit 7d42b83 Card disk: calibration captures without queries; the plan's sizes from gpu-grad-01's measurements
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3871.07it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 45000-45452 free
+   prefill1 on GPU 0 (visible 0,1,2,3), port 45101 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0828_2p2d_tkv_p2p/engine_prefill1.log)
+   prefill2 on GPU 1 (visible 1,0,2,3), port 45102 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0828_2p2d_tkv_p2p/engine_prefill2.log)
+   decode1 on GPU 2 (visible 2,0,1,3), port 45201 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0828_2p2d_tkv_p2p/engine_decode1.log)
+   decode2 on GPU 3 (visible 3,0,1,2), port 45202 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0828_2p2d_tkv_p2p/engine_decode2.log)
+== waiting for the engines
+   (EngineCore pid=4122485) INFO 11-15 08:29:12 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4122506) INFO 11-15 08:29:12 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4122499) INFO 11-15 08:29:12 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4122492) INFO 11-15 08:29:12 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+08:29:31 == check
+08:29:38 check raw: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 16.000
+08:29:41 check ours-hbh: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 9.053
+08:29:45 check t2-hbh: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 8.490
+08:29:45 == sweep
+08:30:03 sweep_raw_nativegbps_rinf: exit 0, 1.15 req/s, TTFT p50 5363 / p99 5392 ms, goodput 0.14; bits 16.000, link 73.7 Gb/s achieved
+08:30:15 sweep_ours-hbh_nativegbps_rinf: exit 0, 3.27 req/s, TTFT p50 888 / p99 912 ms, goodput 3.27; bits 8.684, link 102.1 Gb/s achieved
+08:30:28 sweep_t2-hbh_nativegbps_rinf: exit 0, 2.70 req/s, TTFT p50 1364 / p99 1433 ms, goodput 2.70; bits 8.146, link 128.1 Gb/s achieved
+08:30:28 == report
+08:30:28 report: /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0828_2p2d_tkv_p2p/summary.md
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix/llama32_3b_pd_2p2d_tkv_p2p_rtxa5000x4_20261115_0828_smoke
+
+==== run 4 of 7: SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl
+== PD run /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0830_2p2d_nixl: 2p2d (2 prefill on GPUs 0 1, 2 decode on 2 3), connector nixl, transport ring, eager 0; job GPUs 0 1 2 3; commit 7d42b83 Card disk: calibration captures without queries; the plan's sizes from gpu-grad-01's measurements
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4150.72it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 45000-45452 free
+   prefill1 on GPU 0 (visible 0), port 45101 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0830_2p2d_nixl/engine_prefill1.log)
+   prefill2 on GPU 1 (visible 1), port 45102 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0830_2p2d_nixl/engine_prefill2.log)
+   decode1 on GPU 2 (visible 2), port 45201 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0830_2p2d_nixl/engine_decode1.log)
+   decode2 on GPU 3 (visible 3), port 45202 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0830_2p2d_nixl/engine_decode2.log)
+== waiting for the engines
+   (EngineCore pid=4124039) INFO 11-15 08:31:18 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4124062) INFO 11-15 08:31:18 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4124053) INFO 11-15 08:31:18 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+   (EngineCore pid=4124049) INFO 11-15 08:31:18 [kv_cache_utils.py:2327] GPU KV cache size: 87,184 tokens, Maximum concurrency for 16,384 tokens per request: 5.32x
+08:31:33 == check
+08:31:40 check nixl: OK - 0/4 transfers bit-exact, 3/4 outputs equal to local prefill, bits -
+08:31:40 == sweep
+08:31:54 sweep_nixl_nativegbps_rinf: exit 0, 2.01 req/s, TTFT p50 2337 / p99 2443 ms, goodput 0.00
+08:31:54 == report
+08:31:54 report: /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0830_2p2d_nixl/summary.md
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix/llama32_3b_pd_2p2d_nixl_rtxa5000x4_20261115_0830_smoke
+
+==== run 5 of 7: SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh
+== PD run /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0831_colo4_tkv: colo4 (0 prefill on GPUs none, 4 colocated on 0 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit 7d42b83 Card disk: calibration captures without queries; the plan's sizes from gpu-grad-01's measurements
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3573.27it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 45000-45454 free
+   engine1 on GPU 0 (visible 0), port 45201 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0831_colo4_tkv/engine_engine1.log)
+   engine2 on GPU 1 (visible 1), port 45202 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0831_colo4_tkv/engine_engine2.log)
+   engine3 on GPU 2 (visible 2), port 45203 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0831_colo4_tkv/engine_engine3.log)
+   engine4 on GPU 3 (visible 3), port 45204 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0831_colo4_tkv/engine_engine4.log)
+== waiting for the engines
+   (EngineCore pid=4125465) INFO 11-15 08:32:33 [kv_cache_utils.py:2327] GPU KV cache size: 17,600 tokens, Maximum concurrency for 16,384 tokens per request: 1.07x
+   pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+   (EngineCore pid=4125449) INFO 11-15 08:32:33 [kv_cache_utils.py:2327] GPU KV cache size: 17,600 tokens, Maximum concurrency for 16,384 tokens per request: 1.07x
+   pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+   (EngineCore pid=4125456) INFO 11-15 08:32:33 [kv_cache_utils.py:2327] GPU KV cache size: 17,600 tokens, Maximum concurrency for 16,384 tokens per request: 1.07x
+   pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+   (EngineCore pid=4125442) INFO 11-15 08:32:33 [kv_cache_utils.py:2327] GPU KV cache size: 17,600 tokens, Maximum concurrency for 16,384 tokens per request: 1.07x
+   pd codecs: ibp not available (ModuleNotFoundError("No module named 'ibp'"))
+08:32:48 == tier
+08:32:48 ibp: skipped (ModuleNotFoundError("No module named 'ibp'"))
+08:33:01 tier_raw_c4: exit 0, 12 requests, 2.86 req/s, TTFT p50 100 / p99 276 ms; tier 0 loads (0 tokens, - ms each, bits -), 44 chunks stored
+08:33:14 tier_exans_c4: exit 0, 12 requests, 2.91 req/s, TTFT p50 84 / p99 217 ms; tier 0 loads (0 tokens, - ms each, bits -), 44 chunks stored
+08:33:27 tier_ours-hbh_c4: exit 0, 12 requests, 3.04 req/s, TTFT p50 87 / p99 249 ms; tier 0 loads (0 tokens, - ms each, bits -), 45 chunks stored
+08:33:40 tier_t2-hbh_c4: exit 0, 12 requests, 3.11 req/s, TTFT p50 112 / p99 157 ms; tier 0 loads (0 tokens, - ms each, bits -), 43 chunks stored
+08:33:40 == report
+08:33:40 report: /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0831_colo4_tkv/summary.md
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix/llama32_3b_pd_colo4_tkv_rtxa5000x4_20261115_0831_smoke
+
+==== run 6 of 7: SMOKE=1 LAYOUT=colo4 CONNECTOR=lmcache
+== PD run /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0833_colo4_lmcache: colo4 (0 prefill on GPUs none, 4 colocated on 0 1 2 3), connector lmcache, transport ring, eager 0; job GPUs 0 1 2 3; commit 7d42b83 Card disk: calibration captures without queries; the plan's sizes from gpu-grad-01's measurements
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3964.75it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 45000-45454 free
+   engine1 on GPU 0 (visible 0), port 45201 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0833_colo4_lmcache/engine_engine1.log)
+   engine2 on GPU 1 (visible 1), port 45202 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0833_colo4_lmcache/engine_engine2.log)
+   engine3 on GPU 2 (visible 2), port 45203 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0833_colo4_lmcache/engine_engine3.log)
+   engine4 on GPU 3 (visible 3), port 45204 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0833_colo4_lmcache/engine_engine4.log)
+== waiting for the engines
+   (EngineCore pid=4126910) INFO 11-15 08:34:25 [kv_cache_utils.py:2327] GPU KV cache size: 17,600 tokens, Maximum concurrency for 16,384 tokens per request: 1.07x
+   (EngineCore pid=4126917) INFO 11-15 08:34:25 [kv_cache_utils.py:2327] GPU KV cache size: 17,600 tokens, Maximum concurrency for 16,384 tokens per request: 1.07x
+   (EngineCore pid=4126903) INFO 11-15 08:34:25 [kv_cache_utils.py:2327] GPU KV cache size: 17,600 tokens, Maximum concurrency for 16,384 tokens per request: 1.07x
+   (EngineCore pid=4126924) INFO 11-15 08:34:25 [kv_cache_utils.py:2327] GPU KV cache size: 17,600 tokens, Maximum concurrency for 16,384 tokens per request: 1.07x
+[32;20m[2026-11-15 08:34:53,847] LMCache INFO:[0m torch_dev=<module 'torch.cuda' from '/tmp/nbore/kvpd/30210/home/venv_lmcache/lib/python3.12/site-packages/torch/cuda/__init__.py'>, torch_device_type=cuda [3m(_device_detect.py:311:lmcache.v1.platform._device_detect)[0m
+[32;20m[2026-11-15 08:34:53,848] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[33;20m[2026-11-15 08:34:53,849] LMCache WARNING:[0m lmcache.cuda_ops compiled extension not found; CudaDeviceOps stays on the torch baseline for all ops. [3m(device_ops.py:128:lmcache.v1.platform.devices.cuda.device_ops)[0m
+08:34:55 == tier
+08:34:58 tier_lmcache_c4: exit 1, 0 requests, - req/s, TTFT p50 - / p99 - ms; tier 0 loads (0 tokens, - ms each, bits -), 0 chunks stored
+08:34:58 == report
+08:34:58 report: /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0833_colo4_lmcache/summary.md
+scripts/run_pd_vllm.sh: line 395: 4126670 Killed                  env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 PATH="$ENV_DIR/bin:$PATH" VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}" "$@" nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1
+scripts/run_pd_vllm.sh: line 395: 4126673 Killed                  env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 PATH="$ENV_DIR/bin:$PATH" VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}" "$@" nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1
+scripts/run_pd_vllm.sh: line 395: 4126676 Killed                  env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 PATH="$ENV_DIR/bin:$PATH" VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}" "$@" nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1
+scripts/run_pd_vllm.sh: line 395: 4126679 Killed                  env CUDA_VISIBLE_DEVICES="$(visible "$pos")" PYTHONPATH="$REPO" VLLM_SERVER_DEV_MODE=1 PATH="$ENV_DIR/bin:$PATH" VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}" "$@" nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama --block-size 16 --gpu-memory-utilization "$mem" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" --chat-template "$REPO/scripts/pd_chat_template.jinja" --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" > "$OUT/engine_$name.log" 2>&1
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix/llama32_3b_pd_colo4_lmcache_rtxa5000x4_20261115_0833_smoke
+
+==== run 7 of 7: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256
+== PD run /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0835_1p3d_tkv_ring_eager: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 1; job GPUs 0 1 2 3; commit 7d42b83 Card disk: calibration captures without queries; the plan's sizes from gpu-grad-01's measurements
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3705.87it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 45000-45453 free
+   prefill1 on GPU 0 (visible 0), port 45101 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0835_1p3d_tkv_ring_eager/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 45201 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0835_1p3d_tkv_ring_eager/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 45202 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0835_1p3d_tkv_ring_eager/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 45203 (log /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0835_1p3d_tkv_ring_eager/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=4128221) INFO 11-15 08:35:41 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4128228) INFO 11-15 08:35:41 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4128214) INFO 11-15 08:35:40 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+   (EngineCore pid=4128237) INFO 11-15 08:35:41 [kv_cache_utils.py:2327] GPU KV cache size: 90,544 tokens, Maximum concurrency for 16,384 tokens per request: 5.53x
+08:35:49 == check
+08:35:59 check raw: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 16.000
+08:36:02 check t2-hbh: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 8.489
+08:36:05 check t2-rank256: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 9.578
+08:36:05 == sweep
+08:36:20 sweep_raw_10gbps_rinf: exit 0, 1.85 req/s, TTFT p50 2395 / p99 2816 ms, goodput 0.69; bits 16.000, link 3.7 Gb/s achieved
+08:36:33 sweep_t2-hbh_10gbps_rinf: exit 0, 3.06 req/s, TTFT p50 877 / p99 1079 ms, goodput 3.06; bits 8.146, link 4.0 Gb/s achieved
+08:36:46 sweep_t2-rank256_10gbps_rinf: exit 0, 3.11 req/s, TTFT p50 778 / p99 1051 ms, goodput 3.11; bits 9.230, link 3.8 Gb/s achieved
+08:36:46 == report
+08:36:46 report: /tmp/nbore/kvpd/30210/runs/llama32_3b/pd/20261115_0835_1p3d_tkv_ring_eager/summary.md
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix/llama32_3b_pd_1p3d_tkv_ring_eager_rtxa5000x4_20261115_0835_smoke
+wrote /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix/pd_matrix_smoke_rtxa5000_20261115_0745/summary.md
+PD MATRIX smoke: 7 runs (2 not finished); results in /tmp/nbore/kvpd-evidence/pd_smoke_20261115T123450Z/repo/benchmark_results/pd_card/pd_smoke_20261115T123450Z/matrix
