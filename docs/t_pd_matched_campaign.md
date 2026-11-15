@@ -108,3 +108,54 @@ Within a GPU allocation with an available codec-environment interpreter, a focus
 ## Interpretation limits
 
 The ring link is paced shared host memory, not a measured NIC. Its configured rate is per prefill: 2P has two links, so equal per-link rates do not mean equal aggregate network budgets across layouts. GPU IPC measures the local PCIe path; the peer-access survey identifies hardware support. The CPU tier measures DRAM storage/reload, not SSD. Codecs sharing one engine also share its configured cache capacity and loaded constant sets; NIXL/nvCOMP/LMCache have separate engine runs. Record actual memory and allocation differences before drawing serving-capacity conclusions. Cross-branch numeric claims require matching hardware, model revision, prompt/text hashes, runtime versions, cache policy, seeds, load and measured link capacity; rerunning the original methods inside this campaign supplies the primary controls.
+
+## After the cancelled job 30196
+
+The published evidence is commit `90012974da8fe60ae67f20d4cb4b1f47760cb835` on
+`evidence/experiment/t-pd-matched-campaign-v1/90112640bc59/smoke/job30196`.
+Cleanup job 30204 was verified separately. Its captured self-test records exact
+round trips for `t-fast`, `t-dense-cached`, `t-compact`, and `t-compact-global`
+at 8,192 and 3,000 tokens in the A5000 vLLM environment. That is useful codec
+evidence, not a completed serving comparison or the missing independent-receiver
+readiness proof. Non-eager engines failed on Ninja; LMCache also failed on its
+missing `lmcache.integration.vllm.vllm_v1_adapter` module. Eager engines started,
+but no completed serving sweep was published.
+
+Slurm cancellation bypassed the controller's normal record collection. Cleanup
+now preserves the setup readiness records, package versions and run tail before
+deleting a verified runtime. This does not recover files already removed from
+job 30196, and does not rewrite its published evidence.
+
+Run the focused copy diagnostic first, in our own login/tmux and standalone
+checkout after old-campaign closeout:
+
+```bash
+cd "$HOME/kv_t_pd_independent" &&
+git fetch --no-tags origin experiment/t-pd-matched-campaign-v1 &&
+git merge --ff-only FETCH_HEAD &&
+bash scripts/run_t_pd_diagnostics.sh
+```
+
+It requests four GPUs, four CPUs and 16 GiB for up to 45 minutes, uses the
+campaign's own uv/package cache to make a minimal pinned Torch 2.11.0+cu128
+environment, and runs no model download, calibration or vLLM engines. Source
+files are extracted from the recorded Git pin inside the allocation. Its runtime
+is separate under `/tmp/$USER/kvpd-t-matched-$USER/kvpd-diagnostics/<tag>` and is
+kept for inspection; it does not delete old runs or the reusable cache.
+
+Defaults are 64 MiB, two repetitions, logical GPU pairs 0↔1 and 1↔2, with
+`host`, `host_pipe` and `direct` each in a fresh process. Each child first
+exercises all four GPUs' host legs. Complete pair buffers are compared outside
+the timers. `CUDA_LAUNCH_BLOCKING=1` makes this diagnostic only; no latency can
+pass a performance or serving gate. Host-leg and route markers locate failures.
+Use `T_PD_DIAG_MIB=896` for a later document-sized check after the small check
+passes; `T_PD_DIAG_PAIRS` selects directed logical indexes from the allocation.
+These selected-pair checks do not replace the full node survey.
+
+The printed `OUTPUT` directory is under
+`~/.kvpd_t_matched/diagnostics/links_<tag>/`. It retains `summary.md`,
+`diagnostics.json`, per-route logs/results, GPU UUIDs, topology, package versions
+and `share.zip`. A failed copy stays failed; the script does not silently select
+a different transport or start the matrix. Review the diagnostic report before
+the engine-startup check and the next matched smoke campaign. The LMCache adapter
+failure remains a separate required follow-up.

@@ -267,6 +267,30 @@ class CardTests(unittest.TestCase):
         self.assertIn("not the pin: a new campaign starts from its head", r.stderr)
         self.assertEqual(self.jobs(), [])
 
+    def test_cancelled_controller_cleanup_keeps_readiness_and_package_records(self):
+        result = self.card('create', RUNS='SMOKE=1 LAYOUT=1p3d CODECS=raw')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        ev = self.node / 'kvpd-evidence' / self.tag / 'repo' / 'benchmark_results' / 'pd_card' / self.tag
+        run_job = '39999'
+        runtime = self.node / 'kvpd' / run_job
+        home, run = runtime / 'home', runtime / 'runs' / 'llama32_3b'
+        for folder in (home, run):
+            folder.mkdir(parents=True, mode=0o700)
+        (home / 'pip_freeze_vllm.txt').write_text('package receipt\n')
+        proof = '{"fixture_readiness": true}\n'
+        (run / 'pd_matched_checks.json').write_text(proof)
+        (ev / 'run.log').write_text('controller cancelled before collect\n')
+        (ev / 'run.json').write_text(json.dumps({'run_job':run_job, 'runtime':str(runtime), 'status':'started'}))
+        (self.db / ('job_' + run_job)).write_text(run_job + '|CANCELLED|0:0|2026-11-15T10:00:00|2026-11-15T10:01:00\n')
+        result = self.card('cleanup')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(runtime.exists())
+        self.assertEqual((ev / 'setup/home__pip_freeze_vllm.txt').read_text(), 'package receipt\n')
+        self.assertEqual((ev / 'setup/runs__llama32_3b__pd_matched_checks.json').read_text(), proof)
+        self.assertIn('controller cancelled', (ev / 'run_tail.log').read_text())
+        self.assertTrue((ev / 'run.log.gz').is_file())
+        self.assertEqual(self.card('verify-cleanup').returncode, 0)
+
     def test_failed_specs_stop_before_matrix(self):
         self.assertEqual(self.card('create',RUNS='SMOKE=1 LAYOUT=1p3d CODECS=raw').returncode,0)
         r=self.card('run',KVPD_SPECS_CMD='exit 9')

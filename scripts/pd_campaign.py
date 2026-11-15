@@ -727,6 +727,10 @@ def stage_cleanup(p, a, job):
         require(root.parent == p.runtimes and root.name == rj, "not the run's runtime")
         before = process_refs(root)
         require(not before, f"processes {before[:10]} still use {root}")
+        # Slurm cancellation can kill the run controller before its signal
+        # handler collects readiness proofs and package records. Preserve them
+        # before deleting this verified runtime, not only the engine logs.
+        collect(p, root, ev)
         salvaged = salvage(root, ev)
         for dirpath, dirnames, filenames in os.walk(root):
             for n in filenames:

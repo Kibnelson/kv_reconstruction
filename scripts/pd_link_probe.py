@@ -93,6 +93,8 @@ def main(argv=None):
     nbytes = a.mib << 20
     chunk = a.chunk_mib << 20
     res = {"gpus": names, "topology": topo, "mib": a.mib, "host_legs": [], "pairs": [],
+           "torch": torch.__version__, "cuda_runtime": torch.version.cuda,
+           "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
            'paths':paths,'gpu_executed':True,'diagnostic_only':os.environ.get('CUDA_LAUNCH_BLOCKING','0')=='1'}
     if res['diagnostic_only']:
         print('DIAGNOSTIC ONLY: CUDA_LAUNCH_BLOCKING=1; these timings are not performance results.',flush=True)
@@ -106,6 +108,7 @@ def main(argv=None):
                       ("h2d_pinned", lambda: src.copy_(pinned, non_blocking=True)),
                       ("d2h_pageable", lambda: pageable.copy_(src)),
                       ("h2d_pageable", lambda: src.copy_(pageable))):
+            print(f'HOST_LEG_BEGIN gpu={i} path={k} mib={a.mib}', flush=True)
             t = timed(fn, a.reps)
             row[k] = {"seconds": t, "GB_per_s": nbytes / t / 1e9, "Gb_per_s": 8 * nbytes / t / 1e9}
         res["host_legs"].append(row)
