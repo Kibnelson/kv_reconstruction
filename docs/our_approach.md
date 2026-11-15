@@ -17,11 +17,12 @@ Contents:
 5. [Moving it inside vLLM: TKVConnector](#5-moving-it-inside-vllm-tkvconnector)
 6. [How we compare, fairly](#6-how-we-compare-fairly)
 7. [What is measured so far](#7-what-is-measured-so-far)
-8. [What is new, and what is not](#8-what-is-new-and-what-is-not)
-9. [Limits and open questions](#9-limits-and-open-questions)
-10. [Glossary](#10-glossary)
-11. [Where things live](#11-where-things-live)
-12. [Sources](#12-sources)
+8. [AQUA-KV in PD: the closest method, step by step](#8-aqua-kv-in-pd-the-closest-method-step-by-step)
+9. [What is new, what we lead with, and how we show it](#9-what-is-new-what-we-lead-with-and-how-we-show-it)
+10. [Limits and open questions](#10-limits-and-open-questions)
+11. [Glossary](#11-glossary)
+12. [Where things live](#12-where-things-live)
+13. [Sources](#13-sources)
 
 ---
 
@@ -131,7 +132,7 @@ uncompressed, production path.
 | Method | How it predicts | Why it is not the same |
 |---|---|---|
 | Speculative KV coding (research note) | runs a whole FP8 copy of the model on both sides; codes the BF16 cache against it, 5.9-6.7 bits | the receiver must run the full prefill again, which PD exists to avoid; not timed or verified in the note |
-| AQUA-KV (ICML 2025) | predicts each layer from earlier layers | quantizes the residual: lossy |
+| AQUA-KV (ICML 2025) | keys from the previous layer's keys; values from the previous layer's values plus the current keys; linear, before RoPE | rounds the gap to 2-4 bits: lossy, 2.09 bits at its 2-bit setting (section 8) |
 | AnchorKV (2026) | each token from an anchor token, plus a 2-bit quantized residual | lossy (about 20× smaller) |
 | KVPR, KV-Direct | recompute part of the KV from transferred activations or residual checkpoints | send activations or checkpoints instead; not a bit-exact codec of the cache |
 
@@ -542,16 +543,219 @@ Caveats:
 
 ---
 
-## 8. What is new, and what is not
+## 8. AQUA-KV in PD: the closest method, step by step
+
+**In plain words.** AQUA-KV is the closest published method: like us, it guesses each layer from the layer below.
+But it rounds the gap, so the cache changes, and it was built to save memory on one GPU, not to move a cache
+between two. Put into PD, it changes answers. It also has nowhere good to live on the decode GPU, its rebuild
+chain spans two engines it was not designed for, and it spends bits on things the receiver could compute. Each
+of those gaps is where one of our ideas comes in.
+
+### 8.1 How AQUA-KV works
+
+From the paper (§3.1-3.3, §4.1, §5, Algorithms 1-4) and its reference code:
+
+| Step | What AQUA-KV does |
+|---|---|
+| Calibration | RedPajama: 256 sequences of 8,192 tokens (224 to fit, 32 to choose settings). Predictors are fitted one layer at a time, each on the rebuilt (rounded) outputs of the layer before. Linear regression in closed form; the paper's analysis uses a 10⁻³ regularizer |
+| The guess | keys of layer l from the rebuilt keys of layer l-1; values of layer l from the rebuilt values of layer l-1 plus the rebuilt keys of layer l. Keys are predicted before RoPE. Earlier tokens and more distant layers added little, so they are not used |
+| The gap | the real value minus the guess, rounded by a pluggable quantizer: HIGGS (a Hadamard transform plus vector quantization) or Quanto (round to nearest). 2, 3 or 4 bits per value; 2.09, 3.06 and 4.02 bits with the predictors' overhead |
+| What is stored | only the rounded gaps; the guesses are recomputed when decoding |
+| Layer 0 | no guess; quantized directly, at 4 bits by default for Llama |
+| Tokens kept raw | the first 4 (attention sinks) and up to the newest 128 (a buffer, compressed in batches as it fills), at 16 bits |
+| Decoding | before each forward call, every layer in order, each from the one rebuilt before it; one layer is materialised at a time |
+| Implementation | Hugging Face transformers reference code; HIGGS through FLUTE kernels; "efficient inference kernels" still to come; about 3% slower generation in their unoptimised test |
+| Quality at 2.09 bits | Llama-3.2-3B: WikiText-2 perplexity 7.03 against 6.98, LongBench 44.30 against 44.61. Llama-3.1-8B: perplexity 5.72 against 5.61. Llama-3.1-70B: 2.62 against 2.54 |
+| Their stated future work | bit widths adjusted per component (they "deliberately forego" dynamic bit widths), predictors trained for model-level objectives, vLLM integration |
+
+Their README's example calibrates `unsloth/Llama-3.2-3B` at 8,192 tokens: the model we serve, so a like-for-like
+comparison is direct.
+
+### 8.2 Side by side
+
+| Step | AQUA-KV | Ours (T2 in PD) |
+|---|---|---|
+| Calibration | once, RedPajama | five sets (general, code, math, exam, news), one picked per request |
+| Where the cache goes | stays in one GPU's memory | moves from the prefill GPU to the decode GPU, through a vLLM connector |
+| Layer 0 | quantized, 4 bits | not sent: rebuilt from the token ids |
+| The guess | from the layer below; keys, then values; floating point | from the layer below; head by head; exact integers |
+| The gap | rounded, 2-4 bits, the same for every value | coded exactly with rANS; bits follow how good each guess was |
+| Tokens kept raw | first 4 and up to the newest 128 | none: every token coded, with an escape for any odd value |
+| Decoding | at every step, all layers | once, on arrival, into vLLM's normal cache, with a checksum |
+
+Only one step is shared: guessing from the layer below (both de-rotate the keys first).
+
+### 8.3 What goes wrong if AQUA-KV is used in PD, even when lossy is accepted
+
+**The contract: answers change, and depend on the route.** PD should be invisible: the decode GPU should carry on
+exactly as if it had done the prefill itself.
+- With AQUA-KV it continues from a close copy of the cache. Attention reads slightly different keys and values, so
+  the next-token scores move a little. Usually the top token is unchanged; sometimes it is not. With greedy
+  decoding, everything after a changed token differs.
+- Whether a request goes through PD depends on load and routing. The same prompt can then get one answer on a
+  single GPU, another through PD, and a third when a failed transfer falls back to local prefill. The network
+  path becomes part of the model.
+- The cost is not one number: in their own results it grows with model size (perplexity +0.7% on 3B, +2% on 8B,
+  +3% on 70B at 2 bits) and varies by task. Every new model, bit width, context length and workload must be
+  re-tested. With an exact transfer there is nothing to re-test.
+
+**Gap 1: the compressed cache has nowhere good to live on the decode GPU.** AQUA-KV exists to save memory: the
+cache stays compressed in memory and is unpacked as attention needs it. In PD the compressed cache crosses the
+wire and the decode GPU has two choices:
+
+| | Option A: unpack once, on arrival | Option B: keep it compressed |
+|---|---|---|
+| What happens | expanded into vLLM's normal full-size cache | stays packed, as AQUA-KV intends |
+| Decode GPU memory | full size, as with no compression | small: AQUA-KV's real benefit |
+| The cost | the cache was rounded anyway: a quality change paid only to shorten the transfer | attention must read AQUA-KV's format at every new token; vLLM's attention reads only its own blocks, and AQUA-KV's fast kernels are still to come, so the serving engine needs a new attention path |
+
+So in PD, AQUA-KV either loses its main benefit (memory) or needs a serving engine that does not exist yet.
+Option A is what a port can do today. Its trade is a changed answer for a smaller transfer. An exact codec gives a
+smaller transfer, less small, with no change at all.
+
+**Gap 2: the sender's and receiver's copies can drift apart.** AQUA-KV rebuilds the cache as a chain: rebuilt
+layer 1 = guess from rebuilt layer 0 + rounded gap; rebuilt layer 2 = guess from rebuilt layer 1 + rounded gap;
+and so on to layer 27. The sender computes each gap against its own guess; the receiver adds it to its own guess.
+That works only if the two guesses are the same.
+- On one GPU (AQUA-KV's setting), the same code packs and unpacks, so they are.
+- In PD, packing happens on the prefill GPU, in a batch with other requests; unpacking happens on the decode GPU,
+  in another batch and possibly with another kernel. Floating-point results can differ in the last bits.
+- A tiny difference at layer 1 changes the guess for layer 2, which changes layer 2 a little more, up the chain.
+  The sender cannot know.
+- **How big is it?** Probably small for AQUA-KV, because its 2-bit rounding error is far larger than a
+  last-digit difference. It is a hypothesis until measured (section 8.4); if it is small, we drop it.
+- It is exactly the problem our design removes: our guesses are whole-number arithmetic, the same on both engines,
+  and the receiver rebuilds the original values, not a rounded copy, so there is nothing to drift.
+
+**Wastes: effort spent on what PD or the data gives for free.**
+
+| Where AQUA-KV spends effort | Why it is waste in PD | Our idea | What it is worth (ours, measured) |
+|---|---|---|---|
+| Layer 0 at 4 bits, about twice its other layers | the receiver has the model and the words, and could compute it in about 10 ms. It is about 7% of what AQUA-KV sends, if its 2.09 average includes layer 0 at 4 bits | rebuild layer 0 on the receiver, bit for bit (T2) | 0 bits for layer 0: about 0.36 bits per value, roughly 4% |
+| The same bits for every value | an easy value gets as many bits as a hard one; their own future work | entropy coding with a spread per channel and token | built in; not yet measured on its own |
+| One calibration text | guesses get worse on other text: with general-text constants, code costs 7.5% more bits, math and exam questions 3-4% more | five sets, one picked per request in 11 ms | about 5% (8.78 to 8.34 bits per value) |
+| One step within a layer: keys, then values | the heads of a layer also predict each other | head by head, 16 steps per layer | on one text, 8.56 bits (their order) to 8.12, about 5% |
+| The first 4 and up to the newest 128 tokens at 16 bits | in a transfer they travel at full size; after prefill the prompt is complete, so the buffer has no reason to stay raw | code every token | worst case for a naive port, if 2.09 excludes them: 3.9 bits for a 1,000-token prompt, 3.0 for 2,000, 2.3 for 8,000 |
+| The whole cache decoded at every new token | compute repeated thousands of times in a long answer | decode once, on arrival | one decode per request |
+
+One more possible waste is still to measure: AQUA-KV guesses keys only from the previous layer's keys, while our
+guess uses the whole previous layer, keys and values.
+
+The numbers in this table come from different texts and runs; the ladder in section 8.4 puts them into one table.
+
+**What we must not claim.** A careful port works. On a slow link, a 2-bit transfer still beats our 8 bits on time.
+The claim is not "AQUA-KV fails in PD" but: in PD it changes answers, buys only wire time (or needs a new attention
+path), wastes layer 0, and its rebuild chain spans two engines it was not designed for. We keep answers identical
+and close those wastes.
+
+### 8.4 How we show it: an AQUA-like codec in our harness
+
+Not built yet. Our own code, not their repository, so it runs in the normal card workflow:
+- the same linear guesses (keys from the previous keys; values from the previous values plus the current keys),
+  fitted on the same calibration windows;
+- the gap rounded to 2 bits, rebuilt layer by layer as they do (closed loop);
+- layer 0 at 4 bits; the raw buffer optional.
+
+One run then measures, beside every other codec:
+- the bits that actually travel;
+- the drift: the sender sends a checksum of its rebuilt values per layer, and the receiver compares its own;
+- answer agreement with single-GPU serving, against raw transfer as the baseline (vLLM itself is not perfectly
+  deterministic: in the 30210 smoke, NIXL's raw transfer matched 3 of 4 answers and ours 4 of 4);
+- TTFT under the same rules as every codec (section 6).
+
+The same harness gives the **ladder**, every step coded exactly on the same windows:
+1. AQUA-KV's guess structure, made exact, layer 0 coded;
+2. the whole previous layer as input;
+3. head-by-head order;
+4. layer 0 rebuilt;
+5. per-request constant sets (T2).
+
+---
+
+## 9. What is new, what we lead with, and how we show it
 
 **What is not new** (and we do not claim it):
-- Predicting a value and coding the residual exactly. Audio, image and float compressors have done it for decades.
+- Predicting a value and coding the exact gap with an adaptive entropy coder: lossless float compression has done
+  it for 20 years (Isenburg et al. 2004-2005; fpzip, 2006), escapes and adaptive contexts included.
+- Integer arithmetic so that encoder and decoder agree: standard in lossless coding (JPEG-LS, FLAC, lossless
+  JPEG 2000).
 - Predicting KV from other layers (AQUA-KV, lossy).
 - Entropy coding KV exactly (ExANS, ZipNN).
 - Recomputing KV from upstream state (KVPR, KV-Direct).
+- Batch-size-dependent results in LLM inference (the batch-invariance work on nondeterminism).
 - Disaggregated serving itself.
 
-**What is ours**, as far as our literature checks found (29 October and 15 November 2026):
+### 9.1 The motivation: today's methods in PD
+
+| If you use... in PD | You get | The gap |
+|---|---|---|
+| Raw transfer (NIXL) | 16 bits per value: an 8K prompt is 940 MB, 752 ms at 10 Gb/s | nothing compressed |
+| Bit-exact codecs (SplitZip, ExANS, AdaCode, ...) | the same answers, at 10.9-12.7 bits | the exponent only; 8 of the 16 bits always travel raw |
+| A predictive lossy codec (AQUA-KV) | 2.09 bits | answers change and depend on the route; the cache has nowhere good to live; the rebuild chain spans two engines (section 8) |
+| Predictive exact coding with a whole model (speculative KV coding) | 5.9-6.7 bits, exact | the receiver re-runs the model on the prompt, the cost PD exists to avoid |
+| All of the above | they send the whole cache | the receiver has the model and the prompt, and could compute part of it: layer 0 travels at 16, about 11, 4 or about 10 bits when it could cost nothing |
+
+And the gap we found trying to close the last row: **recomputing on the receiver does not work naively.** Layer 0
+recomputed under vLLM-style batching gave only 50-97% identical words, because the batch's row count changes the
+last bits.
+
+### 9.2 The principle
+
+> In PD the decode engine is a second copy of the same model, holding the same prompt. Anything it can compute
+> bit for bit need not be sent. We send only the rest: nothing for layer 0, and for every other layer only the
+> exact surprise against a guess both engines compute identically.
+
+### 9.3 The two leads
+
+**Lead 1: exact coding of the whole number.** The first bit-exact KV codec to compress the whole 16-bit word, not
+just its exponent, with a guess from the layer below that both engines compute identically.
+- It holds against all three neighbours: "exact" excludes AQUA-KV, "the whole word, predicted" excludes the
+  exponent codecs, "cheap, from the layer below" excludes speculative KV coding.
+- It carries the big number: ExANS 10.87 bits, T 9.03, T2 7.80.
+- Shown by: bits per value against every bit-exact codec on the same KV (have); checksums on every transfer in
+  vLLM (have, smoke 30210); answer agreement against raw transfer, with the AQUA-like bar (section 8.4, to build);
+  TTFT against link speed in vLLM (next smoke and the full matrices).
+
+**Lead 2: layer 0 for free in PD.** The decode engine rebuilds layer 0 from the prompt's words, bit for bit, so it
+never travels. The prefill records each step's matrix-product row count and the receiver pads to it: shape replay
+instead of rewriting kernels to be batch-invariant.
+- Only PD has a receiver that holds the model and the prompt; AQUA-KV spends 4 bits on this layer, the others send
+  it.
+- Shown by: identical words, 50-97% with a naive recompute and 100% with shape replay (have, simulated vLLM
+  schedules); how often layer 0 is rebuilt inside real vLLM, eager against compiled (next smoke: in 30210 it was
+  coded because of the prefix-cache reuse fixed since); the saving, about 0.36 bits per value.
+- The question to expect: is 4% worth a 10 ms recompute? For an 8K prompt the 4% is about 21 MB: 17 ms at
+  10 Gb/s, 1.7 ms at 100 Gb/s. On fast links it pays only if hidden, and it can be: the decode engine gets the
+  prompt when the prefill starts, and the prefill's row counts are known when it schedules, so a few bytes sent
+  ahead would let the receiver rebuild layer 0 during the prefill. Not built yet.
+
+**Refinements, not leads:** bits that adapt to each guess (standard in entropy coding), five constant sets per
+request (about 5%, weak on unseen text), head-by-head order (a generalisation of AQUA-KV's keys-then-values, and
+our slowest mode).
+
+A lead sentence could read: *"We present the first bit-exact KV codec that compresses the whole BF16 word, not
+just its exponent, using a cross-layer guess that both engines of a disaggregated deployment compute bit for bit;
+and in PD we send no layer 0 at all, because the decode engine rebuilds it exactly."*
+
+### 9.4 Built for PD's shape
+
+The design maps onto what PD needs, which is where AQUA-KV's placement problem (section 8.3, gap 1) does not
+arise:
+- **Compressed only on the wire.** The format exists for the transfer (and the CPU tier). The decode engine holds
+  vLLM's normal cache, so attention, memory layout and every vLLM feature work unchanged.
+- **Decoded once, straight into vLLM's blocks.** Each layer goes from the transfer to the request's paged blocks as
+  soon as it is decoded (`kv_compare/pd/paged.py` maps vLLM's block view to our words and back). The receiver never
+  holds a second full copy.
+- **The same result on both engines.** The guess is whole-number arithmetic and layer 0 is rebuilt by shape replay,
+  so the two halves of the codec can run in different engines, batches and kernels.
+- **One constants file for both ends,** exported once per model.
+
+We do not claim memory savings on the decode GPU: that is a different goal (AQUA-KV's), and its lossy route is a
+different contract.
+
+### 9.5 What is ours, in one table
+
+As far as our literature checks found (29 October and 15 November 2026):
 
 | | Others | Ours |
 |---|---|---|
@@ -563,15 +767,17 @@ Caveats:
 | Adapting to the text | one setting | T2: one of five constant sets per request, 11 ms to pick, only its name sent |
 | In a real serving engine | SplitZip: RoCE transfer tests; ExANS: its own vLLM connector | every bit-exact codec, NIXL and LMCache in the same unmodified vLLM PD setup |
 
-In one sentence: a cheap, exact, whole-word predictive codec that beats the exponent-coding floor, plus a PD-specific
-way to send no layer 0 at all.
-
 The novelty is in this particular combination and its measured numbers, not in any one ingredient.
-`docs/novelty_assessment.md` keeps the stricter mechanism-by-mechanism review.
+`docs/novelty_assessment.md` keeps the stricter mechanism-by-mechanism review. **On "first":** re-run the
+literature check just before submission; this area moves fast.
+
+**On origins:** our ideas were not derived from AQUA-KV (T came from our own predictor work, T2's ideas from the
+`t_ideas` study). Present section 8's table as where existing methods leave room and how we close it, not as "we
+started from AQUA-KV".
 
 ---
 
-## 9. Limits and open questions
+## 10. Limits and open questions
 
 - **Speed in serving is not proven yet.** The size gains are measured and checked bit for bit; the TTFT and
   throughput gains in vLLM are the next measurements.
@@ -587,6 +793,9 @@ The novelty is in this particular combination and its measured numbers, not in a
   cross-GPU decoding is not tested.
 - **Compiled engines and layer 0.** Recompute identity is assured in eager engines. In compiled engines T2 may
   fall back to coding layer 0: still exact, a few percent larger.
+- **Layer 0's recompute is not hidden yet.** It runs when the transfer arrives (about 10 ms for 8K tokens), which
+  costs more than it saves above about 17 Gb/s. Sending the prefill's row counts ahead would let the decode engine
+  rebuild layer 0 during the prefill (section 9.3).
 - **Calibration dependence.** The big T2 gain needs the request's kind of text among the sets. On unseen text the
   gain is small (0.054 bits).
 - **One model so far.** Everything here is Llama-3.2-3B. The method needs one offline calibration per model; other
@@ -596,7 +805,7 @@ The novelty is in this particular combination and its measured numbers, not in a
 
 ---
 
-## 10. Glossary
+## 11. Glossary
 
 | Term | Meaning |
 |---|---|
@@ -628,10 +837,18 @@ The novelty is in this particular combination and its measured numbers, not in a
 | LMCache | a KV store for vLLM; here its CPU offload, the reference for a CPU tier |
 | CPU tier | KV kept in host memory after a request, loaded back when a later request shares its prefix |
 | CUDA IPC | sharing GPU memory between processes, so one process can copy straight into another's GPU memory |
+| Lossy / lossless | the decoded cache is close to / exactly equal to the original |
+| Closed loop | a predictive codec whose guesses use the rebuilt (decoded) values, so encoder and decoder stay in step; a lossless codec's rebuilt values are the originals |
+| Drift | the decoder's rebuilt values moving away from the encoder's, when their guesses differ slightly and the difference feeds the next layer's guess |
+| Attention sinks | the first few tokens, which attention leans on heavily; lossy methods often keep them uncompressed |
+| Perplexity | how surprised the model is by real text; lower is better, and a rise after compression means lost quality |
+| LongBench | a benchmark of long-context tasks (question answering, summarisation, code) |
+| Shape replay | our layer-0 recompute: the receiver repeats the prefill's matrix-product row counts, so it gets the same bits |
+| Batch invariance | kernels whose results do not depend on the batch's size; the usual fix for batch-dependent results, which shape replay avoids needing |
 
 ---
 
-## 11. Where things live
+## 12. Where things live
 
 | What | File |
 |---|---|
@@ -653,11 +870,12 @@ The novelty is in this particular combination and its measured numbers, not in a
 | The experiments behind T2 | `docs/t_ideas.md` |
 | The literature table | `docs/lossless_related_work.md` |
 | Novelty review | `docs/novelty_assessment.md` |
+| AQUA-KV's reference code (read, not run) | github.com/goodevening13/aquakv |
 | PD runbook and matrices | `docs/pd_baselines.md`, `docs/pd_protocol.md` |
 
 ---
 
-## 12. Sources
+## 13. Sources
 
 - [SplitZip, arXiv 2605.01708](https://arxiv.org/html/2605.01708v3)
 - [ExANS, OpenLake](https://www.theopenlake.com/blog/exans-lossless-gpu-compression-for-bf16-kv-cache)
@@ -667,7 +885,10 @@ The novelty is in this particular combination and its measured numbers, not in a
 - [GAAC summary](https://welcome.ai/content/gaac-efficient-kv-compression-for-llms-on-personal-devices.md) (paper: [arXiv 2610.38210](https://arxiv.org/abs/2610.38210))
 - [UCCL-Zip, arXiv 2604.17172](https://arxiv.org/abs/2604.17172)
 - [Speculative KV coding](https://fergusfinn.com/blog/kv-entropy-coder/)
-- [AQUA-KV, arXiv 2501.19392](https://arxiv.org/html/2501.19392v4)
+- [AQUA-KV, arXiv 2501.19392](https://arxiv.org/html/2501.19392v4) (§3.1-3.3, §4.1, §5, Algorithms 1-4, Table 2) and its [reference code](https://github.com/goodevening13/aquakv)
+- [Isenburg et al., lossless compression of predicted floating-point values](https://www.cs.unc.edu/~isenburg/research/lcpfpv)
+- [Lindstrom and Isenburg, Fast and Efficient Compression of Floating-Point Data (2006)](https://www.academia.edu/575322/Fast_and_efficient_compression_of_floating_point_data)
+- [Thinking Machines, Defeating Nondeterminism in LLM Inference](https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/)
 - [AnchorKV, arXiv 2608.02901](https://arxiv.org/pdf/2608.02901)
 - [KVPR, Findings of ACL 2025](https://aclanthology.org/2025.findings-acl.997/)
 - [KV-Direct, arXiv 2603.19664](https://arxiv.org/html/2603.19664v1)
