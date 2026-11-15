@@ -145,8 +145,10 @@ is separate under `/tmp/$USER/kvpd-t-matched-$USER/kvpd-diagnostics/<tag>` and i
 kept for inspection; it does not delete old runs or the reusable cache.
 
 Defaults are 64 MiB, two repetitions, logical GPU pairs 0↔1 and 1↔2, with
-`host`, `host_pipe` and `direct` each in a fresh process. Each child first
-exercises all four GPUs' host legs. Complete pair buffers are compared outside
+`host`, `host_pipe` and `direct` each in a fresh Torch process, followed by an
+independent `cudart_peer` process. Each Torch child first exercises all four
+GPUs' host legs. The runtime-only child uses the local controls described
+below on its two selected devices. Complete pair buffers are compared outside
 the timers. `CUDA_LAUNCH_BLOCKING=1` makes this diagnostic only; no latency can
 pass a performance or serving gate. Host-leg and route markers locate failures.
 Use `T_PD_DIAG_MIB=896` for a later document-sized check after the small check
@@ -208,3 +210,52 @@ account tool exists, the launcher stops before allocating GPUs and requests
 an account install or an explicit `T_PD_UV=/absolute/path/to/uv` setting.
 Update the standalone checkout and rerun the same diagnostic command above;
 there is no need to edit or repopulate an old campaign by hand.
+
+### Direct-copy parity failures in job 30223
+
+The provided tail from `links_20261115T163810Z_708926`, job 30223, reports
+direct-copy parity failures for 0→1, 1→0, 1→2 and 2→1 at 64 MiB. It also
+shows passing `host` and `host_pipe` cases for 1→0, 1→2 and 2→1. The report
+ended `DIAG_STATUS=failed`; it is not a serving or compression result. These
+tests transfer ordinary bytes without invoking a T/T2 codec. The underlying
+cause is not established by the traceback or by advertised peer support.
+
+The diagnostic now adds a fourth case, `cudart_peer`, in a separate process
+for each selected pair. It imports NumPy and package metadata, but never
+imports Torch. Its installed Torch version identifies the pinned environment;
+it does not describe the implementation of this copy. The child resolves the
+CUDA 12 runtime from the environment's package files, requires runtime 12.8,
+allocates buffers with `cudaMalloc`, enables peer access in both directions,
+and uses `cudaMemcpyPeer` with explicit source and destination device IDs.
+
+Every repetition uses a new random CPU reference and its bytewise inverse as
+the destination's initial contents. Both selected GPUs must first pass full
+H2D, local D2D and D2H controls. After the peer copy, the child compares the
+entire destination to the reference, verifies the source is unchanged, and
+saves mismatch counts, the first mismatch, hashes and untouched poison bytes.
+Failed comparisons retain their JSON as well as logs. A missing peer capability,
+failed local control, bad return code, corrupted byte or incomplete repetition
+fails the case. It never retries through host memory as a substitute.
+
+`platform_context.json` also records read-only peer-read/write capabilities,
+relevant IOMMU boot flags and visible GPU IOMMU groups. Group presence or
+capability output alone does not establish the cause or validate a working
+peer transfer. No driver, BIOS, IOMMU, ACS or scheduler setting is changed.
+
+Update the standalone checkout and run `bash scripts/run_t_pd_diagnostics.sh`
+again. Allocation size and package pins are unchanged; the default selected
+pairs now produce 16 cases. The original `direct` failures remain failures
+even if the runtime case passes. Comparing the two implementations and the
+local controls helps decide whether to investigate framework/allocator/copy
+differences or the lower-level node peer path. Neither outcome alone proves
+a particular driver or IOMMU fault, and the full serving matrix remains pending.
+
+Relevant primary sources:
+
+- [PyTorch 2.11 CUDA copy implementation](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/cuda/Copy.cu)
+  already selects devices and inserts cross-device stream dependencies.
+- [CUDA 12.8 programming guide](https://docs.nvidia.com/cuda/archive/12.8.2/cuda-c-programming-guide/index.html#iommu-on-linux)
+  describes the Linux bare-metal IOMMU limitation for PCIe peer transfers.
+- [CUDA 12.8 memory API reference](https://docs.nvidia.com/cuda/archive/12.8.2/cuda-runtime-api/group__CUDART__MEMORY.html)
+  defines `cudaMemcpyPeer`. Its name alone is not proof of the physical path;
+  this diagnostic explicitly enables peer access and records the controls.

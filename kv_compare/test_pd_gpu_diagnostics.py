@@ -21,10 +21,19 @@ spec.loader.exec_module(diag)
 
 
 def record(pair=(0, 1), route='host', mib=64):
-    return {'gpu_executed':True, 'diagnostic_only':True, 'gpus':['fixture'] * 4,
+    result = {'gpu_executed':True, 'diagnostic_only':True, 'gpus':['fixture'] * 4,
             'torch':'2.11.0+cu128', 'cuda_runtime':'12.8', 'paths':[route], 'mib':mib,
             'host_legs':[{'gpu':i} for i in range(4)],
             'pairs':[{'src':pair[0], 'dst':pair[1], 'correct':True, route:{'correct':True}}]}
+    if route == 'cudart_peer':
+        result.update(format='t_pd_cudart_peer_v1', runtime_api_only=True, torch_imported=False,
+                      status='passed', requested_reps=2, completed_reps=2,
+                      host_controls=[{'gpu':gpu, 'repetition':rep, 'correct':True, 'mismatched_bytes':0,
+                                      'bytes':mib << 20} for gpu in pair for rep in range(2)],
+                      trials=[{'repetition':rep, 'correct':True, 'source_unchanged':True,
+                               'mismatched_bytes':0, 'untouched_poison_bytes':0, 'bytes':mib << 20} for rep in range(2)],
+                      peer_enable=[{'src':a,'dst':b,'status':'enabled'} for a,b in (pair,pair[::-1])])
+    return result
 
 
 class GPUDiagnosticTests(unittest.TestCase):
@@ -43,6 +52,41 @@ class GPUDiagnosticTests(unittest.TestCase):
         for change in changes:
             with self.subTest(change=change), self.assertRaises(ValueError):
                 diag.validate_case(dict(record(), **change), (0, 1), 'host', 64)
+
+    def test_runtime_proof_requires_all_controls_repetitions_and_source_parity(self):
+        good = record(route='cudart_peer')
+        diag.validate_case(good, (0,1), 'cudart_peer', 64, 2)
+        changes = [{'torch_imported':True}, {'runtime_api_only':False}, {'completed_reps':1},
+                   {'host_controls':[]}, {'trials':[]}, {'peer_enable':[]}, {'cleanup_errors':['fixture error']},
+                   {'trials':[dict(row, source_unchanged=False) for row in good['trials']]},
+                   {'host_controls':[good['host_controls'][0]] * 4},
+                   {'trials':[dict(row, mismatched_bytes=1) for row in good['trials']]}]
+        for change in changes:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                diag.validate_case(dict(good, **change), (0,1), 'cudart_peer', 64, 2)
+        with self.assertRaises(ValueError):
+            diag.validate_case(good, (0,1), 'cudart_peer', 64, 3)
+
+    def test_platform_context_filters_boot_flags_and_retains_read_failures(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);proc=root/'proc';system=root/'sys'
+            proc.mkdir();(system/'kernel/iommu_groups/7').mkdir(parents=True)
+            (proc/'cmdline').write_text('root=private-value intel_iommu=on iommu=pt quiet')
+            device=system/'bus/pci/devices/0000:04:00.0';device.mkdir(parents=True)
+            (device/'iommu_group').symlink_to(system/'kernel/iommu_groups/7')
+            def command(argv, **kwargs):
+                if '--query-gpu=pci.bus_id' in argv:
+                    return type('Result',(),{'returncode':0,'stdout':'00000000:04:00.0\ninvalid\n','stderr':''})()
+                raise FileNotFoundError('fixture missing command')
+            with patch.object(diag.subprocess,'run',side_effect=command):
+                context=diag.platform_context(proc,system)
+            self.assertEqual(context['relevant_boot_flags'],['intel_iommu=on','iommu=pt'])
+            self.assertEqual(context['iommu_group_count'],1)
+            self.assertEqual(context['gpu_iommu_groups'],[{'pci_bus_id':'0000:04:00.0','iommu_group':'7'}])
+            self.assertIn('error',context['p2p_read'])
+            self.assertFalse(context['system_settings_changed'])
+            self.assertFalse(context['iommu_cause_established'])
+            self.assertNotIn('private-value',json.dumps(context))
 
     def test_children_use_fresh_process_groups_and_keep_failure_logs(self):
         with tempfile.TemporaryDirectory() as td:
@@ -68,7 +112,7 @@ class GPUDiagnosticTests(unittest.TestCase):
             self.assertIn('fixture waiting', log.read_text())
 
     def test_diagnostic_report_retains_failures_and_never_validates_performance(self):
-        for bad_route in (None, 'direct'):
+        for bad_route in (None, 'direct', 'cudart_peer'):
             with self.subTest(bad_route=bad_route), tempfile.TemporaryDirectory() as td:
                 output = Path(td)
                 calls = []
@@ -77,21 +121,26 @@ class GPUDiagnosticTests(unittest.TestCase):
                     pair = tuple(map(int, command[command.index('--pairs') + 1].split('-')))
                     calls.append((route, env['CUDA_LAUNCH_BLOCKING']))
                     logfile.write_text('CPU fixture only\n')
-                    if route == bad_route:
-                        return -6, False
-                    Path(command[-1]).write_text(json.dumps(record(pair, route)))
-                    return 0, False
-                with patch.dict(os.environ, {'SLURM_JOB_ID':'cpu-fixture'}), patch.object(diag, 'run_child', child):
+                    data=record(pair,route)
+                    if route == bad_route:data['pairs'][0]['correct']=False
+                    Path(command[-1]).write_text(json.dumps(data))
+                    return (-6 if route == bad_route else 0), False
+                with patch.dict(os.environ, {'SLURM_JOB_ID':'cpu-fixture'}), patch.object(diag, 'run_child', child), \
+                        patch.object(diag,'platform_context',return_value={'cpu_fixture_only':True}):
                     rc = diag.main(['--pin', 'a'*40, '--output', str(output), '--pairs', '0-1'])
                 result = json.loads((output / 'diagnostics.json').read_text())
                 self.assertEqual(rc, 0 if bad_route is None else 1)
-                self.assertEqual(calls, [('host', '1'), ('host_pipe', '1'), ('direct', '1')])
+                self.assertEqual(calls, [(route,'1') for route in diag.ROUTES])
                 self.assertFalse(result['performance_validated'])
                 self.assertFalse(result['serving_validated'])
                 self.assertFalse(result['automatic_merge'])
                 self.assertEqual(result['all_selected_copies_passed'], bad_route is None)
                 self.assertTrue((output / 'summary.md').is_file())
                 self.assertTrue((output / 'share.zip').is_file())
+                self.assertTrue((output / 'platform_context.json').is_file())
+                if bad_route:
+                    failed=next(row for row in result['cases'] if row['route']==bad_route)
+                    self.assertTrue((output/failed['result']).is_file())
 
     def test_launcher_is_syntactically_valid_and_requests_only_diagnostic_resources(self):
         path = ROOT / 'scripts/run_t_pd_diagnostics.sh'
@@ -119,10 +168,16 @@ a=p.parse_args();i,j=map(int,a.pairs.split('-'))
 d={'gpu_executed':True,'diagnostic_only':True,'gpus':['CPU fixture']*4,
 'torch':'2.11.0+cu128','cuda_runtime':'12.8','paths':[a.paths],'mib':int(a.mib),
 'host_legs':[{'gpu':i} for i in range(4)],'pairs':[{'src':i,'dst':j,'correct':True,a.paths:{'correct':True}}]}
+if a.paths=='cudart_peer':
+ d.update(format='t_pd_cudart_peer_v1',runtime_api_only=True,torch_imported=False,status='passed',requested_reps=2,completed_reps=2,
+ host_controls=[{'gpu':g,'repetition':r,'correct':True,'mismatched_bytes':0,'bytes':int(a.mib)<<20} for g in (i,j) for r in range(2)],
+ trials=[{'repetition':r,'correct':True,'source_unchanged':True,'mismatched_bytes':0,'untouched_poison_bytes':0,'bytes':int(a.mib)<<20} for r in range(2)],
+ peer_enable=[{'src':x,'dst':y,'status':'enabled'} for x,y in ((i,j),(j,i))])
 open(a.output,'w').write(json.dumps(d))
 print('CPU fixture only; no GPU execution')
 '''
             (repo / 'scripts/pd_link_probe.py').write_text(probe)
+            (repo / 'scripts/pd_cudart_peer_probe.py').write_text(probe)
             def git(*args):
                 return subprocess.run(['git', '-C', str(repo), *args], check=True,
                                       capture_output=True, text=True).stdout.strip()
@@ -171,7 +226,7 @@ exec "${@: -2:1}" "${@: -1}"
             report_path = next((root / 'state/diagnostics').glob('*/diagnostics.json'))
             report = json.loads(report_path.read_text())
             self.assertEqual(report['pin'], git('rev-parse', 'HEAD'))
-            self.assertEqual(len(report['cases']), 3)
+            self.assertEqual(len(report['cases']), 4)
             self.assertFalse(report['serving_validated'])
             self.assertTrue(next((node / 'kvpd-diagnostics').glob('*/code/scripts/pd_link_probe.py')).is_file())
             self.assertIn('DIAG_JOB=cpu-fixture', result.stdout)

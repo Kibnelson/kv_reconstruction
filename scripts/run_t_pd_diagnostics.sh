@@ -98,7 +98,7 @@ printf 'DIAG_RUNTIME=%s\n' "$runtime"
 diag_stage=source_archive
 printf 'DIAG_STAGE=%s\n' "$diag_stage"
 git -C "$T_PD_DIAG_REPO" archive "$T_PD_DIAG_PIN" -- \
-    scripts/pd_gpu_diagnostics.py scripts/pd_link_probe.py scripts/pd_env.sh | tar -x -C "$runtime/code"
+    scripts/pd_gpu_diagnostics.py scripts/pd_link_probe.py scripts/pd_cudart_peer_probe.py scripts/pd_env.sh | tar -x -C "$runtime/code"
 diag_stage=environment_cleanup
 printf 'DIAG_STAGE=%s\n' "$diag_stage"
 for task_key in ${!UV_@} ${!PIP_@}; do unset "$task_key"; done

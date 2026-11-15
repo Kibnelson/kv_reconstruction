@@ -1,0 +1,83 @@
+{
+  "source_parent": "0db53d971fe99489c5ce560797acf2168c232c62",
+  "observed_job": "30223",
+  "observed_attempt": "links_20261115T163810Z_708926",
+  "observed_pin_in_supplied_excerpt": null,
+  "observed_direct_failures": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      1
+    ]
+  ],
+  "observed_host_passes_in_supplied_excerpt": [
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      1
+    ]
+  ],
+  "observed_host_pipe_passes_in_supplied_excerpt": [
+    [
+      1,
+      0
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      1
+    ]
+  ],
+  "observed_status": "failed",
+  "observed_payload_mib": 64,
+  "cause_established": false,
+  "iommu_fault_established": false,
+  "test_command": "python -m unittest -v kv_compare.test_pd_gpu_diagnostics kv_compare.test_pd_cudart_peer_probe kv_compare.test_pd_probe_tools",
+  "test_count": 21,
+  "tests_passed": true,
+  "checks": [
+    "bash -n scripts/run_t_pd_diagnostics.sh",
+    "python -m py_compile scripts/pd_cudart_peer_probe.py scripts/pd_gpu_diagnostics.py kv_compare/test_pd_cudart_peer_probe.py kv_compare/test_pd_gpu_diagnostics.py"
+  ],
+  "diagnostic_routes": [
+    "host",
+    "host_pipe",
+    "direct",
+    "cudart_peer"
+  ],
+  "default_cases": 16,
+  "default_mib": 64,
+  "new_runtime_worker_gpu_validated": false,
+  "gpu_executed_by_assistant": false,
+  "system_settings_changed": false,
+  "automatic_fallback": false,
+  "serving_validated": false,
+  "performance_validated": false,
+  "automatic_merge": false,
+  "references": [
+    "https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/cuda/Copy.cu",
+    "https://docs.nvidia.com/cuda/archive/12.8.2/cuda-c-programming-guide/index.html#iommu-on-linux",
+    "https://docs.nvidia.com/cuda/archive/12.8.2/cuda-runtime-api/group__CUDART__MEMORY.html"
+  ]
+}
