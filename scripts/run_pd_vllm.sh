@@ -18,8 +18,9 @@
 #   CONNECTOR    tkv (ours, default), nixl (vLLM's NixlConnector, no codec), lmcache (LMCache's CPU offload)
 #   TRANSPORT    ring (pinned host memory, paced links; default), p2p (GPU to GPU, CUDA IPC), tcp
 #   ENGINE_EAGER=1   --enforce-eager (T2's layer-0 recompute matches the cache bit for bit in eager mode)
-#   TIER_GB (8), TIER_CHUNK (256), GPU_BLOCKS (the engines' GPU KV blocks for the tier runs; default 2048, so the
-#   conversations outgrow the GPU), TIER_CODECS, TIER_CLIENTS (8,16), TIER_CONVERSATIONS (64)
+#   TIER_GB (8), TIER_CHUNK (256), GPU_BLOCKS (the engines' GPU KV blocks for the tier runs; default 640, so the
+#   conversations outgrow the GPU), TIER_CODECS, TIER_CLIENTS (8,16), TIER_CONVERSATIONS (64), TIER_PREFIX_MAX (a cap
+#   on each conversation's own start, tokens; 0 = vLLM's config)
 #   SHARE_GPU=1 (every engine on GPU 0, small memory shares: the NUC smoke), SMOKE=1 (few codecs, links, rates and
 #   prompts), STAGES, CODECS, LINKS, RATES, NUM_PROMPTS, PROMPT_TOKENS (2048,8192), OUTPUT_LEN (128), TTFT_SLO_MS
 #   (2000), PORT_BASE (from the Slurm job id: a shared node runs other people's jobs), NO_PUSH=1, KEEP_ENGINES=1
@@ -177,15 +178,15 @@ if [ "${SMOKE:-0}" = 1 ]; then
     NUM_PROMPTS=${NUM_PROMPTS:-8}
     PROMPT_TOKENS=${PROMPT_TOKENS:-2048}
     TIER_CODECS=${TIER_CODECS:-raw,ours-hbh}
-    # the tier was never asked in jobs 30176 and 30210 (0 loads): 8 conversations of 2 prompts each (--max-turns
-    # counts replies too) over 4 engines are 2 conversations an engine, which its GPU cache held. Now 16 conversations,
-    # all active (8 clients x 2), 4 prompts each: about 4 an engine. vLLM's multi-turn config starts a conversation
-    # at 500 shared + up to 5000 own tokens and adds 200-280 a prompt, so the longest request stays under 6.7K: tier
-    # engines get a 7K context and 450 blocks (7.2K tokens), which hold it but not 4 conversations (about 2K each)
+    # the tier was hardly asked in job 30226 (2-5 loads of about 50 requests; the GPU prefix cache hit 68%): 16
+    # conversations of 4 prompts, about 4 an engine, in 450 blocks. Now each conversation's own start is capped at 2,000
+    # tokens (vLLM's config: up to 5,000), so the longest request stays under 3.7K: a 4K context and 300 blocks
+    # (4.8K tokens), against about 7K of conversations an engine
     TIER_CLIENTS=${TIER_CLIENTS:-8}
     TIER_CONVERSATIONS=${TIER_CONVERSATIONS:-16}
     TIER_MAX_TURNS=${TIER_MAX_TURNS:-8}
-    if [ "$COLO" = 1 ]; then GPU_BLOCKS=${GPU_BLOCKS:-450}; MAXLEN=${MAXLEN:-7168}; MAXBT=${MAXBT:-7168}; fi
+    TIER_PREFIX_MAX=${TIER_PREFIX_MAX:-2000}
+    if [ "$COLO" = 1 ]; then GPU_BLOCKS=${GPU_BLOCKS:-300}; MAXLEN=${MAXLEN:-4096}; MAXBT=${MAXBT:-4096}; fi
 fi
 case "$CONNECTOR" in
     nixl) CODECS=nixl; DEFAULT_STAGES=check,sweep,report; LINKS=native ;;
@@ -205,6 +206,10 @@ TIER_CONVERSATIONS=${TIER_CONVERSATIONS:-64}
 TIER_MAX_TURNS=${TIER_MAX_TURNS:-12}
 TIER_GB=${TIER_GB:-8}
 TIER_CHUNK=${TIER_CHUNK:-256}
+TIER_PREFIX_MAX=${TIER_PREFIX_MAX:-0}
+# the full tier: conversations of 6 prompts (vLLM's config) reach about 7.2K tokens at most, 2.9K on average; 640 blocks
+# (10K tokens) at an 8K context hold 4 of an engine's conversations (8 clients) but not 8 (16 clients)
+if [ "$COLO" = 1 ]; then GPU_BLOCKS=${GPU_BLOCKS:-640}; MAXLEN=${MAXLEN:-8192}; MAXBT=${MAXBT:-8192}; fi
 LOAD_CODECS=$([ "$COLO" = 1 ] && echo "$TIER_CODECS" || echo "$CODECS")
 LOAD_CODECS=$(echo "$LOAD_CODECS" | tr ',' '\n' | { grep -v -x -e nixl -e lmcache -e '' || true; } | paste -sd, -)
 
@@ -240,17 +245,28 @@ PORTS=("$PORT_BASE")
 for ((i = 1; i <= NUM_PREFILL; i++)); do PORTS+=($((PORT_BASE + 100 + i)) $((PORT_BASE + 400 + i))); done
 for ((i = 1; i <= NUM_DECODE; i++)); do PORTS+=($((PORT_BASE + 200 + i)) $((PORT_BASE + 300 + i)) $((PORT_BASE + 450 + i))); done
 "$VPY" - "${PORTS[@]}" <<'EOF'
-import socket, sys
-busy = []
-for port in map(int, sys.argv[1:]):
-    s = socket.socket()
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)   # as the servers bind: closed connections of the
-    try:                                                         # previous run (TIME_WAIT) do not hold the port
-        s.bind(("127.0.0.1", port))
-    except OSError:
-        busy.append(port)
-    finally:
-        s.close()
+import socket, sys, time
+
+
+def busy_ports():
+    out = []
+    for port in map(int, sys.argv[1:]):
+        s = socket.socket()
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)   # as the servers bind: closed connections of the
+        try:                                                         # previous run (TIME_WAIT) do not hold the port
+            s.bind(("127.0.0.1", port))
+        except OSError:
+            out.append(port)
+        finally:
+            s.close()
+    return out
+
+
+for _ in range(30):            # a previous run's engines may still be exiting: up to 60 s for their ports
+    busy = busy_ports()
+    if not busy:
+        break
+    time.sleep(2)
 if busy:
     sys.exit(f"STOP: port(s) {busy} already in use on this node (another job?): start again with PORT_BASE=<another>")
 print(f"   ports {min(map(int, sys.argv[1:]))}-{max(map(int, sys.argv[1:]))} free")
@@ -306,7 +322,7 @@ for ((i = 1; i <= NUM_PREFILL; i++)); do
     port=$((PORT_BASE + 100 + i))
     case "$CONNECTOR" in
         tkv) serve "prefill$i" "${PPOS[$((i - 1))]}" "$port" "$P_MEM" \
-                 "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_role\":\"kv_producer\",\"kv_connector_extra_config\":{$COMMON,\"transport\":\"$TRANSPORT\",\"link_control\":\"$LINKFILE\",\"gpu_send_budget\":$SEND_BUDGET}}" ;;
+                 "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_producer\",\"kv_connector_extra_config\":{$COMMON,\"transport\":\"$TRANSPORT\",\"link_control\":\"$LINKFILE\",\"gpu_send_budget\":$SEND_BUDGET}}" ;;
         nixl) serve "prefill$i" "${PPOS[$((i - 1))]}" "$port" "$P_MEM" '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
                   VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT=$((PORT_BASE + 400 + i)) UCX_NET_DEVICES=all ;;
     esac
@@ -318,7 +334,7 @@ for ((i = 1; i <= NUM_DECODE; i++)); do
     if [ "$COLO" = 1 ]; then
         case "$CONNECTOR" in
             tkv) serve "engine$i" "$pos" "$port" "$D_MEM" \
-                     "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{$COMMON,\"tier\":{\"budget_gb\":$TIER_GB,\"chunk\":$TIER_CHUNK,\"control\":\"$TIERFILE\",\"codec\":\"raw\"}}}" ;;
+                     "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_both\",\"kv_connector_extra_config\":{$COMMON,\"tier\":{\"budget_gb\":$TIER_GB,\"chunk\":$TIER_CHUNK,\"control\":\"$TIERFILE\",\"codec\":\"raw\"}}}" ;;
             # LMCache 0.5.7 ships its own connector class for vLLM; vLLM 0.32's built-in LMCacheConnectorV1 imports
             # lmcache.integration.vllm.vllm_v1_adapter, which 0.5.7 moved (job 30176: ModuleNotFoundError)
             lmcache) serve "engine$i" "$pos" "$port" "$D_MEM" '{"kv_connector":"LMCacheConnectorV1Dynamic","kv_connector_module_path":"lmcache.integration.vllm.lmcache_connector_v1","kv_role":"kv_both"}' \
@@ -327,7 +343,7 @@ for ((i = 1; i <= NUM_DECODE; i++)); do
     else
         case "$CONNECTOR" in
             tkv) serve "decode$i" "$pos" "$port" "$D_MEM" \
-                     "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_role\":\"kv_consumer\",\"kv_connector_extra_config\":{$COMMON,\"listen\":\"127.0.0.1:$kv\",\"gpu_recv_budget\":$RECV_BUDGET,\"recv_timeout_s\":600}}" ;;
+                     "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_consumer\",\"kv_connector_extra_config\":{$COMMON,\"listen\":\"127.0.0.1:$kv\",\"gpu_recv_budget\":$RECV_BUDGET,\"recv_timeout_s\":600}}" ;;
             nixl) serve "decode$i" "$pos" "$port" "$D_MEM" '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
                       VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT=$((PORT_BASE + 450 + i)) UCX_NET_DEVICES=all ;;
         esac
@@ -390,7 +406,8 @@ PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
     --rates "$RATES" --num-prompts "$NUM_PROMPTS" --output-len "$OUTPUT_LEN" --ttft-slo-ms "${TTFT_SLO_MS:-2000}" \
     --stages "$STAGES" --vllm-source "$KV_HOME/sources/vllm" --env "$OUT/env.json" \
     --tier-codecs "$TIER_CODECS" --tier-clients "$TIER_CLIENTS" --tier-conversations "$TIER_CONVERSATIONS" \
-    --tier-max-turns "$TIER_MAX_TURNS" --tier-control "$TIERFILE" 2>&1 | tee "$OUT/bench.log"
+    --tier-max-turns "$TIER_MAX_TURNS" --tier-prefix-max "$TIER_PREFIX_MAX" --tier-control "$TIERFILE" \
+    --engine-logs "$OUT" 2>&1 | tee "$OUT/bench.log"
 STATUS=${PIPESTATUS[0]}
 set -e
 if [ "$STATUS" = 124 ]; then echo "STOP: the bench ran past RUN_TIMEOUT_S=$RUN_TIMEOUT_S s; packaged as _partial"; fi

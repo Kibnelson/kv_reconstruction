@@ -36,6 +36,12 @@ NUC, so a crash there costs that run only.
   cache is emptied (`POST /reset_prefix_cache`). The points use the same prompts, so before job 30210's fix a
   later codec's prefill hit its own cache (TTFT without the prefill; T2 without steps for layer 0) and the
   decode engines already held most of a prompt (8 or 16 tokens moved of 2048).
+- **Warm before measuring.** Before each codec's first point: one short request over every prefill-decode pair (its
+  path opens on first use), then a burst with the benchmark's own sampling. In job 30226 the first point of every
+  run compiled vLLM's top-p kernels (about 2 s), because the check samples greedily; the report now lists vLLM's
+  "JIT compilation during inference" warnings with the point each fell in.
+- **A failed transfer is computed locally.** The engines run with `kv_load_failure_policy: recompute`: under vLLM's
+  default the scheduler asserted on a failed request and the engine died (jobs 30176, 30226).
 - **Through host memory at set link speeds** (`TRANSPORT=ring`, 3/10/25/100 Gb/s): the transport of
   `pd-vllm-protocol`, a paced virtual link over pinned host memory.
 - **GPU to GPU directly** (`TRANSPORT=p2p`, unpaced). The receiver's landing ring is in its GPU memory, shared with
@@ -50,8 +56,12 @@ NUC, so a crash there costs that run only.
   - A later request that starts with the same tokens loads those chunks to the GPU and decodes them into its
     blocks. Each chunk is checked against a checksum taken when it was stored.
   - The budget (`TIER_GB`, 8 GB) limits the coded bytes, so a smaller format keeps more conversations.
-  - The engines' GPU cache is limited (`GPU_BLOCKS` 2048, 32K tokens each) so that the conversations outgrow it.
-    The smoke has 16 conversations of 4 prompts, about 4 an engine, in 450 blocks (7.2K tokens) at a 7K context.
+  - The engines' GPU cache is limited so that the conversations outgrow it: `GPU_BLOCKS` 640 (10K tokens each) at
+    an 8K context, which holds an engine's 4 conversations at 8 clients but not its 8 at 16. In job 30226 the GPU
+    prefix cache still served 68% of the smoke's tokens and the tier only 2-5 loads, so the smoke now caps each
+    conversation's own start at 2,000 tokens (`TIER_PREFIX_MAX`) and runs 300 blocks (4.8K tokens) at a 4K context.
+  - The table gives vLLM's own prefix-cache counters (GPU / external, from each engine's `/metrics`), so LMCache's
+    use shows too; the bits are over the whole chunks loaded, with the share of them the requests needed.
   - The workload is vLLM's multi-turn benchmark on fresh conversations at each point, with conversation routing.
   - LMCache's CPU offload (`CONNECTOR=lmcache`) is the reference, with the same chunk size and budget.
 

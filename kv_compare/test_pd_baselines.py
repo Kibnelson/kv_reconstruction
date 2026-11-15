@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -95,6 +96,146 @@ class _Attn:
         c, s = torch.cos(f)[:, None, :], torch.sin(f)[:, None, :]
         a, b = kk[..., :h], kk[..., h:]
         return q, torch.cat([a * c - b * s, b * c + a * s], -1).reshape(n, -1).to(k.dtype)
+
+
+class Layer0FindTests(unittest.TestCase):
+    def setUp(self):
+        import kv_compare.pd.layer0 as l0
+        self.l0 = l0
+        l0._MODEL = None
+        self.addCleanup(setattr, l0, "_MODEL", None)
+
+    def fake(self):
+        inner = torch.nn.Module()
+        inner.embed_tokens = torch.nn.Embedding(4, 2)
+        inner.layers = torch.nn.ModuleList([torch.nn.Linear(2, 2)])
+        model = torch.nn.Module()
+        model.model = inner
+        return model
+
+    def test_found_from_the_model_runner_up_the_stack(self):
+        model = self.fake()
+
+        class GPUModelRunner:                       # vLLM's runner calls register_kv_caches
+            def __init__(self, m):
+                self.model = m
+
+            def initialize_kv_cache(self):
+                return register()
+
+        def register():                              # the connector's register calls remember_model()
+            return self.l0.remember_model()
+        self.assertIs(GPUModelRunner(model).initialize_kv_cache(), model)
+        self.assertIs(self.l0.find_model(), model)
+
+    def test_found_in_a_frozen_heap(self):
+        import gc
+        model = self.fake()
+        gc.freeze()                                  # what vLLM does after start-up
+        try:
+            self.assertIs(self.l0.find_model(), model)
+            self.assertGreater(gc.get_freeze_count(), 0, "the heap is frozen again")
+        finally:
+            gc.unfreeze()
+
+
+class NvcompPieceTests(unittest.TestCase):
+    def test_pieces_round_trip(self):
+        from kv_compare.pd import codecs
+
+        class Arr:                                   # nvCOMP's array: dlpack, its buffer size
+            def __init__(self, t):
+                self.t = t
+                self.buffer_size = t.numel()
+
+            def __dlpack__(self, **kw):
+                return self.t.__dlpack__(**kw)
+
+            def __dlpack_device__(self):
+                return self.t.__dlpack_device__()
+
+        class Codec:                                 # stores a piece reversed, with a 4-byte header
+            calls = []
+
+            def encode(self, a):
+                Codec.calls.append(a.t.numel())
+                return Arr(torch.cat([torch.tensor([7, 7, 7, 7], dtype=torch.uint8), a.t.flip(0)]))
+
+            def decode(self, a):
+                return Arr(a.t[4:].flip(0))
+        nv = codecs.Nvcomp.__new__(codecs.Nvcomp)
+        nv.nv = types.SimpleNamespace(as_array=lambda t, cuda_stream=None: Arr(t))
+        nv.codec, nv.name, nv.version, nv.device = Codec(), "nvcomp-x", "0", torch.device("cpu")
+        nv.stream = types.SimpleNamespace(cuda_stream=0)
+        nv._enter = nv._leave = lambda: None
+        nv.piece = 1000
+        words = torch.randint(-3000, 3000, (3, 7, 50), dtype=torch.int16)      # 2,100 bytes: three pieces
+        parts, meta = nv.encode(words)
+        self.assertEqual(Codec.calls, [1000, 1000, 100])
+        self.assertEqual(meta["pieces"], [1004, 1004, 104])
+        got = {}
+        nv.decode(parts, meta, lambda l, w: got.__setitem__(l, w.clone()))
+        self.assertTrue(all(torch.equal(got[l], words[l]) for l in range(3)))
+
+
+class ExansBatchTests(unittest.TestCase):
+    """Our ExANS wrapper's batches over a stand-in library: uniform blocks fit a 66-byte record, the others go raw."""
+
+    def lib(self, ex):
+        import ctypes
+        calls = []
+
+        class Lib:
+            def openlake_expans_create(self, bb, rb, seg, nseg, cap, href):
+                calls.append(("create", cap))
+                return 0
+
+            def openlake_expans_last_error(self, h):
+                return b"stand-in"
+
+            def openlake_expans_encode(self, h, addrs, sizes, offs, n, rec, fits, stream):
+                calls.append(("encode", n))
+                for i in range(n):
+                    blk = ctypes.string_at(addrs[i], sizes[i])
+                    if blk == blk[:2] * (len(blk) // 2):
+                        head = bytearray(64)
+                        head[20:24] = (66).to_bytes(4, "little")
+                        ctypes.memmove(rec + i * ex.RECORD_BYTES, bytes(head) + blk[:2], 66)
+                        fits[i] = 1
+                    else:
+                        fits[i] = 0
+                return 0
+
+            def openlake_expans_decode(self, h, rec, idx, n, oaddrs, osizes, ooffs, stream):
+                calls.append(("decode", n))
+                for k in range(n):
+                    two = ctypes.string_at(rec + idx[k] * ex.RECORD_BYTES + 64, 2)
+                    ctypes.memmove(oaddrs[k], two * (osizes[k] // 2), osizes[k])
+                return 0
+        return Lib(), calls
+
+    def test_batches_round_trip(self):
+        from unittest import mock
+        from kv_compare import exans_official as ex
+        from kv_compare.pd import codecs
+        import ctypes
+        c = codecs.ExANS.__new__(codecs.ExANS)
+        c.ex, c.ct, c.device, c.handles, c.max_blocks, c.batch = ex, ctypes, torch.device("cpu"), {}, 1 << 16, 2
+        c.lib, calls = self.lib(ex)
+        nb = 5
+        flat = torch.randint(-3000, 3000, (nb * ex.BLOCK_WORDS + 37,), dtype=torch.int16)
+        for i in (0, 3, 4):                          # uniform blocks: they fit
+            flat[i * ex.BLOCK_WORDS:(i + 1) * ex.BLOCK_WORDS] = 1234 + i
+        words = flat.view(1, 1, -1)
+        with mock.patch("torch.cuda.current_stream", return_value=types.SimpleNamespace(cuda_stream=0)):
+            parts, meta = c.encode(words)
+            got = {}
+            c.decode(parts, meta, lambda l, w: got.__setitem__(l, w.clone()))
+        self.assertEqual(meta["fits"], [True, False, False, True, True])
+        self.assertEqual([x for x in calls if x[0] == "encode"], [("encode", 2), ("encode", 2), ("encode", 1)])
+        self.assertEqual([x for x in calls if x[0] == "decode"], [("decode", 2), ("decode", 1)])
+        self.assertTrue(max(x[1] for x in calls if x[0] == "create") <= 64)
+        self.assertTrue(torch.equal(got[0], words[0]))
 
 
 class Layer0Tests(unittest.TestCase):
@@ -738,6 +879,8 @@ class RunnerDryRunTests(unittest.TestCase):
         p = next(e for e in eng if e["cfg"]["kv_role"] == "kv_producer")
         ex = p["cfg"]["kv_connector_extra_config"]
         self.assertEqual((ex["transport"], ex["codecs"]), ("p2p", ["raw", "ours-hbh"]))
+        # a failed transfer is computed by the decode engine: under vLLM's default ("fail") it killed the engine
+        self.assertTrue(all(e["cfg"]["kv_load_failure_policy"] == "recompute" for e in eng))
         self.assertIn("--host", p["argv"])
         out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_2p2d_tkv_p2p_rtxa5000x4_*smoke*"))
         self.assertEqual(len(out), 1, list((self.repo / "benchmark_results").glob("*")))
@@ -762,6 +905,10 @@ class RunnerDryRunTests(unittest.TestCase):
         tier = eng[0]["cfg"]["kv_connector_extra_config"]["tier"]
         self.assertEqual((tier["chunk"], tier["budget_gb"]), (256, 8))
         self.assertIn("--num-gpu-blocks-override", eng[0]["argv"])
+        argv = eng[0]["argv"]
+        self.assertEqual(argv[argv.index("--num-gpu-blocks-override") + 1], "300")     # the smoke's tier sizing
+        self.assertEqual(argv[argv.index("--max-model-len") + 1], "4096")
+        self.assertTrue(all(e["cfg"]["kv_load_failure_policy"] == "recompute" for e in eng))
         r, eng = self.run_pd(LAYOUT="colo4", CONNECTOR="lmcache")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
         self.assertTrue(all(e["cfg"]["kv_connector"] == "LMCacheConnectorV1Dynamic" and
@@ -806,6 +953,8 @@ class RunnerDryRunTests(unittest.TestCase):
                            text=True, timeout=900)
         self.assertIn("NO_PUSH=1: committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
         self.assertIn("run 3 did not finish", r.stdout)
+        if os.environ.get("DEBUG_MATRIX"):
+            print(r.stdout[-12000:], "\n---- stderr\n", r.stderr[-6000:])
         rep = list((self.repo / "benchmark_results").glob("pd_matrix_smoke_rtxa5000_*/summary.md"))
         self.assertEqual(len(rep), 1)
         text = rep[0].read_text()

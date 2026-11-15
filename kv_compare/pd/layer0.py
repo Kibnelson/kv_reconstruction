@@ -21,23 +21,100 @@ in the connector's log (layer0_check).
 from __future__ import annotations
 
 import gc
+import sys
 
 import torch
 
 
-def find_model():
-    """The engine's model in this process (vLLM's single-GPU executor runs the worker in the engine process): the
-    torch module with .model.embed_tokens and .model.layers."""
+_MODEL = None                                        # the engine's model, once found (remember_model)
+
+
+def _is_model(o):
+    try:
+        if not isinstance(o, torch.nn.Module):     # first: getattr on any object (modules) can warn or run code
+            return False
+        inner = getattr(o, "model", None)
+        return isinstance(inner, torch.nn.Module) and hasattr(inner, "embed_tokens") and hasattr(inner, "layers")
+    except Exception:
+        return False
+
+
+def _unwrap(o, depth=4):
+    """The model in o: o itself, a model runner's model (get_model() or .model), or what a wrapper runs
+    (CUDAGraphWrapper's .runnable, a .module)."""
+    for _ in range(depth):
+        if o is None:
+            return None
+        if _is_model(o):
+            return o
+        nxt = None
+        if "Runner" in type(o).__name__ and callable(getattr(o, "get_model", None)):
+            try:
+                nxt = o.get_model()
+            except Exception:
+                nxt = None
+        for name in ("model", "runnable", "module"):
+            if nxt is not None:
+                break
+            try:
+                v = o.__dict__.get(name) if hasattr(o, "__dict__") else None
+                if v is None and isinstance(o, torch.nn.Module):
+                    v = o._modules.get(name)
+            except Exception:
+                v = None
+            if v is not None and v is not o:
+                nxt = v
+        o = nxt
+    return None
+
+
+def remember_model(obj=None):
+    """Find and keep the engine's model, from obj or from the call stack: the connector calls this from
+    register_kv_caches, which vLLM's model runner calls, so a frame up the stack has the runner as `self`. vLLM
+    freezes the garbage collector's heap after start-up (gc.freeze), and gc.get_objects() does not list frozen
+    objects: in job 30226 the search below saw no module at all."""
+    global _MODEL
+    if obj is not None:
+        m = _unwrap(obj)
+    else:
+        m, f = None, sys._getframe(1)
+        while f is not None and m is None:
+            for v in (f.f_locals.get("self"), f.f_locals.get("model_runner"), f.f_locals.get("model")):
+                if v is not None:
+                    m = _unwrap(v)
+                    if m is not None:
+                        break
+            f = f.f_back
+    if m is not None:
+        _MODEL = m
+    return m
+
+
+def _search():
     best = None
     for o in gc.get_objects():
         try:
-            if isinstance(o, torch.nn.Module) and hasattr(o, "model"):
-                inner = o.model
-                if isinstance(inner, torch.nn.Module) and hasattr(inner, "embed_tokens") and hasattr(inner, "layers"):
-                    if best is None or len(list(o.children())) > len(list(best.children())):
-                        best = o
+            if _is_model(o) and (best is None or len(list(o.children())) > len(list(best.children()))):
+                best = o
         except Exception:
             continue
+    return best
+
+
+def find_model():
+    """The engine's model in this process (vLLM's single-GPU executor runs the worker in the engine process): the
+    torch module with .model.embed_tokens and .model.layers. The one remembered at registration first; then the
+    garbage collector's objects, with its frozen heap thawed for the search and frozen again."""
+    if _MODEL is not None:
+        return _MODEL
+    best = _search()
+    frozen = gc.get_freeze_count() if hasattr(gc, "get_freeze_count") else 0
+    if best is None and frozen:
+        gc.unfreeze()
+        try:
+            best = _search()
+        finally:
+            gc.freeze()
     if best is None:                                 # what there is, for the report
         seen = {}
         for o in gc.get_objects():
@@ -48,9 +125,9 @@ def find_model():
                         k for k in ("model", "embed_tokens", "layers", "language_model") if hasattr(o, k))
             except Exception:
                 continue
-        raise RuntimeError("no model with .model.embed_tokens and .model.layers in this process; modules seen: "
-                           + "; ".join(f"{k} {v}" for k, v in list(seen.items())[:8]))
-    return best
+        raise RuntimeError(f"no model with .model.embed_tokens and .model.layers in this process ({frozen} objects "
+                           "frozen); modules seen: " + "; ".join(f"{k} {v}" for k, v in list(seen.items())[:8]))
+    return remember_model(best)
 
 
 class EngineLayer0:

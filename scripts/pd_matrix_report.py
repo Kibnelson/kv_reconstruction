@@ -141,15 +141,23 @@ def main(argv=None):
                     (v, path_of(r["env"])))
     for (lay, eager, clients), vs in sorted(tiers.items(), key=lambda kv: (str(kv[0][0]), kv[0][1], kv[0][2])):
         L += [f"## CPU tier, {lay}{', eager engines' if eager else ''}: {clients} clients", "",
-              "| Tier | Req/s | TTFT p50 / p90 / p99 (ms) | TPOT p50 (ms) | Loads | Tokens loaded | Load ms (copy / "
-              "decode) | Bits stored | Chunks stored |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+              "Prefix hits: vLLM's own counters, GPU cache / external (the tier: ours or LMCache's), % of the tokens "
+              "asked. Bits: of the whole chunks loaded; Needed: the share of those chunks the requests needed. Loads, "
+              "bits and chunks come from our connector's records, so LMCache has none: its external hits show its use.",
+              "", "| Tier | Req/s | TTFT p50 / p90 / p99 (ms) | TPOT p50 (ms) | Prefix hits GPU / external (%) | Loads | "
+              "Tokens loaded | Load ms (copy / decode) | Bits | Needed (%) | Chunks stored |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
         for v, path in sorted(vs, key=lambda x: (x[0]["bench"].get("median_ttft_ms") or 1e18)):
-            b, st = v["bench"], v["tier"]
-            name = v["codec"] if path not in ("LMCache (vLLM)",) else "LMCache CPU offload (raw)"
+            b, st, hc = v["bench"], v["tier"], v.get("prefix_cache") or {}
+            lm = path in ("LMCache (vLLM)",)
+            name = v["codec"] if not lm else "LMCache CPU offload (raw)"
+            dash = lambda x: "-" if lm else x
             L.append(f"| {name} | {fmt(b.get('request_throughput'))} | {fmt(b.get('median_ttft_ms'), 0)} / "
                      f"{fmt(b.get('p90_ttft_ms'), 0)} / {fmt(b.get('p99_ttft_ms'), 0)} | {fmt(b.get('median_tpot_ms'), 1)} | "
-                     f"{st.get('loads')} | {st.get('loaded_tokens')} | {fmt(st.get('load_ms'), 1)} ({fmt(st.get('h2d_ms'), 1)}"
-                     f" / {fmt(st.get('decode_ms'), 1)}) | {fmt(st.get('bits'), 3)} | {st.get('stored_chunks')} |")
+                     f"{fmt(hc.get('gpu_hit_pct'), 1)} / {fmt(hc.get('external_hit_pct'), 1)} | "
+                     f"{dash(st.get('loads'))} | {dash(st.get('loaded_tokens'))} | {dash(fmt(st.get('load_ms'), 1))} "
+                     f"({dash(fmt(st.get('h2d_ms'), 1))} / {dash(fmt(st.get('decode_ms'), 1))}) | "
+                     f"{dash(fmt(st.get('bits'), 3))} | {dash(fmt(st.get('needed_pct'), 0))} | {dash(st.get('stored_chunks'))} |")
         L.append("")
 
     # T2
@@ -166,6 +174,11 @@ def main(argv=None):
               "| --- | --- | --- | --- | --- | --- | --- | --- |"]
         L += [f"| {x[0]} | {x[1]} | {x[2]} | {x[3]} | {x[4]} | {x[5]} | {x[6]} | {x[7][:160]} |" for x in t2]
         L.append("")
+    jits = [(label(r["env"]), j) for r in runs for j in (r["res"].get("jit") or []) if j.get("point")]
+    if jits:
+        L += ["## Kernels compiled inside measured points", "",
+              "vLLM compiled these while a point was measured, so that point's latencies include the compile:", ""]
+        L += [f"- {lab}: {j['point']} ({j['log']}): {j['text'][:110]}" for lab, j in jits[:30]] + [""]
     skipped = {}
     for r in runs:
         for c, w in (r["res"].get("skipped") or {}).items():

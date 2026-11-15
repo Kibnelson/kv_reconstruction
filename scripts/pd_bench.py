@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import re
 import math
 import os
 from pathlib import Path
@@ -93,20 +94,98 @@ def reset_caches(a, tries=30):
 def warm_pairs(a):
     """One short request over every prefill-decode pair in the current mode, before a sweep point's caches are
     emptied: a pair's first transfer opens its path (CUDA IPC handles, NIXL's handshake; 0.2-0.5 s in job 30210),
-    and the check stage, one request at a time, uses the first prefill engine only."""
+    and the check stage, one request at a time, uses the first prefill engine only. No sampling parameters: the
+    server's defaults, as vllm bench serve sends them (warm_burst)."""
     st = get(a.proxy + "/t/status")
     n = 0
     for j in range(len(st.get("prefills") or [None])):
         for i in range(len(st["decodes"])):
             try:
                 post(a.proxy + "/v1/completions", {"model": a.served_name, "prompt": "warm up " * 40 + str(n),
-                                                   "max_tokens": 2, "temperature": 0.0,
-                                                   "t_prefill": j, "t_decode": i}, timeout=600)
+                                                   "max_tokens": 2, "t_prefill": j, "t_decode": i}, timeout=600)
             except Exception as exc:
                 log(f"warm-up of prefill {j} -> decode {i} failed: {exc!r}"[:300])
             n += 1
     wait_idle(a.proxy)
     return n
+
+
+def warm_burst(a, n=16):
+    """n short requests at once in the current mode, with the server's default sampling (the model's generation
+    config: top-p), as the benchmarks send them. In job 30226 the first measured point of every run compiled vLLM's
+    top-p kernels (Triton, about 2 s: "JIT compilation during inference"): the check stage samples greedily, so
+    nothing before had used them; the burst also covers batched sampling."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(i):
+        try:
+            post(a.proxy + "/v1/completions", {"model": a.served_name, "prompt": f"warm-up burst {i} " * 30,
+                                               "max_tokens": 8}, timeout=600)
+            return None
+        except Exception as exc:
+            return repr(exc)[:200]
+    with ThreadPoolExecutor(n) as ex:
+        errs = [e for e in ex.map(one, range(n)) if e]
+    if errs:
+        log(f"warm-up burst: {len(errs)} of {n} failed: {errs[0]}")
+    wait_idle(a.proxy)
+
+
+JIT_RE = re.compile(r"(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d) \[jit_monitor\.py:\d+\] (.*)")
+
+
+def jit_events(a):
+    """vLLM's warnings of a kernel compiled while serving ("JIT compilation during inference"), from the engine logs:
+    [(time, engine log, text)]."""
+    out = []
+    if not getattr(a, "engine_logs", None):
+        return out
+    year = time.localtime().tm_year
+    for f in sorted(Path(a.engine_logs).glob("engine_*.log")):
+        try:
+            text = f.read_text(errors="replace")
+        except OSError:
+            continue
+        for m in JIT_RE.finditer(text):
+            if "JIT compilation during inference" not in m[6]:
+                continue
+            t = time.mktime((year, int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]), 0, 0, -1))
+            out.append((t, f.name, m[6][:160]))
+    return sorted(out)
+
+
+def prefix_metrics(urls):
+    """The engines' prefix-cache counters (Prometheus /metrics: every vllm:*prefix_cache* series, summed over its
+    labels and engines): vLLM's own hits and queries, GPU and external (a connector's: our tier, LMCache)."""
+    tot = {}
+    for u in urls:
+        try:
+            with urllib.request.urlopen(u + "/metrics", timeout=30) as r:
+                text = r.read().decode(errors="replace")
+        except Exception:
+            continue
+        for line in text.splitlines():
+            if line.startswith("vllm:") and "prefix_cache" in line and not line.startswith("#"):
+                name, _, val = line.rpartition(" ")
+                key = name.split("{", 1)[0]
+                try:
+                    tot[key] = tot.get(key, 0.0) + float(val)
+                except ValueError:
+                    pass
+    return tot
+
+
+def hit_rates(before, after):
+    d = {k: after.get(k, 0.0) - before.get(k, 0.0) for k in after}
+
+    def rate(kind):
+        q = [v for k, v in d.items() if kind in k and "queries" in k]
+        h = [v for k, v in d.items() if kind in k and "hits" in k]
+        return (100 * sum(h) / sum(q)) if q and sum(q) > 0 else None
+    gpu_q = [v for k, v in d.items() if "external" not in k and "queries" in k]
+    gpu_h = [v for k, v in d.items() if "external" not in k and "hits" in k]
+    return {"counters": d, "gpu_hit_pct": (100 * sum(gpu_h) / sum(gpu_q)) if gpu_q and sum(gpu_q) > 0 else None,
+            "external_hit_pct": rate("external")}
 
 
 def records(log_dir, t0, t1):
@@ -287,8 +366,10 @@ def stage_sweep(a, res, colocated=False):
                 if name in runs and not a.rerun:
                     continue
                 wait_idle(a.proxy)
-                if not colocated and rate == a.rates[0]:
-                    warm_pairs(a)
+                if rate == a.rates[0]:
+                    if not colocated:
+                        warm_pairs(a)
+                    warm_burst(a)
                 resets = reset_caches(a)
                 n = a.num_prompts if rate != "inf" else a.num_prompts
                 rc, r, t0, t1 = bench_serve(a, str(a.dataset), rate, n, out_dir, name)
@@ -296,7 +377,8 @@ def stage_sweep(a, res, colocated=False):
                 time.sleep(1)
                 st = transfer_stats(records(a.log_dir, t0, time.time())) if not colocated and codec != "nixl" else {}
                 runs[name] = {"link_gbps": link, "codec": codec, "rate": rate, "exit": rc,
-                              "bench": {k: r.get(k) for k in KEEP}, "transfers": st, "resets": resets}
+                              "bench": {k: r.get(k) for k in KEEP}, "transfers": st, "resets": resets,
+                              "t0": t0, "t1": t1}
                 b = runs[name]["bench"]
                 log(f"{name}: exit {rc}, {fmt(b.get('request_throughput'), 2)} req/s, TTFT p50 "
                     f"{fmt(b.get('median_ttft_ms'), 0)} / p99 {fmt(b.get('p99_ttft_ms'), 0)} ms, goodput "
@@ -318,9 +400,11 @@ def stage_multiturn(a, res):
     cfile = a.out / "multi_turn_config.json"
     cfile.write_text(json.dumps(conf, indent=1))
     out = {}
-    for codec in a.mt_codecs:
+    for k, codec in enumerate(a.mt_codecs):
         post(a.proxy + "/t/config", {"mode": "pd", "codec": codec, "policy": a.mt_policy, "reset_conversations": True})
         wait_idle(a.proxy)
+        if k == 0:
+            warm_burst(a)
         reset_caches(a)                            # the same conversations (seed 0) for every codec
         name = f"multiturn_{codec}_{a.mt_policy}"
         t0 = time.time()
@@ -371,7 +455,13 @@ def tier_stats(recs):
             "loaded_tokens": sum(r.get("tokens") or 0 for r in ok),
             "load_ms": mean([r.get("decode_install_ms") for r in ok]), "h2d_ms": mean([r.get("h2d_ms") for r in ok]),
             "decode_ms": mean([r.get("decode_ms") for r in ok]),
-            "bits": 16 * sum(r.get("loaded_bytes") or 0 for r in ok) / raw if raw else None,
+            # bits over the whole chunks moved (chunk_raw_bytes; older records: the tokens needed), and the share of
+            # those chunks the requests needed (a hit can start or end inside a chunk)
+            "bits": (16 * sum(r.get("loaded_bytes") or 0 for r in ok) / sum(r.get("chunk_raw_bytes") or 0 for r in ok)
+                     if ok and all(r.get("chunk_raw_bytes") for r in ok) else
+                     16 * sum(r.get("loaded_bytes") or 0 for r in ok) / raw if raw else None),
+            "needed_pct": (100 * raw / sum(r.get("chunk_raw_bytes") or 0 for r in ok)
+                           if ok and all(r.get("chunk_raw_bytes") for r in ok) else None),
             "stores": len(stores), "store_errors": sum(1 for r in stores if r.get("error")),
             "stored_chunks": sum(r.get("stored") or 0 for r in stores),
             "store_ms": mean([r.get("store_ms") for r in stores if not r.get("error")]),
@@ -387,10 +477,17 @@ def stage_tier(a, res):
     conf = json.loads((src / "generate_multi_turn.json").read_text())
     conf["text_files"] = [str(p) for p in sorted(Path(a.texts).glob("wikitext2*.txt"))][:1] or conf["text_files"]
     conf["num_conversations"] = a.tier_conversations
+    pre = conf.get("prompt_input", {}).get("prefix_num_tokens")
+    if a.tier_prefix_max and isinstance(pre, dict):    # each conversation's own start, capped (the smoke's tier)
+        pre["max"] = min(int(pre.get("max", a.tier_prefix_max)), a.tier_prefix_max)
+        if "average" in pre:
+            pre["average"] = min(pre["average"], max(1, a.tier_prefix_max * 3 // 10))
     cfile = a.out / "tier_conversations_config.json"
     cfile.write_text(json.dumps(conf, indent=1))
     runs = res.setdefault("tier", {})
     engines = [d[0] for d in get(a.proxy + "/t/status")["decodes"]]
+    post(a.proxy + "/t/config", {"mode": "local"})
+    warm_burst(a)
     ctl = Path(a.tier_control) if a.tier_control else None
     gen = int(time.time())
     for codec in usable(a, res, a.tier_codecs):
@@ -416,6 +513,7 @@ def stage_tier(a, res):
                    "--num-clients", str(clients), "--max-active-conversations", str(2 * clients),
                    "--send-conversation-id", "--seed", str(gen % 100000), "--max-turns", str(a.tier_max_turns),
                    "--stats-json-output", str(out_json)]
+            m0 = prefix_metrics(engines)
             t0 = time.time()
             r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(src))
             (a.out / "runs" / (name + ".log")).write_text(r.stdout[-30000:] + "\n" + r.stderr[-30000:])
@@ -423,6 +521,7 @@ def stage_tier(a, res):
                 log(f"{name}: the multi-turn benchmark exited {r.returncode}:\n" + tail_of(r.stderr or r.stdout))
             wait_idle(a.proxy)
             time.sleep(2)
+            hits = hit_rates(m0, prefix_metrics(engines))
             t1 = time.time()
             stats = json.loads(out_json.read_text()) if out_json.is_file() else []
             ttft = [x.get("ttft_ms") for x in stats]
@@ -437,7 +536,7 @@ def stage_tier(a, res):
                      "input_tokens": mean([x.get("input_num_tokens") for x in stats])}
             st = tier_stats(records(a.log_dir, t0, t1))
             runs[name] = {"codec": codec, "clients": clients, "exit": r.returncode, "bench": bench, "tier": st,
-                          "resets": resets, "generation": gen}
+                          "resets": resets, "generation": gen, "prefix_cache": hits, "t0": t0, "t1": t1}
             log(f"{name}: exit {r.returncode}, {bench['requests']} requests, {fmt(bench['request_throughput'], 2)} "
                 f"req/s, TTFT p50 {fmt(bench['median_ttft_ms'], 0)} / p99 {fmt(bench['p99_ttft_ms'], 0)} ms; tier "
                 f"{st['loads']} loads ({st['loaded_tokens']} tokens, {fmt(st['load_ms'], 1)} ms each, bits "
@@ -450,7 +549,21 @@ def save(a, res):
     (a.out / "results.json").write_text(json.dumps(res, indent=1))
 
 
+def jit_report(a, res):
+    """vLLM's kernels compiled while serving, each with the measured point it fell in (None: outside them)."""
+    spans = [(v["t0"], v["t1"], name) for key in ("sweep", "colocated", "tier") for name, v in (res.get(key) or {}).items()
+             if isinstance(v, dict) and v.get("t0") and v.get("t1")]
+    out = []
+    for t, f, text in jit_events(a):
+        point = next((n for t0, t1, n in spans if t0 - 1 <= t <= t1 + 1), None)
+        out.append({"time": t, "log": f, "text": text, "point": point})
+    res["jit"] = out
+    save(a, res)
+    return out
+
+
 def stage_report(a, res):
+    jit = jit_report(a, res)
     L = ["# vLLM PD with our transfer protocol", ""]
     env = res.get("env", {})
     L.append(f"Model {env.get('model')}; {env.get('gpus')}; vLLM {env.get('vllm')}, torch {env.get('torch')}; "
@@ -501,22 +614,34 @@ def stage_report(a, res):
     ti = res.get("tier", {})
     if ti and "error" not in ti:
         L += ["## CPU tier (colocated engines, multi-turn conversations)", "",
-              "| Tier codec | Clients | Req/s | TTFT p50 / p90 / p99 (ms) | TPOT p50 (ms) | Tier loads | Tokens loaded | "
-              "Load ms (copy / decode) | Bits stored | Chunks stored | Chunks in tier |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+              "Prefix hits: vLLM's own counters (GPU cache / external, i.e. the tier: ours or LMCache's), as % of the "
+              "tokens asked. Bits: of the whole chunks loaded; Needed: the share of those chunks the requests needed.", "",
+              "| Tier codec | Clients | Req/s | TTFT p50 / p90 / p99 (ms) | TPOT p50 (ms) | Prefix hits GPU / external (%) | "
+              "Tier loads | Tokens loaded | Load ms (copy / decode) | Bits | Needed (%) | Chunks stored | Chunks in tier |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
         for v in ti.values():
-            b, st = v["bench"], v["tier"]
+            b, st, hc = v["bench"], v["tier"], v.get("prefix_cache") or {}
             L.append(f"| {v['codec']} | {v['clients']} | {fmt(b.get('request_throughput'), 2)} | "
                      f"{fmt(b.get('median_ttft_ms'), 0)} / {fmt(b.get('p90_ttft_ms'), 0)} / {fmt(b.get('p99_ttft_ms'), 0)} | "
-                     f"{fmt(b.get('median_tpot_ms'), 1)} | {st.get('loads')} | {st.get('loaded_tokens')} | "
+                     f"{fmt(b.get('median_tpot_ms'), 1)} | {fmt(hc.get('gpu_hit_pct'), 1)} / {fmt(hc.get('external_hit_pct'), 1)} | "
+                     f"{st.get('loads')} | {st.get('loaded_tokens')} | "
                      f"{fmt(st.get('load_ms'), 1)} ({fmt(st.get('h2d_ms'), 1)} / {fmt(st.get('decode_ms'), 1)}) | "
-                     f"{fmt(st.get('bits'))} | {st.get('stored_chunks')} | {st.get('tier_chunks')} |")
+                     f"{fmt(st.get('bits'))} | {fmt(st.get('needed_pct'), 0)} | {st.get('stored_chunks')} | "
+                     f"{st.get('tier_chunks')} |")
         L.append("")
     elif ti:
         L += ["## CPU tier", "", ti["error"], ""]
     if res.get("skipped"):
         L += ["Codecs not run (did not load on every engine): " + "; ".join(f"{c} ({w[:120]})" for c, w in
                                                                          res["skipped"].items()), ""]
+    inside = [j for j in jit if j["point"]]
+    if jit:
+        L += ["## Kernels compiled while serving (vLLM's JIT warnings)", "",
+              f"{len(jit)} in the engine logs, {len(inside)} inside a measured point"
+              + (" (those points' latencies include the compile):" if inside else "."), ""]
+        L += [f"- {time.strftime('%H:%M:%S', time.localtime(j['time']))} {j['log']}: {j['point'] or 'outside the points'}"
+              f" - {j['text'][:110]}" for j in jit[:20]]
+        L.append("")
     opp = a.out / "opportunity.json"
     if opp.is_file():
         o = json.loads(opp.read_text())
@@ -554,6 +679,9 @@ def main():
     ap.add_argument("--tier-conversations", type=int, default=64)
     ap.add_argument("--tier-max-turns", type=int, default=12)
     ap.add_argument("--tier-control", default=None, help="the connectors' tier control file")
+    ap.add_argument("--tier-prefix-max", type=int, default=0,
+                    help="cap on each conversation's own start in the tier runs (tokens; 0: vLLM's config)")
+    ap.add_argument("--engine-logs", default=None, help="folder of the engine logs (engine_*.log), for the JIT report")
     ap.add_argument("--rerun", action="store_true")
     a = ap.parse_args()
     a.out = Path(a.out)

@@ -324,10 +324,12 @@ NVCOMP = {"ans": ("ANS", {}), "zstd": ("Zstd", {}), "bitcomp": ("Bitcomp", {"dat
 
 
 class Nvcomp:
-    """nvCOMP's Codec (from nvidia import nvcomp) on the request's bytes as one buffer; nvCOMP's own header in the
-    stream (the receiver decodes the bytes as they come)."""
+    """nvCOMP's Codec (from nvidia import nvcomp) on the request's bytes, in pieces of at most `piece` bytes (128 MiB),
+    each with nvCOMP's own header; the receiver decodes the pieces in order. One buffer for a whole 8K request (940 MB)
+    ran out of GPU memory beside vLLM's cache for zstd in job 30226; nvCOMP cuts its input into 64 KB chunks anyway,
+    so the pieces cost a header each and nothing else."""
 
-    def __init__(self, alg, device):
+    def __init__(self, alg, device, piece=128 << 20):
         from nvidia import nvcomp
         if alg not in NVCOMP:
             raise ValueError(f"nvCOMP algorithm is one of {sorted(NVCOMP)}")
@@ -339,6 +341,7 @@ class Nvcomp:
         self.codec = nvcomp.Codec(algorithm=name, device_id=self.device.index or 0,
                                   cuda_stream=self.stream.cuda_stream, **opts)
         self.version = getattr(nvcomp, "__version__", None)
+        self.piece = int(piece)
 
     # nvCOMP works on its own stream (self.stream, fixed when the Codec is made) and owns its output arrays: the
     # input is ready on the caller's stream before nvCOMP reads it, and every output is copied into a tensor of our
@@ -350,9 +353,7 @@ class Nvcomp:
     def _leave(self):
         torch.cuda.current_stream(self.device).wait_stream(self.stream)
 
-    def encode(self, words, pos0=0):
-        L, T, W = words.shape
-        raw = words.contiguous().view(torch.uint8).reshape(-1)
+    def _encode_piece(self, raw):
         self._enter()
         arr = self.nv.as_array(raw, cuda_stream=self.stream.cuda_stream)
         enc = self.codec.encode(arr)
@@ -362,18 +363,35 @@ class Nvcomp:
         view = torch.from_dlpack(enc).reshape(-1).view(torch.uint8)
         coded = view[:n].clone()
         del view, enc, arr
-        return {"coded": coded}, {"codec": self.name, "T": int(T), "L": int(L), "W": int(W), "nvcomp": self.version}
+        return coded
+
+    def _decode_piece(self, src, into):
+        self._enter()
+        arr = self.nv.as_array(src.contiguous(), cuda_stream=self.stream.cuda_stream)
+        out = self.codec.decode(arr)
+        self._leave()
+        view = torch.from_dlpack(out).contiguous().reshape(-1).view(torch.uint8)
+        if view.numel() != into.numel():
+            raise ValueError(f"nvCOMP decoded a piece of {view.numel()} bytes, expected {into.numel()}")
+        into.copy_(view)
+        del view, out, arr
+
+    def encode(self, words, pos0=0):
+        L, T, W = words.shape
+        raw = words.contiguous().view(torch.uint8).reshape(-1)
+        coded = [self._encode_piece(raw[a:a + self.piece]) for a in range(0, raw.numel(), self.piece)]
+        return ({"coded": torch.cat(coded) if len(coded) > 1 else coded[0]},
+                {"codec": self.name, "T": int(T), "L": int(L), "W": int(W), "nvcomp": self.version,
+                 "piece": self.piece, "pieces": [int(c.numel()) for c in coded]})
 
     def decode(self, parts, meta, sink):
         L, T, W = int(meta["L"]), int(meta["T"]), int(meta["W"])
         src = parts["coded"].contiguous()
-        self._enter()
-        arr = self.nv.as_array(src, cuda_stream=self.stream.cuda_stream)
-        out = self.codec.decode(arr)
-        self._leave()
-        view = torch.from_dlpack(out)
-        dec = view.contiguous().reshape(-1).view(torch.uint8).clone()
-        del view, out, arr
+        dec = torch.empty(L * T * W * 2, dtype=torch.uint8, device=self.device)
+        piece, o = int(meta.get("piece") or dec.numel()), 0
+        for k, n in enumerate(meta.get("pieces") or [src.numel()]):
+            self._decode_piece(src[o:o + n], dec[k * piece:min(dec.numel(), (k + 1) * piece)])
+            o += n
         if dec.numel() != L * T * W * 2:
             raise ValueError(f"nvCOMP decoded {dec.numel()} bytes, expected {L * T * W * 2}")
         w = dec.view(torch.int16).view(L, T, W)
@@ -384,10 +402,15 @@ class Nvcomp:
 class ExANS:
     """The authors' ExANS through ctypes (kv_compare.exans_official's loader and constants): the request's words in
     memory order cut into blocks; each block that fits its record travels as the record's used bytes, the others
-    and the tail raw. info: the build information JSON scripts/pd_setup.sh writes."""
+    and the tail raw. info: the build information JSON scripts/pd_setup.sh writes.
+
+    The library is called on at most `batch` blocks at a time (256: about 256 MB of words), with one handle of that
+    capacity: a handle for a whole 8K request (940 blocks, capacity 1024) could not be made beside vLLM's cache in
+    job 30226 ("invalid ExpANS codec"), while 512 could. The blocks are independent, so the batches change nothing
+    in the stream."""
     name = "exans"
 
-    def __init__(self, info_path, device, max_blocks=1 << 16):
+    def __init__(self, info_path, device, max_blocks=1 << 16, batch=256):
         import ctypes
         import json as _json
         from .. import exans_official as ex
@@ -400,6 +423,7 @@ class ExANS:
         self.device = torch.device(device)
         self.handles = {}                            # capacity in blocks -> handle (made as requests need them)
         self.max_blocks = int(max_blocks)
+        self.batch = int(batch)
         self.version = info.get("commit")
         self._handle(64)                             # fails here, not at the first request, if the library cannot
 
@@ -436,27 +460,36 @@ class ExANS:
             meta.update(fits=[], sizes=[])
             return parts, meta
         data = flat[:nb * ex.BLOCK_WORDS].view(nb, ex.BLOCK_WORDS)
-        records = torch.zeros(nb * ex.RECORD_BYTES, dtype=torch.uint8, device=flat.device)
-        fits = (ct.c_uint8 * nb)()
-        addrs = self._u(ct.c_uint64, [data.data_ptr() + i * ex.BLOCK_BYTES for i in range(nb)])
-        sizes = self._u(ct.c_uint32, [ex.BLOCK_BYTES] * nb)
-        offs = self._u(ct.c_uint32, list(range(nb + 1)))
         stream = torch.cuda.current_stream(flat.device)
-        handle = self._handle(nb)
-        st = self.lib.openlake_expans_encode(handle, addrs, sizes, offs, nb, records.data_ptr(), fits,
-                                             stream.cuda_stream)
-        if st:
-            raise RuntimeError("ExANS encode failed: " + self.lib.openlake_expans_last_error(handle).decode())
-        hdr = records.view(nb, ex.RECORD_BYTES)[:, :ex.HEADER_BYTES].cpu()
-        used = hdr[:, 20:24].contiguous().view(torch.int32).flatten().tolist()
-        fit = [bool(fits[i]) for i in range(nb)]
-        rec = records.view(nb, ex.RECORD_BYTES)
-        kept = [rec[i, :used[i]] for i in range(nb) if fit[i]]
-        raw = [data[i] for i in range(nb) if not fit[i]]
+        kept, raw, fit, used_all = [], [], [], []
+        for b0 in range(0, nb, self.batch):
+            n = min(self.batch, nb - b0)
+            handle = self._handle(n)
+            records = torch.zeros(n * ex.RECORD_BYTES, dtype=torch.uint8, device=flat.device)
+            fits = (ct.c_uint8 * n)()
+            addrs = self._u(ct.c_uint64, [data.data_ptr() + (b0 + i) * ex.BLOCK_BYTES for i in range(n)])
+            sizes = self._u(ct.c_uint32, [ex.BLOCK_BYTES] * n)
+            offs = self._u(ct.c_uint32, list(range(n + 1)))
+            st = self.lib.openlake_expans_encode(handle, addrs, sizes, offs, n, records.data_ptr(), fits,
+                                                 stream.cuda_stream)
+            if st:
+                raise RuntimeError("ExANS encode failed: " + self.lib.openlake_expans_last_error(handle).decode())
+            hdr = records.view(n, ex.RECORD_BYTES)[:, :ex.HEADER_BYTES].cpu()
+            used = hdr[:, 20:24].contiguous().view(torch.int32).flatten().tolist()
+            rec = records.view(n, ex.RECORD_BYTES)
+            for i in range(n):
+                ok = bool(fits[i])
+                fit.append(ok)
+                used_all.append(int(used[i]) if ok else 0)
+                if ok:
+                    kept.append(rec[i, :used[i]].clone())
+                else:
+                    raw.append(data[b0 + i])
+            del records, rec
         parts["records"] = torch.cat(kept) if kept else torch.zeros(1, dtype=torch.uint8, device=flat.device)
         if raw:
             parts["raw"] = torch.cat(raw)
-        meta.update(fits=fit, sizes=[int(used[i]) if fit[i] else 0 for i in range(nb)])
+        meta.update(fits=fit, sizes=used_all, batch=self.batch)
         return parts, meta
 
     def decode(self, parts, meta, sink):
@@ -467,21 +500,26 @@ class ExANS:
             fit, sizes = meta["fits"], meta["sizes"]
             blocks = out[:nb * ex.BLOCK_WORDS].view(nb, ex.BLOCK_WORDS)
             idx = [i for i in range(nb) if fit[i]]
-            if idx:
-                records = torch.zeros(nb * ex.RECORD_BYTES, dtype=torch.uint8, device=self.device)
-                rec = records.view(nb, ex.RECORD_BYTES)
-                o = 0
-                for i in idx:
-                    rec[i, :sizes[i]] = parts["records"][o:o + sizes[i]]
-                    o += sizes[i]
-                oaddrs = self._u(ct.c_uint64, [blocks.data_ptr() + i * ex.BLOCK_BYTES for i in idx])
-                handle = self._handle(nb)
-                st = self.lib.openlake_expans_decode(handle, records.data_ptr(), self._u(ct.c_uint32, idx),
-                                                     len(idx), oaddrs, self._u(ct.c_uint32, [ex.BLOCK_BYTES] * len(idx)),
-                                                     self._u(ct.c_uint32, list(range(len(idx) + 1))),
+            starts, o = {}, 0                        # each fitted block's record in the stream
+            for i in idx:
+                starts[i] = o
+                o += sizes[i]
+            for c0 in range(0, len(idx), self.batch):
+                part = idx[c0:c0 + self.batch]
+                n = len(part)
+                records = torch.zeros(n * ex.RECORD_BYTES, dtype=torch.uint8, device=self.device)
+                rec = records.view(n, ex.RECORD_BYTES)
+                for j, i in enumerate(part):
+                    rec[j, :sizes[i]] = parts["records"][starts[i]:starts[i] + sizes[i]]
+                oaddrs = self._u(ct.c_uint64, [blocks.data_ptr() + i * ex.BLOCK_BYTES for i in part])
+                handle = self._handle(n)
+                st = self.lib.openlake_expans_decode(handle, records.data_ptr(), self._u(ct.c_uint32, list(range(n))),
+                                                     n, oaddrs, self._u(ct.c_uint32, [ex.BLOCK_BYTES] * n),
+                                                     self._u(ct.c_uint32, list(range(n + 1))),
                                                      torch.cuda.current_stream(self.device).cuda_stream)
                 if st:
                     raise RuntimeError("ExANS decode failed: " + self.lib.openlake_expans_last_error(handle).decode())
+                del records, rec
             raw = [i for i in range(nb) if not fit[i]]
             if raw:
                 blocks[torch.as_tensor(raw, device=self.device)] = parts["raw"].view(len(raw), ex.BLOCK_WORDS)

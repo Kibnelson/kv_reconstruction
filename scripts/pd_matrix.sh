@@ -33,7 +33,7 @@ if [ -z "${RUNS:-}" ]; then
                      SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=$NV;
                      SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh;
                      SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl;
-                     SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh;
+                     SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh,t2-rank256;
                      SMOKE=1 LAYOUT=colo4 CONNECTOR=lmcache;
                      SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256" ;;
         ring1p3d) RUNS="LAYOUT=1p3d TRANSPORT=ring CODECS=$MAIN; LAYOUT=1p3d TRANSPORT=ring CODECS=$NV" ;;

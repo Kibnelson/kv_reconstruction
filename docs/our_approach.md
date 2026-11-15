@@ -557,7 +557,9 @@ The same codecs also serve a CPU tier: the role LMCache's CPU offload plays (`kv
 - **Failures stay with the request.**
   - A failed encode tells the decode engine at once (an abort message), instead of waiting for the 600 s
     timeout.
-  - A failed install fails only that request, not the engine.
+  - A failed transfer or install fails only that request's transfer, not the engine: the engines run with vLLM's
+    `kv_load_failure_policy` set to `recompute`, so the decode engine then computes the prompt itself. Under vLLM
+    0.32's default (`fail`) its scheduler asserted on the failed request and the engine died (jobs 30176, 30226).
 - **A memory retry.** nvCOMP and ExANS allocate GPU memory outside PyTorch. An encode or decode that fails is
   retried once, after PyTorch gives its cached memory back.
 
@@ -716,7 +718,8 @@ At each engine step, the decode engine's worker installs every transfer that has
 3. **Check**, in the correctness pass: the checksum of what was installed against the sender's. A mismatch fails
    the transfer.
 
-A failed install or an abort fails only that request. A transfer not complete 600 s after admission times out.
+A failed install or an abort fails only that request's transfer: the decode engine then computes the prompt itself
+(vLLM's `recompute` policy). A transfer not complete 600 s after admission times out the same way.
 
 ### 6.11 Generation
 
@@ -774,6 +777,7 @@ The comparison is only meaningful if every method gets the same conditions. The 
 | The same GPU memory share for vLLM (0.65) for every connector, NIXL and LMCache included | nvCOMP and ExANS need room beside vLLM's cache; giving it to everyone keeps the engines identical |
 | Every engine's prefix cache emptied before each check codec and each sweep or multi-turn point | the points reuse the same prompts; otherwise later methods skip the prefill or send only part of the prompt (job 30210) |
 | Every prefill-decode pair warmed up with one short request before each codec's sweep | a pair's first transfer opens its path (CUDA IPC handles, NIXL's handshake), which costs 0.2-0.5 s once |
+| A burst of short requests with the benchmark's own sampling before each codec's first point, the tier and the multi-turn runs; vLLM's "JIT compilation during inference" warnings reported with the point they fell in | the check samples greedily, so the first measured point compiled vLLM's top-p kernels (about 2 s) in job 30226: raw's and NIXL's TTFTs included it |
 | The proxy balances prefill engines by requests in flight, counted when it picks | until job 30210 a burst of requests all went to one engine |
 | The client side (prompts, proxy, benchmark) runs from the same Python environment for every method | LMCache's environment lacked a benchmark dependency |
 | Correctness first: each codec's check pass (with checksums) runs before its timed runs and is reported beside them | a fast codec that is wrong is not a result |

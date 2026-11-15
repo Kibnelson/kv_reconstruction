@@ -442,6 +442,12 @@ class _WorkerSide:
     def register(self, kv_caches):
         from .codecs import build
         from .paged import Paged, layer_order
+        try:                                         # T2's layer 0 needs the engine's model; vLLM's model runner
+            from .layer0 import remember_model       # called us, so it is up the stack now
+            found = remember_model()
+            self.layer0_model = type(found).__name__ if found is not None else None
+        except Exception as exc:
+            self.layer0_model = f"not found: {exc!r}"[:200]
         names = layer_order([n for n, t in kv_caches.items() if torch.is_tensor(t) and t.dim() == 4])
         caches = [kv_caches[n] for n in names]
         device = caches[0].device
@@ -459,7 +465,7 @@ class _WorkerSide:
         warm = self._warm_up_apart()
         self.log.write({"event": "ready", "role": "P" if self.producer else "D", "codecs": sorted(self.codecs),
                         "codec_errors": errors, "layers": len(caches), "view": list(caches[0].shape),
-                        "block_size": self.bs, "warm_up": warm, "time": time.time()})
+                        "block_size": self.bs, "warm_up": warm, "layer0_model": self.layer0_model, "time": time.time()})
         if self.tier is not None:
             import queue
             self.store_q = queue.Queue()
@@ -819,7 +825,9 @@ class _WorkerSide:
                     exact += 1
             rec.update(exact_chunks=exact, codec=self.tier_codec, decode_install_ms=1e3 * (time.perf_counter() - t), h2d_ms=1e3 * h2d,
                        decode_ms=1e3 * dec, loaded_bytes=nbytes, raw_bytes=(spec.t1 - spec.t0) * 2 *
-                       self.paged.heads * self.paged.hd * 2 * len(self.paged.caches))
+                       self.paged.heads * self.paged.hd * 2 * len(self.paged.caches),
+                       chunk_raw_bytes=len(spec.chunks or ()) * c * 2 * self.paged.heads * self.paged.hd * 2 *
+                       len(self.paged.caches))
             self.recv_ok.add(spec.req_id)
         except Exception as exc:
             rec["error"] = repr(exc)[:300]
@@ -848,10 +856,11 @@ class _WorkerSide:
                 if got is not None:
                     del self.pending[rid]
                     self._install(spec, got)
-                # a failed transfer is reported for the request only (failed_recving, with finished_recving), not
-                # also as invalid blocks in the same step: vLLM 0.32 then failed the request on the blocks and
-                # asserted on the finished one (job 30176, scheduler _update_from_kv_xfer_finished), killing the
-                # engine; NIXL's invalid blocks reach the scheduler a step later, after the request is gone
+                # a failed transfer is reported for the request (failed_recving, and finished_recving as vLLM's
+                # connector API asks), not also as invalid blocks. The engines run with kv_load_failure_policy
+                # "recompute" (scripts/run_pd_vllm.sh): under vLLM 0.32's default, "fail", the scheduler finishes
+                # the request with an error and then asserts it still has it (_update_from_kv_xfer_finished), which
+                # killed the engine in jobs 30176 and 30226; under "recompute" the decode engine computes the prompt
                 elif err is not None:                 # the prefill side could not send it
                     del self.pending[rid]
                     self.recv_failed.add(rid)
