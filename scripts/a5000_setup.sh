@@ -58,21 +58,26 @@ AVAIL_GB=$(df -Pk "$KV_HOME" | awk 'NR==2 {print int($4 / 1048576)}')
 [ "$AVAIL_GB" -ge 60 ] || [ -n "${KV_UV:-}" ] || \
     echo "WARNING: only $AVAIL_GB GB free under $KV_HOME (venv ~8 GB, CUDA toolkit ~8 GB, each model 7-17 GB)"
 
-PY=${PYTHON:-}
-if [ -z "$PY" ]; then
-    PY=$(command -v python3.12 || command -v python3 || true)
-fi
-[ -n "$PY" ] || { echo "STOP: no python3 (module load python, or set PYTHON=/path/to/python3.12)"; exit 1; }
-"$PY" - <<'EOF'
+if [ -z "${KV_UV:-}" ]; then
+    PY=${PYTHON:-}
+    if [ -z "$PY" ]; then
+        PY=$(command -v python3.12 || command -v python3 || true)
+    fi
+    [ -n "$PY" ] || { echo "STOP: no python3 (module load python, or set PYTHON=/path/to/python3.12)"; exit 1; }
+    "$PY" - <<'EOF'
 import sys
 v = sys.version_info
 print(f"== python {sys.version.split()[0]} ({sys.executable})")
 if v < (3, 10):
     sys.exit("STOP: Python 3.10 or newer needed (the NUC runs used 3.12): module load python/3.12 or set PYTHON")
 EOF
+fi
 # shellcheck source=scripts/pd_env.sh
 source "$REPO/scripts/pd_env.sh"
+# with uv: uv's own Python (KV_UV_PYTHON, downloaded into UV_PYTHON_INSTALL_DIR), never a python on PATH (on
+# gpu-grad-01, ~/.local/bin/python3.12 points into another project's /tmp folder)
 venv_create "$KV_HOME/venv"
+"$KV_HOME/venv/bin/python" -c "import sys; print(f'== python {sys.version.split()[0]} ({sys.base_prefix})')"
 # shellcheck disable=SC1091
 source "$KV_HOME/venv/bin/activate"
 VENV_PY=$KV_HOME/venv/bin/python

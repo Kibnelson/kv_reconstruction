@@ -247,6 +247,13 @@ class CardTests(unittest.TestCase):
         r = self.card("create")
         self.assertIn("uncommitted changes", r.stderr)
         self.g(self.home, "checkout", "-q", "--", "scripts/pd_proxy.py")
+        # no git identity: publish could not commit, so nothing starts
+        bare = self.tmp / "gitconfig_bare"
+        bare.write_text("[init]\n\tdefaultBranch = pd-baselines\n")
+        self.g(self.home, "config", "--unset", "user.name")
+        r = self.card("create", GIT_CONFIG_GLOBAL=bare)
+        self.assertIn("git has no user.name and user.email", r.stderr)
+        self.g(self.home, "config", "user.name", "t")
         # GitHub's branch moved on: a new campaign must start from its head
         self.g(self.home, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "next")
         self.g(self.home, "push", "-q", "origin", "HEAD:pd-baselines")

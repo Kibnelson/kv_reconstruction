@@ -55,7 +55,7 @@ if [ "$DRIVER" -lt 580 ]; then
 fi
 
 echo "== vLLM environment $KV_HOME/venv_vllm"
-PY=${PYTHON:-$(command -v python3.12 || command -v python3)}
+[ -n "${KV_UV:-}" ] || PY=${PYTHON:-$(command -v python3.12 || command -v python3)}   # uv: its own Python
 # shellcheck source=scripts/pd_env.sh
 source "$REPO/scripts/pd_env.sh"
 venv_create "$KV_HOME/venv_vllm"

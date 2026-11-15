@@ -313,10 +313,23 @@ def find_cuda12():
     return best[1] if best else None
 
 
-def find_uv():
+def find_uv(cache):
+    """uv, copied once into the cache (a single binary): the runs then depend on no folder of another project
+    (on gpu-grad-01, ~/.local/bin's tools can point into another project's /tmp folders)."""
+    mine = cache / "bin" / "uv"
+    if mine.is_file() and os.access(mine, os.X_OK) and not os.environ.get("KVPD_UV"):
+        return str(mine)
     for c in (os.environ.get("KVPD_UV"), shutil.which("uv"), str(Path.home() / ".local/bin/uv")):
         if c and Path(c).is_file() and os.access(c, os.X_OK):
-            return str(Path(c).resolve())
+            src = Path(c).resolve()
+            if subprocess.run([str(src), "--version"], capture_output=True).returncode != 0:
+                continue
+            mine.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            tmp = mine.with_name("uv.tmp")
+            shutil.copyfile(src, tmp)
+            tmp.chmod(0o700)
+            os.replace(tmp, mine)
+            return str(mine)
     return None
 
 
@@ -430,7 +443,8 @@ def stage_run(p, a, job):
     major = min(int(d.split(".")[0]) for d in drivers if d.split(".")[0].isdigit()) if drivers else 0
     if major < 580:
         return finish("stopped", reason=f"driver {sorted(drivers)}: vLLM 0.32's CUDA 13 wheels need 580 or newer")
-    uv = find_uv()
+    private_dir(p.cache, create=True)
+    uv = find_uv(p.cache)
     if uv is None:
         return finish("stopped", reason="no uv (KVPD_UV, PATH or ~/.local/bin/uv)")
     ibp_opt = os.environ.get("KVPD_IBP", "auto")
@@ -448,7 +462,6 @@ def stage_run(p, a, job):
     private_dir(p.runtimes, create=True)
     require(not runtime.exists() and not runtime.is_symlink(), f"{runtime} exists already")
     runtime.mkdir(mode=0o700)
-    private_dir(p.cache, create=True)
     cuda12 = find_cuda12()
     home, runs = runtime / "home", runtime / "runs"
     for d in (home, runs, runtime / "tmp", runtime / "pycache", ev / "matrix", ev / "setup"):

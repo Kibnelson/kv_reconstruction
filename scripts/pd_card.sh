@@ -46,6 +46,15 @@ test "$(git -C "$KVPD_HOME_REPO" rev-parse HEAD)" = "$KVPD_PIN" || {
     echo "STOP: the checkout is at $(git -C "$KVPD_HOME_REPO" rev-parse HEAD), not the pin $KVPD_PIN" >&2; exit 2; }
 test -z "$(git -C "$KVPD_HOME_REPO" status --porcelain --untracked-files=no)" || {
     echo "STOP: uncommitted changes in tracked files of $KVPD_HOME_REPO" >&2; exit 2; }
+# publish commits as you: checked now, not after the hours of the run
+if [ -z "$(git -C "$KVPD_HOME_REPO" config user.name || true)" ] || [ -z "$(git -C "$KVPD_HOME_REPO" config user.email || true)" ]; then
+    printf 'STOP: git has no user.name and user.email for %s (the author of the evidence commit). Set them for this
+' "$KVPD_HOME_REPO" >&2
+    printf '      checkout only:  git -C %s config user.name "Your Name"; git -C %s config user.email "you@example.com"
+' \
+        "$KVPD_HOME_REPO" "$KVPD_HOME_REPO" >&2
+    exit 2
+fi
 test "$(git -C "$KVPD_HOME_REPO" hash-object "$CARD")" = "$(git -C "$KVPD_HOME_REPO" rev-parse "$KVPD_PIN:scripts/pd_card.sh")" || {
     echo "STOP: this card's bytes are not the pin's scripts/pd_card.sh" >&2; exit 2; }
 REMOTE=$(GIT_TERMINAL_PROMPT=0 git -C "$KVPD_HOME_REPO" ls-remote origin "refs/heads/$KVPD_BRANCH" | awk '{print $1}')
