@@ -26,19 +26,28 @@
 #   (leave the engines running after the benchmark, for manual checks), NIXL_ALL_GPUS=1 (NIXL engines see every
 #   job GPU, as the p2p transport needs; default: one GPU each, as vLLM's own NIXL tests run), MODEL_PATH (a local
 #   model folder instead of the Hub download)
-# On the cluster, scripts/pd_matrix.sbatch runs a list of these as one batch job.
+#   RESULTS_ROOT (where the results folder goes; default benchmark_results in this checkout), PD_CARD=1 (run by
+#   scripts/pd_card.sh from a detached node-local checkout: no branch check, no commit; the card publishes)
+# On the cluster, scripts/pd_card.sh runs a list of these (scripts/pd_matrix.sh) in its run stage.
 set -Eeuo pipefail
 trap 'echo "PD RUN STOPPED at line $LINENO (exit $?)" >&2' ERR
 cd "$(dirname "$0")/.."
 REPO=$PWD
-BRANCH=${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
-case "$BRANCH" in pd-vllm-protocol|pd-baselines|pd-*) ;; *) echo "STOP: on branch $BRANCH, not a PD branch"; exit 1 ;; esac
+PD_CARD=${PD_CARD:-0}
+if [ "$PD_CARD" != 1 ]; then
+    BRANCH=${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
+    case "$BRANCH" in pd-vllm-protocol|pd-baselines|pd-*) ;; *) echo "STOP: on branch $BRANCH, not a PD branch"; exit 1 ;; esac
+fi
+RESULTS_ROOT=${RESULTS_ROOT:-benchmark_results}
 KV_HOME=${KV_HOME:-$HOME/kv_a5000}
 KV_RUNS=${KV_RUNS:-$KV_HOME/runs}
-export HF_HOME=$KV_HOME/hf TMPDIR=$KV_HOME/tmp
+export HF_HOME=${KV_HF_HOME:-$KV_HOME/hf} TMPDIR=$KV_HOME/tmp
 # every cache under KV_HOME, not the home directory (its quota ran out installing vLLM on gpu-grad-01): pip, vLLM's
-# compile cache and FlashInfer follow XDG_CACHE_HOME; Triton has its own variable
+# compile cache and FlashInfer follow XDG_CACHE_HOME; Triton, TorchInductor and CUDA's JIT cache have their own
 export XDG_CACHE_HOME=$KV_HOME/cache TRITON_CACHE_DIR=$KV_HOME/cache/triton
+export TORCHINDUCTOR_CACHE_DIR=${TORCHINDUCTOR_CACHE_DIR:-$KV_HOME/cache/inductor} CUDA_CACHE_PATH=${CUDA_CACHE_PATH:-$KV_HOME/cache/nv}
+# CUDA numbers the GPUs as nvidia-smi does (by PCI bus), so engine i's index is the card nvidia-smi calls i
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
 mkdir -p "$TMPDIR" "$TRITON_CACHE_DIR"
 MODEL=${MODEL:-llama32_3b}
 case "$MODEL" in
@@ -66,7 +75,7 @@ PORT_BASE=${PORT_BASE:-$((20000 + ${SLURM_JOB_ID:-0} % 80 * 500))}
 if [ -z "${SLURM_JOB_ID:-}" ] && [ "${ALLOW_NO_SLURM:-0}" != 1 ]; then
     echo "STOP: not inside a Slurm allocation (or set ALLOW_NO_SLURM=1 on the NUC)"; exit 1
 fi
-if [ "${PD_MATRIX:-0}" != 1 ]; then             # scripts/pd_matrix.sh checks once and pushes at the end
+if [ "${PD_MATRIX:-0}" != 1 ] && [ "$PD_CARD" != 1 ]; then   # scripts/pd_matrix.sh checks once and pushes at the end
     git fetch -q origin "$BRANCH"
     [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$BRANCH")" ] || {
         echo "STOP: not GitHub's $BRANCH; run: git pull --ff-only origin $BRANCH"; exit 1; }
@@ -86,6 +95,16 @@ if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
 else
     mapfile -t DEVS < <(nvidia-smi --query-gpu=index --format=csv,noheader)
 fi
+# a GPU named by UUID (some Slurm setups do): its index, since vLLM reads CUDA_VISIBLE_DEVICES as numbers
+for i in "${!DEVS[@]}"; do
+    d=$(echo "${DEVS[$i]}" | tr -d ' ')
+    if ! [[ "$d" =~ ^[0-9]+$ ]]; then
+        idx=$(nvidia-smi --query-gpu=index,uuid --format=csv,noheader | tr -d ' ' | awk -F, -v u="$d" '$2 == u {print $1}')
+        [[ "$idx" =~ ^[0-9]+$ ]] || { echo "STOP: GPU $d of CUDA_VISIBLE_DEVICES is not one nvidia-smi lists"; exit 1; }
+        d=$idx
+    fi
+    DEVS[$i]=$d
+done
 NGPU=${#DEVS[@]}
 NENG=$((NUM_PREFILL + NUM_DECODE))
 seq_list() { local a=$1 n=$2 out=(); for ((i = 0; i < n; i++)); do out+=($((a + i))); done; (IFS=,; echo "${out[*]}"); }
@@ -109,6 +128,30 @@ LOGS=$OUT/connector
 mkdir -p "$OUT" "$LOGS"
 echo "== PD run $OUT: $LAYOUT ($NUM_PREFILL prefill on GPUs ${PPOS[*]:-none}, $NUM_DECODE $([ "$COLO" = 1 ] && echo colocated || echo decode) on ${DPOS[*]}), connector $CONNECTOR, transport $TRANSPORT, eager $EAGER; job GPUs ${DEVS[*]}; commit $(git log --oneline -1)"
 nvidia-smi --query-gpu=index,name,memory.used,memory.total,driver_version --format=csv,noheader | tee "$OUT/nvidia_smi.txt"
+# each job GPU's UUID as nvidia-smi and as torch (in the engines' setting) see it: engine i is on the card intended
+"$VPY" - "$OUT/gpu_map.json" "${DEVS[@]}" <<'EOF'
+import json, os, subprocess, sys
+out, devs = sys.argv[1], sys.argv[2:]
+rows = subprocess.run(["nvidia-smi", "--query-gpu=index,uuid", "--format=csv,noheader"], capture_output=True,
+                      text=True).stdout
+smi = {r.split(",")[0].strip(): r.split(",")[1].strip() for r in rows.splitlines() if r.count(",") == 1}
+code = "import torch; print(torch.cuda.get_device_properties(0).uuid)"
+hexd = lambda u: "".join(c for c in (u or "").lower().replace("gpu-", "") if c in "0123456789abcdef")
+got, bad = {}, []
+for d in devs:
+    env = dict(os.environ, CUDA_VISIBLE_DEVICES=d, CUDA_DEVICE_ORDER="PCI_BUS_ID")
+    r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
+    t = r.stdout.strip() if r.returncode == 0 else None
+    got[d] = {"nvidia_smi": smi.get(d), "torch": t}
+    # compared only when both are 32 hex digits (torch prints the UUID without nvidia-smi's GPU- prefix)
+    if len(hexd(t)) == 32 and len(hexd(smi.get(d))) == 32 and hexd(t) != hexd(smi[d]):
+        bad.append(d)
+json.dump(got, open(out, "w"), indent=1)
+if bad:
+    sys.exit(f"STOP: torch and nvidia-smi disagree on the UUID of GPU(s) {bad}: {got}")
+print("   GPUs " + ", ".join(f"{d}={v['nvidia_smi']}" + ("" if v["torch"] else " (torch check skipped)")
+                            for d, v in got.items()))
+EOF
 
 REVPY=None; [ -n "$REVISION" ] && REVPY="'$REVISION'"
 MP=${MODEL_PATH:-$("$VPY" -c "
@@ -316,9 +359,9 @@ GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n 1p | tr 'A-
 NAME=${TAG}_pd_${RUN_TAG}_${GPU_TAG}x$([ "${SHARE_GPU:-0}" = 1 ] && echo 1shared || echo "$NENG")_${STAMP}
 if [ "${SMOKE:-0}" = 1 ]; then NAME=${NAME}_smoke; fi
 if [ "$STATUS" != 0 ]; then NAME=${NAME}_partial; fi
-DEST=benchmark_results/$NAME
+DEST=$RESULTS_ROOT/$NAME
 mkdir -p "$DEST/runs" "$DEST/connector"
-for f in summary.md results.json opportunity.json env.json nvidia_smi.txt bench.log proxy.log link.json; do
+for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json; do
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
 cp "$OUT"/runs/*.json "$DEST/runs/" 2>/dev/null || true
@@ -326,7 +369,8 @@ for f in "$OUT"/engine_*.log; do tail -n 400 "$f" > "$DEST/$(basename "$f")"; do
 gzip -c "$OUT/proxy.jsonl" > "$DEST/proxy.jsonl.gz" 2>/dev/null || true
 for f in "$LOGS"/*.jsonl; do [ -f "$f" ] && gzip -c "$f" > "$DEST/connector/$(basename "$f").gz"; done
 cp "$RUN"/pd_selftest*.json "$DEST/" 2>/dev/null || true
-git add "$DEST"
+if [ "$PD_CARD" = 1 ]; then echo "RESULTS $DEST"; exit "$STATUS"; fi
+git add -f "$DEST"                 # -f: .gitignore drops runs/ folders, and the runs/*.json are the point
 git commit -q -m "Add vLLM PD results ($NAME)"
 if [ "${NO_PUSH:-0}" = 1 ]; then echo "NO_PUSH=1: committed locally"; exit "$STATUS"; fi
 git fetch -q origin "$BRANCH"

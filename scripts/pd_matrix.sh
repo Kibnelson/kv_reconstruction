@@ -15,14 +15,13 @@
 #   t2eager     T and T2 in eager engines (T2's layer-0 recompute is bit-exact in eager mode), host ring and direct
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
+# PRINT_RUNS=1 prints the list and stops. PD_CARD=1 (scripts/pd_card.sh's run stage): no branch check and no commit;
+# the run folders and the combined report go to RESULTS_ROOT with matrix.json (the runs and which did not finish).
 set -Eeuo pipefail
 trap 'echo "PD MATRIX STOPPED at line $LINENO (exit $?)" >&2' ERR
 cd "$(dirname "$0")/.."
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git fetch -q origin "$BRANCH"
-[ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$BRANCH")" ] || {
-    echo "STOP: not GitHub's $BRANCH; run: git pull --ff-only origin $BRANCH"; exit 1; }
-[ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "STOP: uncommitted changes in tracked files"; exit 1; }
+PD_CARD=${PD_CARD:-0}
+RESULTS_ROOT=${RESULTS_ROOT:-benchmark_results}
 MAIN=raw,splitzip,exans,adacode,exactkv,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256
 NV=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp
 TIERMAIN=raw,splitzip,exans,adacode,exactkv,ibp,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-rank256
@@ -49,12 +48,25 @@ if [ -z "${RUNS:-}" ]; then
         *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier or t2eager (or set RUNS)"; exit 1 ;;
     esac
 fi
+IFS=';' read -r -a LIST <<< "$(echo "$RUNS" | tr '\n\t' '  ')"   # read stops at a newline: one line first
+for i in "${!LIST[@]}"; do LIST[$i]=$(echo "${LIST[$i]}" | tr -s ' \n\t' ' ' | sed 's/^ //; s/ $//'); done
+if [ "${PRINT_RUNS:-0}" = 1 ]; then
+    for run in "${LIST[@]}"; do if [ -n "$run" ]; then echo "$run"; fi; done
+    exit 0
+fi
+if [ "$PD_CARD" != 1 ]; then
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    git fetch -q origin "$BRANCH"
+    [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$BRANCH")" ] || {
+        echo "STOP: not GitHub's $BRANCH; run: git pull --ff-only origin $BRANCH"; exit 1; }
+fi
+[ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "STOP: uncommitted changes in tracked files"; exit 1; }
+mkdir -p "$RESULTS_ROOT"
+BEFORE=$(ls -1 "$RESULTS_ROOT")
 START=$(git rev-parse HEAD)
 STAMP=$(date +%Y%m%d_%H%M)
-IFS=';' read -r -a LIST <<< "$(echo "$RUNS" | tr '\n\t' '  ')"   # read stops at a newline: one line first
-n=0 failed=()
+n=0 failed=() done_runs=()
 for run in "${LIST[@]}"; do
-    run=$(echo "$run" | tr -s ' \n\t' ' ' | sed 's/^ //; s/ $//')
     [ -n "$run" ] || continue
     n=$((n + 1))
     echo
@@ -62,17 +74,35 @@ for run in "${LIST[@]}"; do
     # shellcheck disable=SC2086
     if ! env $run PD_MATRIX=1 NO_PUSH=1 bash scripts/run_pd_vllm.sh; then
         failed+=("$run")
-        echo "==== run $n did not finish (its results, if any, are committed as _partial); going on"
+        echo "==== run $n did not finish (its results, if any, are kept as _partial); going on"
     fi
+    done_runs+=("$run")
 done
-NEW=$(git diff --name-only "$START" HEAD -- benchmark_results | cut -d/ -f2 | sort -u | paste -sd, -)
+if [ "$PD_CARD" = 1 ]; then
+    NEW=$(comm -13 <(echo "$BEFORE" | sort) <(ls -1 "$RESULTS_ROOT" | sort) | paste -sd, -)
+else
+    NEW=$(git diff --name-only "$START" HEAD -- benchmark_results | cut -d/ -f2 | sort -u | paste -sd, -)
+fi
 GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n 1p | tr 'A-Z' 'a-z' | sed 's/nvidia//' | tr -cd 'a-z0-9')
-DEST=benchmark_results/pd_matrix_${MATRIX}_${GPU_TAG}_${STAMP}
+DEST=$RESULTS_ROOT/pd_matrix_${MATRIX}_${GPU_TAG}_${STAMP}
 mkdir -p "$DEST"
 KV_HOME=${KV_HOME:-$HOME/kv_a5000}
-"$KV_HOME/venv_vllm/bin/python" scripts/pd_matrix_report.py --runs "$NEW" --root benchmark_results \
+"$KV_HOME/venv_vllm/bin/python" scripts/pd_matrix_report.py --runs "$NEW" --root "$RESULTS_ROOT" \
     --title "PD matrix $MATRIX on $(hostname -s)" --failed "$(printf '%s;' "${failed[@]}")" --output "$DEST/summary.md" || \
     echo "WARNING: the combined report failed; every run's own summary.md is in its folder"
+"$KV_HOME/venv_vllm/bin/python" - "$DEST/matrix.json" "$MATRIX" "$NEW" "${#failed[@]}" "${done_runs[@]}" \
+    "${failed[@]}" <<'EOF' || true
+import json, sys
+out, matrix, new, nfail, rest = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5:]
+runs, failed = rest[:len(rest) - nfail], rest[len(rest) - nfail:]
+json.dump({"matrix": matrix, "runs": runs, "failed": failed, "folders": [f for f in new.split(",") if f]},
+          open(out, "w"), indent=1)
+EOF
+if [ "$PD_CARD" = 1 ]; then
+    echo "PD MATRIX $MATRIX: $n runs (${#failed[@]} not finished); results in $RESULTS_ROOT"
+    [ "${#failed[@]}" = 0 ] || exit 3
+    exit 0
+fi
 git add "$DEST" 2>/dev/null || true
 git commit -q -m "PD matrix $MATRIX: $n runs (${#failed[@]} not finished)" || true
 if [ "${NO_PUSH:-0}" = 1 ]; then echo "NO_PUSH=1: committed locally"; exit 0; fi

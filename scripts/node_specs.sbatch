@@ -1,4 +1,7 @@
 #!/bin/bash
+# On gpu-grad-01, campaigns run through scripts/pd_card.sh (docs/pd_baselines.md): every stage in its own
+# allocation, everything in the node's /tmp, only results pushed. This job is the older form, for elsewhere.
+#
 # What gpu-grad-01 is, before the PD baseline runs (docs/pd_baselines.md): scripts/node_specs.py on the same 4 GPUs
 # the runs use, packaged into benchmark_results/<host>_specs_<gpu>x<n>_<date> and pushed to this branch.
 # From the login host, in the repository's root on branch pd-baselines:

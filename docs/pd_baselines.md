@@ -67,9 +67,10 @@ NUC, so a crash there costs that run only.
     and the product differently. The report shows how often layer 0 was recomputed, and the `t2eager` matrix
     measures the eager case.
 
-## Stage 0: what the node is (`scripts/node_specs.sbatch`)
+## Stage 0: what the node is (`scripts/node_specs.py`)
 
-One 4-GPU job of about 10 minutes. It records:
+About 10 minutes on the 4 GPUs: in every card run, before its matrix (elsewhere: `scripts/node_specs.sbatch`).
+It records:
 - the GPUs, PCIe, topology and peer-to-peer matrices;
 - CPU, NUMA, memory, disks, quota and network;
 - the Slurm limits and the software.
@@ -81,7 +82,111 @@ It also measures:
 
 It decides which GPUs prefill (`PREFILL_GPUS`, `DECODE_GPUS`) and which link speeds the machine reaches.
 
-## Running it
+## On gpu-grad-01: the card (`scripts/pd_card.sh`)
+
+The cluster runs follow the other team's card workflow: the login host only checks and submits, every stage runs in a
+Slurm allocation of its own on gpu-grad-01, everything lives in the node's `/tmp`, and only the results are pushed,
+to a branch of their own that we then pull.
+
+```
+bash scripts/pd_card.sh STAGE PIN TAG        # PIN: GitHub's pd-baselines head; TAG: pd_<matrix>_<name>
+```
+
+| Stage | Allocation | What it does |
+| --- | --- | --- |
+| (login) | none | The checkout is at the pin and has no changes, the card's bytes are the pin's, GitHub's branch is the pin (for create and run; later stages only need the pin in its history). Then one `srun` with `--chdir=/tmp --export=ALL --propagate=NONE`. |
+| create | 2 CPUs, 8 GB, 1 h | The code at the pin in `/tmp/$USER/kvpd-tools/<pin>` (it shares the home checkout's git objects; `benchmark_results` is left out). The campaign in `/tmp/$USER/kvpd-evidence/<tag>/repo`: the pin's tree with only `benchmark_results/pd_card/<tag>/` checked out, and a marker (node, owner, boot ID, pin, the matrix's runs). |
+| run | 4 GPUs, 16 CPUs, 192 GB, 12 h (smoke 6 h) | The driver (580 or newer), the 4 GPUs and the disk checked before anything is installed. A fresh runtime in `/tmp/$USER/kvpd/<job>`. Then `scripts/a5000_setup.sh`, `scripts/pd_setup.sh`, `scripts/node_specs.py` and `scripts/pd_matrix.sh` with the runs recorded at create. Results, the log, the setup's records and the disk use go into the campaign. Once per campaign. |
+| cleanup | another small allocation | The run job finished (Slurm's record); no process uses the runtime; it deletes exactly `/tmp/$USER/kvpd/<run job>` and writes a receipt. |
+| verify-cleanup | a third one | Slurm's records of the run and the cleanup (completed), the receipt, the folder gone. |
+| review | small | The combined report rebuilt from the kept results only, and an inventory: every file's size and SHA-256. |
+| publish | small | The inventory unchanged, no credentials, no file over 95 MB; one commit on the pin with only the campaign's folder, pushed to `evidence/pd-baselines/<pin12>/<matrix>/job<run job>`. |
+
+On the node (the node's own disk: it stays between jobs, a reboot wipes it):
+
+| Folder | What | Kept |
+| --- | --- | --- |
+| `/tmp/$USER/kvpd-tools/<pin>` | the code at the pin, read only | yes |
+| `/tmp/$USER/kvpd-evidence/<tag>/repo` | the campaign and its results | yes (published) |
+| `/tmp/$USER/kvpd/<run job>` | environments, sources, captures, caches, temporary files | deleted by cleanup |
+| `/tmp/$USER/kvpd-cache` | uv's package cache, uv's Python 3.12, the model, the CUDA 13 toolkit | yes, reused |
+
+Disk. `/tmp` is the node's system disk, shared with every user (about 58 GB were free in November 2026; the other
+repository's folders under `/tmp/$USER` are its own and are never touched). So:
+- The environments are made by uv with `UV_LINK_MODE=hardlink`: every environment's files are hard links into the
+  one cache, so the codec, vLLM and LMCache environments cost the cache once (about 18 GB) and a fresh set per job
+  costs almost nothing.
+- ExANS is built with the cluster's CUDA 12.6 (the module): no CUDA 12.8 download. nvCOMP 5.3 links its CUDA
+  runtime statically, so the cluster's 12.6 suffices.
+- IBP's CUDA 13 toolkit is installed once into the cache and pruned to about 4 GB, only when a matrix uses IBP
+  (smoke, tier) and the disk allows it; otherwise IBP is left out and the report says why.
+- T2's calibration windows are captured, fitted and deleted one set at a time (4 GB at once, not 16), and every
+  capture is deleted after the self-test: the runs read only `pd_codecs.pt`.
+- The run stage adds up what it will need (the cache's missing parts, then about 16 GB for the job) and starts
+  only if 10 GB stay free; `disk_plan.json` and `disk_after.json` record the plan and the measured sizes.
+
+Every cache of the run points into its runtime or the shared cache (pip's, uv's, Hugging Face's, vLLM's, Triton's,
+TorchInductor's, CUDA's JIT cache, Python's bytecode), so nothing is written to the home directory or into the
+code.
+
+### The login-host block
+
+From a fixed login host, inside tmux (the run stage holds the terminal for hours; a dropped connection would end
+it): `tmux new -s kvpd` (later: `tmux attach -t kvpd`, on the same login host). Then paste:
+
+```bash
+bash <<'LOGIN'
+set -Eeuo pipefail
+umask 077
+trap 'printf "PD CAMPAIGN STOPPED: line=%s exit=%s; the campaign and its output are kept\n" "$LINENO" "$?" >&2' ERR
+test -z "${SLURM_JOB_ID:-}"
+cd ~/kv_reconstruction
+test -z "$(git status --porcelain --untracked-files=no)"
+git fetch -q --no-tags origin pd-baselines
+git switch -q pd-baselines 2>/dev/null || git switch -q -c pd-baselines --track origin/pd-baselines
+git merge -q --ff-only origin/pd-baselines
+export KVPD_PIN=$(git rev-parse HEAD)
+test "$(git ls-remote origin refs/heads/pd-baselines | awk '{print $1}')" = "$KVPD_PIN"
+export KVPD_MATRIX=smoke                     # then ring1p3d, ring2p2d, direct, tier, t2eager: one campaign each
+export KVPD_TAG="pd_${KVPD_MATRIX}_$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p ~/.kvpd_campaigns
+STATE=~/.kvpd_campaigns/$KVPD_TAG.sh
+printf 'export KVPD_PIN=%q\nexport KVPD_TAG=%q\n' "$KVPD_PIN" "$KVPD_TAG" > "$STATE"
+printf 'PIN=%s\nTAG=%s\nSTATE=%s\n' "$KVPD_PIN" "$KVPD_TAG" "$STATE"
+for STAGE in create run cleanup verify-cleanup review publish; do
+    bash scripts/pd_card.sh "$STAGE" "$KVPD_PIN" "$KVPD_TAG"
+done
+echo "Campaign $KVPD_TAG published (the PUBLISHED line above names its branch)."
+LOGIN
+```
+
+The run stage goes on through closeout and publication whatever the matrix's outcome (`KVPD_RUN_STATUS`:
+completed, completed with failures, setup failed, matrix failed): a failed setup's logs are evidence too. It stops
+the sequence only when its checks refuse to start (driver, GPUs, disk, no uv); then close the campaign out with
+the block below and start a new tag.
+
+To continue a campaign in a later shell (after a stop, or to close it out):
+
+```bash
+cd ~/kv_reconstruction
+source ~/.kvpd_campaigns/<tag>.sh            # KVPD_PIN, KVPD_TAG
+git switch -q --detach "$KVPD_PIN"           # the card runs only from a checkout at its pin
+for STAGE in cleanup verify-cleanup review publish; do bash scripts/pd_card.sh "$STAGE" "$KVPD_PIN" "$KVPD_TAG" || break; done
+git switch -q pd-baselines
+```
+
+A stage that is done says so and goes on (cleanup, review and publish are create-once). `run` happens once per
+campaign: a new measurement is a new tag. After publish, the results are on GitHub; pull them with the command it
+prints (`git fetch origin evidence/pd-baselines/<pin12>/<matrix>/job<id>`), or say the branch name and we merge it
+into `pd-baselines`.
+
+Options (exported before the block, passed to the node): `KVPD_TIME` (the run's limit), `KVPD_IBP` (auto, 0, 1),
+`RUNS` at create (scripts/pd_matrix.sh's own list instead of the matrix's; the run uses what create recorded).
+
+## Elsewhere: one batch job (`scripts/pd_matrix.sbatch`)
+
+On the NUC or a cluster without the card's rules, the older form runs setup and a matrix as one batch job, with
+everything under `KV_HOME`, and pushes each run's folder to `pd-baselines` itself:
 
 ```bash
 module load slurm
@@ -94,8 +199,8 @@ MATRIX=ring1p3d sbatch scripts/pd_matrix.sbatch           # then one job each: r
 squeue --me; tail -f kv-pd-matrix.<job id>.out
 ```
 
-- The first job also does the setup (`scripts/a5000_setup.sh`, then `scripts/pd_setup.sh`):
-  - the codec environment, with the CUDA 12.8 toolkit that builds ExANS;
+- The setup (`scripts/a5000_setup.sh`, then `scripts/pd_setup.sh`):
+  - the codec environment, with a CUDA 12 toolkit that builds ExANS;
   - vLLM 0.32.0 with nvCOMP 6.0 for CUDA 13 and NIXL 1.5.2;
   - LMCache 0.5.7 in an environment of its own;
   - IBP, built for vLLM's torch with a CUDA 13 toolkit (one build fix: sm_70 to sm_86);
@@ -104,12 +209,13 @@ squeue --me; tail -f kv-pd-matrix.<job id>.out
   - the self-test of every codec through the transport.
 
   A rerun skips what is there.
-- Each matrix fits one 12-hour job. The QoS runs them one after another. Every run is pushed as its own folder
-  (`benchmark_results/llama32_3b_pd_<layout>_<connector>[_<transport>][_eager]_rtxa5000x4_<date>`), and each
-  matrix as a combined report (`benchmark_results/pd_matrix_<matrix>_<gpu>_<date>/summary.md`).
+- Each matrix fits one 12-hour job. Every run is a folder of its own
+  (`<results>/llama32_3b_pd_<layout>_<connector>[_<transport>][_eager]_rtxa5000x4_<date>`), and each matrix has a
+  combined report (`<results>/pd_matrix_<matrix>_<gpu>_<date>/summary.md`).
 - A run that fails is listed in the combined report; the matrix goes on.
-- Disk: about 90 GB under `KV_HOME`. That covers the environments (8 + 12 + 12 GB), two CUDA toolkits (8 + 5 GB),
-  the model (6 GB), the captures (7 GB, plus 16 GB while T2's sets are fitted), and the caches.
+- Disk with pip (no uv): about 90 GB under `KV_HOME`. That covers the environments (8 + 12 + 12 GB), two CUDA
+  toolkits (8 + 5 GB), the model (6 GB), the captures (7 GB, plus one T2 set's 4 GB while it is fitted), and the
+  caches.
 
 The matrices (the times are estimates until the smoke has measured them):
 
@@ -124,6 +230,9 @@ The matrices (the times are estimates until the smoke has measured them):
 
 ## Honest limits
 
+- gpu-grad-01 is shared: the run has its 4 GPUs to itself, but other jobs on the node share its CPUs, host memory
+  bandwidth and PCIe switches. Each card run measures the links (`node_specs/`) in the same allocation, so every
+  campaign's numbers come with the node as it was.
 - The links of the ring path are emulated on one machine (as in `pd-vllm-protocol`). The GPU-to-GPU path and the
   CPU tier are the machine's real paths.
 - ExANS runs its CUDA 12.8 library beside vLLM's CUDA 13 torch in one process (two CUDA runtimes, one driver). The

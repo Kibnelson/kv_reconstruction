@@ -560,6 +560,7 @@ class RunnerDryRunTests(unittest.TestCase):
         if shutil.which("curl") is None or shutil.which("git") is None:
             self.skipTest("curl and git needed")
         self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)   # a clone with every earlier result: 600 MB
         self.repo = self.tmp / "repo"
         subprocess.run(["git", "clone", "-q", str(ROOT), str(self.repo)], check=True)
         br = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True,

@@ -9,14 +9,16 @@
 #   $KV_HOME/cuda12_8        a CUDA 12.8 toolkit (nvcc) for building ExANS, unless one is on PATH or CUDA_HOME is set
 #
 # Options (environment): KV_HOME, PYTHON (default python3.12, else python3), SKIP_EXANS=1 (no toolkit, ExANS left
-# out of the comparison), CUDA_RUNFILE_URL (another CUDA 12.x toolkit installer).
+# out of the comparison), CUDA12_HOME (a CUDA 12 toolkit to build ExANS with: gpu-grad-01's module cuda/cuda-12.6),
+# CUDA_RUNFILE_URL (another CUDA 12.x toolkit installer), KV_HF_HOME (the Hugging Face cache, default $KV_HOME/hf),
+# KV_UV (environments made by uv with hard links into one cache: scripts/pd_env.sh; scripts/pd_card.sh sets it).
 set -Eeuo pipefail
 trap 'echo "SETUP STOPPED at line $LINENO (exit $?); nothing is half-installed that a rerun does not fix" >&2' ERR
 cd "$(dirname "$0")/.."
 REPO=$PWD
 KV_HOME=${KV_HOME:-$HOME/kv_a5000}
-mkdir -p "$KV_HOME"/{hf,sources,tmp}
-export HF_HOME=$KV_HOME/hf TMPDIR=$KV_HOME/tmp
+export HF_HOME=${KV_HF_HOME:-$KV_HOME/hf} TMPDIR=$KV_HOME/tmp
+mkdir -p "$KV_HOME"/{sources,tmp} "$HF_HOME"
 # every cache under KV_HOME, not the home directory (its quota ran out installing vLLM on gpu-grad-01): pip, vLLM and
 # FlashInfer follow XDG_CACHE_HOME; Triton has its own variable
 export XDG_CACHE_HOME=$KV_HOME/cache TRITON_CACHE_DIR=$KV_HOME/cache/triton
@@ -53,7 +55,8 @@ command -v g++ >/dev/null || [ "${SKIP_EXANS:-0}" = 1 ] || { echo "STOP: no g++ 
 echo "== disk under $KV_HOME"
 df -h "$KV_HOME" | tail -n 1
 AVAIL_GB=$(df -Pk "$KV_HOME" | awk 'NR==2 {print int($4 / 1048576)}')
-[ "$AVAIL_GB" -ge 60 ] || echo "WARNING: only $AVAIL_GB GB free under $KV_HOME (venv ~8 GB, CUDA toolkit ~8 GB, each model 7-17 GB)"
+[ "$AVAIL_GB" -ge 60 ] || [ -n "${KV_UV:-}" ] || \
+    echo "WARNING: only $AVAIL_GB GB free under $KV_HOME (venv ~8 GB, CUDA toolkit ~8 GB, each model 7-17 GB)"
 
 PY=${PYTHON:-}
 if [ -z "$PY" ]; then
@@ -67,25 +70,26 @@ print(f"== python {sys.version.split()[0]} ({sys.executable})")
 if v < (3, 10):
     sys.exit("STOP: Python 3.10 or newer needed (the NUC runs used 3.12): module load python/3.12 or set PYTHON")
 EOF
-if [ ! -x "$KV_HOME/venv/bin/python" ]; then
-    "$PY" -m venv "$KV_HOME/venv"
-fi
+# shellcheck source=scripts/pd_env.sh
+source "$REPO/scripts/pd_env.sh"
+venv_create "$KV_HOME/venv"
 # shellcheck disable=SC1091
 source "$KV_HOME/venv/bin/activate"
-python -m pip install -q --upgrade pip
+VENV_PY=$KV_HOME/venv/bin/python
 # FlashInfer's install (scripts/run_pool_gate.sh before it pinned the environment) replaced torch 2.11 + CUDA 12.8
 # with 2.15 + CUDA 13.2 and the CUDA 12 Python bindings with 13's: remove what it brought, then the pins below
 # (torch, triton) and the bindings go back
-python -m pip uninstall -q -y flashinfer-python cuda-python 2>/dev/null || true
-python -m pip install -q -r requirements-cuda.txt
+pip_out "$VENV_PY" flashinfer-python cuda-python
+pip_in "$VENV_PY" -q -r requirements-cuda.txt
 if python -c "import importlib.metadata as m, sys; sys.exit(0 if m.version('cuda-bindings').startswith('12.') else 1)" \
         2>/dev/null; then :
 elif python -c "import importlib.metadata as m; m.version('cuda-bindings')" 2>/dev/null; then
-    python -m pip install -q "cuda-bindings==12.9.10"      # the version of the environment before FlashInfer
+    pip_in "$VENV_PY" -q "cuda-bindings==12.9.10"        # the version of the environment before FlashInfer
 fi
 # nvCOMP 5.x: ExANS (openlake de6c38b) calls nvcompBatchedANS*GetTempSizeAsync, which nvCOMP 6.0 renamed; the
 # Python package pins the native library to its own version, so both stay on 5.3.0.16
-python -m pip install -q pyarrow cmake ninja packaging nvidia-libnvcomp-cu12==5.3.0.16 nvidia-nvcomp-cu12==5.3.0.16
+pip_in "$VENV_PY" -q pyarrow cmake ninja packaging setuptools wheel nvidia-libnvcomp-cu12==5.3.0.16 \
+    nvidia-nvcomp-cu12==5.3.0.16
 # Triton compiles only functions defined in a file: the check runs from one
 cat > "$KV_HOME/tmp/triton_check.py" <<'EOF'
 import torch, triton, transformers
@@ -105,7 +109,7 @@ assert torch.equal(b, a + 1), "Triton kernel gave a wrong result"
 print("   a Triton kernel compiled and ran")
 EOF
 python "$KV_HOME/tmp/triton_check.py"
-python -m pip freeze > "$KV_HOME/pip_freeze.txt"
+pip_freeze "$VENV_PY" > "$KV_HOME/pip_freeze.txt"
 
 echo "== the authors' codecs at the pinned commits"
 read -r SZ_REPO SZ_COMMIT EX_REPO EX_COMMIT < <(python - <<'EOF'
@@ -154,7 +158,8 @@ else
     is12() { "$1/bin/nvcc" --version 2>/dev/null | grep "release 12\." >/dev/null; }
     PATH_TK=""
     command -v nvcc >/dev/null && PATH_TK=$(dirname "$(dirname "$(readlink -f "$(command -v nvcc)")")")
-    if [ -n "${CUDA_HOME:-}" ] && [ -x "$CUDA_HOME/bin/nvcc" ] && is12 "$CUDA_HOME"; then TK=$CUDA_HOME
+    if [ -n "${CUDA12_HOME:-}" ] && [ -x "$CUDA12_HOME/bin/nvcc" ] && is12 "$CUDA12_HOME"; then TK=$CUDA12_HOME
+    elif [ -n "${CUDA_HOME:-}" ] && [ -x "$CUDA_HOME/bin/nvcc" ] && is12 "$CUDA_HOME"; then TK=$CUDA_HOME
     elif [ -x "$KV_HOME/cuda12_8/bin/nvcc" ]; then TK=$KV_HOME/cuda12_8
     elif [ -n "$PATH_TK" ] && is12 "$PATH_TK"; then TK=$PATH_TK
     else
@@ -179,7 +184,7 @@ if [ "${SKIP_IBP:-0}" != 1 ] && [ -s "$KV_HOME/cuda_home" ]; then
     else
         echo "== IBP: building the CUDA extension ($KV_HOME/ibp_build.log, a few minutes)"
         if (cd "$KV_HOME/sources/ibp" && CUDA_HOME=$(cat "$KV_HOME/cuda_home") CONDA_PREFIX=$VIRTUAL_ENV \
-                PATH=$(cat "$KV_HOME/cuda_home")/bin:$PATH python -m pip install -v . --no-build-isolation) \
+                PATH=$(cat "$KV_HOME/cuda_home")/bin:$PATH pip_in "$VENV_PY" -v . --no-build-isolation) \
                 > "$KV_HOME/ibp_build.log" 2>&1 && python -c "import torch, ibp"; then
             echo "   IBP built"
         else

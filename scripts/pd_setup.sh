@@ -13,16 +13,18 @@
 #
 # Options: KV_HOME, KV_RUNS, MODEL (llama32_3b), PYTHON (python3.12), T2_SETS (wikitext,code,math,exam,news; empty
 # for none), LMCACHE=0 (no LMCache environment), NIXL=0 (no NIXL in the vLLM environment), IBP=0 (no IBP build in the
-# vLLM environment; CUDA13_HOME: a CUDA 13 toolkit to build it with), KEEP_CAL_CAPTURES=1 (keep the T2 calibration
-# captures after the export; default: deleted).
+# vLLM environment; CUDA13_HOME: a CUDA 13 toolkit to build it with, installed there if missing), KEEP_CAL_CAPTURES=1
+# (keep the T2 calibration captures after the export; default: each set's are deleted once it is fitted),
+# DROP_CAPTURES=1 (delete every capture after the self-test: the runs need only pd_codecs.pt), KV_HF_HOME, KV_UV
+# (scripts/pd_env.sh; scripts/pd_card.sh sets both).
 set -Eeuo pipefail
 trap 'echo "PD SETUP STOPPED at line $LINENO (exit $?); a rerun continues" >&2' ERR
 cd "$(dirname "$0")/.."
 REPO=$PWD
 KV_HOME=${KV_HOME:-$HOME/kv_a5000}
 KV_RUNS=${KV_RUNS:-$KV_HOME/runs}
-export HF_HOME=$KV_HOME/hf TMPDIR=$KV_HOME/tmp
-mkdir -p "$TMPDIR" "$KV_HOME/sources"
+export HF_HOME=${KV_HF_HOME:-$KV_HOME/hf} TMPDIR=$KV_HOME/tmp
+mkdir -p "$TMPDIR" "$KV_HOME/sources" "$HF_HOME"
 # every cache under KV_HOME, not the home directory (its quota ran out installing vLLM on gpu-grad-01): pip, vLLM and
 # FlashInfer follow XDG_CACHE_HOME; Triton has its own variable
 export XDG_CACHE_HOME=$KV_HOME/cache TRITON_CACHE_DIR=$KV_HOME/cache/triton
@@ -33,7 +35,7 @@ case "$KV_HOME/" in
 esac
 command -v quota >/dev/null && quota -s 2>/dev/null | tail -n +2 | sed 's/^/   quota: /' || true
 AVAIL_GB=$(df -Pk "$KV_HOME" | awk 'NR==2 {print int($4 / 1048576)}')
-[ "$AVAIL_GB" -ge 25 ] || echo "WARNING: $AVAIL_GB GB free under $KV_HOME (the vLLM environment takes about 12 GB, the" \
+[ "$AVAIL_GB" -ge 25 ] || [ -n "${KV_UV:-}" ] || echo "WARNING: $AVAIL_GB GB free under $KV_HOME (the vLLM environment takes about 12 GB, the" \
     "calibration captures about 7 GB; a quota can be smaller than what df shows)"
 MODEL=${MODEL:-llama32_3b}
 case "$MODEL" in
@@ -54,17 +56,18 @@ fi
 
 echo "== vLLM environment $KV_HOME/venv_vllm"
 PY=${PYTHON:-$(command -v python3.12 || command -v python3)}
-[ -x "$KV_HOME/venv_vllm/bin/python" ] || "$PY" -m venv "$KV_HOME/venv_vllm"
+# shellcheck source=scripts/pd_env.sh
+source "$REPO/scripts/pd_env.sh"
+venv_create "$KV_HOME/venv_vllm"
 VPY=$KV_HOME/venv_vllm/bin/python
 if ! "$VPY" -c "import vllm, sys; sys.exit(0 if vllm.__version__ == '0.32.0' else 1)" 2>/dev/null; then
-    "$VPY" -m pip install -q --upgrade pip
-    "$VPY" -m pip install -q "vllm==0.32.0" "pandas>=2.0" "xlsxwriter>=3.2.1" "aiohttp>=3.10"
+    pip_in "$VPY" -q "vllm==0.32.0" "pandas>=2.0" "xlsxwriter>=3.2.1" "aiohttp>=3.10"
 fi
 # nvCOMP's CUDA 13 build (the baseline codecs nvcomp-<alg>) beside vLLM's torch, and NIXL (vLLM's NixlConnector)
-"$VPY" -c "from nvidia import nvcomp" 2>/dev/null || "$VPY" -m pip install -q "nvidia-nvcomp-cu13==6.0.0.12" || \
+"$VPY" -c "from nvidia import nvcomp" 2>/dev/null || pip_in "$VPY" -q "nvidia-nvcomp-cu13==6.0.0.12" || \
     echo "WARNING: nvCOMP did not install in the vLLM environment; the nvcomp codecs are left out"
 if [ "${NIXL:-1}" = 1 ] && ! "$VPY" -c "import nixl" 2>/dev/null; then
-    "$VPY" -m pip install -q "nixl-cu13==1.5.2" || "$VPY" -m pip install -q "nixl==1.5.2" || \
+    pip_in "$VPY" -q "nixl-cu13==1.5.2" || pip_in "$VPY" -q "nixl==1.5.2" || \
         echo "WARNING: NIXL did not install; the NIXL reference runs are left out"
 fi
 "$VPY" - <<'EOF'
@@ -84,11 +87,10 @@ done
 
 if [ "${LMCACHE:-1}" = 1 ]; then
     echo "== LMCache environment $KV_HOME/venv_lmcache (the CPU-tier reference)"
-    [ -x "$KV_HOME/venv_lmcache/bin/python" ] || "$PY" -m venv "$KV_HOME/venv_lmcache"
+    venv_create "$KV_HOME/venv_lmcache"
     LPY=$KV_HOME/venv_lmcache/bin/python
     if ! "$LPY" -c "import vllm, lmcache, sys; sys.exit(0 if vllm.__version__ == '0.32.0' else 1)" 2>/dev/null; then
-        "$LPY" -m pip install -q --upgrade pip
-        "$LPY" -m pip install -q "vllm==0.32.0" "lmcache==0.5.7.post1" "aiohttp>=3.10" || \
+        pip_in "$LPY" -q "vllm==0.32.0" "lmcache==0.5.7.post1" "aiohttp>=3.10" || \
             echo "WARNING: vLLM 0.32.0 and LMCache 0.5.7.post1 did not install together; the LMCache reference is left out"
     fi
     "$LPY" -c "import vllm, lmcache; print(f'   vllm {vllm.__version__}, lmcache {lmcache.__version__}')" || \
@@ -109,17 +111,30 @@ if [ "${IBP:-1}" = 1 ]; then
         if [ ! -x "$TK13/bin/nvcc" ]; then
             URL=${CUDA13_RUNFILE_URL:-https://developer.download.nvidia.com/compute/cuda/13.2.0/local_installers/cuda_13.2.0_595.45.04_linux.run}
             echo "   the CUDA 13 toolkit from $URL into $TK13"
-            curl -fL --retry 3 -o "$KV_HOME/tmp/cuda13.run" "$URL" && \
+            rm -rf "$TK13"
+            if curl -fL --retry 3 -o "$KV_HOME/tmp/cuda13.run" "$URL" && \
                 sh "$KV_HOME/tmp/cuda13.run" --silent --toolkit --installpath="$TK13" --no-opengl-libs --no-man-page \
-                    --no-drm --override || echo "   WARNING: the CUDA 13 toolkit did not install"
-            rm -f "$KV_HOME/tmp/cuda13.run"
+                    --no-drm --override --tmpdir="$KV_HOME/tmp"; then
+                # what a torch extension's build never uses: the profilers and the static libraries (about 4 GB)
+                rm -rf "$TK13"/nsight-compute* "$TK13"/nsight-systems* "$TK13"/nsightee_plugins "$TK13"/libnvvp \
+                    "$TK13"/extras/demo_suite "$TK13"/share/doc "$TK13"/gds* "$TK13"/tools
+                find "$TK13"/ -name 'lib*_static*.a' ! -name 'libcudart_static.a' -delete 2>/dev/null || true
+                du -sh "$TK13" | sed 's/^/   CUDA 13 toolkit: /'
+            else
+                echo "   WARNING: the CUDA 13 toolkit did not install"
+                rm -rf "$TK13"
+            fi
+            rm -rf "$KV_HOME/tmp/cuda13.run" "$KV_HOME"/tmp/cuda-installer* "$KV_HOME"/tmp/cuda_* 2>/dev/null || true
         fi
         B=$KV_HOME/build/ibp_vllm
         rm -rf "$B" && mkdir -p "$(dirname "$B")" && cp -r "$KV_HOME/sources/ibp" "$B"
         sed -i 's/arch=compute_70,code=sm_70/arch=compute_86,code=sm_86/' "$B/setup.py"
         (cd "$KV_HOME/sources/ibp" && git diff --no-index -- setup.py "$B/setup.py") > "$B/ibp_build_fix.diff" || true
+        # a build without isolation uses the environment's setuptools, ninja and torch (a new environment has no
+        # setuptools)
+        [ -x "$TK13/bin/nvcc" ] && pip_in "$VPY" -q setuptools wheel ninja packaging
         if [ -x "$TK13/bin/nvcc" ] && (cd "$B" && CUDA_HOME=$TK13 CONDA_PREFIX=$KV_HOME/venv_vllm PATH=$TK13/bin:$PATH \
-                "$VPY" -m pip install -v . --no-build-isolation) > "$KV_HOME/ibp_vllm_build.log" 2>&1 && \
+                pip_in "$VPY" -v . --no-build-isolation) > "$KV_HOME/ibp_vllm_build.log" 2>&1 && \
                 "$VPY" -c "import torch, ibp"; then
             echo "   IBP built"
         else
@@ -178,6 +193,7 @@ if [ ! -s "$RUN/pd_codecs.pt" ] || { [ -n "$T2_SETS" ] && [ "$HAVE_T2" != "$T2_S
     [ -d "$KV_HOME/sources/splitzip" ] && SZ=(--splitzip-source "$KV_HOME/sources/splitzip")
     T2=()
     [ -n "$T2_SETS" ] && T2=(--t2-sets "$T2_SETS" --texts "$TEXTS")
+    [ -n "$T2_SETS" ] && [ "${KEEP_CAL_CAPTURES:-0}" != 1 ] && T2+=(--drop-cal-captures)   # one set's windows at a time
     "$KV_HOME/venv/bin/python" -u scripts/pd_export_codecs.py --run "$RUN" --output "$RUN/pd_codecs.pt" "${SZ[@]}" "${T2[@]}"
     if [ -n "$T2_SETS" ] && [ "${KEEP_CAL_CAPTURES:-0}" != 1 ]; then
         rm -f "$RUN"/captures/cal_*                  # the T2 calibration windows: in pd_codecs.pt now
@@ -206,4 +222,11 @@ for part in main nvcomp; do
         --names "$NAMES" --output "$OUTF" || SELFTEST_OK=0
 done
 [ "$SELFTEST_OK" = 1 ] || echo "WARNING: a codec failed the self-test (above, and $RUN/pd_selftest*.json); the runs leave it out"
+pip_freeze "$VPY" > "$KV_HOME/pip_freeze_vllm.txt" || true
+[ -x "${LPY:-}" ] && { pip_freeze "$LPY" > "$KV_HOME/pip_freeze_lmcache.txt" || true; }
+if [ "${DROP_CAPTURES:-0}" = 1 ]; then
+    # the runs read pd_codecs.pt, not the captures: their disk back (about 7 GB) for the hours of the matrix
+    du -sh "$RUN/captures" 2>/dev/null | sed 's/^/   deleting the captures: /' || true
+    find "$RUN/captures" -maxdepth 1 -name '*.npy' -delete 2>/dev/null || true
+fi
 echo "PD SETUP DONE"

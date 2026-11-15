@@ -1,4 +1,7 @@
 #!/bin/bash
+# On gpu-grad-01, campaigns run through scripts/pd_card.sh (docs/pd_baselines.md): every stage in its own
+# allocation, everything in the node's /tmp, only results pushed. This job is the older form, for elsewhere.
+#
 # Every baseline in real vLLM PD on gpu-grad-01's 4 A5000s (docs/pd_baselines.md) as ONE batch job: the setup (codec
 # environment with ExANS's toolkit, vLLM, nvCOMP, NIXL, LMCache, T2's constant sets, the self-test), then
 # scripts/pd_matrix.sh with MATRIX. From the login host, in the repository's root on branch pd-baselines:

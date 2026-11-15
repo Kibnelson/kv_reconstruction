@@ -9,7 +9,8 @@ scripts/run_a5000.sh (its calcap stage: the WikiText-2 train calibration capture
 --t2-sets adds T2's constant sets (bundle["t2"]): T's constants, rank-256 and head-group predictors fitted on each
 calibration set of kv_compare.t_ideas.cal_sets (WikiText-2 train, and MBPP, GSM8K train, MMLU dev and validation,
 PTB train: scripts/fetch_calib_texts.py). Missing calibration windows (cal_<domain>_<i>, about 1 GB each for the
-3B) are captured first with the run's model (scripts/t_ideas.py's capture_calib).
+3B) are captured with the run's model (scripts/t_ideas.py's capture_calib), one set at a time; with
+--drop-cal-captures each set's windows are deleted once it is fitted (a set's 4 windows on disk, not all 16).
 """
 from __future__ import annotations
 
@@ -37,6 +38,8 @@ def main():
     ap.add_argument("--texts", default=None, help="folder with the calibration texts (cal_<domain>.txt)")
     ap.add_argument("--cal-windows", type=int, default=3)
     ap.add_argument("--tokens", type=int, default=8192)
+    ap.add_argument("--drop-cal-captures", action="store_true",
+                    help="delete a set's calibration windows (cal_*) after fitting it, unless a later set uses them")
     a = ap.parse_args()
     import torch
     from bench_llama_compare import TRAIN_SETS
@@ -96,14 +99,15 @@ def t2_sets(a, run, names, main):
         raise SystemExit(f"unknown T2 sets {unknown}; known: {sorted(every)}")
     sets = {n: every[n] for n in names}
     args = types.SimpleNamespace(run=str(run), texts=a.texts, tokens=a.tokens, model=None, revision=None)
-    got = drv.capture_calib(args, {}, a.device, {n: v for n, v in sets.items() if n != "wikitext"})
-    if got:
-        print(f"T2: captured {len(got)} calibration windows")
     cap = run / "captures"
     out = {"order": names, "sets": {}, "pick_tokens": 1024, "pick_layers": [1, 2], "cal_windows": a.cal_windows}
     gl = [int(g) for g in a.groups.split(",") if g]
-    for n in names:
+    for i, n in enumerate(names):
         train, tables, note = sets[n]
+        if n != "wikitext":
+            got = drv.capture_calib(args, {}, a.device, {n: sets[n]})
+            if got:
+                print(f"T2 set {n}: captured {len(got)} calibration windows")
         missing = [d for d in train + [tables] if not (cap / f"{d}_K_bits.npy").is_file()]
         if missing:
             raise SystemExit(f"T2 set {n}: calibration windows {missing} missing in {cap}")
@@ -123,7 +127,24 @@ def t2_sets(a, run, names, main):
                           "tables": tables}
         print(f"T2 set {n}: {len(train)} calibration documents ({note})")
         torch.cuda.empty_cache()
+        if a.drop_cal_captures:
+            drop_windows(cap, train + [tables], [sets[m] for m in names[i + 1:]])
     return out
+
+
+def drop_windows(cap, docs, later):
+    """Delete the files of the calibration windows `docs` (only cal_*: the main captures stay) that no set in
+    `later` (a list of (train, tables, note)) still needs."""
+    keep = {d for tr, tb, _ in later for d in tr + [tb]}
+    gone = 0
+    for d in docs:
+        if not d.startswith("cal_") or d in keep:
+            continue
+        for f in cap.glob(f"{d}_*"):
+            gone += f.stat().st_size
+            f.unlink()
+    if gone:
+        print(f"   deleted {gone / 2 ** 30:.1f} GiB of calibration windows")
 
 
 if __name__ == "__main__":
