@@ -159,3 +159,25 @@ and `share.zip`. A failed copy stays failed; the script does not silently select
 a different transport or start the matrix. Review the diagnostic report before
 the engine-startup check and the next matched smoke campaign. The LMCache adapter
 failure remains a separate required follow-up.
+
+### Diagnostic exits before a copy test
+
+The attempt `links_20261115T155840Z_694088` at source `b2e2886` returned
+Slurm exit 1 without a `DIAG_JOB` or copy marker. The old launcher printed its
+job marker only after environment setup, so that output does not identify
+the failed setup step. It supplies no new GPU-copy result.
+
+The launcher now prints the job, node and root immediately on allocation entry,
+then `DIAG_STAGE` before each setup step. Node errors report
+`DIAG_NODE_STOP stage=... line=... exit=... job=...`; directory and cached-uv
+checks also name the rejected path. Environment creation and package
+installation keep their normal error output. `node_job.txt` and
+`node_status.txt` retain the allocation identity and shell failure status in the
+printed home `OUTPUT` directory, beside `login.log`.
+
+Update this standalone checkout and rerun the same diagnostic command above.
+Each attempt gets a new tag. If it stops before `DIAG_BEGIN`, share the output
+including `DIAG_STAGE` and `DIAG_NODE_STOP` so the actual setup failure can be
+resolved. If it reaches a copy failure, inspect its per-route report instead.
+This logging change does not establish that the earlier setup or CUDA failure
+is fixed and does not start the serving matrix.

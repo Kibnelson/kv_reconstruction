@@ -139,7 +139,9 @@ print('CPU fixture only; no GPU execution')
 import os,sys
 from pathlib import Path
 if sys.argv[1]=='venv':
+ if os.environ.get('FIXTURE_FAIL_STAGE')=='create_environment':raise SystemExit(9)
  d=Path(sys.argv[-1])/'bin';d.mkdir(parents=True);os.symlink(sys.executable,d/'python')
+elif 'install' in sys.argv and os.environ.get('FIXTURE_FAIL_STAGE')=='install_packages':raise SystemExit(9)
 elif 'freeze' in sys.argv:print('CPU fixture packages')
 ''')
             uv.chmod(0o755)
@@ -160,6 +162,35 @@ elif 'freeze' in sys.argv:print('CPU fixture packages')
             self.assertEqual(len(report['cases']), 3)
             self.assertFalse(report['serving_validated'])
             self.assertTrue(next((node / 'kvpd-diagnostics').glob('*/code/scripts/pd_link_probe.py')).is_file())
+            self.assertIn('DIAG_JOB=cpu-fixture', result.stdout)
+            self.assertEqual((report_path.parent/'node_status.txt').read_text().strip(), 'stage=complete exit=0 job=cpu-fixture')
+            # Quiet installer exits used to produce only srun's generic exit.
+            for stage in ('create_environment', 'install_packages'):
+                with self.subTest(stage=stage):
+                    failed = subprocess.run(['bash', str(repo / 'scripts/run_t_pd_diagnostics.sh')],
+                                            env=dict(env, FIXTURE_FAIL_STAGE=stage), capture_output=True,
+                                            text=True, timeout=30)
+                    self.assertEqual(failed.returncode, 9, failed.stdout+failed.stderr)
+                    self.assertIn(f'DIAG_NODE_STOP stage={stage}', failed.stdout+failed.stderr)
+                    self.assertIn('DIAG_JOB=cpu-fixture', failed.stdout)
+                    self.assertNotIn('DIAG_BEGIN pair=', failed.stdout)
+                    output = Path(next(line.split('=', 1)[1] for line in failed.stdout.splitlines() if line.startswith('OUTPUT=')))
+                    self.assertEqual((output/'node_status.txt').read_text().strip(), f'stage={stage} exit=9 job=cpu-fixture')
+            uv.chmod(0o644)
+            failed = subprocess.run(['bash', str(repo / 'scripts/run_t_pd_diagnostics.sh')],
+                                    env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(failed.returncode, 1, failed.stdout+failed.stderr)
+            self.assertIn('DIAG_NODE_STOP stage=cached_uv', failed.stdout+failed.stderr)
+            self.assertIn(f'cached uv executable is unavailable: {uv}', failed.stdout+failed.stderr)
+            self.assertNotIn('DIAG_BEGIN pair=', failed.stdout)
+            uv.chmod(0o755)
+            node.chmod(0o777)
+            failed = subprocess.run(['bash', str(repo / 'scripts/run_t_pd_diagnostics.sh')],
+                                    env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(failed.returncode, 2, failed.stdout+failed.stderr)
+            self.assertIn('DIAG_NODE_STOP stage=private_root', failed.stdout+failed.stderr)
+            self.assertIn('mode=777', failed.stdout+failed.stderr)
+            node.chmod(0o700)
             self.assertEqual(git('status', '--porcelain'), '')
 
 
