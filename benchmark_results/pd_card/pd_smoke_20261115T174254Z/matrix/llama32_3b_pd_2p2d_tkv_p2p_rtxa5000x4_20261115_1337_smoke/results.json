@@ -1,0 +1,281 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 2,
+  "decodes": 2,
+  "layout": "2p2d",
+  "connector": "tkv",
+  "transport": "p2p",
+  "eager": false,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "raw": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 7.962386589497328,
+    "encode_ms": 2.5593643076717854,
+    "link_ms": 96.97019634768367,
+    "queue_ms": 0.22619962692260742,
+    "achieved_gbps": 70.92581248925464,
+    "install_ms": 23.52028526365757,
+    "wait_ms": 551.5481233596802,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "ours-hbh": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 9.052769707416353,
+    "gather_ms": 7.569456472992897,
+    "encode_ms": 67.79945828020573,
+    "link_ms": 23.189323488622904,
+    "queue_ms": 0.2829432487487793,
+    "achieved_gbps": 92.78087953834545,
+    "install_ms": 174.88650837913156,
+    "wait_ms": 662.5150442123413,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "t2-hbh": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.489440736825125,
+    "gather_ms": 7.289243396371603,
+    "encode_ms": 76.49296429008245,
+    "link_ms": 21.41520567238331,
+    "queue_ms": 0.2772808074951172,
+    "achieved_gbps": 93.06081056623482,
+    "install_ms": 177.3104900494218,
+    "wait_ms": 670.4025864601135,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 4,
+    "layer0_checks": [
+     "recompute failed: RuntimeError('no model with .model.embed_tokens and .model.layers in this process; modules seen: ')"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  }
+ },
+ "sweep": {
+  "sweep_raw_nativegbps_rinf": {
+   "link_gbps": "native",
+   "codec": "raw",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 4.731045430526137,
+    "request_throughput": 1.690958186193178,
+    "request_goodput": 0.0,
+    "output_throughput": 216.44264783272678,
+    "total_token_throughput": 3679.5250131563553,
+    "mean_ttft_ms": 3126.6569637227803,
+    "median_ttft_ms": 3109.6472227945924,
+    "p90_ttft_ms": 3203.6807561293244,
+    "p99_ttft_ms": 3203.961708638817,
+    "mean_tpot_ms": 12.067750233819519,
+    "median_tpot_ms": 12.093056975973873,
+    "p99_tpot_ms": 12.13645066053966,
+    "mean_e2el_ms": 4659.261243417859,
+    "p99_e2el_ms": 4729.545041341335,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 3.984979586675763,
+    "encode_ms": 1.439045649021864,
+    "link_ms": 12.582496274262667,
+    "queue_ms": 12.42595911026001,
+    "achieved_gbps": 125.20925228942704,
+    "install_ms": 2.8432803228497505,
+    "wait_ms": 3051.2756407260895,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "sweep_ours-hbh_nativegbps_rinf": {
+   "link_gbps": "native",
+   "codec": "ours-hbh",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 2.86076832190156,
+    "request_throughput": 2.7964515472131555,
+    "request_goodput": 2.7964515472131555,
+    "output_throughput": 357.9457980432839,
+    "total_token_throughput": 6085.078566735827,
+    "mean_ttft_ms": 1319.0144638065249,
+    "median_ttft_ms": 1319.0503800287843,
+    "p90_ttft_ms": 1331.5129827708006,
+    "p99_ttft_ms": 1331.7867149412632,
+    "mean_tpot_ms": 12.09338719582581,
+    "median_tpot_ms": 12.064064126901739,
+    "p99_tpot_ms": 12.178933196444445,
+    "mean_e2el_ms": 2854.874637676403,
+    "p99_e2el_ms": 2859.51827544719,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.684127398899623,
+    "gather_ms": 116.42721598036587,
+    "encode_ms": 32.16667706146836,
+    "link_ms": 5.549805937334895,
+    "queue_ms": 0.2734959125518799,
+    "achieved_gbps": 137.05556555920847,
+    "install_ms": 152.2468263283372,
+    "wait_ms": 1054.316222667694,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "sweep_t2-hbh_nativegbps_rinf": {
+   "link_gbps": "native",
+   "codec": "t2-hbh",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 2.834604535251856,
+    "request_throughput": 2.8222631765771857,
+    "request_goodput": 2.8222631765771857,
+    "output_throughput": 361.2496866018798,
+    "total_token_throughput": 6141.244672231956,
+    "mean_ttft_ms": 1292.9828248452395,
+    "median_ttft_ms": 1293.0170698091388,
+    "p90_ttft_ms": 1296.617741882801,
+    "p99_ttft_ms": 1296.8200381100178,
+    "mean_tpot_ms": 12.079099011717467,
+    "median_tpot_ms": 12.079415439562066,
+    "p99_tpot_ms": 12.102628081274315,
+    "mean_e2el_ms": 2827.028399333358,
+    "p99_e2el_ms": 2833.1823565997183,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.145817756652832,
+    "gather_ms": 117.69454390741885,
+    "encode_ms": 42.11040120571852,
+    "link_ms": 5.522743333131075,
+    "queue_ms": 0.28252601623535156,
+    "achieved_gbps": 136.94128952169012,
+    "install_ms": 146.3830831926316,
+    "wait_ms": 1049.5420694351196,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 8,
+    "layer0_checks": [
+     "recompute failed: RuntimeError('no model with .model.embed_tokens and .model.layers in this process; modules seen: ')"
+    ],
+    "sets": {
+     "news": 1,
+     "wikitext": 2,
+     "code": 2,
+     "math": 2,
+     "exam": 1
+    }
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  }
+ }
+}

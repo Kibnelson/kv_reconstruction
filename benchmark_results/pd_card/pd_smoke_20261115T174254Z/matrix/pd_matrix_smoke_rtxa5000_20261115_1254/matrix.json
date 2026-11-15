@@ -1,0 +1,25 @@
+{
+ "matrix": "smoke",
+ "runs": [
+  "SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh",
+  "SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp",
+  "SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh",
+  "SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl",
+  "SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh",
+  "SMOKE=1 LAYOUT=colo4 CONNECTOR=lmcache",
+  "SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256"
+ ],
+ "failed": [
+  "SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh",
+  "SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp"
+ ],
+ "folders": [
+  "llama32_3b_pd_1p3d_tkv_ring_eager_rtxa5000x4_20261115_1344_smoke",
+  "llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261115_1254_smoke_partial",
+  "llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261115_1316_smoke_partial",
+  "llama32_3b_pd_2p2d_nixl_rtxa5000x4_20261115_1339_smoke",
+  "llama32_3b_pd_2p2d_tkv_p2p_rtxa5000x4_20261115_1337_smoke",
+  "llama32_3b_pd_colo4_lmcache_rtxa5000x4_20261115_1343_smoke",
+  "llama32_3b_pd_colo4_tkv_rtxa5000x4_20261115_1340_smoke"
+ ]
+}

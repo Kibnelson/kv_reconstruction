@@ -1,0 +1,296 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 1,
+  "decodes": 3,
+  "layout": "1p3d",
+  "connector": "tkv",
+  "transport": "ring",
+  "eager": true,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "raw": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 7.738255430012941,
+    "encode_ms": 2.4767331779003143,
+    "link_ms": 40.75907124206424,
+    "queue_ms": 0.27489662170410156,
+    "achieved_gbps": 95.22508436719437,
+    "install_ms": 24.34087125584483,
+    "wait_ms": 1043.6760783195496,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "t2-hbh": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.489336471920922,
+    "gather_ms": 7.368733640760183,
+    "encode_ms": 95.49521096050739,
+    "link_ms": 21.29372302442789,
+    "queue_ms": 0.29027462005615234,
+    "achieved_gbps": 94.04447805308189,
+    "install_ms": 173.13662497326732,
+    "wait_ms": 687.6494884490967,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 4,
+    "layer0_checks": [
+     "recompute failed: RuntimeError('no model with .model.embed_tokens and .model.layers in this process; modules seen: ')"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "t2-rank256": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 9.578000411042712,
+    "gather_ms": 7.35060591250658,
+    "encode_ms": 49.98736269772053,
+    "link_ms": 24.107082281261683,
+    "queue_ms": 0.25582313537597656,
+    "achieved_gbps": 93.81001891044052,
+    "install_ms": 53.672886453568935,
+    "wait_ms": 521.8942165374756,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 4,
+    "layer0_checks": [
+     "recompute failed: RuntimeError('no model with .model.embed_tokens and .model.layers in this process; modules seen: ')"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  }
+ },
+ "sweep": {
+  "sweep_raw_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "raw",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 5.477624451741576,
+    "request_throughput": 1.4604871273087097,
+    "request_goodput": 0.0,
+    "output_throughput": 186.94235229551484,
+    "total_token_throughput": 3178.0199890237523,
+    "mean_ttft_ms": 3457.3013577610254,
+    "median_ttft_ms": 3544.7110757231712,
+    "p90_ttft_ms": 3953.9730032905936,
+    "p99_ttft_ms": 3967.5609127245843,
+    "mean_tpot_ms": 11.86746911065081,
+    "median_tpot_ms": 11.894414025380856,
+    "p99_tpot_ms": 12.003615910964688,
+    "mean_e2el_ms": 4964.469934813678,
+    "p99_e2el_ms": 5474.117637332529,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 3.7543997168540955,
+    "encode_ms": 1.1253200937062502,
+    "link_ms": 469.762054271996,
+    "queue_ms": 319.63738799095154,
+    "achieved_gbps": 3.748776831935377,
+    "install_ms": 2.5856990832835436,
+    "wait_ms": 3373.085916042328,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 4,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "sweep_t2-hbh_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-hbh",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.7813639268279076,
+    "request_throughput": 2.1156387363939873,
+    "request_goodput": 1.0578193681969936,
+    "output_throughput": 270.80175825843037,
+    "total_token_throughput": 4603.629890393317,
+    "mean_ttft_ms": 1997.3537477198988,
+    "median_ttft_ms": 2009.467501193285,
+    "p90_ttft_ms": 2241.249380260706,
+    "p99_ttft_ms": 2248.168121986091,
+    "mean_tpot_ms": 12.970366953380816,
+    "median_tpot_ms": 13.056009443198132,
+    "p99_tpot_ms": 14.33576332390543,
+    "mean_e2el_ms": 3644.5903507992625,
+    "p99_e2el_ms": 3778.7578787840903,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.14551830291748,
+    "gather_ms": 134.46108205243945,
+    "encode_ms": 41.968971490859985,
+    "link_ms": 211.5259966813028,
+    "queue_ms": 85.87387204170227,
+    "achieved_gbps": 3.9202790897746267,
+    "install_ms": 151.60641190595925,
+    "wait_ms": 1941.6259825229645,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 8,
+    "layer0_checks": [
+     "recompute failed: RuntimeError('no model with .model.embed_tokens and .model.layers in this process; modules seen: ')"
+    ],
+    "sets": {
+     "news": 1,
+     "code": 2,
+     "math": 2,
+     "wikitext": 2,
+     "exam": 1
+    }
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "sweep_t2-rank256_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-rank256",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.746619302779436,
+    "request_throughput": 2.1352583098221873,
+    "request_goodput": 1.334536443638867,
+    "output_throughput": 273.31306365724,
+    "total_token_throughput": 4646.322082173079,
+    "mean_ttft_ms": 1933.7031131144613,
+    "median_ttft_ms": 1973.0002880096436,
+    "p90_ttft_ms": 2209.994917549193,
+    "p99_ttft_ms": 2224.2258772067726,
+    "mean_tpot_ms": 12.0618442828789,
+    "median_tpot_ms": 12.077409268070861,
+    "p99_tpot_ms": 12.30720850279716,
+    "mean_e2el_ms": 3465.5573370400816,
+    "p99_e2el_ms": 3744.0818232297897,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 9.230306625366211,
+    "gather_ms": 135.12117718346417,
+    "encode_ms": 29.59529752843082,
+    "link_ms": 247.5385630968958,
+    "queue_ms": 157.4018895626068,
+    "achieved_gbps": 3.8868249830950137,
+    "install_ms": 20.15294204466045,
+    "wait_ms": 1869.760662317276,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 1,
+    "layer0_recomputed": 0,
+    "layer0_coded": 8,
+    "layer0_checks": [
+     "recompute failed: RuntimeError('no model with .model.embed_tokens and .model.layers in this process; modules seen: ')"
+    ],
+    "sets": {
+     "wikitext": 2,
+     "math": 2,
+     "news": 1,
+     "code": 2,
+     "exam": 1
+    }
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  }
+ }
+}
