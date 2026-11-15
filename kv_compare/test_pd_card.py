@@ -63,6 +63,8 @@ echo "fake setup in $KV_HOME (uv $KV_UV, cache $UV_CACHE_DIR, link mode $UV_LINK
 for env in venv_vllm venv_lmcache; do
   mkdir -p "$KV_HOME/$env/bin"
   printf '#!/usr/bin/env bash\nPYTHONPATH="%s:${PYTHONPATH:-}" exec %s "$@"\n' "$FAKE_STUB" "$FAKE_PY" > "$KV_HOME/$env/bin/python"
+  printf '#!/bin/sh\nprintf "1.13.0\\n"\n' > "$KV_HOME/$env/bin/ninja"
+  chmod +x "$KV_HOME/$env/bin/ninja"
   cp "$FAKE_VLLM_BIN" "$KV_HOME/$env/bin/vllm"
   chmod 755 "$KV_HOME/$env/bin/python" "$KV_HOME/$env/bin/vllm"
 done
@@ -264,6 +266,18 @@ class CardTests(unittest.TestCase):
         r = self.card("create")
         self.assertIn("not the pin: a new campaign starts from its head", r.stderr)
         self.assertEqual(self.jobs(), [])
+
+    def test_failed_specs_stop_before_matrix(self):
+        self.assertEqual(self.card('create',RUNS='SMOKE=1 LAYOUT=1p3d CODECS=raw').returncode,0)
+        r=self.card('run',KVPD_SPECS_CMD='exit 9')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        ev=self.node/'kvpd-evidence'/self.tag/'repo'/'benchmark_results'/'pd_card'/self.tag
+        run=json.loads((ev/'run.json').read_text())
+        self.assertEqual(run['specs_exit'],9)
+        self.assertEqual(run['status'],'specs failed')
+        self.assertNotIn('matrix_exit',run)
+        self.assertFalse(list((ev/'matrix').iterdir()))
+        self.assertIn('hardware/bandwidth survey failed',r.stdout)
 
     def test_real_filtered_clone_and_failed_campaign_publish(self):
         # file:// uses upload-pack filtering; a plain local clone silently ignores --filter.

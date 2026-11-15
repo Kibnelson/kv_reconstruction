@@ -85,6 +85,11 @@ ENV_DIR=$KV_HOME/venv_vllm
 [ "$CONNECTOR" = lmcache ] && ENV_DIR=$KV_HOME/venv_lmcache
 VPY=$ENV_DIR/bin/python
 [ -x "$VPY" ] || { echo "STOP: no $ENV_DIR: run scripts/pd_setup.sh first"; exit 1; }
+export PATH="$ENV_DIR/bin:$PATH"
+NINJA_BIN=$ENV_DIR/bin/ninja
+[ -x "$NINJA_BIN" ] || { echo "STOP: no ninja in $ENV_DIR/bin: run scripts/pd_setup.sh"; exit 1; }
+NINJA_VERSION=$("$NINJA_BIN" --version)
+echo "   engine build tool $NINJA_BIN: $NINJA_VERSION"
 [ "$CONNECTOR" != tkv ] || [ -s "$RUN/pd_codecs.pt" ] || { echo "STOP: no $RUN/pd_codecs.pt: run scripts/pd_setup.sh first"; exit 1; }
 if [ "$CONNECTOR" = nixl ] && ! "$VPY" -c "import torch; from nixl._api import nixl_agent" 2>/dev/null; then
     echo "STOP: NIXL does not import in $ENV_DIR (scripts/pd_setup.sh):"
@@ -359,10 +364,12 @@ nohup "$VPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_AR
 PIDS+=($!)
 for _ in $(seq 1 30); do curl -sf "$PROXY/health" >/dev/null && break; sleep 1; done
 "$VPY" - "$OUT/env.json" "$MODEL_ID" "$NUM_PREFILL" "$NUM_DECODE" "$LAYOUT" "$CONNECTOR" "$TRANSPORT" "$EAGER" "$PROMPTS" "$REVISION" "$KV_RUNS/dataset_texts" "$LOAD_CODECS" <<'EOF'
-import hashlib, json, os, subprocess, sys, torch, vllm
+import hashlib, json, os, shutil, subprocess, sys, torch, vllm
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
 loaded=[n for n in sys.argv[12].split(',') if n]
 extra = {'matched_round': int(os.environ.get('MATCHED_ROUND','0')),
+         'ninja_path':shutil.which('ninja'),
+         'ninja_version':subprocess.check_output(['ninja','--version'],text=True).strip(),
          'memory_profiler_estimate_cudagraphs': os.environ.get('VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS','0'),
          'requested_codecs':loaded,
          'engine_group':'nvcomp' if any(n.startswith('nvcomp-') for n in loaded) else ('matched' if 't-fast' in loaded else sys.argv[6]),

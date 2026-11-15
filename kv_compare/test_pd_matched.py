@@ -129,7 +129,7 @@ class CampaignContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);(root/'setup').mkdir();(root/'matrix'/'pd_matrix_fixture').mkdir(parents=True)
             (root/'node_specs').mkdir()
-            (root/'node_specs'/'specs.json').write_text(json.dumps(dict(system={'fixture':True},bandwidth={'patterns':[{'fixture':True}]})))
+            (root/'node_specs'/'specs.json').write_text(json.dumps(dict(system={'fixture':True},bandwidth={'patterns':[{'fixture':True,'correct':True}]})))
             resultdir=root/'matrix'/'run';resultdir.mkdir()
             declared='LAYOUT=1p3d CODECS='+','.join(names)+' MATCHED_ROUND=0'
             (root/'campaign.json').write_text(json.dumps(dict(matrix='smoke',runs=[declared])))

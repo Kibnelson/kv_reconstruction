@@ -189,10 +189,11 @@ def bandwidth(reps, chunk_mib, layouts_only=False):
     import pd_link_probe as lp
     n = torch.cuda.device_count()
     res = {"gpus": [torch.cuda.get_device_name(i) for i in range(n)], "torch": torch.__version__,
-           "cuda": torch.version.cuda, "mib_per_transfer": MIB, "chunk_mib": chunk_mib, "patterns": []}
+           "cuda": torch.version.cuda, "mib_per_transfer": MIB, "chunk_mib": chunk_mib, "patterns": [],
+           'diagnostic_only':os.environ.get('CUDA_LAUNCH_BLOCKING','0')=='1'}
     if not layouts_only:
         tmp = Path(os.environ.get("TMPDIR", "/tmp")) / f"link_probe_{os.getpid()}.json"
-        lp.main(["--mib", str(MIB), "--reps", str(reps), "--output", str(tmp)])
+        lp.main(["--mib", str(MIB), "--reps", str(reps), '--chunk-mib',str(chunk_mib), "--output", str(tmp)])
         res["probe"] = json.loads(tmp.read_text())
         tmp.unlink()
     nbytes = MIB << 20
@@ -253,7 +254,7 @@ def bandwidth(reps, chunk_mib, layouts_only=False):
             t, d = once()
             if t < best:
                 best, legs_t = t, d
-        ok = all(bool(torch.equal(b[1][:1 << 20].cpu(), b[0][:1 << 20].cpu())) for b in bufs)
+        ok = all(lp.same_bytes(b[0],b[1]) for b in bufs)
         row = {"pattern": name, "kind": kind, "legs": [f"{s}->{d}" for s, d in legs], "correct": ok,
                "seconds": best, "aggregate_GB_per_s": len(legs) * nbytes / best / 1e9,
                "per_leg_GB_per_s": [nbytes / t / 1e9 for t in legs_t]}
@@ -419,6 +420,14 @@ def main(argv=None):
     (out / "specs.json").write_text(json.dumps(spec, indent=1))
     (out / "summary.md").write_text(summary(spec))
     print(f"wrote {out}/specs.json and summary.md", flush=True)
+    if spec.get('bandwidth_error'):
+        return 1
+    if not a.skip_bandwidth:
+        bw=spec.get('bandwidth',{})
+        patterns=bw.get('patterns',[])
+        if not patterns or any(not p.get('correct') for p in patterns) or bw.get('diagnostic_only') or bw.get('probe',{}).get('diagnostic_only'):
+            print('STOP: bandwidth survey is missing, incorrect or diagnostic-only',flush=True)
+            return 1
     return 0
 
 

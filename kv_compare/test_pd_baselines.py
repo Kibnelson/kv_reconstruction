@@ -503,7 +503,7 @@ if __name__ == "__main__":
 FAKE_VLLM = r'''#!/usr/bin/env python3
 """A stand-in for vLLM's CLI in the runner's dry run: `vllm serve` answers /health, /v1/completions (with
 kv_transfer_params for NIXL prefills) and /reset_prefix_cache; `vllm bench serve` writes a result file."""
-import json, os, sys, threading
+import json, os, subprocess, sys, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 args = sys.argv[1:]
 if args[:2] == ["bench", "serve"]:
@@ -526,7 +526,8 @@ cfg = json.loads(args[args.index("--kv-transfer-config") + 1])
 log = os.environ.get("FAKE_LOG")
 with open(log, "a") as f:
     f.write(json.dumps({"port": port, "cvd": os.environ.get("CUDA_VISIBLE_DEVICES"), "cfg": cfg,
-                        "argv": args, "env": {k: v for k, v in os.environ.items() if k.startswith(("LMCACHE", "VLLM_NIXL"))}}) + "\n")
+                        "argv": args, "env": {**{k: v for k, v in os.environ.items() if k.startswith(("LMCACHE", "VLLM_NIXL"))},
+                        "PATH":os.environ.get("PATH"),"ninja_version":subprocess.check_output(["ninja","--version"],text=True).strip()}}) + "\n")
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -598,6 +599,7 @@ class RunnerDryRunTests(unittest.TestCase):
             b.mkdir(parents=True)
             (b / "python").write_text(f'#!/usr/bin/env bash\nPYTHONPATH="{stub}:${{PYTHONPATH:-}}" exec {sys.executable} "$@"\n')
             (b / "vllm").write_text(FAKE_VLLM.replace("#!/usr/bin/env python3", f"#!{sys.executable}"))
+            (b / "ninja").write_text('#!/bin/sh\nprintf "1.13.0\\n"\n')
         (self.kv / "venv_vllm" / "lib").mkdir()
         (stub / "nixl").mkdir()                    # NIXL's module as vLLM imports it: nixl._api.nixl_agent
         (stub / "nixl" / "__init__.py").write_text("")
@@ -639,6 +641,8 @@ class RunnerDryRunTests(unittest.TestCase):
         ex = p["cfg"]["kv_connector_extra_config"]
         self.assertEqual((ex["transport"], ex["codecs"]), ("p2p", ["raw", "ours-hbh"]))
         self.assertIn("--host", p["argv"])
+        self.assertEqual(p['env']['PATH'].split(':')[0],str(self.kv/'venv_vllm'/'bin'))
+        self.assertEqual(p['env']['ninja_version'],'1.13.0')
         out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_2p2d_tkv_p2p_rtxa5000x4_*smoke*"))
         self.assertEqual(len(out), 1, list((self.repo / "benchmark_results").glob("*")))
         env = json.loads((out[0] / "env.json").read_text())
@@ -666,6 +670,8 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
         self.assertTrue(all(e["cfg"]["kv_connector"] == "LMCacheConnectorV1" for e in eng))
         self.assertEqual(eng[0]["env"]["LMCACHE_MAX_LOCAL_CPU_SIZE"], "8")
+        self.assertEqual(eng[0]['env']['PATH'].split(':')[0],str(self.kv/'venv_lmcache'/'bin'))
+        self.assertEqual(eng[0]['env']['ninja_version'],'1.13.0')
         r, _ = self.run_pd(LAYOUT="colo4", CONNECTOR="nixl")
         self.assertIn("NIXL needs prefill and decode engines", r.stdout)
 
@@ -676,6 +682,19 @@ class RunnerDryRunTests(unittest.TestCase):
         out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_*_partial"))
         self.assertEqual(len(out), 1)
         self.assertIn("the root cause", (out[0] / "engine_prefill1.log").read_text())
+
+    def test_missing_ninja_stops_before_engines(self):
+        (self.kv/'venv_vllm'/'bin'/'ninja').unlink()
+        r,eng=self.run_pd(LAYOUT='1p3d',CODECS='raw')
+        self.assertNotEqual(r.returncode,0)
+        self.assertIn('STOP: no ninja in',r.stdout)
+        self.assertEqual(eng,[])
+
+    def test_broken_ninja_stops_before_engines(self):
+        (self.kv/'venv_vllm'/'bin'/'ninja').write_text('#!/bin/sh\nexit 3\n')
+        r,eng=self.run_pd(LAYOUT='1p3d',CODECS='raw')
+        self.assertEqual(r.returncode,3)
+        self.assertEqual(eng,[])
 
     def test_matrix_runs_each_and_reports_once(self):
         import os

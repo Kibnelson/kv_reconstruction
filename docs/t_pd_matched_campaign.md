@@ -93,6 +93,18 @@ The node-local code and evidence clones now inherit the home clone's promisor co
 
 For a campaign already stopped at an older pin, keep that checkout at its saved pin while closing it out. Source its printed `state.sh`. In a small CPU allocation on its `KVPD_NODE`, set `remote.origin.promisor=true` and `remote.origin.partialclonefilter=blob:none` in its two existing repositories: `$KVPD_ROOT/kvpd-tools/$KVPD_PIN` and `$KVPD_ROOT/kvpd-evidence/$KVPD_TAG/repo`. This repairs repository metadata without editing the pinned source. Read `$KVPD_ROOT/kvpd-evidence/$KVPD_TAG/repo/benchmark_results/pd_card/$KVPD_TAG/run.json` and `disk_plan.json` if present. Then use the saved pin for `cleanup`, `verify-cleanup`, `review` and `publish`. Update the home checkout only after closeout; the next campaign uses a new tag and the updated branch head.
 
+## Engine build tools and failed link surveys
+
+Job 30196 reached the link survey and engine startup but did not produce a valid serving comparison. Its survey child reported a CUDA launch failure, and its engines reported `FileNotFoundError: ninja`. These are separate failures; the CUDA traceback alone does not establish the failing copy or prove a codec bug.
+
+Setup now explicitly installs Ninja in both the vLLM and LMCache environments. The runner puts the selected environment's `bin` first on PATH and requires its Ninja executable to run successfully before launching engines. The executable path and version are recorded in `env.json`.
+
+Failed survey children and incorrect copy patterns return a failure after saving `specs.json` and its summary. The controller records `specs failed`, collects the evidence and ends the run stage before starting the matrix; normal closeout can then proceed. A failed survey cannot pass the comparison gate.
+
+The pair probe now prints the active GPU pair and route before timing it. Serial host staging explicitly selects and synchronizes the source and destination devices. Both pair and concurrent-pattern checks compare the complete transferred buffer outside the timer. A new `--paths host`, `--paths direct` or `--paths host_pipe` option allows each route to be diagnosed in a fresh process. The original observed CUDA failure still needs a real GPU retest; CPU contracts do not establish that it is fixed.
+
+Within a GPU allocation with an available codec-environment interpreter, a focused diagnostic can use `CUDA_LAUNCH_BLOCKING=1` and `--mib 64 --pairs 0-1 --paths host --reps 2`. Start the other routes in separate processes. These runs are diagnostic only: their output is flagged and cannot pass the performance comparison gate. The campaign launcher clears inherited `CUDA_LAUNCH_BLOCKING` for measured runs. Begin a new full campaign only after the focused GPU check resolves the copy failure.
+
 ## Interpretation limits
 
 The ring link is paced shared host memory, not a measured NIC. Its configured rate is per prefill: 2P has two links, so equal per-link rates do not mean equal aggregate network budgets across layouts. GPU IPC measures the local PCIe path; the peer-access survey identifies hardware support. The CPU tier measures DRAM storage/reload, not SSD. Codecs sharing one engine also share its configured cache capacity and loaded constant sets; NIXL/nvCOMP/LMCache have separate engine runs. Record actual memory and allocation differences before drawing serving-capacity conclusions. Cross-branch numeric claims require matching hardware, model revision, prompt/text hashes, runtime versions, cache policy, seeds, load and measured link capacity; rerunning the original methods inside this campaign supplies the primary controls.

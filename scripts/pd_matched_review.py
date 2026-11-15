@@ -22,8 +22,11 @@ def audit(ev):
         len(load(p).get('fresh_receivers',[]))==4 for p in readiness)
     if not ready:issues.append('Compiled GPU / independent receiver readiness evidence is missing or failed.')
     specs=load(ev/'node_specs'/'specs.json') if (ev/'node_specs'/'specs.json').is_file() else {}
-    survey=bool(run.get('specs_exit')==0 and specs.get('system') and
-        specs.get('bandwidth',{}).get('patterns') and not specs.get('bandwidth_error'))
+    bw=specs.get('bandwidth',{})
+    patterns=bw.get('patterns',[])
+    survey=bool(run.get('specs_exit')==0 and specs.get('system') and patterns and
+        all(p.get('correct') for p in patterns) and not specs.get('bandwidth_error') and
+        not bw.get('diagnostic_only') and not bw.get('probe',{}).get('diagnostic_only'))
     if not survey:issues.append('Same-allocation hardware and bandwidth survey is missing or incomplete.')
     matrices=list((ev/'matrix').glob('pd_matrix_*/matrix.json'))
     matrix=load(matrices[-1]) if matrices else {}

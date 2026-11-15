@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import time
 
@@ -37,6 +38,7 @@ def sync():
 
 def timed(fn, reps):
     """Best wall time of fn over reps runs, every GPU synchronised before and after."""
+    sync()
     fn()
     sync()
     best = float("inf")
@@ -49,14 +51,35 @@ def timed(fn, reps):
     return best
 
 
+def serial_host_copy(src, dst, host):
+    """Complete each host leg on its owning device before the next leg."""
+    with torch.cuda.device(src.device):
+        host.copy_(src, non_blocking=True)
+        torch.cuda.synchronize(src.device)
+    with torch.cuda.device(dst.device):
+        dst.copy_(host, non_blocking=True)
+        torch.cuda.synchronize(dst.device)
+
+
+def same_bytes(src, dst):
+    """Validate the entire transfer outside its timer, including the final byte."""
+    return bool(torch.equal(dst.cpu(), src.cpu()))
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--mib", type=int, default=896, help="bytes moved per measurement (default: one document)")
     p.add_argument("--chunk-mib", type=int, default=32)
     p.add_argument("--reps", type=int, default=5)
     p.add_argument("--pairs", default="", help="e.g. 0-1,0-2 (default: every ordered pair)")
+    p.add_argument('--paths', default='direct,host,host_pipe', help='comma-separated routes; run one per fresh process for diagnosis')
     p.add_argument("--output", default="")
     a = p.parse_args(argv)
+    paths=a.paths.split(',')
+    if not paths or len(paths)!=len(set(paths)) or any(x not in ('direct','host','host_pipe') for x in paths):
+        p.error('--paths must select distinct direct,host,host_pipe routes')
+    if min(a.mib,a.chunk_mib,a.reps)<1:
+        p.error('sizes and reps must be positive')
     try:
         topo = subprocess.run(["nvidia-smi", "topo", "-m"], capture_output=True, text=True, timeout=30).stdout
     except Exception as exc:                          # no nvidia-smi: carry on with the measurements
@@ -69,7 +92,10 @@ def main(argv=None):
         raise SystemExit("no GPU visible")
     nbytes = a.mib << 20
     chunk = a.chunk_mib << 20
-    res = {"gpus": names, "topology": topo, "mib": a.mib, "host_legs": [], "pairs": []}
+    res = {"gpus": names, "topology": topo, "mib": a.mib, "host_legs": [], "pairs": [],
+           'paths':paths,'gpu_executed':True,'diagnostic_only':os.environ.get('CUDA_LAUNCH_BLOCKING','0')=='1'}
+    if res['diagnostic_only']:
+        print('DIAGNOSTIC ONLY: CUDA_LAUNCH_BLOCKING=1; these timings are not performance results.',flush=True)
     print(f"\n{'GPU':>4} {'to pinned':>12} {'from pinned':>12} {'to pageable':>12} {'from pageable':>14}")
     for i in range(n):
         src = torch.empty(nbytes, dtype=torch.uint8, device=f"cuda:{i}").random_(0, 255)
@@ -91,19 +117,14 @@ def main(argv=None):
         [(i, j) for i in range(n) for j in range(n) if i != j]
     if not pairs:
         print("\none GPU: no GPU pairs to measure (allocate two GPUs for the GPU-to-GPU paths)")
-    print(f"\n{'pair':>6} {'peer':>5} {'direct':>16} {'host':>16} {'host_pipe':>16}")
+    print(f"\n{'pair':>6} {'peer':>5} " + ' '.join(f'{path:>16}' for path in paths))
     for i, j in pairs:
         src = torch.empty(nbytes, dtype=torch.uint8, device=f"cuda:{i}").random_(0, 255)
         dst = torch.empty(nbytes, dtype=torch.uint8, device=f"cuda:{j}")
         host = torch.empty(nbytes, dtype=torch.uint8, pin_memory=True)
         peer = torch.cuda.can_device_access_peer(i, j)
-        t_direct = timed(lambda: dst.copy_(src, non_blocking=True), a.reps)
-
         def via_host():
-            host.copy_(src, non_blocking=True)
-            torch.cuda.synchronize(i)
-            dst.copy_(host, non_blocking=True)
-        t_host = timed(via_host, a.reps)
+            serial_host_copy(src,dst,host)
         s_out = torch.cuda.Stream(device=f"cuda:{i}")
         s_in = torch.cuda.Stream(device=f"cuda:{j}")
 
@@ -120,21 +141,24 @@ def main(argv=None):
                 with torch.cuda.stream(s_in):
                     dst[o:o + chunk].copy_(host[o:o + chunk], non_blocking=True)
             s_in.synchronize()
-        t_pipe = timed(via_host_pipe, a.reps)
-        ok = bool(torch.equal(dst.cpu()[:1 << 20], src.cpu()[:1 << 20]))
-        row = {"src": i, "dst": j, "peer_access": peer, "correct": ok}
+        functions={'direct':lambda:dst.copy_(src,non_blocking=True),'host':via_host,'host_pipe':via_host_pipe}
+        row = {"src": i, "dst": j, "peer_access": peer, "correct": True}
         cells = []
-        for k, t in (("direct", t_direct), ("host", t_host), ("host_pipe", t_pipe)):
+        for k in paths:
+            print(f'PROBE_BEGIN pair={i}->{j} path={k} mib={a.mib}',flush=True)
+            t=timed(functions[k],a.reps)
+            if not same_bytes(src,dst):
+                raise RuntimeError(f'copy parity failed for pair={i}->{j} path={k}')
             gbs = nbytes / t / 1e9
-            row[k] = {"seconds": t, "GB_per_s": gbs, "Gb_per_s": 8 * gbs}
+            row[k] = {"seconds": t, "GB_per_s": gbs, "Gb_per_s": 8 * gbs,'correct':True}
             cells.append(f"{gbs:6.1f} GB/s {8 * gbs:4.0f}Gb")
         res["pairs"].append(row)
         print(f"{i:>3}->{j:<2} {str(peer):>5} " + " ".join(f"{c:>16}" for c in cells))
         del src, dst, host
         torch.cuda.empty_cache()
     if res["pairs"]:
-        best = max(max(r["direct"]["GB_per_s"], r["host_pipe"]["GB_per_s"]) for r in res["pairs"])
-        worst = min(max(r["direct"]["GB_per_s"], r["host_pipe"]["GB_per_s"]) for r in res["pairs"])
+        best = max(max(r[k]['GB_per_s'] for k in paths) for r in res['pairs'])
+        worst = min(max(r[k]['GB_per_s'] for k in paths) for r in res['pairs'])
         what = "pair"
     else:                                             # one GPU: the slower pinned leg bounds a transfer through host
         legs = [min(r["d2h_pinned"]["GB_per_s"], r["h2d_pinned"]["GB_per_s"]) for r in res["host_legs"]]
@@ -154,3 +178,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+

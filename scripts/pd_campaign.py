@@ -545,8 +545,11 @@ def stage_run(p, a, job):
         collect(p, runtime, ev)
         return finish("setup failed", code=0)
     write_json(ev / "run.json", rec)
-    rec["specs_exit"] = streamer.run(ev / "node_specs.sh", env)     # a failure here costs only the specs
+    rec["specs_exit"] = streamer.run(ev / "node_specs.sh", env)
     write_json(ev / "run.json", rec)
+    if rec['specs_exit'] != 0:
+        collect(p, runtime, ev)
+        return finish('specs failed', code=0, reason='hardware/bandwidth survey failed; see node_specs and run log')
     code = streamer.run(ev / "node_matrix.sh", env)
     rec["matrix_exit"] = code
     collect(p, runtime, ev)

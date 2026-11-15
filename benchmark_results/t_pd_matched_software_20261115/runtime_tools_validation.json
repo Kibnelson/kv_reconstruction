@@ -1,0 +1,49 @@
+{
+  "actual_gpu_retest_executed": false,
+  "actual_slurm_job_submitted": false,
+  "actual_vllm_jit_startup_validated": false,
+  "automatic_merge": false,
+  "bash_syntax_passed": true,
+  "changes": [
+    "explicit Ninja dependency in vLLM and LMCache environments",
+    "selected environment bin first on engine PATH",
+    "Ninja executable/version checked before any engine and recorded in env.json",
+    "failed hardware survey stops before matrix and keeps report",
+    "explicit source/destination device completion for serial host copies",
+    "full-buffer probe parity outside timing",
+    "per-route diagnostic selection with flushed progress labels",
+    "diagnostic-only timings rejected by comparison gate"
+  ],
+  "command": "TRITON_INTERPRET=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m unittest kv_compare.test_pd_card kv_compare.test_pd_baselines.RunnerDryRunTests kv_compare.test_pd_probe_tools kv_compare.test_pd_matched.CampaignContracts kv_compare.test_pd_independent -v",
+  "file_sha256": {
+    "kv_compare/test_pd_baselines.py": "a110eff61cf9b6b2c84a6628232c7cd254e0c17f826a5c834c201eeb1add374b",
+    "kv_compare/test_pd_card.py": "127a5c6dfa72fc4def4d87084624e063900e0f9f9822484e4ad059024a2da88f",
+    "kv_compare/test_pd_matched.py": "c0516eca86ae3c2b60cb8517d6008f6c956bd09d5a70e522a425d62397d3b685",
+    "kv_compare/test_pd_probe_tools.py": "4d092b1951a5b77252bb8a5fb0f59d92dca08dff1e47290dc0a86eefa16d490e",
+    "scripts/node_specs.py": "a90e969318fc9ce2b74ba2b5ba726f05e596b8aad41f7db06469e1631fda3b24",
+    "scripts/pd_campaign.py": "b28dfd842d8f7635f56df8a6081756c972383ab0bb64ffded78cc854e71720c4",
+    "scripts/pd_link_probe.py": "1c3334a4359a4892d8d97e370ec2e0c21c498f2dab023967b890bbaaf8078cc2",
+    "scripts/pd_matched_review.py": "c3c633d1934cdbaeb5bdb23d02d8cbdb72bb1b16bb085f464865a07454221061",
+    "scripts/pd_setup.sh": "bcb6356a4c2e421f6beb55121e5ee0a451a0c7b59b42773c483a716be8a5800b",
+    "scripts/run_pd_vllm.sh": "ac5d9fd2967d29e3dbbe7937b029f2ece51749b1e19953e7abc195621ca6653f",
+    "scripts/run_t_pd_independent.sh": "b3d5542ba2f46cf6d772af276b0e7fe0c5a129b05b9a3ee8cfe153b481ce4f60"
+  },
+  "format": "pd_runtime_tools_probe_validation_v1",
+  "generated_utc": "2026-11-15T12:03:00.327309+00:00",
+  "job_30196_gpu_copy_error_root_cause_established": false,
+  "job_30196_readiness_report_reviewed": false,
+  "limitations": [
+    "CPU fixtures and stream-call contracts do not establish that the observed CUDA launch failure is fixed.",
+    "The corrected vLLM startup still requires actual GPU JIT validation.",
+    "Fresh-process focused GPU copy diagnostics are required before another full serving campaign."
+  ],
+  "parent_source_pin": "90112640bc59bac6ea1a82f79b8c53f2b22aa996",
+  "python_compilation_passed": true,
+  "seconds": 134.664,
+  "software_checks_passed": true,
+  "source_docs": [
+    "https://docs.pytorch.org/docs/2.11/notes/cuda.html",
+    "https://docs.pytorch.org/docs/2.11/cpp_extension.html"
+  ],
+  "tests_passed": 31
+}

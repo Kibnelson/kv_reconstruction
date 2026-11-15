@@ -63,6 +63,8 @@ VPY=$KV_HOME/venv_vllm/bin/python
 if ! "$VPY" -c "import vllm, sys; sys.exit(0 if vllm.__version__ == '0.32.0' else 1)" 2>/dev/null; then
     pip_in "$VPY" -q "vllm==0.32.0" "pandas>=2.0" "xlsxwriter>=3.2.1" "aiohttp>=3.10"
 fi
+pip_in "$VPY" -q 'ninja>=1.11'
+PATH="$KV_HOME/venv_vllm/bin:$PATH" "$VPY" -c 'import shutil,subprocess; p=shutil.which("ninja"); assert p, "ninja is not on the engine PATH"; print("   engine build tool:",p,subprocess.check_output([p,"--version"],text=True).strip())'
 # nvCOMP's CUDA 13 build (the baseline codecs nvcomp-<alg>) beside vLLM's torch, and NIXL (vLLM's NixlConnector)
 "$VPY" -c "from nvidia import nvcomp" 2>/dev/null || pip_in "$VPY" -q "nvidia-nvcomp-cu13==6.0.0.12" || \
     echo "WARNING: nvCOMP did not install in the vLLM environment; the nvcomp codecs are left out"
@@ -98,6 +100,8 @@ if [ "${LMCACHE:-1}" = 1 ]; then
     fi
     "$LPY" -c "import vllm, lmcache; print(f'   vllm {vllm.__version__}, lmcache {lmcache.__version__}')" || \
         echo "WARNING: LMCache does not import; the LMCache reference is left out"
+    pip_in "$LPY" -q 'ninja>=1.11'
+    PATH="$KV_HOME/venv_lmcache/bin:$PATH" "$LPY" -c 'import shutil,subprocess; p=shutil.which("ninja"); assert p; print("   LMCache build tool:",p,subprocess.check_output([p,"--version"],text=True).strip())'
 fi
 
 if [ "${IBP:-1}" = 1 ]; then
