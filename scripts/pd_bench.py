@@ -326,11 +326,13 @@ def transfer_stats(recs):
             "sets": sets or None}
 
 
-def bench_serve(a, dataset, rate, n, out_dir, name):
+def bench_serve(a, dataset, rate, n, out_dir, name, concurrency=None, output_len=None):
     vllm = os.path.join(os.path.dirname(sys.executable), "vllm")
     cmd = [vllm if os.path.exists(vllm) else "vllm", "bench", "serve", "--backend", "openai", "--base-url", a.proxy, "--endpoint", "/v1/completions",
            "--model", a.model, "--served-model-name", a.served_name, "--tokenizer", a.model,
-           "--dataset-name", "custom", "--dataset-path", dataset, "--custom-output-len", str(a.output_len),
+           "--dataset-name", "custom", "--dataset-path", dataset,
+           "--custom-output-len", str(output_len or a.output_len)] + \
+          (["--max-concurrency", str(concurrency)] if concurrency else []) + [
            "--skip-chat-template", "--num-prompts", str(n), "--request-rate", str(rate), "--ignore-eos",
            "--percentile-metrics", "ttft,tpot,itl,e2el", "--metric-percentiles", "50,90,99",
            "--goodput", f"ttft:{a.ttft_slo_ms}", "--seed", "0", "--disable-tqdm",
@@ -446,6 +448,81 @@ def stage_sweep(a, res, colocated=False):
                 save(a, res)
     if colocated:
         post(a.proxy + "/t/config", {"mode": "pd"})
+
+
+# the published baselines' own workloads (docs/pd_baselines.md, "Workloads"): which family a label names
+SHAPE_FAMILIES = {
+    "sz1": "SplitZip: 1 request at a time, prompt length swept",
+    "sz16": "SplitZip: 16 at once, prompt length swept",
+    "sz1024": "SplitZip: 1,024-token prompts, requests at once swept",
+    "sz32k": "SplitZip: 32,768-token prompts, requests at once swept",
+    "ibp": "IBP: 20 at once, 1,920 tokens in, 128 out",
+    "exactkv": "exactkv: 4,096 tokens in, 256 out, as many as one decode GPU holds",
+}
+
+
+def parse_shapes(spec):
+    """"T:B:O:R:label,..." (prompt tokens, requests at once, output tokens, rounds, family) into one entry per
+    distinct (T, B, O), its families listed; R the most any family asks."""
+    out = {}
+    for item in (x for x in (spec or "").split(",") if x):
+        t, b, o, r, *lab = item.split(":")
+        k = (int(t), int(b), int(o))
+        e = out.setdefault(k, {"tokens": k[0], "batch": k[1], "output": k[2], "rounds": 0, "families": []})
+        e["rounds"] = max(e["rounds"], int(r))
+        for x in lab:
+            if x not in e["families"]:
+                e["families"].append(x)
+    # the smallest first: a workload too big for the node (memory) fails last, after the rest are measured
+    return sorted(out.values(), key=lambda e: (e["tokens"] * e["batch"], e["tokens"], e["output"]))
+
+
+def stage_shapes(a, res):
+    """Every codec on each published workload: B requests at once (vllm bench serve --max-concurrency B), B x R of
+    them, T-token prompts (prompts_<T>.jsonl), O tokens out, at each link speed; caches reset before each point."""
+    runs = res.setdefault("shapes", {})
+    out_dir = a.out / "runs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    codecs = usable(a, res, a.codecs)
+    for link in a.links:
+        Path(a.link_control).write_text(json.dumps({"gbps": None if link == "native" else link}))
+        time.sleep(0.5)
+        for codec in codecs:
+            if codec == "nixl":
+                post(a.proxy + "/t/config", {"mode": "nixl"})
+            else:
+                post(a.proxy + "/t/config", {"mode": "pd", "codec": codec, "verify": False})
+            first = True
+            for sh in a.shapes:
+                name = f"shape_{codec}_{link}gbps_t{sh['tokens']}_b{sh['batch']}_o{sh['output']}"
+                if name in runs and not a.rerun:
+                    continue
+                data = a.prompts / f"prompts_{sh['tokens']}.jsonl"
+                wait_idle(a.proxy)
+                if first:
+                    warm_pairs(a)
+                    warm_burst(a, greedy=True)
+                    first = False
+                resets = reset_caches(a)
+                n = sh["batch"] * sh["rounds"]
+                logs0 = log_marks(a)
+                rc, r, t0, t1 = bench_serve(a, str(data), "inf", n, out_dir, name, concurrency=sh["batch"],
+                                            output_len=sh["output"])
+                logs1 = log_marks(a)
+                wait_idle(a.proxy)
+                time.sleep(1)
+                st = transfer_stats(records(a.log_dir, t0, time.time())) if codec != "nixl" else {}
+                runs[name] = dict(sh, link_gbps=link, codec=codec, requests=n, exit=rc,
+                                  bench={k: r.get(k) for k in KEEP}, transfers=st, resets=resets,
+                                  t0=t0, t1=t1, logs0=logs0, logs1=logs1)
+                b = runs[name]["bench"]
+                log(f"{name} ({'/'.join(sh['families'])}, {n} requests): exit {rc}, TTFT p50 "
+                    f"{fmt(b.get('median_ttft_ms'), 0)} / p99 {fmt(b.get('p99_ttft_ms'), 0)} ms, "
+                    f"{fmt(b.get('request_throughput'), 2)} req/s, {fmt(b.get('output_throughput'), 0)} tok/s out"
+                    + (f"; bits {fmt(st.get('bits'))}, link {fmt(st.get('wire_gbps'), 1)} Gb/s while busy" if st else "")
+                    + (f"; {st.get('install_errors', 0) + st.get('send_errors', 0) + st.get('timeouts', 0)} transfers "
+                       "failed" if st and (st.get('install_errors') or st.get('send_errors') or st.get('timeouts')) else ""))
+                save(a, res)
 
 
 def stage_multiturn(a, res):
@@ -613,7 +690,7 @@ def save(a, res):
 
 def jit_report(a, res):
     """vLLM's kernels compiled while serving, each with the measured point it fell in (None: outside them)."""
-    spans = [(v, name) for key in ("sweep", "colocated", "tier") for name, v in (res.get(key) or {}).items()
+    spans = [(v, name) for key in ("sweep", "colocated", "tier", "shapes") for name, v in (res.get(key) or {}).items()
              if isinstance(v, dict) and v.get("t0") and v.get("t1")]
 
     def inside(v, t, f, off):
@@ -670,6 +747,19 @@ def stage_report(a, res):
                              f"{fmt(st.get('encode_ms'), 1)} / {fmt(st.get('install_ms'), 1)} | {fmt(st.get('link_ms'), 1)} | "
                              f"{fmt(st.get('achieved_gbps'), 1)} |")
             L.append("")
+    sh = res.get("shapes", {})
+    if sh:
+        L += ["## The published workloads (TTFT p50 / p99 in ms; requests per second)", "",
+              "| Link | Prompt tokens | At once | Out | Requests | Families | Codec | TTFT p50 / p99 | Req/s | Bits | "
+              "Failed transfers |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+        for v in sh.values():
+            b, st = v["bench"], v.get("transfers") or {}
+            bad = (st.get("install_errors") or 0) + (st.get("send_errors") or 0) + (st.get("timeouts") or 0)
+            L.append(f"| {v['link_gbps']} | {v['tokens']} | {v['batch']} | {v['output']} | {v['requests']} | "
+                     f"{'/'.join(v['families'])} | {v['codec']} | {fmt(b.get('median_ttft_ms'), 0)} / "
+                     f"{fmt(b.get('p99_ttft_ms'), 0)} | {fmt(b.get('request_throughput'), 2)} | {fmt(st.get('bits'))} | "
+                     f"{bad if st else '-'} |")
+        L.append("")
     co = res.get("colocated", {})
     if co:
         L += ["## Without disaggregation (each decode engine prefills its own requests)", "",
@@ -750,6 +840,7 @@ def main():
     ap.add_argument("--tier-prefix-max", type=int, default=0,
                     help="cap on each conversation's own start in the tier runs (tokens; 0: vLLM's config)")
     ap.add_argument("--engine-logs", default=None, help="folder of the engine logs (engine_*.log), for the JIT report")
+    ap.add_argument("--shapes", default="", help="T:B:O:R:label,... the published workloads (stage shapes)")
     ap.add_argument("--rerun", action="store_true")
     a = ap.parse_args()
     a.out = Path(a.out)
@@ -762,6 +853,7 @@ def main():
     a.tier_codecs = [c for c in a.tier_codecs.split(",") if c]
     a.tier_clients = [int(c) for c in a.tier_clients.split(",") if c]
     a.rates = [x if x == "inf" else float(x) for x in a.rates.split(",")]
+    a.shapes = parse_shapes(a.shapes)
     p = a.out / "results.json"
     res = json.loads(p.read_text()) if p.is_file() else {}
     if a.env:
@@ -778,6 +870,8 @@ def main():
             stage_multiturn(a, res)
         elif stage == "tier":
             stage_tier(a, res)
+        elif stage == "shapes":
+            stage_shapes(a, res)
         elif stage == "report":
             stage_report(a, res)
         save(a, res)

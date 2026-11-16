@@ -975,6 +975,42 @@ class RunnerDryRunTests(unittest.TestCase):
         engines = [json.loads(l) for l in log.read_text().splitlines()] if log.is_file() else []
         return r, engines
 
+    def test_published_workloads(self):
+        """SHAPES: the baselines' own workloads through the runner and the bench: their prompt files, the context the
+        longest needs, B requests at once (vllm bench serve --max-concurrency), O tokens out, one point each."""
+        shapes = "1024:2:256:2:sz1024,1024:2:256:3:sz16,20000:1:128:1:sz1"
+        h = subprocess.run(["bash", "-c", f"printf %s '{shapes}' | cksum | cut -d' ' -f1"], capture_output=True,
+                           text=True).stdout.strip()
+        prompts = self.kv / "runs" / "llama32_3b" / "pd" / f"prompts_2048_check_1000_3000_5000_8192_shapes_{h}"
+        prompts.mkdir(parents=True, exist_ok=True)
+        for f in ("check.jsonl", "prompts_mixed.jsonl", "prompts_1024.jsonl", "prompts_20000.jsonl"):
+            (prompts / f).write_text(json.dumps({"prompt": "hello", "output_tokens": 4}) + "\n")
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw,ours-hbh", LINKS="10",
+                             STAGES="check,shapes,report", SHAPES=shapes)
+        self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
+        self.assertIn("context 20224 tokens for the workloads", r.stdout)
+        argv = next(e for e in eng if e["cfg"]["kv_role"] == "kv_producer")["argv"]
+        self.assertEqual(argv[argv.index("--max-model-len") + 1], "20224")
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        res = json.loads((out / "results.json").read_text())
+        self.assertEqual(sorted(res["shapes"]), sorted(f"shape_{c}_10gbps_{s}" for c in ("raw", "ours-hbh")
+                                                       for s in ("t1024_b2_o256", "t20000_b1_o128")))
+        v = res["shapes"]["shape_ours-hbh_10gbps_t1024_b2_o256"]
+        self.assertEqual((v["families"], v["rounds"], v["requests"]), (["sz1024", "sz16"], 3, 6))
+        log = sorted(self.tmp.glob("engines_*.jsonl"))[-1]
+        bench = [json.loads(l) for l in Path(str(log) + ".bench").read_text().splitlines()]
+        b = next(x for x in bench if "shape_raw_10gbps_t1024_b2_o256.json" in x)
+        self.assertEqual((b[b.index("--max-concurrency") + 1], b[b.index("--num-prompts") + 1],
+                          b[b.index("--custom-output-len") + 1]), ("2", "6", "256"))
+        self.assertTrue(b[b.index("--dataset-path") + 1].endswith("prompts_1024.jsonl"))
+        self.assertIn("## The published workloads", (out / "summary.md").read_text())
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_matrix_report as mr
+        mr.main(["--runs", out.name, "--root", str(out.parent), "--output", str(self.tmp / "wl.md")])
+        text = (self.tmp / "wl.md").read_text()
+        self.assertIn("## Published workloads: 1p3d, host memory, link 10 Gb/s", text)
+        self.assertIn("| SplitZip, 16 at once + SplitZip, 1,024 tokens | 1024 x 2, 256 |", text)
+
     def test_layouts_connectors_and_packaging(self):
         r, eng = self.run_pd(LAYOUT="2p2d", TRANSPORT="p2p", CODECS="raw,ours-hbh")
         self.assertIn("NO_PUSH=1: committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
@@ -1024,6 +1060,23 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertIn("LINKS=10,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400 RATES=inf", runs[0])
         self.assertIn("TRANSPORT=p2p LINKS=10,25", runs[1])
         self.assertIn(",400,native", runs[1])
+        # the workloads matrix: the published shapes in every main run, the 32K ones last on their own
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="workloads", PRINT_RUNS="1"))
+        runs = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual(len(runs), 6)
+        self.assertTrue(all("STAGES=check,sweep,shapes,report" in x for x in runs[:4]))
+        self.assertIn("1920:20:128:2:ibp,4096:16:256:2:exactkv", runs[0])
+        self.assertIn("1024:64:128:2:sz1024", runs[0])
+        self.assertIn("CONNECTOR=nixl NIXL_ALL_GPUS=1", runs[2])
+        self.assertIn("CODECS=raw,nvcomp-ans", runs[3])
+        self.assertTrue(all("SHAPES=32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,"
+                            "8192:16:128:2:sz16,16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024" in x
+                            for x in runs[4:]))
+        import pd_bench as pb
+        parsed = pb.parse_shapes(runs[0].split("SHAPES=")[1].split()[0])
+        self.assertEqual(len(parsed), 19)                         # 21 entries; 2 shared by two families
+        self.assertEqual(max(e["tokens"] * e["batch"] for e in parsed), 65536)
         # colocated with the CPU tier, and LMCache
         r, eng = self.run_pd(LAYOUT="colo4", TIER_CODECS="raw,ours-hbh")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])

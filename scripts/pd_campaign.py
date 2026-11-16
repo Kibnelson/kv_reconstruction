@@ -39,7 +39,7 @@ import time
 
 SCHEMA = 1
 KIND = "kvpd_campaign"
-MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links")
+MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links", "workloads")
 # Disk (GB) on the node's root file system, which /tmp is: the shared cache's parts when missing, then a job's peak.
 # Measured sizes go into disk_after.json; these only decide whether to start.
 NEED_GB = {"uv": 17.0, "python": 0.2, "hf": 6.6}   # measured on gpu-grad-01 (job 30170): 16.7, 0.1, 6.5

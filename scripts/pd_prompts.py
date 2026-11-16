@@ -7,7 +7,9 @@ count with the model's tokenizer, in round-robin over the datasets.
       --per-length 64 --output-len 128 --out $RUN/pd/prompts
 
 Writes prompts_<tokens>.jsonl ({"prompt", "output_tokens", "dataset"}) and prompts_mixed.jsonl (all lengths
-interleaved), plus check.jsonl (a few prompts of uneven lengths for the correctness pass).
+interleaved), plus check.jsonl (a few prompts of uneven lengths for the correctness pass). --shape-counts T:n,...
+adds prompts_<T>.jsonl files of n prompts each for the published workloads (scripts/pd_bench.py --shapes), outside
+prompts_mixed.jsonl.
 """
 from __future__ import annotations
 
@@ -27,6 +29,7 @@ def main():
     ap.add_argument("--per-length", type=int, default=64)
     ap.add_argument("--output-len", type=int, default=128)
     ap.add_argument("--check-lengths", default="1000,3000,5000,8192")
+    ap.add_argument("--shape-counts", default="", help="T:n,...: n prompts of T tokens each, not in the mixed file")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     from transformers import AutoTokenizer
@@ -54,15 +57,21 @@ def main():
 
     mixed = []
     names = list(ids)
-    for n in [int(t) for t in a.tokens.split(",")]:
+    sweep = [int(t) for t in a.tokens.split(",") if t]
+    counts = {n: a.per_length for n in sweep}
+    for item in (x for x in a.shape_counts.split(",") if x):
+        n, k = (int(v) for v in item.split(":"))
+        counts[n] = max(counts.get(n, 0), k)
+    for n, k in counts.items():
         rows = []
-        for i in range(a.per_length):
+        for i in range(k):
             d = names[i % len(names)]
             rows.append({"prompt": window(d, n - 1), "output_tokens": a.output_len, "dataset": d, "tokens": n})
         with open(out / f"prompts_{n}.jsonl", "w") as f:
             for r in rows:
                 f.write(json.dumps(r) + "\n")
-        mixed.append(rows)
+        if n in sweep:
+            mixed.append(rows[:a.per_length])
     with open(out / "prompts_mixed.jsonl", "w") as f:
         for group in zip(*mixed):
             for r in group:

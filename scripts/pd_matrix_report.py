@@ -113,6 +113,71 @@ def link_tables(key, vs):
     return L
 
 
+FAMILIES = {"sz1": "SplitZip, 1 at a time", "sz16": "SplitZip, 16 at once", "sz1024": "SplitZip, 1,024 tokens",
+            "sz32k": "SplitZip, 32K tokens", "ibp": "IBP", "exactkv": "exactkv"}
+
+
+def workload_tables(runs):
+    """The published workloads (scripts/pd_bench.py stage shapes): per layout, path and link, one row per workload
+    and one column per codec; TTFT p50 with its speedup over raw, then requests per second with its gain."""
+    groups = {}
+    for r in runs:
+        for v in (r["res"].get("shapes") or {}).values():
+            key = (r["env"].get("layout") or "", path_of(r["env"]), bool(r["env"].get("eager")), str(v.get("link_gbps")))
+            groups.setdefault(key, []).append((r["name"], v))
+    L = []
+    order = list(FAMILIES)
+    for (lay, path, eager, link), vs in sorted(groups.items(), key=lambda kv: (kv[0][:3], speed_key(kv[0][3]))):
+        labels, by, shapes = {}, {}, {}
+        for run, v in vs:
+            if (run, v["codec"]) not in labels:     # the same codec from a second run (raw beside nvCOMP): "raw #2"
+                n = sum(1 for _, c in labels if c == v["codec"])
+                labels[(run, v["codec"])] = v["codec"] if n == 0 else f"{v['codec']} #{n + 1}"
+            lab = labels[(run, v["codec"])]
+            k = (v["tokens"], v["batch"], v["output"])
+            fam = shapes.setdefault(k, [])
+            fam += [f for f in v.get("families") or [] if f not in fam]
+            by[(lab, k)] = v
+        cols = list(dict.fromkeys(labels.values()))
+        rows = sorted(shapes, key=lambda k: (min([order.index(f) for f in shapes[k] if f in order] or [99]), k[1], k[0]))
+        link_s = "unpaced (the machine's own path)" if link in ("native", "None") else f"{float(link):g} Gb/s"
+        ref = "raw" if "raw" in cols else None
+
+        def table(metric, unit, better):
+            out = ["| Workload | Prompt tokens x at once, out | " + " | ".join(cols) + " |",
+                   "| --- | --- |" + " --- |" * len(cols)]
+            for k in rows:
+                vals = {c: ((by.get((c, k)) or {}).get("bench") or {}).get(metric) for c in cols}
+                good = [x for x in vals.values() if x]
+                best = (min(good) if better == "low" else max(good)) if good else None
+                cells = []
+                for c in cols:
+                    x, v = vals[c], by.get((c, k)) or {}
+                    st = v.get("transfers") or {}
+                    bad = (st.get("install_errors") or 0) + (st.get("send_errors") or 0) + (st.get("timeouts") or 0)
+                    if not x:
+                        cells.append("-")
+                        continue
+                    cell = f"{x:.0f}" if unit == "ms" else f"{x:.2f}"
+                    cell = f"**{cell}**" if x == best else cell
+                    rx = vals.get(ref) if ref else None
+                    if rx and c != ref:
+                        cell += f" ({(rx / x) if better == 'low' else (x / rx):.2f}x)"
+                    cells.append(cell + (" (failed)" if bad else ""))
+                fam = " + ".join(FAMILIES.get(f, f) for f in sorted(shapes[k], key=lambda f: order.index(f)
+                                                                         if f in order else 99))
+                out.append(f"| {fam} | {k[0]} x {k[1]}, {k[2]} | " + " | ".join(cells) + " |")
+            return out
+        L += [f"## Published workloads: {lay}, {path}{', eager engines' if eager else ''}, link {link_s}", "",
+              "Each baseline's own workload, as its authors reported it (docs/pd_baselines.md, \"Workloads\"), for "
+              "every codec: B requests at once, B x R in all, T-token prompts, O tokens out. TTFT p50 in ms, the best "
+              "in bold, and in brackets the speedup over raw (raw's time / the codec's).", ""]
+        L += table("median_ttft_ms", "ms", "low") + [""]
+        L += ["Requests per second, and in brackets the gain over raw:", ""]
+        L += table("request_throughput", "req/s", "high") + [""]
+    return L
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--runs", required=True)
@@ -206,6 +271,8 @@ def main(argv=None):
                 best.append(f"rate {rt}: {c} (goodput {g:.2f}/s, TTFT p50 {-t:.0f} ms)")
         if best:
             L += ["Best by goodput, then TTFT p50: " + "; ".join(best) + ".", ""]
+
+    L += workload_tables(runs)
 
     # CPU tier
     tiers = {}

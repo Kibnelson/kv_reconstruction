@@ -84,6 +84,39 @@ copies a piece that lands unaligned, since nvCOMP's decoder refuses one (job 302
   - The workload is vLLM's multi-turn benchmark on fresh conversations at each point, with conversation routing.
   - LMCache's CPU offload (`CONNECTOR=lmcache`) is the reference, with the same chunk size and budget.
 
+## Workloads: the baselines' own, and ours
+
+Every codec runs every workload: the same prompts (real text from WikiText-2, HumanEval, GSM8K, MMLU and PTB, cut to
+an exact token count), the same number of requests, greedy decoding, caches reset before each point. The `workloads`
+matrix adds, beside our own serving workload, each baseline's workload as its authors reported it (read at the
+sources on 16 November 2026). None reports a request count or an arrival rate for a serving test, so these are their
+shapes: how many requests at once, how long, how much output.
+
+| Family | The authors' setup | Ours (`T:B:O:R`: prompt tokens, at once, out, rounds) | Left out on this node |
+| --- | --- | --- | --- |
+| SplitZip, 1 at a time (`sz1`) | SGLang + Mooncake PD, Qwen3-32B and others, H200: batch 1, sequence 512 to 131K | 512, 1K, 2K, 4K, 8K (8 rounds), 16K (4) and 32K (4) tokens, 1 at a time | 64K and longer: our connector moves a request whole, and its KV then outgrows what the engines leave free (64K: 7.3 GB, held twice while it is coded); a layer-by-layer send would lift that |
+| SplitZip, 16 at once (`sz16`) | batch 16, sequence 128 to 64K | 128 to 16K tokens, 16 at once, 2 rounds | 32K and 64K (16 x 32K is 2.5 times what the three decode engines hold at once) |
+| SplitZip, 1,024 tokens (`sz1024`) | sequence 1,024, batch 1 to 256 | 1, 2, 4, ... 256 at once | - |
+| SplitZip, 32K tokens (`sz32k`) | sequence 32,768, batch 1 to 128 | 1, 2 and 4 at once | 8 and more |
+| IBP (`ibp`) | InfiniGen KV offload, OPT, A100: 1,920 tokens in, batch 20, 128 out | 20 at once x 1,920 tokens, 128 out, 2 rounds | - |
+| exactkv (`exactkv`) | RTX 4090 decoding loop: 4,096 tokens in, 256 greedy out, as many as fit | 16 at once (one decode engine's cache) x 4,096, 256 out, 2 rounds | - |
+| ours | - | 2,048 tokens, 32 requests at 0.5, 1 and 2 per second and all at once; goodput at a 2 s TTFT | - |
+
+ExANS reports a codec benchmark on one 256K-token KV snapshot (no model or data named) and AdaCode accuracy and
+memory at batch 1, with no serving or transfer test; nvCOMP is a library. Their codecs run on all of the above.
+
+The runs, in order (each fits the 12-hour allocation; the 32K ones last, so a failure there costs nothing else):
+1. host memory at 10 and 100 Gb/s: raw, SplitZip, ExANS, AdaCode, exactkv, T (hbh), T2 (hbh, rank 256);
+2. GPU to GPU, unpaced: the same codecs;
+3. vLLM's NIXL, every GPU visible;
+4. nVIDIA nvCOMP (ANS, Zstd, Bitcomp) on its own engines, host memory at 10 and 100 Gb/s;
+5. and 6. the biggest workloads, host memory and GPU to GPU: 32K-token prompts, 16 at once of 8K and 16K tokens,
+   128 and 256 at once of 1,024. Where more are at once than the decode engines hold, vLLM queues them, as it would
+   in service.
+
+The report gives one table per path and link: a row per workload, a column per codec, TTFT p50 with its speedup
+over raw (SplitZip's measure), then requests per second with the gain over raw.
+
 ## T2 in vLLM
 
 - **The constant set.** The sender ranks five constant sets per request (WikiText-2, MBPP, GSM8K, MMLU, PTB) by
@@ -183,7 +216,7 @@ git switch -q pd-baselines 2>/dev/null || git switch -q -c pd-baselines --track 
 git merge -q --ff-only origin/pd-baselines
 export KVPD_PIN=$(git rev-parse HEAD)
 test "$(git ls-remote origin refs/heads/pd-baselines | awk '{print $1}')" = "$KVPD_PIN"
-export KVPD_MATRIX=smoke                     # then ring1p3d, ring2p2d, direct, tier, t2eager, links: one campaign each
+export KVPD_MATRIX=smoke                     # then ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads
 export KVPD_TAG="pd_${KVPD_MATRIX}_$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p ~/.kvpd_campaigns
 STATE=~/.kvpd_campaigns/$KVPD_TAG.sh
@@ -261,6 +294,7 @@ The matrices (the times are estimates until the smoke has measured them):
 | ring1p3d | 1+3 through host memory at 3/10/25/100 Gb/s: the in-process baselines, T and T2; then nvCOMP |
 | ring2p2d | the same with 2+2 |
 | direct | GPU to GPU for 1+3 and 2+2, every codec, nvCOMP apart; NIXL for both layouts with every GPU visible, and 2+2 with its own GPU only |
+| workloads | 1+3, every codec on the baselines' published workloads and ours (above, "Workloads"): host memory at 10 and 100 Gb/s, GPU to GPU, NIXL, nvCOMP; the 32K-token ones last |
 | links | 1+3 over 10, 25, 50, ... 400 Gb/s (steps of 25), through host memory and GPU to GPU (paced, then unpaced), 16 requests at once: raw, SplitZip, ExANS, AdaCode, exactkv, T (hbh) and T2 (hbh, rank 256). One table per path: TTFT p50 per codec and speed, what the link carried, where each codec beats raw, and where a request's time goes |
 | tier | the CPU tier with every codec, nvCOMP apart; LMCache |
 | t2eager | T and T2 in eager engines: host memory at 10 and 100 Gb/s, GPU to GPU, the CPU tier |

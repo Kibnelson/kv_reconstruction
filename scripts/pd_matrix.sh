@@ -15,6 +15,10 @@
 #   t2eager     T and T2 in eager engines (T2's layer-0 recompute is bit-exact in eager mode), host ring and direct
 #   links       the link speed from 10 to 400 Gb/s in steps of 25, 16 requests at once, 1 prefill + 3 decode: through
 #               host memory and GPU to GPU (paced), the in-process baselines and ours; where each codec stops paying
+#   workloads   every codec on the baselines' own published workloads (SplitZip's four sweeps, IBP's, exactkv's) and
+#               on ours (rates 0.5-2 per second and all at once), 1 prefill + 3 decode at 10 and 100 Gb/s and GPU to
+#               GPU, NIXL and nvCOMP too; the biggest (32K-token prompts, 16 x 8K and more, 128 and 256 at once)
+#               last, in runs of their own
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
 # PRINT_RUNS=1 prints the list and stops. PD_CARD=1 (scripts/pd_card.sh's run stage): no branch check and no commit;
@@ -31,6 +35,19 @@ T2SET=raw,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256
 LINKSET=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh,t2-rank256
 SPEEDS=10,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400
 LINKRUN="RATES=inf NUM_PROMPTS=16 PROMPT_TOKENS=2048 CODECS=$LINKSET"
+# the published workloads, T:B:O:R:family (prompt tokens, requests at once, output tokens, rounds); docs/pd_baselines.md
+WL=""
+for t in 512 1024 2048 4096 8192; do WL+="$t:1:128:8:sz1,"; done
+WL+="16384:1:128:4:sz1,"
+for t in 128 256 512 1024 2048 4096; do WL+="$t:16:128:2:sz16,"; done
+for b in 1:8 2:4 4:2 8:2 16:2 32:2 64:2; do WL+="1024:${b%%:*}:128:${b##*:}:sz1024,"; done
+WL+="1920:20:128:2:ibp,4096:16:256:2:exactkv"
+# the big ones in runs of their own, last: a request's KV near what an engine leaves free (32K tokens: 3.7 GB, coded
+# beside itself), or more at once than the decode engines hold (they queue); an engine lost there costs nothing else
+WLONG="32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,8192:16:128:2:sz16,"
+WLONG+="16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024"
+WLRUN="LAYOUT=1p3d PROMPT_TOKENS=2048 RATES=0.5,1,2,inf NUM_PROMPTS=32 STAGES=check,sweep,shapes,report SHAPES=$WL RUN_TIMEOUT_S=25200"
+WLLONG="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$WLONG RUN_TIMEOUT_S=10800"
 MATRIX=${MATRIX:-smoke}
 if [ -z "${RUNS:-}" ]; then
     case "$MATRIX" in
@@ -53,7 +70,14 @@ if [ -z "${RUNS:-}" ]; then
                        LAYOUT=colo4 ENGINE_EAGER=1 TIER_CODECS=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256" ;;
         links) RUNS="LAYOUT=1p3d TRANSPORT=ring LINKS=$SPEEDS $LINKRUN;
                      LAYOUT=1p3d TRANSPORT=p2p LINKS=$SPEEDS,native $LINKRUN" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager or links (or set RUNS)"; exit 1 ;;
+        workloads) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$LINKSET $WLRUN;
+                         TRANSPORT=p2p LINKS=native CODECS=$LINKSET $WLRUN;
+                         CONNECTOR=nixl NIXL_ALL_GPUS=1 $WLRUN;
+                         TRANSPORT=ring LINKS=10,100 CODECS=$NV $WLRUN;
+                         TRANSPORT=ring LINKS=10,100 CODECS=$LINKSET $WLLONG;
+                         TRANSPORT=p2p LINKS=native CODECS=$LINKSET $WLLONG" ;;
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links or workloads (or set RUNS)"
+           exit 1 ;;
     esac
 fi
 IFS=';' read -r -a LIST <<< "$(echo "$RUNS" | tr '\n\t' '  ')"   # read stops at a newline: one line first

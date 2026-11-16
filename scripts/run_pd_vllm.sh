@@ -211,6 +211,12 @@ TIER_PREFIX_MAX=${TIER_PREFIX_MAX:-0}
 # the full tier: conversations of 6 prompts (vLLM's config) reach about 7.2K tokens at most, 2.9K on average; 640 blocks
 # (10K tokens) at an 8K context hold 4 of an engine's conversations (8 clients) but not 8 (16 clients)
 if [ "$COLO" = 1 ]; then GPU_BLOCKS=${GPU_BLOCKS:-640}; MAXLEN=${MAXLEN:-8192}; MAXBT=${MAXBT:-8192}; fi
+# the published workloads (stage shapes): SHAPES="T:B:O:R:label,..." (prompt tokens, requests at once, output tokens,
+# rounds, family); their prompt files (B x R prompts of T tokens) are made beside the sweep's, outside its mix
+SHAPES=${SHAPES:-}
+SHAPE_COUNTS=$(echo "$SHAPES" | tr ',' '\n' | awk -F: 'NF>=4 {n = $2 * $4; if (n > c[$1]) c[$1] = n}
+    END {for (t in c) printf "%s:%d,", t, c[t]}' | sed 's/,$//')
+SHAPE_NEED=$(echo "$SHAPES" | tr ',' '\n' | awk -F: 'NF>=4 {x = $1 + $3; if (x > m) m = x} END {print m + 0}')
 LOAD_CODECS=$([ "$COLO" = 1 ] && echo "$TIER_CODECS" || echo "$CODECS")
 LOAD_CODECS=$(echo "$LOAD_CODECS" | tr ',' '\n' | { grep -v -x -e nixl -e lmcache -e '' || true; } | paste -sd, -)
 
@@ -227,13 +233,18 @@ else
     [ "$EAGER" = 1 ] && ENGINE_ARGS+=(--enforce-eager)
 fi
 [ "$COLO" = 1 ] && ENGINE_ARGS+=(--num-gpu-blocks-override "${GPU_BLOCKS:-2048}" --distributed-executor-backend uni)
+if [ "$SHAPE_NEED" -gt "$MAXLEN" ]; then           # the longest workload's prompt and output
+    MAXLEN=$(( (SHAPE_NEED + 255) / 256 * 256 ))
+    echo "   context $MAXLEN tokens for the workloads (SHAPES)"
+fi
 
 CHECK_LENGTHS=${CHECK_LENGTHS:-1000,3000,5000,8192}
 [ "${SHARE_GPU:-0}" = 1 ] && CHECK_LENGTHS=${CHECK_LENGTHS_SHARED:-500,1000,1777,3000}
-PROMPTS=$RUN/pd/prompts_${PROMPT_TOKENS//,/_}_check_${CHECK_LENGTHS//,/_}
+PROMPTS=$RUN/pd/prompts_${PROMPT_TOKENS//,/_}_check_${CHECK_LENGTHS//,/_}${SHAPES:+_shapes_$(printf %s "$SHAPES" | cksum | cut -d' ' -f1)}
 if [ ! -s "$PROMPTS/check.jsonl" ]; then
     "$CPY" scripts/pd_prompts.py --texts "$KV_RUNS/dataset_texts" --model "$MP" --tokens "$PROMPT_TOKENS" \
-        --per-length "$NUM_PROMPTS" --output-len "$OUTPUT_LEN" --check-lengths "$CHECK_LENGTHS" --out "$PROMPTS"
+        --per-length "$NUM_PROMPTS" --output-len "$OUTPUT_LEN" --check-lengths "$CHECK_LENGTHS" --out "$PROMPTS" \
+        --shape-counts "$SHAPE_COUNTS"
 fi
 LINKFILE=$OUT/link.json
 echo '{"gbps": 100}' > "$LINKFILE"
@@ -412,7 +423,7 @@ PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
     --stages "$STAGES" --vllm-source "$KV_HOME/sources/vllm" --env "$OUT/env.json" \
     --tier-codecs "$TIER_CODECS" --tier-clients "$TIER_CLIENTS" --tier-conversations "$TIER_CONVERSATIONS" \
     --tier-max-turns "$TIER_MAX_TURNS" --tier-prefix-max "$TIER_PREFIX_MAX" --tier-control "$TIERFILE" \
-    --engine-logs "$OUT" 2>&1 | tee "$OUT/bench.log"
+    --engine-logs "$OUT" --shapes "$SHAPES" 2>&1 | tee "$OUT/bench.log"
 STATUS=${PIPESTATUS[0]}
 set -e
 if [ "$STATUS" = 124 ]; then echo "STOP: the bench ran past RUN_TIMEOUT_S=$RUN_TIMEOUT_S s; packaged as _partial"; fi
