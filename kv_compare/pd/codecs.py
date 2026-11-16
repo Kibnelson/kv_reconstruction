@@ -654,6 +654,188 @@ class IBP:
             sink(l, out.view(torch.int16).view(T, W))
 
 
+def _pack(idx, bits):
+    """Indices (int64, < 2^bits) into bytes: 8 bits one a byte, 4 bits two a byte, 6 bits four in three bytes."""
+    i = idx.reshape(-1)
+    if bits == 8:
+        return i.to(torch.uint8)
+    if bits == 4:
+        return (i[0::2] | (i[1::2] << 4)).to(torch.uint8)
+    if bits == 6:
+        q = i.reshape(-1, 4)
+        v = q[:, 0] | (q[:, 1] << 6) | (q[:, 2] << 12) | (q[:, 3] << 18)
+        return torch.stack([v & 255, (v >> 8) & 255, (v >> 16) & 255], 1).reshape(-1).to(torch.uint8)
+    raise ValueError(f"no packing for {bits}-bit indices")
+
+
+def _unpack(b, bits, count):
+    b = b.to(torch.int64)
+    if bits == 8:
+        return b[:count]
+    if bits == 4:
+        return torch.stack([b & 15, b >> 4], 1).reshape(-1)[:count]
+    if bits == 6:
+        t = b.reshape(-1, 3)
+        v = t[:, 0] | (t[:, 1] << 8) | (t[:, 2] << 16)
+        return torch.stack([v & 63, (v >> 6) & 63, (v >> 12) & 63, (v >> 18) & 63], 1).reshape(-1)[:count]
+    raise ValueError(f"no packing for {bits}-bit indices")
+
+
+class AquaKV:
+    """AQUA-KV (Shutova et al., "Cache Me If You Must", arXiv 2501.19392) as a transfer codec on the GPU. LOSSY:
+    measured for speed and size beside the bit-exact codecs, never as one of them (no checksum; the sender reports
+    its own reconstruction's relative error). The algorithm is the authors' (goodevening13/aquakv e744183), as
+    kv_compare.baselines.aqua_official re-implements and checks it:
+      - keys without RoPE; the first AQUA_PREFIX positions (the attention sinks) sent as they are (BF16);
+      - layer 0: keys and values quantized with HIGGS 4-bit, no predictor;
+      - layer l >= 1: keys predicted from layer l-1's reconstructed keys, values from [this layer's reconstructed
+        keys, layer l-1's reconstructed values] (BF16 linear maps fitted at setup on the calibration documents' own
+        closed-loop reconstructions: scripts/pd_export_codecs.py --aqua-bits); the residual quantized with HIGGS
+        b-bit: a Walsh-Hadamard transform over groups of 1,024 channels, each group divided by its L2 norm (one
+        scale per token and group), each pair of values replaced by the nearest of 2^(2b) EDEN grid points.
+    Encoder and decoder share the dequantization and the predictors, so the receiver rebuilds exactly the
+    reconstruction the sender's closed loop used, and that is the reference's to the value (test_kv_compare). The
+    scale travels as float32, as the reference multiplies by it: the paper counts 16 bits for it, so the size here
+    is 16 bits per 1,024 values (0.016 bits a value) above the paper's count. A float16 scale changed 12% of the
+    first layer's values and, through the predictors, 70% of the last's."""
+    lossy = True
+
+    def __init__(self, bundle, bits, device):
+        from .. import baselines as bl
+        if bundle is None or int(bits) not in (bundle.get("aqua") or {}):
+            raise ValueError(f"no AQUA-KV {bits}-bit predictors in the codec file (pd_export_codecs.py --aqua-bits)")
+        self.bl = bl
+        self.bits = int(bits)
+        self.name = f"aquakv-{self.bits}"
+        dev = torch.device(device)
+        m = bundle["meta"]
+        if m.get("rope_layout", "half") != "half":
+            raise ValueError("AQUA-KV's codec here assumes the rotate-half RoPE layout (Llama)")
+        self.C, self.hd, self.L, self.W = (int(m[k]) for k in ("C", "hd", "L", "W"))
+        self.n, self.n0 = bl.AQUA_GRID[self.bits], bl.AQUA_GRID[4]
+        self.G, self.prefix = bl.AQUA_GROUP, bl.AQUA_PREFIX
+        self.mult = -(-self.C // self.G)
+        self.fits = {int(l): tuple((_on(w, dev), _on(b, dev)) for w, b in pair)
+                     for l, pair in bundle["aqua"][self.bits].items()}
+        self.grids = {n: bl.higgs_grid(n, dev).to(torch.float32) for n in {self.n, self.n0}}
+        self.cos, self.sin = _on(bundle["cos"], dev), _on(bundle["sin"], dev)
+        self.device = dev
+
+    def _rot(self, k, cos, sin, inverse=False):
+        """RoPE (rotate-half) on keys [T, C] float32, or its inverse."""
+        T = k.shape[0]
+        x = k.reshape(T, -1, self.hd)
+        a, b = x[..., : self.hd // 2], x[..., self.hd // 2:]
+        c, s = cos[:, None, :], sin[:, None, :]
+        if inverse:
+            r = c * c + s * s
+            c, s = c / r, -s / r
+        return torch.cat([a * c - b * s, b * c + a * s], -1).reshape(T, -1)
+
+    def _dequant(self, idx, s16, n):
+        """HIGGS dequantization (HiggsQuantizer.dequantize): grid points x the scale, in float16, the inverse
+        Hadamard transform (scale 1 / group) in float32, then float16. idx [T, mult, G/2], s16 [T, mult]."""
+        T = idx.shape[0]
+        deq = (self.grids[n][idx].flatten(2) * s16.to(torch.float32)[:, :, None]).half()
+        out = (self.bl.hadamard(deq.to(torch.float32)) * (1.0 / self.G)).half()
+        return out.reshape(T, -1)[:, : self.C]
+
+    def _quant(self, r, n):
+        """HIGGS quantization of residuals r [T, C] (BF16): indices [T, mult, G/2] and float32 scales [T, mult]."""
+        T = r.shape[0]
+        x = r.to(torch.float32)
+        pad = self.mult * self.G - self.C
+        if pad:
+            x = torch.nn.functional.pad(x, (0, pad))
+        xg = x.reshape(T, self.mult, self.G)
+        scales = torch.linalg.norm(xg, dim=-1)
+        safe = torch.where(scales > 0, scales, torch.ones_like(scales))
+        z = (self.bl.hadamard(xg) / safe[:, :, None]).reshape(T, self.mult, self.G // 2, 2)
+        grid = self.grids[n]
+        gn = grid.pow(2).sum(1)
+        idx = torch.empty(T, self.mult, self.G // 2, dtype=torch.int64, device=r.device)
+        rows = max(1, (64 << 20) // (self.mult * self.G // 2 * n * 4))     # about 64 MB of scores at once
+        for i in range(0, T, rows):
+            idx[i:i + rows] = torch.argmax(2 * z[i:i + rows] @ grid.T - gn, dim=-1)
+        return idx, scales
+
+    def _predict(self, l, which, x):
+        w, b = self.fits[l][which]
+        return torch.nn.functional.linear(x, w, b)
+
+    def _span(self, T, pos0):
+        p = max(0, min(self.prefix - int(pos0), T))
+        pos = torch.arange(int(pos0) + p, int(pos0) + T, device=self.device)
+        if pos.numel() and int(pos[-1]) >= self.cos.shape[0]:
+            raise ValueError(f"positions up to {int(pos[-1])} beyond the exported RoPE tables ({self.cos.shape[0]})")
+        return p, self.cos[pos], self.sin[pos]
+
+    def _nbits(self, n):
+        return {16: 4, 64: 6, 256: 8}[n]
+
+    def encode(self, words, pos0=0):
+        L, T, W = words.shape
+        C, bf = self.C, torch.bfloat16
+        p, cos, sin = self._span(T, pos0)
+        x = words.view(bf)
+        idx_parts, scale_parts = [], []
+        num = torch.zeros((), dtype=torch.float64, device=words.device)
+        den = torch.zeros((), dtype=torch.float64, device=words.device)
+        prev = None
+        for l in range(L):
+            xl = x[l, p:].to(torch.float32)
+            kd = self._rot(xl[:, :C], cos, sin, inverse=True).to(bf)
+            vd = x[l, p:, C:]
+            n = self.n0 if l == 0 else self.n
+            pk = torch.zeros_like(kd) if l == 0 else self._predict(l, 0, prev[0])
+            ik, sk = self._quant((kd.float() - pk.float()).to(bf), n)
+            kr = (pk.float() + self._dequant(ik, sk, n).to(bf).float()).to(bf)
+            pv = torch.zeros_like(vd) if l == 0 else self._predict(l, 1, torch.cat([kr, prev[1]], 1))
+            iv, sv = self._quant((vd.float() - pv.float()).to(bf), n)
+            vr = (pv.float() + self._dequant(iv, sv, n).to(bf).float()).to(bf)
+            prev = (kr, vr)
+            idx_parts += [_pack(ik, self._nbits(n)), _pack(iv, self._nbits(n))]
+            scale_parts += [sk, sv]
+            kk = self._rot(kr.float(), cos, sin).to(bf).float()
+            num += (kk - xl[:, :C]).double().pow(2).sum() + (vr.float() - xl[:, C:]).double().pow(2).sum()
+            den += x[l].double().pow(2).sum()                 # over every token: the sinks' error is 0
+        e = x.new_zeros(0)
+        parts = {"prefix": words[:, :p].contiguous(),
+                 "idx": torch.cat(idx_parts) if idx_parts else e.view(torch.uint8),
+                 "scales": torch.stack(scale_parts) if scale_parts else e.view(torch.float32)}
+        rel = float((num / den).sqrt()) if float(den) > 0 else 0.0
+        return parts, {"codec": self.name, "T": int(T), "p": int(p), "pos0": int(pos0), "bits": self.bits,
+                       "rel_err": rel}
+
+    def decode(self, parts, meta, sink):
+        T, p, pos0 = int(meta["T"]), int(meta["p"]), int(meta.get("pos0", 0))
+        C, bf = self.C, torch.bfloat16
+        _, cos, sin = self._span(T, pos0)
+        prefix, idx, scales = parts["prefix"], parts["idx"], parts["scales"]
+        T1 = T - p
+        count = T1 * self.mult * (self.G // 2)
+        o, prev = 0, None
+        for l in range(self.L):
+            n = self.n0 if l == 0 else self.n
+            nb = count * self._nbits(n) // 8
+            shape = (T1, self.mult, self.G // 2)
+            ik = _unpack(idx[o:o + nb], self._nbits(n), count).reshape(shape)
+            iv = _unpack(idx[o + nb:o + 2 * nb], self._nbits(n), count).reshape(shape)
+            o += 2 * nb
+            pk = torch.zeros(T1, C, dtype=bf, device=idx.device) if l == 0 else self._predict(l, 0, prev[0])
+            kr = (pk.float() + self._dequant(ik, scales[2 * l], n).to(bf).float()).to(bf)
+            pv = torch.zeros(T1, C, dtype=bf, device=idx.device) if l == 0 else \
+                self._predict(l, 1, torch.cat([kr, prev[1]], 1))
+            vr = (pv.float() + self._dequant(iv, scales[2 * l + 1], n).to(bf).float()).to(bf)
+            prev = (kr, vr)
+            out = torch.empty(T, self.W, dtype=torch.int16, device=idx.device)
+            if p:
+                out[:p] = prefix[l]
+            out[p:, :C] = self._rot(kr.float(), cos, sin).to(bf).view(torch.int16)
+            out[p:, C:] = vr.view(torch.int16)
+            sink(l, out)
+
+
 def build(bundle_path, device, names, splitzip_source=None, adacode_source=None, log=print, exactkv_source=None,
           exans_info=None):
     """{name: codec} for the requested names (raw, ours-<mode>, t2-<mode>, splitzip, adacode, exactkv,
@@ -683,6 +865,8 @@ def build(bundle_path, device, names, splitzip_source=None, adacode_source=None,
                 out[n] = ExANS(exans_info, device)
             elif n == "ibp":
                 out[n] = IBP(device)
+            elif n.startswith("aquakv-"):
+                out[n] = AquaKV(bundle, int(n[7:]), device)
             else:
                 raise ValueError(f"unknown codec {n}")
         except Exception as exc:

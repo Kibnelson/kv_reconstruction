@@ -564,15 +564,18 @@ class _WorkerSide:
             sync(self.device)
             rec["gather_ms"] = 1e3 * (time.perf_counter() - t)
             self.sent_ready.add(spec.req_id)         # the blocks are copied out: vLLM may free them
-            check = word_checksum(words) if spec.verify else None
+            lossy = getattr(codec, "lossy", False)    # AQUA-KV: a speed reference; its own error, no checksum
+            check = word_checksum(words) if spec.verify and not lossy else None
             t = time.perf_counter()
             ctx = self._ctx(codec, spec.prompt, spec.steps)
             parts, meta = _retry_once(lambda w=words, c=ctx: (codec.encode(w, pos0=spec.t0, ctx=c) if c is not None
                                                              else codec.encode(w, pos0=spec.t0)), self.device, rec)
             header, blob = bundle(parts, dict(meta, checksum=check, key=spec.key, t0=spec.t0, sent_at=time.time()))
-            for k in ("set", "layer0", "layer0_check"):
+            for k in ("set", "layer0", "layer0_check", "rel_err"):
                 if k in meta:
                     rec[k] = meta[k]
+            if lossy:
+                rec["lossy"] = True
             sync(self.device)
             rec["encode_ms"] = 1e3 * (time.perf_counter() - t)
             rec["raw_bytes"] = int(words.numel() * 2)

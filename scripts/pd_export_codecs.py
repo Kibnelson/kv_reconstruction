@@ -38,6 +38,9 @@ def main():
     ap.add_argument("--texts", default=None, help="folder with the calibration texts (cal_<domain>.txt)")
     ap.add_argument("--cal-windows", type=int, default=3)
     ap.add_argument("--tokens", type=int, default=8192)
+    ap.add_argument("--aqua-bits", default="2,3",
+                    help="AQUA-KV's predictors (lossy, a speed reference: codecs aquakv-<b>), fitted the authors' way "
+                         "on the calibration documents' own closed-loop reconstructions; empty for none")
     ap.add_argument("--drop-cal-captures", action="store_true",
                     help="delete a set's calibration windows (cal_*) after fitting it, unless a later set uses them")
     a = ap.parse_args()
@@ -72,7 +75,19 @@ def main():
     meta = load_meta(run / "captures")
     b = make_bundle(study, consts, rc, groups, a.max_positions, splitzip=sz, adacode=ada,
                     meta={"model": meta.get("model"), "revision": meta.get("revision"), "train_set": a.train_set,
-                          "calibration": [d.name for d in study.train], "splitzip_book_from": cal.name})
+                          "calibration": [d.name for d in study.train], "splitzip_book_from": cal.name,
+                          "rope_layout": study.rope.layout})
+    aqua_bits = [int(x) for x in a.aqua_bits.split(",") if x]
+    if aqua_bits:
+        from kv_compare import baselines
+        b["aqua"] = {}
+        for bits in aqua_bits:
+            fits = baselines.aqua_official_fit(study, study.L, bits, log=print)
+            b["aqua"][bits] = {int(l): tuple((w.to(torch.bfloat16).cpu(), bb.to(torch.bfloat16).cpu()) for w, bb in pair)
+                               for l, pair in fits.items()}
+            print(f"AQUA-KV {bits}-bit: predictors for layers 1..{study.L - 1} on {len(study.train)} documents "
+                  f"({baselines.AQUA_SOURCE})")
+        b["meta"]["aqua_bits"] = aqua_bits
     names = [n for n in a.t2_sets.split(",") if n]
     if names:
         b["t2"] = t2_sets(a, run, names, b)

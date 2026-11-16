@@ -315,7 +315,7 @@ def transfer_stats(recs):
             "encode_ms": mean([r.get("encode_ms") for r in s]),
             "link_ms": mean([1e3 * r["link_s"] for r in s if r.get("link_s") is not None]),
             "queue_ms": mean([1e3 * (r["send_begin"] - r["queued"]) for r in s if r.get("send_begin")]),
-            "achieved_gbps": mean(ach), "wire_gbps": wire_gbps(s),
+            "achieved_gbps": mean(ach), "wire_gbps": wire_gbps(s), "rel_err": mean([r.get("rel_err") for r in s]),
             "install_ms": mean([r.get("decode_install_ms") for r in d]),
             "wait_ms": mean([1e3 * (r["done_at"] - r["admitted_at"]) for r in d if r.get("admitted_at")]),
             "exact": sum(1 for r in d if r.get("exact") is True), "inexact": sum(1 for r in d if r.get("exact") is False),
@@ -378,17 +378,25 @@ def stage_check(a, res):
         same = sum(1 for x, y in zip(got, ref) if x.get("text") is not None and x.get("text") == y.get("text"))
         if codec == "nixl":                          # vLLM's connector: no checksums; the outputs and no errors
             ok = not any("error" in g for g in got)
+        elif is_lossy(codec):                     # AQUA-KV: every transfer installed; its error, not exactness
+            ok = st["installs"] == len(rows) and not st["install_errors"] and not any("error" in g for g in got)
         else:
             ok = st["installs"] == len(rows) and st["exact"] == len(rows) and not st["install_errors"] and \
                 not any("error" in g for g in got)
         out[codec] = {"prompts": len(rows), "same_text_as_local": same, "transfers": st, "ok": ok,
-                      "errors": [g["error"] for g in got if "error" in g], "resets": resets}
+                      "errors": [g["error"] for g in got if "error" in g], "resets": resets, "lossy": is_lossy(codec)}
         log(f"check {codec}: {'OK' if ok else 'FAILED'} - " +
-            (f"{st['exact']}/{len(rows)} transfers bit-exact, " if codec != "nixl" else
+            (f"{st['exact']}/{len(rows)} transfers bit-exact, " if codec != "nixl" and not is_lossy(codec) else
+             f"lossy, KV error {fmt(100 * (st.get('rel_err') or 0), 2)}% (relative L2), " if is_lossy(codec) else
              "transfers n/a (vLLM's connector: no checksums), ") +
             f"{same}/{len(rows)} outputs equal to local prefill, bits {fmt(st['bits'])}")
     post(a.proxy + "/t/config", {"verify": False})
     res["check"] = out
+
+
+def is_lossy(codec):
+    """AQUA-KV (aquakv-<b>): lossy, a speed reference beside the bit-exact codecs."""
+    return str(codec).startswith("aquakv-")
 
 
 def completion(a, prompt, n):

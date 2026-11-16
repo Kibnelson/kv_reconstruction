@@ -17,8 +17,9 @@
 #               host memory and GPU to GPU (paced), the in-process baselines and ours; where each codec stops paying
 #   workloads   every codec on the baselines' own published workloads (SplitZip's four sweeps, IBP's, exactkv's) and
 #               on ours (rates 0.5-2 per second and all at once), 1 prefill + 3 decode at 10 and 100 Gb/s and GPU to
-#               GPU, NIXL and nvCOMP too; the biggest (32K-token prompts, 16 x 8K and more, 128 and 256 at once)
-#               last, in runs of their own
+#               GPU, NIXL and nvCOMP too; AQUA-KV (lossy) beside them for speed
+#   wlong       the biggest published workloads (32K-token prompts, 16 at once of 8K and 16K, 128 and 256 at once of
+#               1,024), host memory at 10 and 100 Gb/s and GPU to GPU: a campaign of their own
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
 # PRINT_RUNS=1 prints the list and stops. PD_CARD=1 (scripts/pd_card.sh's run stage): no branch check and no commit;
@@ -33,8 +34,9 @@ NV=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp
 TIERMAIN=raw,splitzip,exans,adacode,exactkv,ibp,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-rank256
 T2SET=raw,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256
 LINKSET=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh,t2-rank256
+AQUA=aquakv-2,aquakv-3                    # AQUA-KV, lossy: a speed and size reference beside the bit-exact codecs
 SPEEDS=10,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400
-LINKRUN="RATES=inf NUM_PROMPTS=16 PROMPT_TOKENS=2048 CODECS=$LINKSET"
+LINKRUN="RATES=inf NUM_PROMPTS=16 PROMPT_TOKENS=2048 CODECS=$LINKSET,aquakv-2"
 # the published workloads, T:B:O:R:family (prompt tokens, requests at once, output tokens, rounds); docs/pd_baselines.md
 WL=""
 for t in 512 1024 2048 4096 8192; do WL+="$t:1:128:8:sz1,"; done
@@ -51,7 +53,7 @@ WLLONG="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$WLONG RUN_TIMEOUT_S=10800
 MATRIX=${MATRIX:-smoke}
 if [ -z "${RUNS:-}" ]; then
     case "$MATRIX" in
-        smoke) RUNS="SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh;
+        smoke) RUNS="SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh,aquakv-2;
                      SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=$NV;
                      SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh;
                      SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl NIXL_ALL_GPUS=1;
@@ -70,13 +72,14 @@ if [ -z "${RUNS:-}" ]; then
                        LAYOUT=colo4 ENGINE_EAGER=1 TIER_CODECS=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256" ;;
         links) RUNS="LAYOUT=1p3d TRANSPORT=ring LINKS=$SPEEDS $LINKRUN;
                      LAYOUT=1p3d TRANSPORT=p2p LINKS=$SPEEDS,native $LINKRUN" ;;
-        workloads) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$LINKSET $WLRUN;
-                         TRANSPORT=p2p LINKS=native CODECS=$LINKSET $WLRUN;
+        workloads) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$LINKSET,$AQUA $WLRUN;
+                         TRANSPORT=p2p LINKS=native CODECS=$LINKSET,$AQUA $WLRUN;
                          CONNECTOR=nixl NIXL_ALL_GPUS=1 $WLRUN;
-                         TRANSPORT=ring LINKS=10,100 CODECS=$NV $WLRUN;
-                         TRANSPORT=ring LINKS=10,100 CODECS=$LINKSET $WLLONG;
-                         TRANSPORT=p2p LINKS=native CODECS=$LINKSET $WLLONG" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links or workloads (or set RUNS)"
+                         TRANSPORT=ring LINKS=10,100 CODECS=$NV $WLRUN" ;;
+        wlong) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$LINKSET,aquakv-2 $WLLONG;
+                     TRANSPORT=p2p LINKS=native CODECS=$LINKSET,aquakv-2 $WLLONG" ;;
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads or wlong" \
+                "(or set RUNS)"
            exit 1 ;;
     esac
 fi

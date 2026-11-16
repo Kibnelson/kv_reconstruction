@@ -199,13 +199,25 @@ print(",".join(b.get("t2", {}).get("order", [])) or "none")
 EOF
 )
 fi
-if [ ! -s "$RUN/pd_codecs.pt" ] || { [ -n "$T2_SETS" ] && [ "$HAVE_T2" != "$T2_SETS" ]; }; then
+AQUA_BITS=${AQUA_BITS:-2,3}
+HAVE_AQUA=none
+if [ -s "$RUN/pd_codecs.pt" ]; then
+    HAVE_AQUA=$("$KV_HOME/venv/bin/python" - "$RUN/pd_codecs.pt" <<'EOF' 2>/dev/null || echo none
+import sys, torch
+b = torch.load(sys.argv[1], map_location="cpu", weights_only=False)
+print(",".join(str(x) for x in b.get("meta", {}).get("aqua_bits", [])) or "none")
+EOF
+)
+fi
+if [ ! -s "$RUN/pd_codecs.pt" ] || { [ -n "$T2_SETS" ] && [ "$HAVE_T2" != "$T2_SETS" ]; } || \
+        { [ -n "$AQUA_BITS" ] && [ "$HAVE_AQUA" != "$AQUA_BITS" ]; }; then
     SZ=()
     [ -d "$KV_HOME/sources/splitzip" ] && SZ=(--splitzip-source "$KV_HOME/sources/splitzip")
     T2=()
     [ -n "$T2_SETS" ] && T2=(--t2-sets "$T2_SETS" --texts "$TEXTS")
     [ -n "$T2_SETS" ] && [ "${KEEP_CAL_CAPTURES:-0}" != 1 ] && T2+=(--drop-cal-captures)   # one set's windows at a time
-    "$KV_HOME/venv/bin/python" -u scripts/pd_export_codecs.py --run "$RUN" --output "$RUN/pd_codecs.pt" "${SZ[@]}" "${T2[@]}"
+    "$KV_HOME/venv/bin/python" -u scripts/pd_export_codecs.py --run "$RUN" --output "$RUN/pd_codecs.pt" "${SZ[@]}" "${T2[@]}" \
+        --aqua-bits "$AQUA_BITS"
     if [ -n "$T2_SETS" ] && [ "${KEEP_CAL_CAPTURES:-0}" != 1 ]; then
         rm -f "$RUN"/captures/cal_*                  # the T2 calibration windows: in pd_codecs.pt now
     fi
@@ -221,7 +233,7 @@ EXANS_INFO=()
 SELFTEST_OK=1
 for part in main nvcomp; do
     if [ "$part" = main ]; then
-        NAMES=${SELFTEST_CODECS:-raw,ours-dense,ours-kv,ours-4g,ours-hbh,ours-rank256,t2-dense,t2-hbh,t2-rank256,splitzip,adacode,exactkv,exans,ibp}
+        NAMES=${SELFTEST_CODECS:-raw,ours-dense,ours-kv,ours-4g,ours-hbh,ours-rank256,t2-dense,t2-hbh,t2-rank256,splitzip,adacode,exactkv,exans,ibp,aquakv-2,aquakv-3}
         OUTF=$RUN/pd_selftest.json
     else
         NAMES=${SELFTEST_NVCOMP:-nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp}

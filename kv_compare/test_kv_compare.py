@@ -164,6 +164,60 @@ class TinyLlamaTests(unittest.TestCase):
         self.assertTrue(errs[0] > errs[1] > errs[2] > 0)
         self.assertLess(errs[0], 0.4)
 
+    def test_aquakv_transfer_codec_follows_the_reference(self):
+        """The PD transfer codec aquakv-<b> (float32 and BF16 arithmetic, as on the GPU) against
+        kv_compare.baselines.aqua_official (the authors' algorithm, float64 with BF16 rounding emulated): the same
+        reconstruction, value for value; the receiver rebuilds the sender's (the error it reports), the
+        attention-sink tokens exactly."""
+        from kv_compare import baselines
+        from kv_compare.core import words_to_float
+        from kv_compare.pd import codecs as cd
+        from kv_compare.pd.wire import bundle as wbundle, payload_bytes, unbundle
+        st, doc, P = self.study, self.study.tests[0] if hasattr(self.study, "tests") else None, 200
+        from kv_compare.predict import Doc
+        doc = Doc(self.root, "test_text")
+        pos = torch.arange(P + 64)
+        cos, sin = st.rope.tables(pos)
+        for bits in (2, 3):
+            fits = baselines.aqua_official_fit(st, st.L, bits)
+            b = {"meta": {"C": st.C, "hd": st.hd, "L": st.L, "W": st.W, "rope_layout": st.rope.layout},
+                 "cos": cos.to(torch.float32), "sin": sin.to(torch.float32),
+                 "aqua": {bits: {l: tuple((w.to(torch.bfloat16), bb.to(torch.bfloat16)) for w, bb in pair)
+                                 for l, pair in fits.items()}}}
+            c = cd.AquaKV(b, bits, "cpu")
+            self.assertTrue(c.lossy)
+            words = torch.stack([doc.words(l, "cpu", P) for l in range(st.L)])
+            words = (words - 65536 * (words >= 32768).to(torch.int32)).to(torch.int16)
+            parts, meta = c.encode(words)
+            header, blob = wbundle(parts, meta)
+            p2, m2 = unbundle(header, blob)
+            back = torch.empty_like(words)
+            c.decode(p2, m2, lambda l, w: back[l].copy_(w))
+            exact = torch.stack([words_to_float(doc.words(l, "cpu", P)) for l in range(st.L)])
+            got = words_to_float(back.to(torch.int32) & 0xFFFF)
+            ref, ref_bits = baselines.aqua_official(st, fits, doc, P, bits)
+            ref = ref.double()
+            p = baselines.AQUA_PREFIX
+            self.assertTrue(torch.equal(back[:, :p], words[:, :p]))           # the sinks as they are
+            err = float((got - exact).norm() / exact.norm())
+            ref_err = float((ref - exact).norm() / exact.norm())
+            self.assertAlmostEqual(err, meta["rel_err"], places=6)            # the receiver has the sender's values
+            self.assertAlmostEqual(err, ref_err, places=9)
+            self.assertTrue(torch.equal(got, ref), bits)
+            # size: b bits a value (4 in layer 0), a float32 scale per token, K or V and group; the sinks 16
+            coded = 8.0 * payload_bytes(header) / words.numel()
+            G = baselines.AQUA_GROUP
+            per_tok = lambda bb: 2 * (G * bb + 32)                            # one padded group each for K, V
+            want = (p * st.W * 16 * st.L + (P - p) * (per_tok(4) + (st.L - 1) * per_tok(bits))) / words.numel()
+            self.assertAlmostEqual(coded, want, places=6)
+        # a later chunk of the same request (positions 100..): no sinks in it, every token coded
+        parts, meta = c.encode(words[:, 100:140].contiguous(), pos0=100)
+        self.assertEqual((meta["p"], tuple(parts["prefix"].shape)), (0, (st.L, 0, st.W)))
+        back = torch.empty(st.L, 40, st.W, dtype=torch.int16)
+        c.decode(parts, meta, lambda l, w: back[l].copy_(w))
+        e = words_to_float(back.to(torch.int32) & 0xFFFF) - exact[:, 100:140]
+        self.assertAlmostEqual(float(e.norm() / exact[:, 100:140].norm()), meta["rel_err"], places=6)
+
     def test_lossy_and_quality(self):
         from kv_compare import baselines
         from kv_compare.core import words_to_float

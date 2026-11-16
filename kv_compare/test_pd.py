@@ -345,8 +345,19 @@ class ConnectorFlowTests(unittest.TestCase):
                                                       failed_recving=r.failed_recving))
         return r
 
-    def flow(self, local_hit=0, codec="raw"):
+    def flow(self, local_hit=0, codec="raw", lossy=False):
         Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make()
+        if lossy:                                     # a lossy stand-in for AQUA-KV: every word's lowest bit flipped
+            from kv_compare.pd.codecs import Raw
+
+            class Lossy(Raw):
+                lossy = True
+
+                def encode(self, words, pos0=0):
+                    parts, meta = Raw.encode(self, words ^ 1, pos0)
+                    return parts, dict(meta, rel_err=0.0123)
+            Pw.w.codecs[codec] = Lossy()
+            Dw.w.codecs[codec] = Lossy()
         prompt = list(range(100, 140))                # 40 tokens: 3 blocks of 16
         p_blocks, d_blocks = [5, 2, 9], [1, 7, 3]
         dreq = SimpleNamespace(request_id="d-1", prompt_token_ids=prompt, num_computed_tokens=0,
@@ -381,7 +392,7 @@ class ConnectorFlowTests(unittest.TestCase):
         L = len(pc)
         src = Paged([pc[f"model.layers.{l}.self_attn.attn"] for l in range(L)], 16, 2, 8).gather(p_blocks, 0, 40)
         dst = Paged([dc[f"model.layers.{l}.self_attn.attn"] for l in range(L)], 16, 2, 8)
-        self.assertTrue(torch.equal(dst.gather(d_blocks, local_hit, 40), src[:, local_hit:]))
+        self.assertTrue(torch.equal(dst.gather(d_blocks, local_hit, 40), (src ^ 1 if lossy else src)[:, local_hit:]))
         if local_hit:                                 # what the engine had stays as it was
             self.assertTrue(torch.equal(dst.gather(d_blocks, 0, local_hit),
                                         Paged([before[f"model.layers.{l}.self_attn.attn"] for l in range(L)], 16, 2,
@@ -389,6 +400,12 @@ class ConnectorFlowTests(unittest.TestCase):
         recs = [json.loads(l) for f in Path(log_dir).glob("tkv_*.jsonl") for l in f.read_text().splitlines()]
         inst = [x for x in recs if x.get("event") == "install"]
         self.assertEqual(len(inst), 1)
+        if lossy:                                     # no checksum to compare; the sender's own error recorded
+            self.assertIsNone(inst[0]["exact"])
+            self.assertNotIn("error", inst[0])
+            send = next(x for x in recs if x.get("event") == "send")
+            self.assertEqual((send["lossy"], send["rel_err"]), (True, 0.0123))
+            return recs
         self.assertTrue(inst[0]["exact"])
         self.assertTrue(any(x.get("event") == "match" and x["local_hit"] == local_hit for x in recs))
         self.assertTrue(any(x.get("event") == "prefill_done" and len(x["blocks"]) == 2 for x in recs))
@@ -396,6 +413,10 @@ class ConnectorFlowTests(unittest.TestCase):
 
     def test_whole_prompt_moves_exactly(self):
         self.flow()
+
+    def test_a_lossy_codec_installs_without_a_checksum(self):
+        """AQUA-KV is lossy: with the check on, its sender sends no checksum and the receiver installs what came."""
+        self.flow(lossy=True)
 
     def test_only_the_missing_tokens_are_installed(self):
         self.flow(local_hit=16)

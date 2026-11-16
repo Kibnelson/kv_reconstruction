@@ -46,6 +46,20 @@ def label(env):
     return f"{lay}, {path_of(env)}" + (", eager" if env.get("eager") else "")
 
 
+def lossy(c):
+    return str(c).startswith("aquakv-")
+
+
+def cname(c):
+    """A codec's name in the tables: AQUA-KV marked lossy."""
+    return f"{c} (lossy)" if lossy(c.split(" #")[0]) else c
+
+
+LOSSY_NOTE = ("aquakv-<b> is AQUA-KV (arXiv 2501.19392, the authors' algorithm on the GPU), lossy: the KV it "
+              "delivers differs from the original (its error is in the correctness table). It is here for speed and "
+              "size only, beside the bit-exact codecs.")
+
+
 def speed_key(x):
     return (1, 0.0) if x in ("native", "None") else (0, float(x))
 
@@ -80,7 +94,7 @@ def link_tables(key, vs):
                 bad = (st.get("install_errors") or 0) + (st.get("send_errors") or 0) + (st.get("timeouts") or 0)
                 cell = "-" if t is None else (f"**{t:.0f}**" if t == best[l] else f"{t:.0f}")
                 cells.append(cell + (" (failed)" if bad else ""))
-            L.append(f"| {c} | {fmt(bits, 2) if c != 'raw' else '16.00'} | " + " | ".join(cells) + " |")
+            L.append(f"| {cname(c)} | {fmt(bits, 2) if c != 'raw' else '16.00'} | " + " | ".join(cells) + " |")
         carried = [fmt(((by.get(("raw", l)) or {}).get("transfers") or {}).get("wire_gbps"), 0) for l in links]
         L += ["| *Carried (raw)* | | " + " | ".join(carried) + " |", ""]
         wins = []
@@ -89,7 +103,7 @@ def link_tables(key, vs):
                 continue
             w = [h for l, h in zip(links, head)
                  if ttft(c, l) is not None and ttft("raw", l) is not None and ttft(c, l) < ttft("raw", l)]
-            wins.append(f"{c}: " + (", ".join(w) if w else "none"))
+            wins.append(f"{cname(c)}: " + (", ".join(w) if w else "none"))
         L += ["Faster than raw at: " + "; ".join(wins) + ".", ""]
         # where the time goes, at the slowest and the fastest speed
         L += ["Where a request's transfer time goes (ms, mean per request): *queue* waiting for the sender, *gather* "
@@ -144,7 +158,7 @@ def workload_tables(runs):
         ref = "raw" if "raw" in cols else None
 
         def table(metric, unit, better):
-            out = ["| Workload | Prompt tokens x at once, out | " + " | ".join(cols) + " |",
+            out = ["| Workload | Prompt tokens x at once, out | " + " | ".join(cname(c) for c in cols) + " |",
                    "| --- | --- |" + " --- |" * len(cols)]
             for k in rows:
                 vals = {c: ((by.get((c, k)) or {}).get("bench") or {}).get(metric) for c in cols}
@@ -202,7 +216,10 @@ def main(argv=None):
     for r in runs:
         for c, v in (r["res"].get("check") or {}).items():
             st = v.get("transfers") or {}
-            rows.append((label(r["env"]), c, f"{st.get('exact')}/{v.get('prompts')}" if c != "nixl" else "n/a",
+            ex = ("n/a" if c == "nixl" else
+                  f"lossy (KV error {100 * st['rel_err']:.2f}%)" if lossy(c) and st.get("rel_err") is not None else
+                  "lossy" if lossy(c) else f"{st.get('exact')}/{v.get('prompts')}")
+            rows.append((label(r["env"]), cname(c), ex,
                          f"{v.get('same_text_as_local')}/{v.get('prompts')}", "yes" if v.get("ok") else "NO",
                          fmt(st.get("bits"), 3)))
         for v in (r["res"].get("tier") or {}).values():
@@ -259,7 +276,7 @@ def main(argv=None):
                 cells.append(f"{fmt(b.get('request_throughput'))} ({fmt(b.get('request_goodput'))}); "
                              f"{fmt(b.get('median_ttft_ms'), 0)} / {fmt(b.get('p99_ttft_ms'), 0)}"
                              + (f"; **{bad} of {st.get('sends') or '?'} transfers failed, computed locally**" if bad else ""))
-            L.append(f"| {c} | {fmt(bits, 3) if c not in ('raw', 'nixl') else '16.000'} | " + " | ".join(cells) +
+            L.append(f"| {cname(c)} | {fmt(bits, 3) if c not in ('raw', 'nixl') else '16.000'} | " + " | ".join(cells) +
                      f" | {fmt(tpot, 1)} |")
         L.append("")
         best = []
@@ -268,7 +285,7 @@ def main(argv=None):
             cand = [(b.get("request_goodput") or 0, -(b.get("median_ttft_ms") or 1e18), c) for b, c in cand]
             if cand:
                 g, t, c = max(cand)
-                best.append(f"rate {rt}: {c} (goodput {g:.2f}/s, TTFT p50 {-t:.0f} ms)")
+                best.append(f"rate {rt}: {cname(c)} (goodput {g:.2f}/s, TTFT p50 {-t:.0f} ms)")
         if best:
             L += ["Best by goodput, then TTFT p50: " + "; ".join(best) + ".", ""]
 
@@ -327,6 +344,10 @@ def main(argv=None):
             skipped.setdefault(c, w)
     if skipped:
         L += ["## Codecs that did not load", ""] + [f"- {c}: {w[:200]}" for c, w in sorted(skipped.items())] + [""]
+    if any(lossy(c) for r in runs for key in ("check", "sweep", "shapes")
+           for c in ([v.get("codec") for v in (r["res"].get(key) or {}).values()] if key != "check"
+                     else list(r["res"].get("check") or {}))):
+        L += ["## Note on the lossy reference", "", LOSSY_NOTE, ""]
     out = Path(a.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(L) + "\n")

@@ -19,6 +19,7 @@ the published baselines, then T and T2, and vLLM's own connectors as references.
 | ibp | the authors' Invariant Bit Packing: compressed in pinned host memory, decompressed on the way to the GPU | the CPU tier only (its design point) |
 | ours-hbh, -dense, -rank256 | T | every path |
 | t2-hbh, -dense, -rank256 | T2: T with a constant set picked per request and layer 0 recomputed by the receiver | every path |
+| aquakv-2, aquakv-3 | **lossy**, for speed and size only: AQUA-KV (arXiv 2501.19392), the authors' algorithm (goodevening13/aquakv) on the GPU. Keys without RoPE; the first 4 positions as they are; layer 0 HIGGS 4-bit; layer l keys predicted from layer l-1's reconstructed keys, values from this layer's reconstructed keys and layer l-1's values (BF16 linear maps fitted at setup on the calibration documents' own reconstructions, `pd_export_codecs.py --aqua-bits`); the residual HIGGS b-bit (Hadamard over 1,024 channels, one scale per token and group, EDEN grid). It matches `kv_compare.baselines.aqua_official` value for value (test_kv_compare). No checksum: the check reports its KV error instead (relative L2, the sender's), and the outputs' agreement with local prefill | every path |
 | nixl | vLLM's NixlConnector, no codec | GPU to GPU reference |
 | lmcache | LMCache 0.5.7's CPU offload in vLLM (uncompressed) | CPU-tier reference |
 
@@ -105,14 +106,17 @@ shapes: how many requests at once, how long, how much output.
 ExANS reports a codec benchmark on one 256K-token KV snapshot (no model or data named) and AdaCode accuracy and
 memory at batch 1, with no serving or transfer test; nvCOMP is a library. Their codecs run on all of the above.
 
-The runs, in order (each fits the 12-hour allocation; the 32K ones last, so a failure there costs nothing else):
-1. host memory at 10 and 100 Gb/s: raw, SplitZip, ExANS, AdaCode, exactkv, T (hbh), T2 (hbh, rank 256);
+The `workloads` campaign (about 7 hours):
+1. host memory at 10 and 100 Gb/s: raw, SplitZip, ExANS, AdaCode, exactkv, T (hbh), T2 (hbh, rank 256), and
+   AQUA-KV 2- and 3-bit (lossy, for speed);
 2. GPU to GPU, unpaced: the same codecs;
 3. vLLM's NIXL, every GPU visible;
-4. nVIDIA nvCOMP (ANS, Zstd, Bitcomp) on its own engines, host memory at 10 and 100 Gb/s;
-5. and 6. the biggest workloads, host memory and GPU to GPU: 32K-token prompts, 16 at once of 8K and 16K tokens,
-   128 and 256 at once of 1,024. Where more are at once than the decode engines hold, vLLM queues them, as it would
-   in service.
+4. nVIDIA nvCOMP (ANS, Zstd, Bitcomp) on its own engines, host memory at 10 and 100 Gb/s.
+
+The `wlong` campaign (about 3 hours): the biggest workloads, host memory and GPU to GPU, with AQUA-KV 2-bit:
+32K-token prompts, 16 at once of 8K and 16K tokens, 128 and 256 at once of 1,024. Where more are at once than the
+decode engines hold, vLLM queues them, as it would in service. Apart, so that an engine lost there costs nothing of
+the main campaign.
 
 The report gives one table per path and link: a row per workload, a column per codec, TTFT p50 with its speedup
 over raw (SplitZip's measure), then requests per second with the gain over raw.
@@ -294,7 +298,8 @@ The matrices (the times are estimates until the smoke has measured them):
 | ring1p3d | 1+3 through host memory at 3/10/25/100 Gb/s: the in-process baselines, T and T2; then nvCOMP |
 | ring2p2d | the same with 2+2 |
 | direct | GPU to GPU for 1+3 and 2+2, every codec, nvCOMP apart; NIXL for both layouts with every GPU visible, and 2+2 with its own GPU only |
-| workloads | 1+3, every codec on the baselines' published workloads and ours (above, "Workloads"): host memory at 10 and 100 Gb/s, GPU to GPU, NIXL, nvCOMP; the 32K-token ones last |
+| workloads | 1+3, every codec on the baselines' published workloads and ours (above, "Workloads"), AQUA-KV 2- and 3-bit beside them: host memory at 10 and 100 Gb/s, GPU to GPU, NIXL, nvCOMP |
+| wlong | the biggest published workloads (32K-token prompts, 16 at once of 8K and 16K, 128 and 256 at once of 1,024): host memory at 10 and 100 Gb/s, GPU to GPU |
 | links | 1+3 over 10, 25, 50, ... 400 Gb/s (steps of 25), through host memory and GPU to GPU (paced, then unpaced), 16 requests at once: raw, SplitZip, ExANS, AdaCode, exactkv, T (hbh) and T2 (hbh, rank 256). One table per path: TTFT p50 per codec and speed, what the link carried, where each codec beats raw, and where a request's time goes |
 | tier | the CPU tier with every codec, nvCOMP apart; LMCache |
 | t2eager | T and T2 in eager engines: host memory at 10 and 100 Gb/s, GPU to GPU, the CPU tier |

@@ -783,6 +783,37 @@ class BenchAndReportTests(unittest.TestCase):
         self.assertIn("(failed)", text)
         self.assertNotIn("link 10 Gb/s", text)                  # no table per speed when there are many
 
+    def test_aquakv_is_reported_as_lossy(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_matrix_report as mr
+        import pd_bench as pb
+        self.assertTrue(pb.is_lossy("aquakv-2") and not pb.is_lossy("t2-hbh"))
+        root = Path(tempfile.mkdtemp())
+        (root / "r").mkdir()
+        (root / "r" / "env.json").write_text(json.dumps({"layout": "1p3d", "connector": "tkv", "transport": "ring"}))
+        st = {"installs": 4, "exact": 0, "bits": 2.13, "rel_err": 0.0311}
+        sw = {f"s_{c}": {"link_gbps": 10, "codec": c, "rate": "inf", "bench": {"median_ttft_ms": t},
+                         "transfers": {"bits": b}} for c, t, b in (("raw", 2400, 16), ("aquakv-2", 1700, 2.13))}
+        (root / "r" / "results.json").write_text(json.dumps({
+            "check": {"aquakv-2": {"prompts": 4, "same_text_as_local": 2, "ok": True, "lossy": True, "transfers": st},
+                      "raw": {"prompts": 4, "same_text_as_local": 4, "ok": True, "transfers": dict(st, exact=4)}},
+            "sweep": sw}))
+        mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
+        text = (root / "s.md").read_text()
+        self.assertIn("| aquakv-2 (lossy) | lossy (KV error 3.11%) | 2/4 | yes |", text)
+        self.assertIn("| aquakv-2 (lossy) | 2.130 |", text)
+        self.assertIn("## Note on the lossy reference", text)
+
+    def test_aquakv_index_packing(self):
+        from kv_compare.pd import codecs as cd
+        g = torch.Generator().manual_seed(1)
+        for bits in (4, 6, 8):
+            idx = torch.randint(0, 2 ** bits, (3, 2, 512), generator=g)
+            b = cd._pack(idx, bits)
+            self.assertEqual(b.dtype, torch.uint8)
+            self.assertEqual(b.numel(), idx.numel() * bits // 8)
+            self.assertTrue(torch.equal(cd._unpack(b, bits, idx.numel()).reshape(idx.shape), idx))
+
     def test_ibp_left_out_says_why(self):
         from kv_compare.pd import codecs
         from unittest import mock
@@ -1064,15 +1095,21 @@ class RunnerDryRunTests(unittest.TestCase):
         r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                            env=dict(os.environ, MATRIX="workloads", PRINT_RUNS="1"))
         runs = [x for x in r.stdout.split("\n") if x]
-        self.assertEqual(len(runs), 6)
-        self.assertTrue(all("STAGES=check,sweep,shapes,report" in x for x in runs[:4]))
+        self.assertEqual(len(runs), 4)
+        self.assertTrue(all("STAGES=check,sweep,shapes,report" in x for x in runs))
+        self.assertTrue(all("CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh,t2-rank256,aquakv-2,aquakv-3 "
+                            in x for x in runs[:2]))
         self.assertIn("1920:20:128:2:ibp,4096:16:256:2:exactkv", runs[0])
         self.assertIn("1024:64:128:2:sz1024", runs[0])
         self.assertIn("CONNECTOR=nixl NIXL_ALL_GPUS=1", runs[2])
         self.assertIn("CODECS=raw,nvcomp-ans", runs[3])
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="wlong", PRINT_RUNS="1"))
+        long = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual(len(long), 2)
         self.assertTrue(all("SHAPES=32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,"
                             "8192:16:128:2:sz16,16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024" in x
-                            for x in runs[4:]))
+                            for x in long))
         import pd_bench as pb
         parsed = pb.parse_shapes(runs[0].split("SHAPES=")[1].split()[0])
         self.assertEqual(len(parsed), 19)                         # 21 entries; 2 shared by two families

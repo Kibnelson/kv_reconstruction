@@ -5,7 +5,8 @@ environment before starting the engines: same torch and Triton as the connector)
       --tokens 8192,3000 --splitzip-source $KV_HOME/sources/splitzip --adacode-source $KV_HOME/sources/adacode
 
 Per codec and token count: bit-exact through bundle -> paced transport (ring and tcp, loopback) -> layer sink;
-bits per value; encode and decode times. Exit status 1 when any loaded codec is not exact.
+bits per value; encode and decode times. Exit status 1 when any loaded codec is not exact; a lossy codec (AQUA-KV)
+reports its error instead (the sender's, and the received words' against the original).
 """
 from __future__ import annotations
 
@@ -15,6 +16,13 @@ import sys
 import time
 
 import torch
+
+
+def _rel_err(back, words):
+    """Relative L2 error of BF16 words back against words."""
+    a = back.view(torch.bfloat16).double()
+    b = words.view(torch.bfloat16).double()
+    return float((a - b).norm() / b.norm())
 
 
 def main(argv=None):
@@ -84,8 +92,12 @@ def main(argv=None):
                 c.decode(p2, m2, lambda l, w: back[l].copy_(w))
                 sync()
                 row["decode_ms"] = 1e3 * (time.perf_counter() - t)
-                row["exact"] = bool(torch.equal(back, words)) and word_checksum(back) == want
-                ok_all = ok_all and row["exact"]
+                if getattr(c, "lossy", False):      # AQUA-KV: a speed reference, not bit-exact by design
+                    row.update(exact=None, lossy=True, rel_err=m.get("rel_err"),
+                               rel_err_received=_rel_err(back, words))
+                else:
+                    row["exact"] = bool(torch.equal(back, words)) and word_checksum(back) == want
+                    ok_all = ok_all and row["exact"]
             except Exception as exc:
                 row["error"] = repr(exc)[:300]
                 ok_all = False
