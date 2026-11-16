@@ -39,6 +39,12 @@ copies a piece that lands unaligned, since nvCOMP's decoder refuses one (job 302
   cache is emptied (`POST /reset_prefix_cache`). The points use the same prompts, so before job 30210's fix a
   later codec's prefill hit its own cache (TTFT without the prefill; T2 without steps for layer 0) and the
   decode engines already held most of a prompt (8 or 16 tokens moved of 2048).
+- **The link.** Our transport paces a virtual link per prefill engine (kv_compare/pd/transport.py): a chunk of n
+  bytes is booked for 8n/speed seconds after what is queued, and the receiver is told of it only when its booking
+  ends. The speed is set per point (`LINKS`, 3 to 400 Gb/s, or `native` for unpaced). The report gives what the link
+  carried while busy, all its transfers together (job 30280: 9.97-9.99 Gb/s at 10); one transfer's own rate is lower
+  whenever transfers share the link (3.7 Gb/s each there). The node's own path bounds the pacing: on the A5000 node,
+  about 125 Gb/s GPU to GPU, so faster set speeds measure the node, and the *Carried* row shows where that starts.
 - **Greedy sweeps.** `vllm bench serve` in vLLM 0.32 no longer sends temperature 0, so until job 30252 the
   sweeps sampled with the model's defaults (temperature 0.6, top-p 0.9): each codec's run wrote its own text and
   vLLM compiled its top-p kernels at first use. The sweeps now pass `--temperature 0`; the tier and multi-turn runs
@@ -177,7 +183,7 @@ git switch -q pd-baselines 2>/dev/null || git switch -q -c pd-baselines --track 
 git merge -q --ff-only origin/pd-baselines
 export KVPD_PIN=$(git rev-parse HEAD)
 test "$(git ls-remote origin refs/heads/pd-baselines | awk '{print $1}')" = "$KVPD_PIN"
-export KVPD_MATRIX=smoke                     # then ring1p3d, ring2p2d, direct, tier, t2eager: one campaign each
+export KVPD_MATRIX=smoke                     # then ring1p3d, ring2p2d, direct, tier, t2eager, links: one campaign each
 export KVPD_TAG="pd_${KVPD_MATRIX}_$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p ~/.kvpd_campaigns
 STATE=~/.kvpd_campaigns/$KVPD_TAG.sh
@@ -255,6 +261,7 @@ The matrices (the times are estimates until the smoke has measured them):
 | ring1p3d | 1+3 through host memory at 3/10/25/100 Gb/s: the in-process baselines, T and T2; then nvCOMP |
 | ring2p2d | the same with 2+2 |
 | direct | GPU to GPU for 1+3 and 2+2, every codec, nvCOMP apart; NIXL for both layouts with every GPU visible, and 2+2 with its own GPU only |
+| links | 1+3 over 10, 25, 50, ... 400 Gb/s (steps of 25), through host memory and GPU to GPU (paced, then unpaced), 16 requests at once: raw, SplitZip, ExANS, AdaCode, exactkv, T (hbh) and T2 (hbh, rank 256). One table per path: TTFT p50 per codec and speed, what the link carried, where each codec beats raw, and where a request's time goes |
 | tier | the CPU tier with every codec, nvCOMP apart; LMCache |
 | t2eager | T and T2 in eager engines: host memory at 10 and 100 Gb/s, GPU to GPU, the CPU tier |
 

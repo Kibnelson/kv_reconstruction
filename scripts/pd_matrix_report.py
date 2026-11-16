@@ -46,6 +46,73 @@ def label(env):
     return f"{lay}, {path_of(env)}" + (", eager" if env.get("eager") else "")
 
 
+def speed_key(x):
+    return (1, 0.0) if x in ("native", "None") else (0, float(x))
+
+
+def link_tables(key, vs):
+    """One layout and path over many link speeds: TTFT p50 per codec and speed (the best in bold), what the link
+    carried, the speeds where each codec beats raw, and where a request's time goes."""
+    lay, path, eager = key
+    L = []
+    links = sorted({str(v.get("link_gbps")) for v in vs}, key=speed_key)
+    codecs = []
+    for v in vs:
+        if v["codec"] not in codecs:
+            codecs.append(v["codec"])
+    for rate in sorted({str(v["rate"]) for v in vs}, key=lambda x: (x == "inf", float(x) if x != "inf" else 0)):
+        by = {(v["codec"], str(v.get("link_gbps"))): v for v in vs if str(v["rate"]) == rate}
+        ttft = lambda c, l: ((by.get((c, l)) or {}).get("bench") or {}).get("median_ttft_ms")
+        head = [("native" if l in ("native", "None") else f"{float(l):g}") for l in links]
+        L += [f"## {lay}, {path}{', eager engines' if eager else ''}: link speed sweep, request rate {rate}", "",
+              "TTFT p50 in ms per set link speed (Gb/s); the best at each speed in bold. *Carried*: what the link "
+              "carried while busy for raw, all transfers together: below the set speed, the node's own path is the "
+              "limit, and the faster speeds measure the node.", "",
+              "| Codec | Bits | " + " | ".join(head) + " |", "| --- | --- |" + " --- |" * len(links)]
+        best = {l: min([t for t in (ttft(c, l) for c in codecs) if t is not None] or [None]) for l in links}
+        for c in codecs:
+            bits = next((by[(c, l)]["transfers"].get("bits") for l in links
+                         if (c, l) in by and (by[(c, l)].get("transfers") or {}).get("bits") is not None), None)
+            cells = []
+            for l in links:
+                t = ttft(c, l)
+                st = (by.get((c, l)) or {}).get("transfers") or {}
+                bad = (st.get("install_errors") or 0) + (st.get("send_errors") or 0) + (st.get("timeouts") or 0)
+                cell = "-" if t is None else (f"**{t:.0f}**" if t == best[l] else f"{t:.0f}")
+                cells.append(cell + (" (failed)" if bad else ""))
+            L.append(f"| {c} | {fmt(bits, 2) if c != 'raw' else '16.00'} | " + " | ".join(cells) + " |")
+        carried = [fmt(((by.get(("raw", l)) or {}).get("transfers") or {}).get("wire_gbps"), 0) for l in links]
+        L += ["| *Carried (raw)* | | " + " | ".join(carried) + " |", ""]
+        wins = []
+        for c in codecs:
+            if c == "raw":
+                continue
+            w = [h for l, h in zip(links, head)
+                 if ttft(c, l) is not None and ttft("raw", l) is not None and ttft(c, l) < ttft("raw", l)]
+            wins.append(f"{c}: " + (", ".join(w) if w else "none"))
+        L += ["Faster than raw at: " + "; ".join(wins) + ".", ""]
+        # where the time goes, at the slowest and the fastest speed
+        L += ["Where a request's transfer time goes (ms, mean per request): *queue* waiting for the sender, *gather* "
+              "copying the request's KV out of vLLM's cache (includes waiting for the GPU's queued prefill work: "
+              "the same for every codec), *encode* on the prefill GPU, *link* its time on the link (shared with the "
+              "other transfers), *install* decoding and writing it into the decode engine's cache.", "",
+              "| Codec | Link | Queue | Gather | Encode | Link time | Install | TTFT p50 |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        for l, h in ((links[0], head[0]), (links[-1], head[-1])):
+            for c in codecs:
+                v = by.get((c, l))
+                if not v:
+                    continue
+                st = v.get("transfers") or {}
+                L.append(f"| {c} | {h} | {fmt(st.get('queue_ms'), 0)} | {fmt(st.get('gather_ms'), 0)} | "
+                         f"{fmt(st.get('encode_ms'), 0)} | {fmt(st.get('link_ms'), 0)} | {fmt(st.get('install_ms'), 0)} | "
+                         f"{fmt(ttft(c, l), 0)} |")
+            if len(links) == 1:
+                break
+        L.append("")
+    return L
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--runs", required=True)
@@ -86,13 +153,19 @@ def main(argv=None):
         L += [f"| {' | '.join(map(str, x))} |" for x in rows]
         L.append("")
 
-    # PD sweeps
-    groups = {}
+    # PD sweeps: many link speeds in one table per layout and path; a table per link when there are few
+    groups, speeds = {}, {}
     for r in runs:
         for v in (r["res"].get("sweep") or {}).values():
             key = (r["env"].get("layout") or "", path_of(r["env"]), bool(r["env"].get("eager")), str(v.get("link_gbps")))
             groups.setdefault(key, []).append(v)
+            speeds.setdefault(key[:3], set()).add(str(v.get("link_gbps")))
+    many = {k for k, ls in speeds.items() if len(ls) > 4}
+    for k in sorted(many):
+        L += link_tables(k, [v for g, vs in groups.items() if g[:3] == k for v in vs])
     for (lay, path, eager, link), vs in sorted(groups.items()):
+        if (lay, path, eager) in many:
+            continue
         rates = []
         for v in vs:
             if v["rate"] not in rates:

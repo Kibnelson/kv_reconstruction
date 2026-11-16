@@ -13,6 +13,8 @@
 #   direct      GPU to GPU (the p2p transport, unpaced) for 1+3 and 2+2, every codec; vLLM's NixlConnector for both
 #   tier        4 colocated engines with the CPU tier: every codec, nvCOMP apart, and LMCache's CPU offload
 #   t2eager     T and T2 in eager engines (T2's layer-0 recompute is bit-exact in eager mode), host ring and direct
+#   links       the link speed from 10 to 400 Gb/s in steps of 25, 16 requests at once, 1 prefill + 3 decode: through
+#               host memory and GPU to GPU (paced), the in-process baselines and ours; where each codec stops paying
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
 # PRINT_RUNS=1 prints the list and stops. PD_CARD=1 (scripts/pd_card.sh's run stage): no branch check and no commit;
@@ -26,6 +28,9 @@ MAIN=raw,splitzip,exans,adacode,exactkv,ours-hbh,ours-dense,ours-rank256,t2-hbh,
 NV=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp
 TIERMAIN=raw,splitzip,exans,adacode,exactkv,ibp,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-rank256
 T2SET=raw,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256
+LINKSET=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh,t2-rank256
+SPEEDS=10,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400
+LINKRUN="RATES=inf NUM_PROMPTS=16 PROMPT_TOKENS=2048 CODECS=$LINKSET"
 MATRIX=${MATRIX:-smoke}
 if [ -z "${RUNS:-}" ]; then
     case "$MATRIX" in
@@ -46,7 +51,9 @@ if [ -z "${RUNS:-}" ]; then
         t2eager) RUNS="LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=$T2SET LINKS=10,100;
                        LAYOUT=1p3d TRANSPORT=p2p ENGINE_EAGER=1 CODECS=$T2SET;
                        LAYOUT=colo4 ENGINE_EAGER=1 TIER_CODECS=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier or t2eager (or set RUNS)"; exit 1 ;;
+        links) RUNS="LAYOUT=1p3d TRANSPORT=ring LINKS=$SPEEDS $LINKRUN;
+                     LAYOUT=1p3d TRANSPORT=p2p LINKS=$SPEEDS,native $LINKRUN" ;;
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager or links (or set RUNS)"; exit 1 ;;
     esac
 fi
 IFS=';' read -r -a LIST <<< "$(echo "$RUNS" | tr '\n\t' '  ')"   # read stops at a newline: one line first

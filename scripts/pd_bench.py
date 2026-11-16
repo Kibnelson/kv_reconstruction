@@ -229,8 +229,33 @@ def records(log_dir, t0, t1):
                     continue
                 t = r.get("finished_at") or r.get("taken_at") or r.get("time")
                 if t is not None and t0 <= t <= t1:
+                    r.setdefault("log", os.path.basename(p))     # which engine's connector wrote it
                     out.append(r)
     return out
+
+
+def wire_gbps(sends):
+    """The link's throughput while it carried data: each sending engine's bytes over the union of its transfers' times
+    (one link per prefill engine), the engines' rates added. A transfer's own rate ("achieved") is lower whenever
+    several share the link: one prefill engine feeding three decode engines gave 3.7 Gb/s each on a 10 Gb/s link
+    that carried 9.99 (job 30280)."""
+    by = {}
+    for r in sends:
+        if r.get("send_begin") is not None and r.get("send_end") is not None and r["send_end"] > r["send_begin"] \
+                and r.get("blob_bytes"):
+            by.setdefault(r.get("log"), []).append((r["send_begin"], r["send_end"], r["blob_bytes"]))
+    total = 0.0
+    for spans in by.values():
+        spans.sort()
+        busy, (a, b) = 0.0, spans[0][:2]
+        for s, e, _ in spans[1:]:
+            if s > b:
+                busy, a, b = busy + (b - a), s, e
+            else:
+                b = max(b, e)
+        busy += b - a
+        total += 8 * sum(n for _, _, n in spans) / busy / 1e9
+    return total if by else None
 
 
 def loaded(log_dir):
@@ -290,7 +315,7 @@ def transfer_stats(recs):
             "encode_ms": mean([r.get("encode_ms") for r in s]),
             "link_ms": mean([1e3 * r["link_s"] for r in s if r.get("link_s") is not None]),
             "queue_ms": mean([1e3 * (r["send_begin"] - r["queued"]) for r in s if r.get("send_begin")]),
-            "achieved_gbps": mean(ach),
+            "achieved_gbps": mean(ach), "wire_gbps": wire_gbps(s),
             "install_ms": mean([r.get("decode_install_ms") for r in d]),
             "wait_ms": mean([1e3 * (r["done_at"] - r["admitted_at"]) for r in d if r.get("admitted_at")]),
             "exact": sum(1 for r in d if r.get("exact") is True), "inexact": sum(1 for r in d if r.get("exact") is False),
@@ -356,7 +381,9 @@ def stage_check(a, res):
                 not any("error" in g for g in got)
         out[codec] = {"prompts": len(rows), "same_text_as_local": same, "transfers": st, "ok": ok,
                       "errors": [g["error"] for g in got if "error" in g], "resets": resets}
-        log(f"check {codec}: {'OK' if ok else 'FAILED'} - {st['exact']}/{len(rows)} transfers bit-exact, "
+        log(f"check {codec}: {'OK' if ok else 'FAILED'} - " +
+            (f"{st['exact']}/{len(rows)} transfers bit-exact, " if codec != "nixl" else
+             "transfers n/a (vLLM's connector: no checksums), ") +
             f"{same}/{len(rows)} outputs equal to local prefill, bits {fmt(st['bits'])}")
     post(a.proxy + "/t/config", {"verify": False})
     res["check"] = out
@@ -413,8 +440,9 @@ def stage_sweep(a, res, colocated=False):
                 b = runs[name]["bench"]
                 log(f"{name}: exit {rc}, {fmt(b.get('request_throughput'), 2)} req/s, TTFT p50 "
                     f"{fmt(b.get('median_ttft_ms'), 0)} / p99 {fmt(b.get('p99_ttft_ms'), 0)} ms, goodput "
-                    f"{fmt(b.get('request_goodput'), 2)}" + (f"; bits {fmt(st.get('bits'))}, link "
-                    f"{fmt(st.get('achieved_gbps'), 1)} Gb/s achieved" if st else ""))
+                    f"{fmt(b.get('request_goodput'), 2)}" + (f"; bits {fmt(st.get('bits'))}, the link carried "
+                    f"{fmt(st.get('wire_gbps'), 1)} Gb/s while busy" + (f" (set {link})" if link != "native" else "")
+                    if st else ""))
                 save(a, res)
     if colocated:
         post(a.proxy + "/t/config", {"mode": "pd"})

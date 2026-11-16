@@ -8,6 +8,7 @@ prefill engines, the bench's codec filter and tier statistics, the matrix report
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -750,6 +751,46 @@ class BenchAndReportTests(unittest.TestCase):
         mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
         self.assertIn("**6 of 8 transfers failed, computed locally**", (root / "s.md").read_text())
 
+    def test_wire_rate_and_link_speed_tables(self):
+        """Job 30280: three transfers sharing a 10 Gb/s link each ran at about a third of it; the link carried 10."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_bench as pb
+        import pd_matrix_report as mr
+        one = lambda b, e, log="tkv_Ps_1.jsonl": {"log": log, "send_begin": b, "send_end": e, "blob_bytes": 156_250_000}
+        self.assertAlmostEqual(pb.wire_gbps([one(0, .375), one(0, .375), one(0, .375), one(1, 1.125)]), 10.0)
+        # two prefill engines, two links: their rates add
+        self.assertAlmostEqual(pb.wire_gbps([one(0, .125), one(0, .125, "tkv_Ps_2.jsonl")]), 20.0)
+        self.assertIsNone(pb.wire_gbps([]))
+        root = Path(tempfile.mkdtemp())
+        (root / "r").mkdir()
+        (root / "r" / "env.json").write_text(json.dumps({"layout": "1p3d", "connector": "tkv", "transport": "p2p"}))
+        sw = {}
+        for l in [10, 25, 50, 100, 200, 400, "native"]:
+            g = 125.0 if l == "native" else float(l)
+            for c, fixed in (("raw", 0), ("t2-hbh", 250)):
+                sw[f"s_{c}_{l}"] = {"link_gbps": l, "codec": c, "rate": "inf",
+                                    "bench": {"median_ttft_ms": 400 + fixed + (24000 if c == "raw" else 12000) / min(g, 125)},
+                                    "transfers": {"bits": 16 if c == "raw" else 8.1, "wire_gbps": min(g, 125.0),
+                                                  "install_ms": 150 if c != "raw" else 3,
+                                                  "install_errors": 1 if (c, l) == ("t2-hbh", 400) else 0}}
+        (root / "r" / "results.json").write_text(json.dumps({"sweep": sw}))
+        mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
+        text = (root / "s.md").read_text()
+        self.assertIn("## 1p3d, GPU to GPU: link speed sweep, request rate inf", text)
+        self.assertIn("| Codec | Bits | 10 | 25 | 50 | 100 | 200 | 400 | native |", text)
+        self.assertIn("| *Carried (raw)* | | 10 | 25 | 50 | 100 | 125 | 125 | 125 |", text)
+        self.assertIn("Faster than raw at: t2-hbh: 10, 25.", text)
+        self.assertIn("(failed)", text)
+        self.assertNotIn("link 10 Gb/s", text)                  # no table per speed when there are many
+
+    def test_ibp_left_out_says_why(self):
+        from kv_compare.pd import codecs
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"IBP_SKIP_REASON": "KVPD_IBP=0 in the login shell"}), \
+                mock.patch.dict(sys.modules, {"ibp": None}):
+            with self.assertRaisesRegex(ImportError, "IBP left out: KVPD_IBP=0 in the login shell"):
+                codecs.IBP("cpu")
+
     def test_compiles_placed_by_log_position(self):
         """Job 30252: a compile in the warm-up, logged in the same whole second as the point's start, was counted
         inside the point; the log's position at the point's start and end places it."""
@@ -976,6 +1017,13 @@ class RunnerDryRunTests(unittest.TestCase):
         out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_2p2d_nixl_allgpus_*"))
         self.assertEqual(len(out), 1)
         self.assertTrue(json.loads((out[0] / "env.json").read_text())["nixl_all_gpus"])
+        # the links matrix: 10 to 400 Gb/s in steps of 25, both paths
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="links", PRINT_RUNS="1"))
+        runs = r.stdout.split("\n")
+        self.assertIn("LINKS=10,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400 RATES=inf", runs[0])
+        self.assertIn("TRANSPORT=p2p LINKS=10,25", runs[1])
+        self.assertIn(",400,native", runs[1])
         # colocated with the CPU tier, and LMCache
         r, eng = self.run_pd(LAYOUT="colo4", TIER_CODECS="raw,ours-hbh")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])

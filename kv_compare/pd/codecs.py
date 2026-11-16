@@ -32,6 +32,7 @@ kernels as the measured 8K windows.
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -619,7 +620,13 @@ class IBP:
     tier_only = True
 
     def __init__(self, device):
-        import ibp
+        try:
+            import ibp
+        except ImportError:
+            why = os.environ.get("IBP_SKIP_REASON")
+            if why:                                  # left out on purpose: say so, not "No module named 'ibp'"
+                raise ImportError(f"IBP left out: {why}") from None
+            raise
         self.ibp = ibp
         self.device = torch.device(device)
 

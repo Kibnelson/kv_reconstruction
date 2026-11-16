@@ -39,7 +39,7 @@ import time
 
 SCHEMA = 1
 KIND = "kvpd_campaign"
-MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager")
+MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links")
 # Disk (GB) on the node's root file system, which /tmp is: the shared cache's parts when missing, then a job's peak.
 # Measured sizes go into disk_after.json; these only decide whether to start.
 NEED_GB = {"uv": 17.0, "python": 0.2, "hf": 6.6}   # measured on gpu-grad-01 (job 30170): 16.7, 0.1, 6.5
@@ -478,6 +478,9 @@ def stage_run(p, a, job):
         "UV_PYTHON_PREFERENCE": "only-managed", "UV_NO_CONFIG": "1", "PIP_CONFIG_FILE": "/dev/null",
         "PIP_DISABLE_PIP_VERSION_CHECK": "1", "CUDA13_HOME": str(p.cache / "cuda13"),
         "IBP": "1" if plan["ibp"] else "0", "SKIP_IBP": "1", "SKIP_EXANS": "0", "DROP_CAPTURES": "1",
+        "IBP_SKIP_REASON": "" if plan["ibp"] else (
+            f"KVPD_IBP={ibp_opt} in the login shell" if ibp_opt == "0" else
+            "the matrix does not use it" if not want_ibp else (plan.get("note") or "the disk plan left it out")),
         "TMPDIR": str(runtime / "tmp"), "PYTHONPYCACHEPREFIX": str(runtime / "pycache"), "PYTHONNOUSERSITE": "1",
         "XDG_CACHE_HOME": str(home / "cache"), "TRITON_CACHE_DIR": str(home / "cache" / "triton"),
         "TRITON_HOME": str(home / "triton"), "TORCHINDUCTOR_CACHE_DIR": str(home / "cache" / "inductor"),
