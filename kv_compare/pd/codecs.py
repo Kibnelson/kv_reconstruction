@@ -367,6 +367,8 @@ class Nvcomp:
 
     def _decode_piece(self, src, into):
         self._enter()
+        if src.data_ptr() % 16:  # nvCOMP needs its input aligned to 8 or 16 bytes (job 30252); a received piece can sit
+            src = src.clone()    # anywhere in the landing buffer: then a copy of its own
         arr = self.nv.as_array(src.contiguous(), cuda_stream=self.stream.cuda_stream)
         out = self.codec.decode(arr)
         self._leave()
@@ -380,18 +382,25 @@ class Nvcomp:
         L, T, W = words.shape
         raw = words.contiguous().view(torch.uint8).reshape(-1)
         coded = [self._encode_piece(raw[a:a + self.piece]) for a in range(0, raw.numel(), self.piece)]
-        return ({"coded": torch.cat(coded) if len(coded) > 1 else coded[0]},
+        sizes = [int(c.numel()) for c in coded]
+        if len(coded) > 1:       # each piece starts 16-byte aligned in the stream
+            pads = [torch.zeros((-n) % 16, dtype=torch.uint8, device=raw.device) for n in sizes]
+            blob = torch.cat([t for c, p in zip(coded, pads) for t in (c, p)])
+        else:
+            blob = coded[0]
+        return ({"coded": blob},
                 {"codec": self.name, "T": int(T), "L": int(L), "W": int(W), "nvcomp": self.version,
-                 "piece": self.piece, "pieces": [int(c.numel()) for c in coded]})
+                 "piece": self.piece, "pieces": sizes, "align": 16})
 
     def decode(self, parts, meta, sink):
         L, T, W = int(meta["L"]), int(meta["T"]), int(meta["W"])
         src = parts["coded"].contiguous()
         dec = torch.empty(L * T * W * 2, dtype=torch.uint8, device=self.device)
         piece, o = int(meta.get("piece") or dec.numel()), 0
+        align = int(meta.get("align") or 1)
         for k, n in enumerate(meta.get("pieces") or [src.numel()]):
             self._decode_piece(src[o:o + n], dec[k * piece:min(dec.numel(), (k + 1) * piece)])
-            o += n
+            o += n + (-n) % align
         if dec.numel() != L * T * W * 2:
             raise ValueError(f"nvCOMP decoded {dec.numel()} bytes, expected {L * T * W * 2}")
         w = dec.view(torch.int16).view(L, T, W)

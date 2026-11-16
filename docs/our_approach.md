@@ -778,6 +778,7 @@ The comparison is only meaningful if every method gets the same conditions. The 
 | Every engine's prefix cache emptied before each check codec and each sweep or multi-turn point | the points reuse the same prompts; otherwise later methods skip the prefill or send only part of the prompt (job 30210) |
 | Every prefill-decode pair warmed up with one short request before each codec's sweep | a pair's first transfer opens its path (CUDA IPC handles, NIXL's handshake), which costs 0.2-0.5 s once |
 | A burst of short requests with the benchmark's own sampling before each codec's first point, the tier and the multi-turn runs; vLLM's "JIT compilation during inference" warnings reported with the point they fell in | the check samples greedily, so the first measured point compiled vLLM's top-p kernels (about 2 s) in job 30226: raw's and NIXL's TTFTs included it |
+| The sweeps greedy (`--temperature 0`) | vLLM 0.32's `vllm bench serve` no longer sends temperature 0, so the sweeps sampled at temperature 0.6 until job 30252, and each codec's run wrote different text |
 | The proxy balances prefill engines by requests in flight, counted when it picks | until job 30210 a burst of requests all went to one engine |
 | The client side (prompts, proxy, benchmark) runs from the same Python environment for every method | LMCache's environment lacked a benchmark dependency |
 | Correctness first: each codec's check pass (with checksums) runs before its timed runs and is reported beside them | a fast codec that is wrong is not a result |

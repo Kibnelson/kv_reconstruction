@@ -23,7 +23,10 @@ the published baselines, then T and T2, and vLLM's own connectors as references.
 | lmcache | LMCache 0.5.7's CPU offload in vLLM (uncompressed) | CPU-tier reference |
 
 nvCOMP runs on engines of its own in every matrix. Its Python package crashed whole processes at random on the
-NUC, so a crash there costs that run only.
+NUC, so a crash there costs that run only. It codes a request in pieces of 128 MiB (zstd ran out of memory on a
+whole 8,192-token request, job 30226), each piece starting 16-byte aligned in the coded stream; the receiver
+copies a piece that lands unaligned, since nvCOMP's decoder refuses one (job 30252: 3 of 4 transfers failed with
+"not aligned to the required alignment of 16 bytes").
 
 ## Layouts and paths
 
@@ -36,10 +39,16 @@ NUC, so a crash there costs that run only.
   cache is emptied (`POST /reset_prefix_cache`). The points use the same prompts, so before job 30210's fix a
   later codec's prefill hit its own cache (TTFT without the prefill; T2 without steps for layer 0) and the
   decode engines already held most of a prompt (8 or 16 tokens moved of 2048).
+- **Greedy sweeps.** `vllm bench serve` in vLLM 0.32 no longer sends temperature 0, so until job 30252 the
+  sweeps sampled with the model's defaults (temperature 0.6, top-p 0.9): each codec's run wrote its own text and
+  vLLM compiled its top-p kernels at first use. The sweeps now pass `--temperature 0`; the tier and multi-turn runs
+  keep the server's sampling, as a chat client would.
 - **Warm before measuring.** Before each codec's first point: one short request over every prefill-decode pair (its
-  path opens on first use), then a burst with the benchmark's own sampling. In job 30226 the first point of every
-  run compiled vLLM's top-p kernels (about 2 s), because the check samples greedily; the report now lists vLLM's
-  "JIT compilation during inference" warnings with the point each fell in.
+  path opens on first use), then a burst of 16 concurrent requests with the point's own sampling (greedy for the
+  sweeps, the server's for the tier and multi-turn runs). The report lists vLLM's "JIT compilation during
+  inference" warnings with the point each fell in, by the engine log's own position at the point's start and end.
+  Job 30252's one compile "inside" a point was in the warm-up just before it: the logs' times are whole seconds,
+  and the old one-second slack counted it in.
 - **A failed transfer is computed locally.** The engines run with `kv_load_failure_policy: recompute`: under vLLM's
   default the scheduler asserted on a failed request and the engine died (jobs 30176, 30226).
 - **Through host memory at set link speeds** (`TRANSPORT=ring`, 3/10/25/100 Gb/s): the transport of
@@ -48,7 +57,11 @@ NUC, so a crash there costs that run only.
   the sender by a CUDA IPC handle, so the sender's copy goes peer to peer over PCIe. Every engine sees all the job's
   GPUs, its own first.
   - vLLM's NixlConnector (`CONNECTOR=nixl`) is the production reference for this path. By default each NIXL engine
-    sees only its own GPU, as vLLM's own NIXL tests run; `NIXL_ALL_GPUS=1` gives it all of them.
+    sees only its own GPU, as vLLM's own NIXL tests run; `NIXL_ALL_GPUS=1` gives it all of them, as our p2p
+    engines have. Job 30252 ran NIXL with its own GPU only: TTFT p50 2271 ms against raw p2p's 749 ms. A process
+    that cannot see the peer GPU likely cannot use CUDA IPC (peer to peer), so UCX may stage the copy; the engine
+    logs now record UCX's choice (`UCX_PROTO_INFO=y`), which settles it. The matrices run NIXL with every GPU
+    visible (`_allgpus` in the run name); the direct matrix keeps one 2p2d run with its own GPU only, to compare.
 - **A CPU tier** (`LAYOUT=colo4`): 4 engines, each prefilling its own requests, each with a tier in host memory
   (`kv_compare/pd/tier.py`, LMCache's role).
   - Each request's full 256-token chunks are coded and kept when it finishes. A background thread does this,
@@ -241,7 +254,7 @@ The matrices (the times are estimates until the smoke has measured them):
 | smoke | each path, layout and connector once, with few prompts |
 | ring1p3d | 1+3 through host memory at 3/10/25/100 Gb/s: the in-process baselines, T and T2; then nvCOMP |
 | ring2p2d | the same with 2+2 |
-| direct | GPU to GPU for 1+3 and 2+2, every codec, nvCOMP apart; NIXL for both layouts |
+| direct | GPU to GPU for 1+3 and 2+2, every codec, nvCOMP apart; NIXL for both layouts with every GPU visible, and 2+2 with its own GPU only |
 | tier | the CPU tier with every codec, nvCOMP apart; LMCache |
 | t2eager | T and T2 in eager engines: host memory at 10 and 100 Gb/s, GPU to GPU, the CPU tier |
 

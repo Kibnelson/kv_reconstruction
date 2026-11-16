@@ -35,7 +35,7 @@ def load(root, names):
 
 def path_of(env):
     if env.get("connector") == "nixl":
-        return "NIXL (vLLM)"
+        return "NIXL (vLLM), every GPU visible" if env.get("nixl_all_gpus") else "NIXL (vLLM), own GPU only"
     if env.get("connector") == "lmcache":
         return "LMCache (vLLM)"
     return {"ring": "host memory", "p2p": "GPU to GPU", "tcp": "TCP"}.get(env.get("transport"), env.get("transport"))
@@ -117,8 +117,10 @@ def main(argv=None):
                 b, st = v.get("bench") or {}, v.get("transfers") or {}
                 bits = st.get("bits") if st.get("bits") is not None else bits
                 tpot = b.get("median_tpot_ms") if b.get("median_tpot_ms") is not None else tpot
+                bad = (st.get("install_errors") or 0) + (st.get("send_errors") or 0) + (st.get("timeouts") or 0)
                 cells.append(f"{fmt(b.get('request_throughput'))} ({fmt(b.get('request_goodput'))}); "
-                             f"{fmt(b.get('median_ttft_ms'), 0)} / {fmt(b.get('p99_ttft_ms'), 0)}")
+                             f"{fmt(b.get('median_ttft_ms'), 0)} / {fmt(b.get('p99_ttft_ms'), 0)}"
+                             + (f"; **{bad} of {st.get('sends') or '?'} transfers failed, computed locally**" if bad else ""))
             L.append(f"| {c} | {fmt(bits, 3) if c not in ('raw', 'nixl') else '16.000'} | " + " | ".join(cells) +
                      f" | {fmt(tpot, 1)} |")
         L.append("")

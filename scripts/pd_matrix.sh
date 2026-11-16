@@ -32,7 +32,7 @@ if [ -z "${RUNS:-}" ]; then
         smoke) RUNS="SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh;
                      SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=$NV;
                      SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh;
-                     SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl;
+                     SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl NIXL_ALL_GPUS=1;
                      SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh,t2-rank256;
                      SMOKE=1 LAYOUT=colo4 CONNECTOR=lmcache;
                      SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256" ;;
@@ -40,7 +40,8 @@ if [ -z "${RUNS:-}" ]; then
         ring2p2d) RUNS="LAYOUT=2p2d TRANSPORT=ring CODECS=$MAIN; LAYOUT=2p2d TRANSPORT=ring CODECS=$NV" ;;
         direct) RUNS="LAYOUT=1p3d TRANSPORT=p2p CODECS=$MAIN; LAYOUT=1p3d TRANSPORT=p2p CODECS=$NV;
                       LAYOUT=2p2d TRANSPORT=p2p CODECS=$MAIN; LAYOUT=2p2d TRANSPORT=p2p CODECS=$NV;
-                      LAYOUT=1p3d CONNECTOR=nixl; LAYOUT=2p2d CONNECTOR=nixl" ;;
+                      LAYOUT=1p3d CONNECTOR=nixl NIXL_ALL_GPUS=1; LAYOUT=2p2d CONNECTOR=nixl NIXL_ALL_GPUS=1;
+                      LAYOUT=2p2d CONNECTOR=nixl" ;;
         tier) RUNS="LAYOUT=colo4 TIER_CODECS=$TIERMAIN; LAYOUT=colo4 TIER_CODECS=$NV; LAYOUT=colo4 CONNECTOR=lmcache" ;;
         t2eager) RUNS="LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=$T2SET LINKS=10,100;
                        LAYOUT=1p3d TRANSPORT=p2p ENGINE_EAGER=1 CODECS=$T2SET;

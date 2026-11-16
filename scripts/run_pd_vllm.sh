@@ -130,6 +130,7 @@ fi
 EAGER=${ENGINE_EAGER:-0}
 RUN_TAG=${LAYOUT}_${CONNECTOR}
 if [ "$CONNECTOR" = tkv ] && [ "$COLO" = 0 ]; then RUN_TAG=${RUN_TAG}_$TRANSPORT; fi
+if [ "$CONNECTOR" = nixl ] && [ "${NIXL_ALL_GPUS:-0}" = 1 ]; then RUN_TAG=${RUN_TAG}_allgpus; fi
 if [ "$EAGER" = 1 ]; then RUN_TAG=${RUN_TAG}_eager; fi
 STAMP=$(date +%Y%m%d_%H%M)
 OUT=$RUN/pd/${STAMP}_$RUN_TAG
@@ -324,7 +325,8 @@ for ((i = 1; i <= NUM_PREFILL; i++)); do
         tkv) serve "prefill$i" "${PPOS[$((i - 1))]}" "$port" "$P_MEM" \
                  "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_producer\",\"kv_connector_extra_config\":{$COMMON,\"transport\":\"$TRANSPORT\",\"link_control\":\"$LINKFILE\",\"gpu_send_budget\":$SEND_BUDGET}}" ;;
         nixl) serve "prefill$i" "${PPOS[$((i - 1))]}" "$port" "$P_MEM" '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
-                  VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT=$((PORT_BASE + 400 + i)) UCX_NET_DEVICES=all ;;
+                  VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT=$((PORT_BASE + 400 + i)) UCX_NET_DEVICES=all \
+                  UCX_PROTO_INFO=y ;;   # UCX logs the protocol and transports it picks (cuda_ipc: peer to peer)
     esac
     P_URLS+=(--prefill "http://127.0.0.1:$port")
     [ "$STAGGER" != 0 ] && sleep "$STAGGER"
@@ -345,7 +347,8 @@ for ((i = 1; i <= NUM_DECODE; i++)); do
             tkv) serve "decode$i" "$pos" "$port" "$D_MEM" \
                      "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_consumer\",\"kv_connector_extra_config\":{$COMMON,\"listen\":\"127.0.0.1:$kv\",\"gpu_recv_budget\":$RECV_BUDGET,\"recv_timeout_s\":600}}" ;;
             nixl) serve "decode$i" "$pos" "$port" "$D_MEM" '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
-                      VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT=$((PORT_BASE + 450 + i)) UCX_NET_DEVICES=all ;;
+                      VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT=$((PORT_BASE + 450 + i)) UCX_NET_DEVICES=all \
+                      UCX_PROTO_INFO=y ;;
         esac
     fi
     DECODE_ARGS+=(--decode "http://127.0.0.1:$port=127.0.0.1:$kv")
@@ -385,7 +388,8 @@ nohup "$CPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_AR
     --log "$OUT/proxy.jsonl" > "$OUT/proxy.log" 2>&1 &
 PIDS+=($!)
 for _ in $(seq 1 30); do curl -sf "$PROXY/health" >/dev/null && break; sleep 1; done
-"$VPY" - "$OUT/env.json" "$MODEL_ID" "$NUM_PREFILL" "$NUM_DECODE" "$LAYOUT" "$CONNECTOR" "$TRANSPORT" "$EAGER" <<'EOF'
+"$VPY" - "$OUT/env.json" "$MODEL_ID" "$NUM_PREFILL" "$NUM_DECODE" "$LAYOUT" "$CONNECTOR" "$TRANSPORT" "$EAGER" \
+    "${NIXL_ALL_GPUS:-0}" <<'EOF'
 import json, subprocess, sys, torch, vllm
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
 extra = {}
@@ -396,7 +400,8 @@ for m in ("lmcache", "nixl"):
         pass
 json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sys.argv[4]), "layout": sys.argv[5],
            "connector": sys.argv[6], "transport": sys.argv[7], "eager": sys.argv[8] == "1", "vllm": vllm.__version__,
-           "torch": torch.__version__, "gpus": ", ".join(sorted(set(gpus.split("\n")) - {""})), **extra},
+           "torch": torch.__version__, "gpus": ", ".join(sorted(set(gpus.split("\n")) - {""})),
+           "nixl_all_gpus": sys.argv[6] == "nixl" and sys.argv[9] == "1", **extra},
           open(sys.argv[1], "w"))
 EOF
 set +e

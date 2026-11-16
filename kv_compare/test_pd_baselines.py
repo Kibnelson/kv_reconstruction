@@ -140,7 +140,9 @@ class Layer0FindTests(unittest.TestCase):
 
 
 class NvcompPieceTests(unittest.TestCase):
-    def test_pieces_round_trip(self):
+    """Our nvCOMP wrapper's pieces over a stand-in codec that, like nvCOMP, checks its input's alignment."""
+
+    def fake(self):
         from kv_compare.pd import codecs
 
         class Arr:                                   # nvCOMP's array: dlpack, its buffer size
@@ -163,19 +165,39 @@ class NvcompPieceTests(unittest.TestCase):
 
             def decode(self, a):
                 return Arr(a.t[4:].flip(0))
+        seen = []
+
+        def as_array(t, cuda_stream=None):           # job 30252: "not aligned to the required alignment of 16 bytes"
+            seen.append(t.data_ptr() % 16)
+            return Arr(t)
         nv = codecs.Nvcomp.__new__(codecs.Nvcomp)
-        nv.nv = types.SimpleNamespace(as_array=lambda t, cuda_stream=None: Arr(t))
+        nv.nv = types.SimpleNamespace(as_array=as_array)
         nv.codec, nv.name, nv.version, nv.device = Codec(), "nvcomp-x", "0", torch.device("cpu")
         nv.stream = types.SimpleNamespace(cuda_stream=0)
         nv._enter = nv._leave = lambda: None
         nv.piece = 1000
         words = torch.randint(-3000, 3000, (3, 7, 50), dtype=torch.int16)      # 2,100 bytes: three pieces
+        return nv, words, Codec, seen
+
+    def round_trip(self, offset):
+        nv, words, Codec, seen = self.fake()
         parts, meta = nv.encode(words)
-        self.assertEqual(Codec.calls, [1000, 1000, 100])
+        self.assertEqual(Codec.calls[-3:], [1000, 1000, 100])
         self.assertEqual(meta["pieces"], [1004, 1004, 104])
+        self.assertEqual(parts["coded"].numel(), 1008 + 1008 + 112)            # each piece padded to 16 bytes
+        buf = torch.zeros(parts["coded"].numel() + offset, dtype=torch.uint8)  # as received: offset into a buffer
+        buf[offset:] = parts["coded"]
+        seen.clear()
         got = {}
-        nv.decode(parts, meta, lambda l, w: got.__setitem__(l, w.clone()))
+        nv.decode({"coded": buf[offset:]}, meta, lambda l, w: got.__setitem__(l, w.clone()))
         self.assertTrue(all(torch.equal(got[l], words[l]) for l in range(3)))
+        self.assertEqual(seen, [0, 0, 0])                                     # every piece decoded from aligned bytes
+
+    def test_pieces_round_trip(self):
+        self.round_trip(0)
+
+    def test_unaligned_received_buffer(self):
+        self.round_trip(4)
 
 
 class ExansBatchTests(unittest.TestCase):
@@ -713,6 +735,46 @@ class BenchAndReportTests(unittest.TestCase):
         self.assertIn("| 1p3d, host memory | t2-hbh | 10 | inf | 40 | 8 |", text)
         self.assertIn("ibp: No module named 'ibp'", text)
         self.assertIn("`LAYOUT=2p2d`", text)
+        self.assertIn("NIXL (vLLM), own GPU only", mr.path_of({"connector": "nixl"}))
+        self.assertIn("every GPU visible", mr.path_of({"connector": "nixl", "nixl_all_gpus": True}))
+
+    def test_failed_transfers_marked_in_the_sweep(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_matrix_report as mr
+        root = Path(tempfile.mkdtemp())
+        (root / "r").mkdir()
+        (root / "r" / "env.json").write_text(json.dumps({"layout": "1p3d", "connector": "tkv", "transport": "ring"}))
+        (root / "r" / "results.json").write_text(json.dumps({"sweep": {"s": {
+            "link_gbps": 10, "codec": "nvcomp-zstd", "rate": "inf", "bench": {"median_ttft_ms": 900},
+            "transfers": {"sends": 8, "install_errors": 6, "bits": 12.0}}}}))
+        mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
+        self.assertIn("**6 of 8 transfers failed, computed locally**", (root / "s.md").read_text())
+
+    def test_compiles_placed_by_log_position(self):
+        """Job 30252: a compile in the warm-up, logged in the same whole second as the point's start, was counted
+        inside the point; the log's position at the point's start and end places it."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_bench as pb
+        d = Path(tempfile.mkdtemp())
+        f = d / "engine_decode2.log"
+        warn = "(EngineCore pid=1) WARNING 11-15 17:36:50 [jit_monitor.py:140] Triton kernel JIT compilation " \
+               "during inference: _topp_sb_mask_kernel. This causes a latency spike\n"
+        f.write_text("start\n" + warn)
+        a = SimpleNamespace(engine_logs=str(d), out=d, rerun=False)
+        m0 = pb.log_marks(a)
+        f.write_text(f.read_text() + "the point's requests\n" + warn.replace("_topp_sb_mask", "_other"))
+        m1 = pb.log_marks(a)
+        t = time.mktime((time.localtime().tm_year, 11, 15, 17, 36, 50, 0, 0, -1))
+        res = {"sweep": {"p": {"t0": t + 0.9, "t1": t + 12, "logs0": m0, "logs1": m1}}}
+        from unittest import mock
+        kernel = lambda j: j["text"].split("inference: ")[1].split(".")[0]
+        with mock.patch.object(pb, "save", lambda *x: None):
+            jit = pb.jit_report(a, res)
+            self.assertEqual([(kernel(j), j["point"]) for j in jit],
+                             [("_topp_sb_mask_kernel", None), ("_other_kernel", "p")])
+            # without the positions (older results): the time, with its one-second slack
+            res = {"sweep": {"p": {"t0": t + 0.9, "t1": t + 12}}}
+            self.assertEqual([j["point"] for j in pb.jit_report(a, res)], ["p", "p"])
 
 
 class NodeSpecsTests(unittest.TestCase):
@@ -750,6 +812,9 @@ args = sys.argv[1:]
 if args[:2] == ["bench", "serve"]:
     d = args[args.index("--result-dir") + 1]
     n = args[args.index("--result-filename") + 1]
+    if os.environ.get("FAKE_LOG"):
+        with open(os.environ["FAKE_LOG"] + ".bench", "a") as f:
+            f.write(json.dumps(args) + "\n")
     json.dump({"completed": 8, "request_throughput": 1.5, "request_goodput": 1.0, "median_ttft_ms": 500.0,
                "p99_ttft_ms": 900.0, "median_tpot_ms": 20.0}, open(os.path.join(d, n), "w"))
     sys.exit(0)
@@ -767,7 +832,7 @@ cfg = json.loads(args[args.index("--kv-transfer-config") + 1])
 log = os.environ.get("FAKE_LOG")
 with open(log, "a") as f:
     f.write(json.dumps({"port": port, "cvd": os.environ.get("CUDA_VISIBLE_DEVICES"), "cfg": cfg,
-                        "argv": args, "env": {k: v for k, v in os.environ.items() if k.startswith(("LMCACHE", "VLLM_NIXL"))}}) + "\n")
+                        "argv": args, "env": {k: v for k, v in os.environ.items() if k.startswith(("LMCACHE", "VLLM_NIXL", "UCX_"))}}) + "\n")
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -894,10 +959,23 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertEqual(sorted(e["cvd"] for e in eng), ["0", "1", "2", "3"])
         self.assertTrue(all(e["cfg"]["kv_connector"] == "NixlConnector" for e in eng))
         self.assertEqual(len({e["env"]["VLLM_NIXL_SIDE_CHANNEL_PORT"] for e in eng}), 4)
-        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_nixl_*"))
+        self.assertTrue(all(e["env"]["UCX_PROTO_INFO"] == "y" for e in eng))       # UCX logs its transports
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_nixl_rtx*"))
         res = json.loads((out[0] / "results.json").read_text())
         self.assertTrue(res["check"]["nixl"]["ok"])
         self.assertIn("sweep_nixl_nativegbps_rinf", res["sweep"])
+        self.assertFalse(json.loads((out[0] / "env.json").read_text())["nixl_all_gpus"])
+        # the sweeps greedy: vLLM 0.32's bench no longer sends temperature 0 by default
+        bench = [json.loads(l) for l in Path(str(self.tmp / sorted(self.tmp.glob("engines_*.jsonl"))[-1].name)
+                                                + ".bench").read_text().splitlines()]
+        self.assertTrue(bench and all(b[b.index("--temperature") + 1] == "0" for b in bench))
+        # NIXL with every GPU visible, as our p2p engines have
+        r, eng = self.run_pd(LAYOUT="2p2d", CONNECTOR="nixl", NIXL_ALL_GPUS="1")
+        self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
+        self.assertEqual(sorted(e["cvd"] for e in eng), ["0,1,2,3", "1,0,2,3", "2,0,1,3", "3,0,1,2"])
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_2p2d_nixl_allgpus_*"))
+        self.assertEqual(len(out), 1)
+        self.assertTrue(json.loads((out[0] / "env.json").read_text())["nixl_all_gpus"])
         # colocated with the CPU tier, and LMCache
         r, eng = self.run_pd(LAYOUT="colo4", TIER_CODECS="raw,ours-hbh")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])

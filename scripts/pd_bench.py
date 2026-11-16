@@ -110,17 +110,32 @@ def warm_pairs(a):
     return n
 
 
-def warm_burst(a, n=16):
-    """n short requests at once in the current mode, with the server's default sampling (the model's generation
-    config: top-p), as the benchmarks send them. In job 30226 the first measured point of every run compiled vLLM's
+GREEDY = ["--temperature", "0"]
+
+
+def greedy_args():
+    """vllm bench serve's sampling: greedy. vLLM 0.32's bench no longer sends temperature 0 by default ("WARNING: vllm
+    bench serve no longer sets temperature==0 (greedy)", in every sweep log of job 30252), so the server's default
+    applied: the model's generation config, temperature 0.6 and top-p 0.9. Its top-p kernels compiled at first use, on
+    each engine (jobs 30226, 30252), and each codec's run sampled its own text. Greedy needs no top-p kernel, and every
+    codec writes the same text."""
+    return GREEDY
+
+
+def warm_burst(a, n=16, greedy=False):
+    """n short requests at once in the current mode, sampled as the next point samples: greedy before a sweep
+    (greedy_args), the server's default (the model's generation config: top-p) before the tier and multi-turn runs,
+    which send no temperature. In job 30226 the first measured point of every run compiled vLLM's
     top-p kernels (Triton, about 2 s: "JIT compilation during inference"): the check stage samples greedily, so
     nothing before had used them; the burst also covers batched sampling."""
     from concurrent.futures import ThreadPoolExecutor
 
     def one(i):
         try:
-            post(a.proxy + "/v1/completions", {"model": a.served_name, "prompt": f"warm-up burst {i} " * 30,
-                                               "max_tokens": 8}, timeout=600)
+            body = {"model": a.served_name, "prompt": f"warm-up burst {i} " * 30, "max_tokens": 8}
+            if greedy:
+                body["temperature"] = 0.0
+            post(a.proxy + "/v1/completions", body, timeout=600)
             return None
         except Exception as exc:
             return repr(exc)[:200]
@@ -134,9 +149,23 @@ def warm_burst(a, n=16):
 JIT_RE = re.compile(r"(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d) \[jit_monitor\.py:\d+\] (.*)")
 
 
+def log_marks(a):
+    """How far each engine log has been written ({log name: bytes}): taken at a point's start and end, it says which
+    log lines the point wrote, more precisely than the logs' whole-second times."""
+    if not getattr(a, "engine_logs", None):
+        return {}
+    out = {}
+    for f in Path(a.engine_logs).glob("engine_*.log"):
+        try:
+            out[f.name] = f.stat().st_size
+        except OSError:
+            pass
+    return out
+
+
 def jit_events(a):
     """vLLM's warnings of a kernel compiled while serving ("JIT compilation during inference"), from the engine logs:
-    [(time, engine log, text)]."""
+    [(time, engine log, text, byte offset in the log)]."""
     out = []
     if not getattr(a, "engine_logs", None):
         return out
@@ -150,8 +179,8 @@ def jit_events(a):
             if "JIT compilation during inference" not in m[6]:
                 continue
             t = time.mktime((year, int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]), 0, 0, -1))
-            out.append((t, f.name, m[6][:160]))
-    return sorted(out)
+            out.append((t, f.name, m[6][:160], len(text[:m.start()].encode())))
+    return sorted(out, key=lambda e: (e[0], e[1], e[3]))     # in the order written
 
 
 def prefix_metrics(urls):
@@ -280,7 +309,7 @@ def bench_serve(a, dataset, rate, n, out_dir, name):
            "--skip-chat-template", "--num-prompts", str(n), "--request-rate", str(rate), "--ignore-eos",
            "--percentile-metrics", "ttft,tpot,itl,e2el", "--metric-percentiles", "50,90,99",
            "--goodput", f"ttft:{a.ttft_slo_ms}", "--seed", "0", "--disable-tqdm",
-           "--save-result", "--result-dir", str(out_dir), "--result-filename", name + ".json"]
+           "--save-result", "--result-dir", str(out_dir), "--result-filename", name + ".json"] + greedy_args()
     t0 = time.time()
     r = subprocess.run(cmd, capture_output=True, text=True)
     t1 = time.time()
@@ -369,16 +398,18 @@ def stage_sweep(a, res, colocated=False):
                 if rate == a.rates[0]:
                     if not colocated:
                         warm_pairs(a)
-                    warm_burst(a)
+                    warm_burst(a, greedy=True)
                 resets = reset_caches(a)
                 n = a.num_prompts if rate != "inf" else a.num_prompts
+                logs0 = log_marks(a)
                 rc, r, t0, t1 = bench_serve(a, str(a.dataset), rate, n, out_dir, name)
+                logs1 = log_marks(a)
                 wait_idle(a.proxy)
                 time.sleep(1)
                 st = transfer_stats(records(a.log_dir, t0, time.time())) if not colocated and codec != "nixl" else {}
                 runs[name] = {"link_gbps": link, "codec": codec, "rate": rate, "exit": rc,
                               "bench": {k: r.get(k) for k in KEEP}, "transfers": st, "resets": resets,
-                              "t0": t0, "t1": t1}
+                              "t0": t0, "t1": t1, "logs0": logs0, "logs1": logs1}
                 b = runs[name]["bench"]
                 log(f"{name}: exit {rc}, {fmt(b.get('request_throughput'), 2)} req/s, TTFT p50 "
                     f"{fmt(b.get('median_ttft_ms'), 0)} / p99 {fmt(b.get('p99_ttft_ms'), 0)} ms, goodput "
@@ -514,6 +545,7 @@ def stage_tier(a, res):
                    "--send-conversation-id", "--seed", str(gen % 100000), "--max-turns", str(a.tier_max_turns),
                    "--stats-json-output", str(out_json)]
             m0 = prefix_metrics(engines)
+            logs0 = log_marks(a)
             t0 = time.time()
             r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(src))
             (a.out / "runs" / (name + ".log")).write_text(r.stdout[-30000:] + "\n" + r.stderr[-30000:])
@@ -523,6 +555,7 @@ def stage_tier(a, res):
             time.sleep(2)
             hits = hit_rates(m0, prefix_metrics(engines))
             t1 = time.time()
+            logs1 = log_marks(a)
             stats = json.loads(out_json.read_text()) if out_json.is_file() else []
             ttft = [x.get("ttft_ms") for x in stats]
             starts = [x.get("start_time_ms") for x in stats if x.get("start_time_ms")]
@@ -536,7 +569,8 @@ def stage_tier(a, res):
                      "input_tokens": mean([x.get("input_num_tokens") for x in stats])}
             st = tier_stats(records(a.log_dir, t0, t1))
             runs[name] = {"codec": codec, "clients": clients, "exit": r.returncode, "bench": bench, "tier": st,
-                          "resets": resets, "generation": gen, "prefix_cache": hits, "t0": t0, "t1": t1}
+                          "resets": resets, "generation": gen, "prefix_cache": hits, "t0": t0, "t1": t1,
+                          "logs0": logs0, "logs1": logs1}
             log(f"{name}: exit {r.returncode}, {bench['requests']} requests, {fmt(bench['request_throughput'], 2)} "
                 f"req/s, TTFT p50 {fmt(bench['median_ttft_ms'], 0)} / p99 {fmt(bench['p99_ttft_ms'], 0)} ms; tier "
                 f"{st['loads']} loads ({st['loaded_tokens']} tokens, {fmt(st['load_ms'], 1)} ms each, bits "
@@ -551,11 +585,17 @@ def save(a, res):
 
 def jit_report(a, res):
     """vLLM's kernels compiled while serving, each with the measured point it fell in (None: outside them)."""
-    spans = [(v["t0"], v["t1"], name) for key in ("sweep", "colocated", "tier") for name, v in (res.get(key) or {}).items()
+    spans = [(v, name) for key in ("sweep", "colocated", "tier") for name, v in (res.get(key) or {}).items()
              if isinstance(v, dict) and v.get("t0") and v.get("t1")]
+
+    def inside(v, t, f, off):
+        m0, m1 = v.get("logs0") or {}, v.get("logs1") or {}
+        if f in m0 and f in m1:        # the log's own position: job 30252's compile in the warm-up just before a point
+            return m0[f] <= off < m1[f]    # fell within the whole-second slack and was counted inside it
+        return v["t0"] - 1 <= t <= v["t1"] + 1
     out = []
-    for t, f, text in jit_events(a):
-        point = next((n for t0, t1, n in spans if t0 - 1 <= t <= t1 + 1), None)
+    for t, f, text, off in jit_events(a):
+        point = next((n for v, n in spans if inside(v, t, f, off)), None)
         out.append({"time": t, "log": f, "text": text, "point": point})
     res["jit"] = out
     save(a, res)
