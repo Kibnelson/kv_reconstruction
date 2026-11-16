@@ -1,0 +1,355 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 1,
+  "decodes": 3,
+  "layout": "1p3d",
+  "connector": "tkv",
+  "transport": "ring",
+  "eager": true,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl_all_gpus": false,
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "raw": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 7.742080837488174,
+    "encode_ms": 2.4908012710511684,
+    "link_ms": 40.709064807742834,
+    "queue_ms": 0.27674436569213867,
+    "achieved_gbps": 94.87337162897973,
+    "wire_gbps": 95.89143144241567,
+    "rel_err": null,
+    "install_ms": 24.158930871635675,
+    "wait_ms": 1046.6703176498413,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "lossy": false
+  },
+  "t2-hbh": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.188592239416213,
+    "gather_ms": 7.341545075178146,
+    "encode_ms": 95.96181707456708,
+    "link_ms": 20.6162016838789,
+    "queue_ms": 0.2955198287963867,
+    "achieved_gbps": 93.37470223566191,
+    "wire_gbps": 94.19915472973098,
+    "rel_err": null,
+    "install_ms": 463.9864582568407,
+    "wait_ms": 979.540228843689,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 4,
+    "layer0_coded": 0,
+    "layer0_checks": [
+     "equal"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "lossy": false
+  },
+  "t2-rank256": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 9.199482172066825,
+    "gather_ms": 7.387668825685978,
+    "encode_ms": 51.92219605669379,
+    "link_ms": 23.44728959724307,
+    "queue_ms": 0.28651952743530273,
+    "achieved_gbps": 92.42014354562944,
+    "wire_gbps": 93.17979692388784,
+    "rel_err": null,
+    "install_ms": 169.50723016634583,
+    "wait_ms": 644.6291208267212,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 4,
+    "layer0_coded": 0,
+    "layer0_checks": [
+     "equal"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "lossy": false
+  }
+ },
+ "sweep": {
+  "sweep_raw_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "raw",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 4.289580659940839,
+    "request_throughput": 1.8649841637691305,
+    "request_goodput": 0.6993690614134239,
+    "output_throughput": 238.7179729624487,
+    "total_token_throughput": 4058.2055403616278,
+    "mean_ttft_ms": 2277.433297596872,
+    "median_ttft_ms": 2373.1942418962717,
+    "p90_ttft_ms": 2776.5670528635383,
+    "p99_ttft_ms": 2793.235302325338,
+    "mean_tpot_ms": 11.793113636278262,
+    "median_tpot_ms": 11.82746002083923,
+    "p99_tpot_ms": 11.903749000662424,
+    "mean_e2el_ms": 3775.158729404211,
+    "p99_e2el_ms": 4286.731804776937,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 135.10542945005,
+    "encode_ms": 1.1325073428452015,
+    "link_ms": 469.762054271996,
+    "queue_ms": 319.3637728691101,
+    "achieved_gbps": 3.7500165173823357,
+    "wire_gbps": 9.994007561348546,
+    "rel_err": null,
+    "install_ms": 2.592796692624688,
+    "wait_ms": 2198.753386735916,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 4,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794868627.0775077,
+   "t1": 1794868640.8636537,
+   "logs0": {
+    "engine_prefill1.log": 23597,
+    "engine_decode1.log": 22500,
+    "engine_decode3.log": 22073,
+    "engine_decode2.log": 22331
+   },
+   "logs1": {
+    "engine_prefill1.log": 24411,
+    "engine_decode1.log": 23061,
+    "engine_decode3.log": 22634,
+    "engine_decode2.log": 22825
+   }
+  },
+  "sweep_t2-hbh_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-hbh",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.730321954935789,
+    "request_throughput": 2.1445870079430467,
+    "request_goodput": 1.0722935039715233,
+    "output_throughput": 274.50713701671,
+    "total_token_throughput": 4666.621329284069,
+    "mean_ttft_ms": 1982.6553775928915,
+    "median_ttft_ms": 2030.689605511725,
+    "p90_ttft_ms": 2184.3865871429443,
+    "p99_ttft_ms": 2204.2600205540657,
+    "mean_tpot_ms": 12.72933408581307,
+    "median_tpot_ms": 12.401791406780715,
+    "p99_tpot_ms": 14.196311249801024,
+    "mean_e2el_ms": 3599.2808064911515,
+    "p99_e2el_ms": 3726.870828103274,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 7.85963249206543,
+    "gather_ms": 134.6979308873415,
+    "encode_ms": 43.55773492716253,
+    "link_ms": 202.03870837576687,
+    "queue_ms": 73.78444075584412,
+    "achieved_gbps": 3.9573505788237555,
+    "wire_gbps": 9.98316422945313,
+    "rel_err": null,
+    "install_ms": 146.47202054038644,
+    "wait_ms": 1913.1336212158203,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 8,
+    "layer0_coded": 0,
+    "layer0_checks": [
+     "equal"
+    ],
+    "sets": {
+     "news": 1,
+     "code": 2,
+     "wikitext": 2,
+     "math": 2,
+     "exam": 1
+    }
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794868643.849875,
+   "t1": 1794868657.0010455,
+   "logs0": {
+    "engine_prefill1.log": 25937,
+    "engine_decode1.log": 23716,
+    "engine_decode3.log": 23289,
+    "engine_decode2.log": 23547
+   },
+   "logs1": {
+    "engine_prefill1.log": 27029,
+    "engine_decode1.log": 24471,
+    "engine_decode3.log": 24044,
+    "engine_decode2.log": 24235
+   }
+  },
+  "sweep_t2-rank256_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-rank256",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.6832012739032507,
+    "request_throughput": 2.172023575437692,
+    "request_goodput": 1.3575147346485574,
+    "output_throughput": 278.0190176560246,
+    "total_token_throughput": 4726.323300152418,
+    "mean_ttft_ms": 1877.9800322372466,
+    "median_ttft_ms": 1908.7263299152255,
+    "p90_ttft_ms": 2136.253829859197,
+    "p99_ttft_ms": 2165.73782319203,
+    "mean_tpot_ms": 12.018113831556807,
+    "median_tpot_ms": 12.029266021559089,
+    "p99_tpot_ms": 12.295899115590833,
+    "mean_e2el_ms": 3404.280488844961,
+    "p99_e2el_ms": 3678.7532717362046,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.866535323006767,
+    "gather_ms": 132.63512100093067,
+    "encode_ms": 31.17718663997948,
+    "link_ms": 234.32130995206535,
+    "queue_ms": 138.279527425766,
+    "achieved_gbps": 3.950349368687216,
+    "wire_gbps": 9.98508221700993,
+    "rel_err": null,
+    "install_ms": 22.69432693719864,
+    "wait_ms": 1817.8538084030151,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 8,
+    "layer0_coded": 0,
+    "layer0_checks": [
+     "equal"
+    ],
+    "sets": {
+     "news": 1,
+     "code": 2,
+     "wikitext": 2,
+     "math": 2,
+     "exam": 1
+    }
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794868659.0056276,
+   "t1": 1794868672.2549257,
+   "logs0": {
+    "engine_prefill1.log": 28555,
+    "engine_decode1.log": 25126,
+    "engine_decode3.log": 24699,
+    "engine_decode2.log": 24957
+   },
+   "logs1": {
+    "engine_prefill1.log": 29368,
+    "engine_decode1.log": 25603,
+    "engine_decode3.log": 25176,
+    "engine_decode2.log": 25367
+   }
+  }
+ },
+ "jit": []
+}

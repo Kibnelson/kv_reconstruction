@@ -1,0 +1,28 @@
+{
+ "bytes": 2962069,
+ "failed": [],
+ "files": 216,
+ "folders": [
+  "llama32_3b_pd_1p3d_tkv_ring_eager_rtxa5000x4_20261116_1735_smoke",
+  "llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261116_1721_smoke",
+  "llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261116_1725_smoke",
+  "llama32_3b_pd_2p2d_nixl_allgpus_rtxa5000x4_20261116_1730_smoke",
+  "llama32_3b_pd_2p2d_tkv_p2p_rtxa5000x4_20261116_1728_smoke",
+  "llama32_3b_pd_colo4_lmcache_rtxa5000x4_20261116_1734_smoke",
+  "llama32_3b_pd_colo4_tkv_rtxa5000x4_20261116_1731_smoke"
+ ],
+ "review_job": "30299",
+ "run_job": "30293",
+ "runs": [
+  "SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh,aquakv-2",
+  "SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,nvcomp-ans,nvcomp-zstd,nvcomp-bitcomp",
+  "SMOKE=1 LAYOUT=2p2d TRANSPORT=p2p CODECS=raw,ours-hbh,t2-hbh",
+  "SMOKE=1 LAYOUT=2p2d CONNECTOR=nixl NIXL_ALL_GPUS=1",
+  "SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh,t2-rank256",
+  "SMOKE=1 LAYOUT=colo4 CONNECTOR=lmcache",
+  "SMOKE=1 LAYOUT=1p3d TRANSPORT=ring ENGINE_EAGER=1 CODECS=raw,t2-hbh,t2-rank256"
+ ],
+ "schema": 1,
+ "status": "completed",
+ "when": "2026-11-16T22:38:11Z"
+}
