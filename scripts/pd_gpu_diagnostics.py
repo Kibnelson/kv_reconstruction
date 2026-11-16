@@ -91,6 +91,7 @@ def platform_context(proc_root=Path('/proc'), sys_root=Path('/sys')):
         result['iommu_groups_error'] = str(exc)
     commands = {'p2p_read': ['nvidia-smi', 'topo', '-p2p', 'r'],
                 'p2p_write': ['nvidia-smi', 'topo', '-p2p', 'w'],
+                'virtualization': ['systemd-detect-virt'],
                 'pci_bus_ids': ['nvidia-smi', '--query-gpu=pci.bus_id', '--format=csv,noheader']}
     for name, command in commands.items():
         try:
@@ -105,10 +106,17 @@ def platform_context(proc_root=Path('/proc'), sys_root=Path('/sys')):
             bdf = f'{int(match[1], 16):04x}:{match[2].lower()}'
             link = sys_root/'bus/pci/devices'/bdf/'iommu_group'
             try:
-                group = link.resolve(strict=True).name if link.is_symlink() else None
-                result['gpu_iommu_groups'].append({'pci_bus_id': bdf, 'iommu_group': group})
+                group = link.resolve(strict=True) if link.is_symlink() else None
             except OSError as exc:
                 result['gpu_iommu_groups'].append({'pci_bus_id': bdf, 'error': str(exc)})
+                continue
+            row = {'pci_bus_id': bdf, 'iommu_group': group.name if group else None, 'domain_type': None}
+            if group:
+                try:
+                    row['domain_type'] = (group/'type').read_text().strip() or None
+                except OSError as exc:
+                    row['domain_type_error'] = str(exc)
+            result['gpu_iommu_groups'].append(row)
     return result
 
 

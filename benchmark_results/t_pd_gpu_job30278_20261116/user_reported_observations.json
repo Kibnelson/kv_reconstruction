@@ -1,0 +1,159 @@
+{
+  "format": "t_pd_iommu_followup_user_report_v1",
+  "evidence_origin": "user-supplied stdout from a four-GPU Slurm allocation",
+  "received_date": "2026-11-16",
+  "received_date_timezone": "America/Toronto",
+  "job": "30278",
+  "node": "gpu-grad-01",
+  "allocated_gpus": 4,
+  "command_reference_commit": "9816bf3b65e33475902b57c6db3bfbd0320975ae",
+  "git_pin_printed_by_command": false,
+  "nvidia_smi_gpus": [
+    {
+      "index": 0,
+      "name": "NVIDIA RTX A5000",
+      "uuid": "GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286"
+    },
+    {
+      "index": 1,
+      "name": "NVIDIA RTX A5000",
+      "uuid": "GPU-1593dd02-947c-388d-92af-e2c750110f35"
+    },
+    {
+      "index": 2,
+      "name": "NVIDIA RTX A5000",
+      "uuid": "GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7"
+    },
+    {
+      "index": 3,
+      "name": "NVIDIA RTX A5000",
+      "uuid": "GPU-06931f50-f453-a006-ef25-da5c555c0b34"
+    }
+  ],
+  "gpu_group_domains": [
+    {
+      "pci_bus_id": "0000:06:00.0",
+      "iommu_group": "55",
+      "domain_type": "DMA-FQ"
+    },
+    {
+      "pci_bus_id": "0000:45:00.0",
+      "iommu_group": "30",
+      "domain_type": "DMA-FQ"
+    },
+    {
+      "pci_bus_id": "0000:46:00.0",
+      "iommu_group": "31",
+      "domain_type": "DMA-FQ"
+    },
+    {
+      "pci_bus_id": "0000:47:00.0",
+      "iommu_group": "32",
+      "domain_type": "DMA-FQ"
+    }
+  ],
+  "virtualization_detection": "none",
+  "gpu_allocation_observed": true,
+  "gpu_copy_test_in_this_followup": false,
+  "domain_translation_observed": true,
+  "documented_relevant_configuration_condition_observed": true,
+  "definitive_cause_proven": false,
+  "configuration_changed": false,
+  "repair_tested": false,
+  "direct_pd_validated": false,
+  "previous_copy_job": "30224",
+  "followup_is_a_separate_allocation": true,
+  "gpu_identity_comparison": {
+    "earlier_job": "30196",
+    "earlier_evidence_commit": "90012974da8fe60ae67f20d4cb4b1f47760cb835",
+    "earlier_specs_path": "benchmark_results/pd_card/pd_smoke_tmatched_20261115T112147Z_594875/node_specs/specs.json",
+    "removed_uuids": [
+      "GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff"
+    ],
+    "added_uuids": [
+      "GPU-1593dd02-947c-388d-92af-e2c750110f35"
+    ],
+    "cause_of_identity_difference": "not established",
+    "change_between_jobs_30224_and_30278": "not established; job 30224 UUID list not supplied",
+    "logical_cuda_to_current_pci_mapping": "not included in this follow-up stdout"
+  },
+  "earlier_test_scope": {
+    "logical_pairs": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "all_share_logical_device": 1,
+    "all_ordered_pairs_tested": false
+  },
+  "assistant_executed_gpu_tests": false,
+  "new_metadata_capture_gpu_validation_pending": true,
+  "next_diagnostic_pairs": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      0,
+      2
+    ],
+    [
+      2,
+      0
+    ],
+    [
+      0,
+      3
+    ],
+    [
+      3,
+      0
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      1
+    ],
+    [
+      1,
+      3
+    ],
+    [
+      3,
+      1
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      3,
+      2
+    ]
+  ],
+  "next_diagnostic_case_count": 48,
+  "planned_diagnostic_uses": [
+    "current reported hardware cohort and links excluding logical device 1",
+    "post-maintenance exact repair validation"
+  ]
+}

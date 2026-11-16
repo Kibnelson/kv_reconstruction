@@ -141,7 +141,7 @@ pip_in "$py" 'torch==2.11.0+cu128' 'numpy==2.3.5' \
 diag_stage=collect_environment
 printf 'DIAG_STAGE=%s\n' "$diag_stage"
 pip_freeze "$py" > "$T_PD_DIAG_OUT/pip_freeze.txt"
-nvidia-smi --query-gpu=index,name,uuid,driver_version,memory.total --format=csv > "$T_PD_DIAG_OUT/gpus.txt"
+nvidia-smi --query-gpu=index,name,uuid,pci.bus_id,driver_version,memory.total --format=csv > "$T_PD_DIAG_OUT/gpus.txt"
 nvidia-smi topo -m > "$T_PD_DIAG_OUT/topology.txt"
 diag_stage=gpu_copy_diagnostics
 printf 'DIAG_STAGE=%s\n' "$diag_stage"

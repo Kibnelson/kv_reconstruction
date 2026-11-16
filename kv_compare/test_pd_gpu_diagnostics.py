@@ -71,6 +71,8 @@ class GPUDiagnosticTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);proc=root/'proc';system=root/'sys'
             proc.mkdir();(system/'kernel/iommu_groups/7').mkdir(parents=True)
+            domain_file=system/'kernel/iommu_groups/7/type'
+            domain_file.write_text('DMA-FQ\n')
             (proc/'cmdline').write_text('root=private-value intel_iommu=on iommu=pt quiet')
             device=system/'bus/pci/devices/0000:04:00.0';device.mkdir(parents=True)
             (device/'iommu_group').symlink_to(system/'kernel/iommu_groups/7')
@@ -82,11 +84,17 @@ class GPUDiagnosticTests(unittest.TestCase):
                 context=diag.platform_context(proc,system)
             self.assertEqual(context['relevant_boot_flags'],['intel_iommu=on','iommu=pt'])
             self.assertEqual(context['iommu_group_count'],1)
-            self.assertEqual(context['gpu_iommu_groups'],[{'pci_bus_id':'0000:04:00.0','iommu_group':'7'}])
+            self.assertEqual(context['gpu_iommu_groups'],[{'pci_bus_id':'0000:04:00.0','iommu_group':'7','domain_type':'DMA-FQ'}])
             self.assertIn('error',context['p2p_read'])
             self.assertFalse(context['system_settings_changed'])
             self.assertFalse(context['iommu_cause_established'])
             self.assertNotIn('private-value',json.dumps(context))
+            domain_file.unlink()
+            with patch.object(diag.subprocess,'run',side_effect=command):
+                context=diag.platform_context(proc,system)
+            self.assertEqual(context['gpu_iommu_groups'][0]['iommu_group'],'7')
+            self.assertIsNone(context['gpu_iommu_groups'][0]['domain_type'])
+            self.assertIn('domain_type_error',context['gpu_iommu_groups'][0])
 
     def test_children_use_fresh_process_groups_and_keep_failure_logs(self):
         with tempfile.TemporaryDirectory() as td:

@@ -294,4 +294,28 @@ are transcribed from the user's supplied output; the full `share.zip` has
 not been independently retrieved. No codec, transport, gate or node setting
 was changed for this review.
 
+### Job 30278: translated GPU IOMMU domains observed
+
+The follow-up was executed inside a four-GPU allocation on `gpu-grad-01`.
+All four GPU groups reported `DMA-FQ`; virtualization detection reported
+`none`. This identifies a translated-domain condition matching NVIDIA's
+documented Linux bare-metal PCIe peer-transfer limitation. It is a strong
+candidate cause, while a controlled configuration repair and exact retest
+remain necessary to demonstrate causality.
+
+[Job 30278 observations and administrator follow-up](../benchmark_results/t_pd_gpu_job30278_20261116/review.md)
+keep this configuration check separate from job 30224's failed-copy evidence.
+The reported GPU UUID set also differs from the older job 30196 record;
+the cause of that identity change is unknown. All earlier tested directions
+shared logical CUDA device 1. The complete diagnostic command in the review
+therefore selects all 12 ordered GPU pairs in a four-GPU allocation. Use it
+to establish affected links on the current GPU set and again after maintenance
+to verify a repair.
+
+Subsequent diagnostic reports capture IOMMU domain types, virtualization
+output and PCI bus IDs with GPU UUIDs. This metadata update does not change
+copy operations or acceptance gates and has not yet been executed in a
+new GPU job. No CPU test suite was run for the update.
+
+
 
