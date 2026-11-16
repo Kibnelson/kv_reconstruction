@@ -1,0 +1,170 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 2,
+  "decodes": 2,
+  "layout": "2p2d",
+  "connector": "nixl",
+  "transport": "ring",
+  "eager": false,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl_all_gpus": true,
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "nixl": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 0,
+    "send_errors": 0,
+    "installs": 0,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": null,
+    "gather_ms": null,
+    "encode_ms": null,
+    "link_ms": null,
+    "queue_ms": null,
+    "achieved_gbps": null,
+    "install_ms": null,
+    "wait_ms": null,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  }
+ },
+ "sweep": {
+  "sweep_nixl_nativegbps_rinf": {
+   "link_gbps": "native",
+   "codec": "nixl",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.836914326995611,
+    "request_throughput": 2.0850087643901545,
+    "request_goodput": 1.0425043821950772,
+    "output_throughput": 266.8811218419398,
+    "total_token_throughput": 4536.979071312976,
+    "mean_ttft_ms": 1929.9492822028697,
+    "median_ttft_ms": 2079.610859043896,
+    "p90_ttft_ms": 2311.322844028473,
+    "p99_ttft_ms": 2312.8065210208297,
+    "mean_tpot_ms": 11.83981538977562,
+    "median_tpot_ms": 11.897971010290261,
+    "p99_tpot_ms": 11.994082945156988,
+    "mean_e2el_ms": 3433.6058367043734,
+    "p99_e2el_ms": 3834.9528884515166,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794858995.3713682,
+   "t1": 1794859011.5042746,
+   "logs0": {
+    "engine_prefill1.log": 105512,
+    "engine_prefill2.log": 105506,
+    "engine_decode1.log": 144095,
+    "engine_decode2.log": 144281
+   },
+   "logs1": {
+    "engine_prefill1.log": 106056,
+    "engine_prefill2.log": 106327,
+    "engine_decode1.log": 145010,
+    "engine_decode2.log": 145197
+   }
+  }
+ },
+ "jit": [
+  {
+   "time": 1794858994.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_prefill2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_prefill2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858994.0,
+   "log": "engine_prefill2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  }
+ ]
+}

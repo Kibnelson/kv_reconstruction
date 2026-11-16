@@ -1,0 +1,807 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 1,
+  "decodes": 3,
+  "layout": "1p3d",
+  "connector": "tkv",
+  "transport": "ring",
+  "eager": false,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl_all_gpus": false,
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "raw": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 7.954917848110199,
+    "encode_ms": 2.5255861692130566,
+    "link_ms": 40.90153053402901,
+    "queue_ms": 0.29653310775756836,
+    "achieved_gbps": 94.37083818345396,
+    "install_ms": 24.423330556601286,
+    "wait_ms": 1035.9434485435486,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "splitzip": {
+   "prompts": 4,
+   "same_text_as_local": 3,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 12.044045828580856,
+    "gather_ms": 7.303851656615734,
+    "encode_ms": 110.50651548430324,
+    "link_ms": 30.80953983590007,
+    "queue_ms": 0.2442002296447754,
+    "achieved_gbps": 94.1517439494718,
+    "install_ms": 26.672198437154293,
+    "wait_ms": 566.9724941253662,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "exans": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 10.92349424196879,
+    "gather_ms": 7.341207005083561,
+    "encode_ms": 118.42085607349873,
+    "link_ms": 28.141544200479984,
+    "queue_ms": 0.3229379653930664,
+    "achieved_gbps": 93.27888731935744,
+    "install_ms": 47.624808736145496,
+    "wait_ms": 592.9054617881775,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "adacode": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 11.371432879497892,
+    "gather_ms": 7.346284110099077,
+    "encode_ms": 19.808730110526085,
+    "link_ms": 29.319958295673132,
+    "queue_ms": 0.30493736267089844,
+    "achieved_gbps": 89.09415914658709,
+    "install_ms": 28.882555197924376,
+    "wait_ms": 479.94500398635864,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "exactkv": {
+   "prompts": 4,
+   "same_text_as_local": 3,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 12.628653277297246,
+    "gather_ms": 7.515617646276951,
+    "encode_ms": 45.38847226649523,
+    "link_ms": 32.40568283945322,
+    "queue_ms": 0.3707408905029297,
+    "achieved_gbps": 90.76279164033576,
+    "install_ms": 37.23639668896794,
+    "wait_ms": 519.0791487693787,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "ours-hbh": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 9.052769707416353,
+    "gather_ms": 7.305429317057133,
+    "encode_ms": 81.37406082823873,
+    "link_ms": 23.056715726852417,
+    "queue_ms": 0.33217668533325195,
+    "achieved_gbps": 92.92227776094153,
+    "install_ms": 171.7340345494449,
+    "wait_ms": 675.4487752914429,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  },
+  "t2-hbh": {
+   "prompts": 4,
+   "same_text_as_local": 4,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.489440736825125,
+    "gather_ms": 7.267216686159372,
+    "encode_ms": 92.51681342720985,
+    "link_ms": 21.46001812070608,
+    "queue_ms": 0.32442808151245117,
+    "achieved_gbps": 93.10077871251455,
+    "install_ms": 171.26795183867216,
+    "wait_ms": 683.803141117096,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 4,
+    "layer0_checks": [
+     "differs in 3037581 of 6144000 words (3000 of 3000 tokens) with the scheduler's row counts",
+     "differs in 5000454 of 10240000 words (5000 of 5000 tokens) with the scheduler's row counts",
+     "differs in 8319655 of 16777216 words (8192 of 8192 tokens) with the scheduler's row counts",
+     "differs in 980743 of 2048000 words (1000 of 1000 tokens) with the scheduler's row counts"
+    ],
+    "sets": {
+     "wikitext": 1,
+     "code": 1,
+     "math": 1,
+     "exam": 1
+    }
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   }
+  }
+ },
+ "sweep": {
+  "sweep_raw_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "raw",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 4.241520017385483,
+    "request_throughput": 1.8861162901999655,
+    "request_goodput": 0.707293608824987,
+    "output_throughput": 241.4228851455956,
+    "total_token_throughput": 4104.189047475125,
+    "mean_ttft_ms": 2264.394868630916,
+    "median_ttft_ms": 2379.535344429314,
+    "p90_ttft_ms": 2771.9448076561093,
+    "p99_ttft_ms": 2788.3361190371215,
+    "mean_tpot_ms": 11.425427841315939,
+    "median_tpot_ms": 11.43401233464714,
+    "p99_tpot_ms": 11.493419852606424,
+    "mean_e2el_ms": 3715.4242044780403,
+    "p99_e2el_ms": 4237.563932128251,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 132.82971014268696,
+    "encode_ms": 1.1234013363718987,
+    "link_ms": 469.762054271996,
+    "queue_ms": 320.2064335346222,
+    "achieved_gbps": 3.748238350937235,
+    "install_ms": 2.6725553907454014,
+    "wait_ms": 2207.389771938324,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 4,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794858538.7211592,
+   "t1": 1794858553.1487708,
+   "logs0": {
+    "engine_prefill1.log": 35693,
+    "engine_decode1.log": 32832,
+    "engine_decode3.log": 32089,
+    "engine_decode2.log": 31913
+   },
+   "logs1": {
+    "engine_prefill1.log": 36789,
+    "engine_decode1.log": 33590,
+    "engine_decode3.log": 32780,
+    "engine_decode2.log": 32671
+   }
+  },
+  "sweep_splitzip_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "splitzip",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 4.097818799316883,
+    "request_throughput": 1.9522581138369566,
+    "request_goodput": 0.7320967926888587,
+    "output_throughput": 249.88903857113044,
+    "total_token_throughput": 4248.113655709218,
+    "mean_ttft_ms": 2245.759510435164,
+    "median_ttft_ms": 2340.8967778086662,
+    "p90_ttft_ms": 2628.783646784723,
+    "p99_ttft_ms": 2633.68993697688,
+    "mean_tpot_ms": 11.52422243736567,
+    "median_tpot_ms": 11.558265234600372,
+    "p99_tpot_ms": 11.634506906463406,
+    "mean_e2el_ms": 3709.335759980604,
+    "p99_e2el_ms": 4095.6785746850073,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 12.041575908660889,
+    "gather_ms": 132.08900368772447,
+    "encode_ms": 31.10293415375054,
+    "link_ms": 359.11310906521976,
+    "queue_ms": 306.70174956321716,
+    "achieved_gbps": 3.771031621158053,
+    "install_ms": 5.294998409226537,
+    "wait_ms": 2195.084124803543,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 2,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794858555.3845725,
+   "t1": 1794858568.9386184,
+   "logs0": {
+    "engine_prefill1.log": 38319,
+    "engine_decode1.log": 34249,
+    "engine_decode3.log": 33506,
+    "engine_decode2.log": 33330
+   },
+   "logs1": {
+    "engine_prefill1.log": 39134,
+    "engine_decode1.log": 34729,
+    "engine_decode3.log": 33919,
+    "engine_decode2.log": 33810
+   }
+  },
+  "sweep_exans_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "exans",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.8519405387341976,
+    "request_throughput": 2.076875257952168,
+    "request_goodput": 1.038437628976084,
+    "output_throughput": 265.8400330178775,
+    "total_token_throughput": 4519.280561303918,
+    "mean_ttft_ms": 2013.4953756351024,
+    "median_ttft_ms": 2060.391031205654,
+    "p90_ttft_ms": 2330.1115311682224,
+    "p99_ttft_ms": 2376.487155035138,
+    "mean_tpot_ms": 11.58995607750505,
+    "median_tpot_ms": 11.609720638183159,
+    "p99_tpot_ms": 11.763055593831332,
+    "mean_e2el_ms": 3485.4197974782437,
+    "p99_e2el_ms": 3844.506305512041,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 10.883887989180428,
+    "gather_ms": 133.36965814232826,
+    "encode_ms": 50.25131348520517,
+    "link_ms": 293.6035683378577,
+    "queue_ms": 137.45209574699402,
+    "achieved_gbps": 4.06551913647781,
+    "install_ms": 11.879985220730305,
+    "wait_ms": 1963.1585478782654,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 1,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794858570.7276978,
+   "t1": 1794858584.0426323,
+   "logs0": {
+    "engine_prefill1.log": 40664,
+    "engine_decode1.log": 35388,
+    "engine_decode3.log": 34645,
+    "engine_decode2.log": 34469
+   },
+   "logs1": {
+    "engine_prefill1.log": 41760,
+    "engine_decode1.log": 36146,
+    "engine_decode3.log": 35420,
+    "engine_decode2.log": 35311
+   }
+  },
+  "sweep_adacode_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "adacode",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.847266661003232,
+    "request_throughput": 2.079398363801973,
+    "request_goodput": 0.7797743864257398,
+    "output_throughput": 266.1629905666525,
+    "total_token_throughput": 4524.770839633093,
+    "mean_ttft_ms": 1994.9894370511174,
+    "median_ttft_ms": 2061.1804043874145,
+    "p90_ttft_ms": 2359.4263900071383,
+    "p99_ttft_ms": 2378.8120509684086,
+    "mean_tpot_ms": 11.55667413781419,
+    "median_tpot_ms": 11.574014632661981,
+    "p99_tpot_ms": 11.707533627865821,
+    "mean_e2el_ms": 3462.6870525535196,
+    "p99_e2el_ms": 3843.004907798022,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 11.371796054499491,
+    "gather_ms": 131.69683166779578,
+    "encode_ms": 14.189956709742546,
+    "link_ms": 320.7026042509824,
+    "queue_ms": 238.9822006225586,
+    "achieved_gbps": 3.7634607083704155,
+    "install_ms": 8.591146906837821,
+    "wait_ms": 1949.359267950058,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 2,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794858585.9431593,
+   "t1": 1794858599.2114358,
+   "logs0": {
+    "engine_prefill1.log": 43290,
+    "engine_decode1.log": 36805,
+    "engine_decode3.log": 36146,
+    "engine_decode2.log": 35970
+   },
+   "logs1": {
+    "engine_prefill1.log": 44105,
+    "engine_decode1.log": 37285,
+    "engine_decode3.log": 36559,
+    "engine_decode2.log": 36450
+   }
+  },
+  "sweep_exactkv_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "exactkv",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.9751724898815155,
+    "request_throughput": 2.0124912869475127,
+    "request_goodput": 0.7546842326053173,
+    "output_throughput": 257.5988847292816,
+    "total_token_throughput": 4379.181040397788,
+    "mean_ttft_ms": 2097.2184822894633,
+    "median_ttft_ms": 2175.767868757248,
+    "p90_ttft_ms": 2499.554162658751,
+    "p99_ttft_ms": 2510.60804406181,
+    "mean_tpot_ms": 11.549421085602068,
+    "median_tpot_ms": 11.57239567136436,
+    "p99_tpot_ms": 11.689399968187406,
+    "mean_e2el_ms": 3563.994960160926,
+    "p99_e2el_ms": 3972.1115425229073,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 12.590153285435267,
+    "gather_ms": 133.66637006402016,
+    "encode_ms": 14.751996379345655,
+    "link_ms": 367.8832685109228,
+    "queue_ms": 250.00563263893127,
+    "achieved_gbps": 3.7548127598107564,
+    "install_ms": 8.821954717859626,
+    "wait_ms": 2043.5475707054138,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 3,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794858601.1361654,
+   "t1": 1794858614.6361065,
+   "logs0": {
+    "engine_prefill1.log": 45635,
+    "engine_decode1.log": 37944,
+    "engine_decode3.log": 37285,
+    "engine_decode2.log": 37109
+   },
+   "logs1": {
+    "engine_prefill1.log": 46731,
+    "engine_decode1.log": 38786,
+    "engine_decode3.log": 38060,
+    "engine_decode2.log": 37951
+   }
+  },
+  "sweep_ours-hbh_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "ours-hbh",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.799450511112809,
+    "request_throughput": 2.1055676278980946,
+    "request_goodput": 1.0527838139490473,
+    "output_throughput": 269.5126563709561,
+    "total_token_throughput": 4581.715158306253,
+    "mean_ttft_ms": 2018.5315601993352,
+    "median_ttft_ms": 2050.285365432501,
+    "p90_ttft_ms": 2276.013522222638,
+    "p99_ttft_ms": 2304.8039558157325,
+    "mean_tpot_ms": 12.648748648242922,
+    "median_tpot_ms": 12.714946635184795,
+    "p99_tpot_ms": 14.04492048018678,
+    "mean_e2el_ms": 3624.9226385261863,
+    "p99_e2el_ms": 3794.706036467105,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.684105600629534,
+    "gather_ms": 134.82800032943487,
+    "encode_ms": 31.942371279001236,
+    "link_ms": 228.19268656894565,
+    "queue_ms": 130.97324967384338,
+    "achieved_gbps": 3.958532998823553,
+    "install_ms": 154.7368369065225,
+    "wait_ms": 1964.2556011676788,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794858617.64684,
+   "t1": 1794858631.017378,
+   "logs0": {
+    "engine_prefill1.log": 48261,
+    "engine_decode1.log": 39445,
+    "engine_decode3.log": 38786,
+    "engine_decode2.log": 38610
+   },
+   "logs1": {
+    "engine_prefill1.log": 49076,
+    "engine_decode1.log": 39925,
+    "engine_decode3.log": 39199,
+    "engine_decode2.log": 39090
+   }
+  },
+  "sweep_t2-hbh_10gbps_rinf": {
+   "link_gbps": 10,
+   "codec": "t2-hbh",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 3.7357036508619785,
+    "request_throughput": 2.1414974922205285,
+    "request_goodput": 1.0707487461102643,
+    "output_throughput": 274.11167900422765,
+    "total_token_throughput": 4659.89854307187,
+    "mean_ttft_ms": 1981.9105467759073,
+    "median_ttft_ms": 1998.4837509691715,
+    "p90_ttft_ms": 2215.1311822235584,
+    "p99_ttft_ms": 2241.945512406528,
+    "mean_tpot_ms": 12.627748466338815,
+    "median_tpot_ms": 12.689403192264827,
+    "p99_tpot_ms": 14.003698395521154,
+    "mean_e2el_ms": 3585.634602000937,
+    "p99_e2el_ms": 3730.779510270804,
+    "failed": 0
+   },
+   "transfers": {
+    "sends": 8,
+    "send_errors": 0,
+    "installs": 8,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 8.1457918712071,
+    "gather_ms": 132.23880855366588,
+    "encode_ms": 45.92620814219117,
+    "link_ms": 210.86263726465404,
+    "queue_ms": 72.37225770950317,
+    "achieved_gbps": 3.9562560185209463,
+    "install_ms": 157.50049520283937,
+    "wait_ms": 1929.7972321510315,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": 0,
+    "layer0_coded": 8,
+    "layer0_checks": [
+     "differs in 1979472 of 4194304 words (2048 of 2048 tokens) with the scheduler's row counts",
+     "differs in 2027116 of 4194304 words (2048 of 2048 tokens) with the scheduler's row counts",
+     "differs in 2031811 of 4194304 words (2048 of 2048 tokens) with the scheduler's row counts",
+     "differs in 2039700 of 4194304 words (2048 of 2048 tokens) with the scheduler's row counts",
+     "differs in 2040672 of 4194304 words (2048 of 2048 tokens) with the scheduler's row counts"
+    ],
+    "sets": {
+     "code": 2,
+     "math": 2,
+     "wikitext": 2,
+     "news": 1,
+     "exam": 1
+    }
+   },
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794858633.9459066,
+   "t1": 1794858647.215965,
+   "logs0": {
+    "engine_prefill1.log": 50886,
+    "engine_decode1.log": 40947,
+    "engine_decode3.log": 40204,
+    "engine_decode2.log": 40028
+   },
+   "logs1": {
+    "engine_prefill1.log": 51701,
+    "engine_decode1.log": 41426,
+    "engine_decode3.log": 40616,
+    "engine_decode2.log": 40507
+   }
+  }
+ },
+ "jit": [
+  {
+   "time": 1794858508.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _enc_4bit_quad64_count2_chunks. This causes a latency spike; consider extending warmup to cover this shape/confi",
+   "point": null
+  },
+  {
+   "time": 1794858509.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _write_escapes_chunk. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858522.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _encode_pages_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858536.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858537.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858537.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858537.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858537.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858537.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858538.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858538.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858538.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858538.0,
+   "log": "engine_decode3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858538.0,
+   "log": "engine_decode3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794858538.0,
+   "log": "engine_decode3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  }
+ ]
+}
