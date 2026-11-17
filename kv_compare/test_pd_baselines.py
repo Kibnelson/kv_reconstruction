@@ -834,6 +834,16 @@ class BenchAndReportTests(unittest.TestCase):
         self.assertEqual([e[0] for e in errs], [0] * 6, errs)
         self.assertEqual((clone / "f").read_text(), "2")
 
+    def test_aquakv_hadamard_by_matrix_product(self):
+        """On the GPU AQUA-KV's transform is x @ H with H = the butterfly applied to the identity: the same
+        transform, but for rounding."""
+        from kv_compare import baselines as bl
+        H = bl.hadamard(torch.eye(1024, dtype=torch.float32))
+        self.assertTrue(torch.equal(H, H.T))
+        self.assertTrue(torch.equal(H.abs(), torch.ones_like(H)))
+        x = torch.randn(64, 2, 1024, generator=torch.Generator().manual_seed(0))
+        self.assertTrue(torch.allclose((x.reshape(-1, 1024) @ H).reshape(x.shape), bl.hadamard(x), rtol=0, atol=1e-4))
+
     def test_aquakv_index_packing(self):
         from kv_compare.pd import codecs as cd
         g = torch.Generator().manual_seed(1)

@@ -116,14 +116,41 @@ if [ "${IBP:-1}" = 1 ]; then
             URL=${CUDA13_RUNFILE_URL:-https://developer.download.nvidia.com/compute/cuda/13.2.0/local_installers/cuda_13.2.0_595.45.04_linux.run}
             echo "   the CUDA 13 toolkit from $URL into $TK13"
             rm -rf "$TK13"
-            # the runfile installs the toolkit and then fails to link /usr/local/cuda to it without root (job 30293:
-            # "Failed to create symlink"), so the toolkit is judged by its nvcc, not the installer's exit status
-            if curl -fL --retry 3 -o "$KV_HOME/tmp/cuda13.run" "$URL" && \
-                { sh "$KV_HOME/tmp/cuda13.run" --silent --toolkit --installpath="$TK13" --no-opengl-libs --no-man-page \
+            # the runfile installs the toolkit, then fails at a step that needs root (linking /usr/local/cuda to it:
+            # jobs 30293 and 30304), and no bin/nvcc was found after it. So: the installer, then the toolkit's
+            # include/ and lib64/ links made if missing, then, without an nvcc, the runfile's own files extracted
+            # (--extract: no install steps) and merged into one toolkit; judged by nvcc and the runtime headers.
+            cuda13_links() {
+                local name sub
+                for name in include:include lib64:lib; do
+                    sub=${name##*:}; name=${name%%:*}
+                    [ -e "$TK13/$name" ] || [ ! -d "$TK13/targets/x86_64-linux/$sub" ] || \
+                        ln -s "targets/x86_64-linux/$sub" "$TK13/$name"
+                done
+            }
+            if curl -fL --retry 3 -o "$KV_HOME/tmp/cuda13.run" "$URL"; then
+                sh "$KV_HOME/tmp/cuda13.run" --silent --toolkit --installpath="$TK13" --no-opengl-libs --no-man-page \
                     --no-drm --override --tmpdir="$KV_HOME/tmp" ||
-                  echo "   the installer exited $? (a system step it lacks root for); the toolkit is checked by nvcc"; } && \
-                [ -x "$TK13/bin/nvcc" ] && "$TK13/bin/nvcc" --version | tail -n 1 | sed 's/^/   nvcc: /' && \
-                [ -f "$TK13/include/cuda_runtime.h" ]; then
+                    echo "   the installer exited $? (a step it lacks root for); the toolkit is judged by its nvcc"
+                cuda13_links
+                echo "   after the installer: $(ls "$TK13" 2>/dev/null | tr '\n' ' '); bin: $(ls "$TK13/bin" 2>/dev/null |
+                    head -n 12 | tr '\n' ' ')"
+                if [ ! -x "$TK13/bin/nvcc" ]; then
+                    X=$KV_HOME/tmp/cuda13_extract
+                    rm -rf "$X" "$TK13" && mkdir -p "$X" "$TK13"
+                    echo "   no bin/nvcc: extracting the runfile's files instead"
+                    sh "$KV_HOME/tmp/cuda13.run" --silent --extract="$X" --tmpdir="$KV_HOME/tmp" || \
+                        echo "   the extraction exited $?"
+                    for c in "$X"/*/; do         # each component holds its files where they go in the toolkit
+                        [ -d "$c" ] && cp -alf "$c". "$TK13"/ 2>/dev/null || cp -af "$c". "$TK13"/ || true
+                    done
+                    rm -rf "$X"
+                    cuda13_links
+                    echo "   after the extraction: $(ls "$TK13" 2>/dev/null | tr '\n' ' ')"
+                fi
+            fi
+            if [ -x "$TK13/bin/nvcc" ] && "$TK13/bin/nvcc" --version | tail -n 1 | sed 's/^/   nvcc: /' && \
+                    [ -f "$TK13/include/cuda_runtime.h" ]; then
                 # what a torch extension's build never uses: the profilers and the static libraries (about 4 GB)
                 rm -rf "$TK13"/nsight-compute* "$TK13"/nsight-systems* "$TK13"/nsightee_plugins "$TK13"/libnvvp \
                     "$TK13"/extras/demo_suite "$TK13"/share/doc "$TK13"/gds* "$TK13"/tools

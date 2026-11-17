@@ -226,9 +226,13 @@ if [ "${SHARE_GPU:-0}" = 1 ]; then
     P_MEM=${P_MEM:-0.44}; D_MEM=${D_MEM:-0.44}; MAXLEN=${MAXLEN:-4096}; MAXBT=${MAXBT:-2048}
     SEND_BUDGET=$((256 << 20)); RECV_BUDGET=$((256 << 20)); ENGINE_ARGS=(--enforce-eager)
 else
-    # 0.65 of each GPU for vLLM: nvCOMP and ExANS allocate their scratch outside PyTorch, and at 0.72 they ran out
-    # of memory beside PyTorch's cache (job 30210); the same share for every connector, NIXL and LMCache included
-    P_MEM=${P_MEM:-0.65}; D_MEM=${D_MEM:-0.65}; MAXLEN=${MAXLEN:-16384}; MAXBT=${MAXBT:-16384}
+    # vLLM's share of each GPU; the rest holds our transfers and the codecs' constants. nvCOMP and ExANS allocate
+    # their scratch outside PyTorch, and at 0.72 they ran out of memory beside PyTorch's cache (job 30210); at 0.65
+    # the prefill GPU had 1.7 GB left when T2 coded an 8,192-token request beside every other codec's constants
+    # (job 30304: out of memory, the request computed locally). 0.55 on the prefill GPUs leaves about 2.4 GB more
+    # (its KV cache still holds some 45K tokens), 0.60 on the decode GPUs; the same shares for every connector, NIXL
+    # and LMCache included
+    P_MEM=${P_MEM:-0.55}; D_MEM=${D_MEM:-0.60}; MAXLEN=${MAXLEN:-16384}; MAXBT=${MAXBT:-16384}
     SEND_BUDGET=$((1 << 30)); RECV_BUDGET=$((1536 << 20)); ENGINE_ARGS=()
     [ "$EAGER" = 1 ] && ENGINE_ARGS+=(--enforce-eager)
 fi

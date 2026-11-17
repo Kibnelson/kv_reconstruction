@@ -700,7 +700,12 @@ class AquaKV:
     reconstruction the sender's closed loop used, and that is the reference's to the value (test_kv_compare). The
     scale travels as float32, as the reference multiplies by it: the paper counts 16 bits for it, so the size here
     is 16 bits per 1,024 values (0.016 bits a value) above the paper's count. A float16 scale changed 12% of the
-    first layer's values and, through the predictors, 70% of the last's."""
+    first layer's values and, through the predictors, 70% of the last's.
+    On the GPU the Walsh-Hadamard transform is one float32 product with the 1,024 x 1,024 Hadamard matrix (the
+    authors call fast_hadamard_transform's CUDA kernel; the butterfly in plain PyTorch took most of the 768 ms that
+    8,192 tokens took to encode, job 30293), when float32 products run at full precision (no TF32); the sums'
+    order differs from the butterfly's, so the GPU's reconstruction is the reference's but for rounding. Sender and
+    receiver use the same transform."""
     lossy = True
 
     def __init__(self, bundle, bits, device):
@@ -723,6 +728,17 @@ class AquaKV:
         self.grids = {n: bl.higgs_grid(n, dev).to(torch.float32) for n in {self.n, self.n0}}
         self.cos, self.sin = _on(bundle["cos"], dev), _on(bundle["sin"], dev)
         self.device = dev
+        self.H = None
+        if dev.type == "cuda":
+            self.H = bl.hadamard(torch.eye(self.G, dtype=torch.float32, device=dev))      # symmetric: H = H^T
+
+    def _hadamard(self, x):
+        """The unnormalised transform over the last dimension (G): a matrix product on the GPU, the reference's
+        butterfly elsewhere or when float32 products may run in TF32."""
+        if self.H is not None and x.is_cuda and torch.get_float32_matmul_precision() == "highest" and \
+                not torch.backends.cuda.matmul.allow_tf32:
+            return (x.reshape(-1, self.G) @ self.H).reshape(x.shape)
+        return self.bl.hadamard(x)
 
     def _rot(self, k, cos, sin, inverse=False):
         """RoPE (rotate-half) on keys [T, C] float32, or its inverse."""
@@ -740,7 +756,7 @@ class AquaKV:
         Hadamard transform (scale 1 / group) in float32, then float16. idx [T, mult, G/2], s16 [T, mult]."""
         T = idx.shape[0]
         deq = (self.grids[n][idx].flatten(2) * s16.to(torch.float32)[:, :, None]).half()
-        out = (self.bl.hadamard(deq.to(torch.float32)) * (1.0 / self.G)).half()
+        out = (self._hadamard(deq.to(torch.float32)) * (1.0 / self.G)).half()
         return out.reshape(T, -1)[:, : self.C]
 
     def _quant(self, r, n):
@@ -753,7 +769,7 @@ class AquaKV:
         xg = x.reshape(T, self.mult, self.G)
         scales = torch.linalg.norm(xg, dim=-1)
         safe = torch.where(scales > 0, scales, torch.ones_like(scales))
-        z = (self.bl.hadamard(xg) / safe[:, :, None]).reshape(T, self.mult, self.G // 2, 2)
+        z = (self._hadamard(xg) / safe[:, :, None]).reshape(T, self.mult, self.G // 2, 2)
         grid = self.grids[n]
         gn = grid.pow(2).sum(1)
         idx = torch.empty(T, self.mult, self.G // 2, dtype=torch.int64, device=r.device)
