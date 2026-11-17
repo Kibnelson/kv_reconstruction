@@ -791,6 +791,7 @@ class _WorkerSide:
         from .wire import Checksum, unbundle
         rec = {"event": "install", "kind": "tier", "key": spec.key, "req": spec.req_id, "tokens": spec.t1 - spec.t0,
                "admitted_at": spec.admitted_at, "taken_at": time.time(), "chunks": len(spec.chunks or ())}
+        cur = None
         try:
             c = self.tier.chunk
             sync = torch.cuda.synchronize if self.device.type == "cuda" else (lambda *x: None)
@@ -798,6 +799,7 @@ class _WorkerSide:
             h2d = dec = 0.0
             nbytes = exact = 0
             for i, h in spec.chunks:
+                cur = h
                 e = self.tier.get(h)
                 if e is None:
                     raise KeyError(f"chunk {i} left the tier before its load")
@@ -846,6 +848,8 @@ class _WorkerSide:
             rec["error"] = repr(exc)[:300]
             self.recv_failed.add(spec.req_id)
             self.failed_blocks.update(spec.block_ids[spec.t0 // self.bs:])
+            if cur is not None and self.tier.drop(cur):
+                rec["dropped_chunk"] = cur              # vLLM computes it; the next lookup stops before it
             logger.warning("TKVConnector: tier load of %s failed: %s", spec.key, rec["error"])
         rec["done_at"] = time.time()
         self.log.write(rec)

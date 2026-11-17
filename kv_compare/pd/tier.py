@@ -100,6 +100,16 @@ class HostTier:
                 self.stats["loaded_bytes"] += e["bytes"]
             return e
 
+    def drop(self, h):
+        """One chunk out (a load of it failed): the next lookup stops before it, so vLLM computes it instead of
+        asking for it again (job 30316: IBP's chunks failed their check and were asked for 18,000 times an engine)."""
+        with self.lock:
+            e = self.entries.pop(h, None)
+            if e is not None:
+                self.bytes -= e["bytes"]
+                self.stats["dropped"] = self.stats.get("dropped", 0) + 1
+            return e is not None
+
     def clear(self):
         with self.lock:
             self.entries.clear()

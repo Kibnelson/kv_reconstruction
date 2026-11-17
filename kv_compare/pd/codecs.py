@@ -631,7 +631,10 @@ class IBP:
                 raise ImportError(f"IBP left out: {why}") from None
             raise
         self.ibp = ibp
-        self.device = torch.device(device)
+        dev = torch.device(device)
+        if dev.type == "cuda" and dev.index is None:  # IBP compares the output tensor's device with this one, index
+            dev = torch.device("cuda", torch.cuda.current_device())   # and all (setup's self-test, job 30316)
+        self.device = dev
 
     def tier_store(self, words):
         ibp = self.ibp
@@ -647,13 +650,17 @@ class IBP:
             layers.append((host, mask, bitval, bitmask, comp_len))
             nbytes += host.numel() * 8 + sum(t.numel() * t.element_size() for t in (mask, bitval, bitmask))
             coded += int(sizes.sum().item())
+        # compress_inplace rewrites the pinned host buffer from a kernel on the current stream, and returns at once: a
+        # load before it finishes read a half-compressed chunk (job 30316: chunks failed their check)
+        if words.is_cuda:
+            torch.cuda.current_stream(words.device).synchronize()
         return {"layers": layers, "T": int(T), "W": int(W)}, nbytes, coded
 
     def tier_load(self, state, sink):
         T, W = state["T"], state["W"]
         for l, (host, mask, bitval, bitmask, comp_len) in enumerate(state["layers"]):
             out = torch.empty(T, W // 4, dtype=torch.int64, device=self.device)
-            self.ibp.decompress_fetch(host, mask, bitval, bitmask, self.device, comp_len=comp_len, output_tensor=out)
+            self.ibp.decompress_fetch(host, mask, bitval, bitmask, out.device, comp_len=comp_len, output_tensor=out)
             sink(l, out.view(torch.int16).view(T, W))
 
 

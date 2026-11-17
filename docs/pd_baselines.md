@@ -313,8 +313,10 @@ The matrices (the times are estimates until the smoke has measured them):
   CPU tier are the machine's real paths.
 - ExANS runs its CUDA 12.8 library beside vLLM's CUDA 13 torch in one process (two CUDA runtimes, one driver). The
   self-test checks it bit-exact before any run.
-- IBP has never built on our machines (the NUC's build failed). Its build log is kept; without it, IBP is listed as
-  not loaded.
+- IBP built on the A5000 node first in job 30316, from the CUDA 13 runfile's extracted files (its installer stops
+  at a root-only step). Its store compresses in place, from a kernel that returns at once; until the store waited
+  for it, loads read half-compressed chunks, failed their check, and vLLM asked for them again 18,000 times an
+  engine (job 30316). A chunk that fails its check now leaves the tier: vLLM computes it.
 - IBP compresses in place, so its host buffer keeps the raw size. The tier counts that size, not IBP's compressed
   size: IBP saves PCIe time, not capacity.
 - T2's layer-0 recompute needs eager engines to match vLLM's cache. In compiled engines T2 may code layer 0,

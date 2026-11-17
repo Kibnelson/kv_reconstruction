@@ -383,6 +383,24 @@ class TierFlowTests(unittest.TestCase):
         rc = SimpleNamespace(request_id="c", prompt_token_ids=a[:20], num_computed_tokens=0, kv_transfer_params=None)
         self.assertEqual(S.get_num_new_matched_tokens(rc, 0), (16, True))
         self.assertEqual(S.get_num_new_matched_tokens(rc, 16), (0, False))    # the GPU has it already
+        # a chunk that fails its check on load leaves the tier: vLLM computes it, and the next lookup stops before
+        # it instead of asking for it again (job 30316: IBP's chunks, 18,000 loads an engine)
+        for e in tier.entries.values():               # every stored chunk wrong: the load fails at the first
+            e["checksum"] = json.loads(json.dumps(e["checksum"]).replace("1", "2", 1))
+        first = set(tier.entries)
+        rd = SimpleNamespace(request_id="d", prompt_token_ids=b, num_computed_tokens=0, kv_transfer_params=None,
+                             status=self.Status.FINISHED_STOPPED)
+        n, _ = S.get_num_new_matched_tokens(rd, 0)
+        self.assertEqual(n, 32)
+        S.update_state_after_alloc(rd, SimpleNamespace(get_block_ids=lambda: ([4, 6, 8],)), n)
+        r = self.step(S, W)
+        self.assertEqual((r.finished_recving, r.failed_recving), ({"d"}, {"d"}))
+        self.assertEqual(len(first - set(tier.entries)), 1)                 # the first chunk dropped, only it
+        self.assertEqual(S.get_num_new_matched_tokens(rd, 0), (0, False))
+        recs = [json.loads(l) for f in Path(log_dir).glob("tkv_*.jsonl") for l in f.read_text().splitlines()]
+        bad = [x for x in recs if x.get("event") == "install" and x.get("req") == "d"]
+        self.assertEqual((len(bad), bad[0]["dropped_chunk"]), (1, (first - set(tier.entries)).pop()))
+        self.assertIn("differ from the stored ones", bad[0]["error"])
         ctl.write_text(json.dumps({"generation": 2, "codec": "raw"}))
         time.sleep(0.01)
         self.step(S, W)
