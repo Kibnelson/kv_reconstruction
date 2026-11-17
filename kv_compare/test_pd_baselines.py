@@ -862,6 +862,26 @@ class BenchAndReportTests(unittest.TestCase):
         x = torch.randn(64, 2, 1024, generator=torch.Generator().manual_seed(0))
         self.assertTrue(torch.allclose((x.reshape(-1, 1024) @ H).reshape(x.shape), bl.hadamard(x), rtol=0, atol=1e-4))
 
+    def test_ibp_round_trip_with_a_stand_in(self):
+        """Our IBP wrapper's store and load, over a stand-in for the library that keeps the data as it is."""
+        from kv_compare.pd import codecs
+        from unittest import mock
+        calls = []
+        fake = types.SimpleNamespace(
+            preprocess=lambda d: (torch.zeros(d.shape[1], dtype=d.dtype), torch.zeros(d.shape[1], dtype=d.dtype)),
+            get_compress_size=lambda d, m, b: torch.full((d.shape[0],), d.shape[1]),
+            get_single_compress_len=lambda d, m, b: d.shape[1],
+            compress_inplace=lambda h, m, b: calls.append(h.is_pinned() or True) or torch.zeros(1, dtype=torch.int32),
+            decompress_fetch=lambda h, m, b, bm, dev, comp_len=None, output_tensor=None: output_tensor.copy_(h))
+        with mock.patch.dict(sys.modules, {"ibp": fake}), mock.patch.object(torch.Tensor, "pin_memory", lambda t: t):
+            c = codecs.IBP("cpu")
+            words = torch.randint(-3000, 3000, (3, 16, 32), dtype=torch.int16)
+            state, nbytes, coded = c.tier_store(words)
+            back = torch.empty_like(words)
+            c.tier_load(state, lambda l, w: back[l].copy_(w))
+        self.assertTrue(torch.equal(back, words))
+        self.assertEqual((len(calls), coded), (3, 3 * 16 * 8))
+
     def test_aquakv_index_packing(self):
         from kv_compare.pd import codecs as cd
         g = torch.Generator().manual_seed(1)

@@ -314,9 +314,12 @@ The matrices (the times are estimates until the smoke has measured them):
 - ExANS runs its CUDA 12.8 library beside vLLM's CUDA 13 torch in one process (two CUDA runtimes, one driver). The
   self-test checks it bit-exact before any run.
 - IBP built on the A5000 node first in job 30316, from the CUDA 13 runfile's extracted files (its installer stops
-  at a root-only step). Its store compresses in place, from a kernel that returns at once; until the store waited
-  for it, loads read half-compressed chunks, failed their check, and vLLM asked for them again 18,000 times an
-  engine (job 30316). A chunk that fails its check now leaves the tier: vLLM computes it.
+  at a root-only step). Its preprocess copies the mask it picked with `cudaMemcpy` on the legacy default stream
+  while its kernels run on PyTorch's current stream; called from our connector's own (non-blocking) streams, the
+  two raced and every tier load failed its check (jobs 30316, 30322), though the self-test, on the default stream,
+  was exact. IBP now runs on the default stream, ordered with ours, as its own tests run; its store waits for its
+  in-place compression, which returns before its kernel ends. A chunk that fails its check leaves the tier, so vLLM
+  computes it instead of asking for it again (job 30316: 18,000 times an engine).
 - IBP compresses in place, so its host buffer keeps the raw size. The tier counts that size, not IBP's compressed
   size: IBP saves PCIe time, not capacity.
 - T2's layer-0 recompute needs eager engines to match vLLM's cache. In compiled engines T2 may code layer 0,

@@ -636,32 +636,52 @@ class IBP:
             dev = torch.device("cuda", torch.cuda.current_device())   # and all (setup's self-test, job 30316)
         self.device = dev
 
+    def _default_stream(self, t):
+        """IBP on the device's default (legacy) stream, ordered after the caller's stream on entry and before it on
+        exit. Its preprocess copies the mask and bit values it picked with cudaMemcpy, on the legacy stream, while its
+        kernels run on PyTorch's current stream: from our connector's own (non-blocking) streams the two raced, the
+        stored chunk and its mask disagreed, and every tier load failed its check (job 30322; the self-test, on the
+        default stream, was exact). IBP's own tests run on the default stream."""
+        import contextlib
+        if not t.is_cuda:
+            return contextlib.nullcontext()
+        cur, ds = torch.cuda.current_stream(t.device), torch.cuda.default_stream(t.device)
+
+        @contextlib.contextmanager
+        def ctx():
+            ds.wait_stream(cur)
+            with torch.cuda.stream(ds):
+                yield
+            ds.synchronize()                         # compress_inplace returns before its kernel ends (job 30316)
+            cur.wait_stream(ds)
+        return ctx()
+
     def tier_store(self, words):
         ibp = self.ibp
         L, T, W = words.shape
         layers, nbytes, coded = [], 0, 0
-        for l in range(L):
-            data = words[l].contiguous().view(torch.int64)
-            mask, bitval = ibp.preprocess(data)
-            sizes = ibp.get_compress_size(data, mask, bitval)
-            comp_len = ibp.get_single_compress_len(data, mask, bitval)
-            host = data.cpu().pin_memory()
-            bitmask = ibp.compress_inplace(host, mask, bitval)
-            layers.append((host, mask, bitval, bitmask, comp_len))
-            nbytes += host.numel() * 8 + sum(t.numel() * t.element_size() for t in (mask, bitval, bitmask))
-            coded += int(sizes.sum().item())
-        # compress_inplace rewrites the pinned host buffer from a kernel on the current stream, and returns at once: a
-        # load before it finishes read a half-compressed chunk (job 30316: chunks failed their check)
-        if words.is_cuda:
-            torch.cuda.current_stream(words.device).synchronize()
+        with self._default_stream(words):
+            for l in range(L):
+                data = words[l].contiguous().view(torch.int64)
+                mask, bitval = ibp.preprocess(data)
+                sizes = ibp.get_compress_size(data, mask, bitval)
+                comp_len = ibp.get_single_compress_len(data, mask, bitval)
+                host = data.cpu().pin_memory()
+                bitmask = ibp.compress_inplace(host, mask, bitval)
+                layers.append((host, mask, bitval, bitmask, comp_len))
+                nbytes += host.numel() * 8 + sum(t.numel() * t.element_size() for t in (mask, bitval, bitmask))
+                coded += int(sizes.sum().item())
         return {"layers": layers, "T": int(T), "W": int(W)}, nbytes, coded
 
     def tier_load(self, state, sink):
         T, W = state["T"], state["W"]
-        for l, (host, mask, bitval, bitmask, comp_len) in enumerate(state["layers"]):
-            out = torch.empty(T, W // 4, dtype=torch.int64, device=self.device)
-            self.ibp.decompress_fetch(host, mask, bitval, bitmask, out.device, comp_len=comp_len, output_tensor=out)
-            sink(l, out.view(torch.int16).view(T, W))
+        probe = torch.empty(0, device=self.device)
+        with self._default_stream(probe):            # the sink writes on the same stream, after each layer
+            for l, (host, mask, bitval, bitmask, comp_len) in enumerate(state["layers"]):
+                out = torch.empty(T, W // 4, dtype=torch.int64, device=self.device)
+                self.ibp.decompress_fetch(host, mask, bitval, bitmask, out.device, comp_len=comp_len,
+                                          output_tensor=out)
+                sink(l, out.view(torch.int16).view(T, W))
 
 
 def _pack(idx, bits):
