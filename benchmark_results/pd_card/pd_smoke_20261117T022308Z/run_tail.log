@@ -1,0 +1,398 @@
+== allocation: job 30316 on gpu-grad-01.cs.mcgill.ca, CUDA_VISIBLE_DEVICES=0,1,2,3
+0, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+NOTE: 4 GPUs visible; the runs use the first one (cuda:0)
+== network from this node (the runs download models, datasets and the baselines' sources)
+  ok  https://pypi.org/simple/
+  ok  https://download.pytorch.org/whl/cu128/
+  ok  https://huggingface.co
+  ok  https://github.com
+  ok  https://raw.githubusercontent.com/wojzaremba/lstm/master/data/ptb.test.txt
+== disk under /tmp/nbore/kvpd/30316/home
+/dev/mapper/ubuntu--vg-ubuntu--lv  197G  144G   44G  77% /
+== python 3.12.14 (/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu)
+== torch 2.11.0+cu128 (CUDA 12.8), triton 3.6.0, transformers 4.57.6
+   GPU: NVIDIA RTX A5000
+   a Triton kernel compiled and ran
+== the authors' codecs at the pinned commits
+   SplitZip 42c7431 in /tmp/nbore/kvpd/30316/home/sources/splitzip
+   ExANS (openlake) de6c38b in /tmp/nbore/kvpd/30316/home/sources/exans; the runs build it from source
+== the other bit-exact codecs (docs/lossless_related_work.md) at their pinned commits
+   adacode d46cf6c in /tmp/nbore/kvpd/30316/home/sources/adacode
+   exactkv d90376b in /tmp/nbore/kvpd/30316/home/sources/exactkv
+   ibp b2f7100 in /tmp/nbore/kvpd/30316/home/sources/ibp
+   nvCOMP (Python) 5.3.0
+== CUDA toolkit with nvcc (ExANS is built from source)
+Cuda compilation tools, release 12.6, V12.6.68
+Build cuda_12.6.r12.6/compiler.34714021_0
+   CUDA_HOME for the runs: /usr/local/pkgs/cuda/12.6
+SETUP DONE: KV_HOME=/tmp/nbore/kvpd/30316/home (python /tmp/nbore/kvpd/30316/home/venv/bin/python)
+0, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+== vLLM environment /tmp/nbore/kvpd/30316/home/venv_vllm
+   NIXL 1.5.2 (nixl_cu13)
+   vllm 0.32.0, torch 2.13.0+cu130 (CUDA 13.0), triton 3.7.1, transformers 5.19.0
+== vLLM source (benchmarks/multi_turn)
+Note: switching to '5df63a7203cdb9328d824a27b682e77c7b9928be'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+== LMCache environment /tmp/nbore/kvpd/30316/home/venv_lmcache (the CPU-tier reference)
+[32;20m[2026-11-16 21:23:59,417] LMCache INFO:[0m torch_dev=<module 'torch.cuda' from '/tmp/nbore/kvpd/30316/home/venv_lmcache/lib/python3.12/site-packages/torch/cuda/__init__.py'>, torch_device_type=cuda [3m(_device_detect.py:311:lmcache.v1.platform._device_detect)[0m
+[32;20m[2026-11-16 21:23:59,417] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[33;20m[2026-11-16 21:23:59,419] LMCache WARNING:[0m lmcache.cuda_ops compiled extension not found; CudaDeviceOps stays on the torch baseline for all ops. [3m(device_ops.py:128:lmcache.v1.platform.devices.cuda.device_ops)[0m
+   vllm 0.32.0, lmcache 0.5.7.post1
+== IBP in the vLLM environment (/tmp/nbore/kvpd/30316/home/ibp_vllm_build.log)
+   the CUDA 13 toolkit from https://developer.download.nvidia.com/compute/cuda/13.2.0/local_installers/cuda_13.2.0_595.45.04_linux.run into /tmp/nbore/kvpd-cache/cuda13
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  5 4150M    5  229M    0     0   283M      0  0:00:14 --:--:--  0:00:14  283M
+ 15 4150M   15  647M    0     0   358M      0  0:00:11  0:00:01  0:00:10  358M
+ 24 4150M   24 1030M    0     0   366M      0  0:00:11  0:00:02  0:00:09  366M
+ 34 4150M   34 1417M    0     0   372M      0  0:00:11  0:00:03  0:00:08  372M
+ 43 4150M   43 1820M    0     0   378M      0  0:00:10  0:00:04  0:00:06  378M
+ 52 4150M   52 2196M    0     0   378M      0  0:00:10  0:00:05  0:00:05  393M
+ 62 4150M   62 2608M    0     0   383M      0  0:00:10  0:00:06  0:00:04  392M
+ 69 4150M   69 2878M    0     0   368M      0  0:00:11  0:00:07  0:00:04  369M
+ 79 4150M   79 3293M    0     0   373M      0  0:00:11  0:00:08  0:00:03  375M
+ 89 4150M   89 3727M    0     0   380M      0  0:00:10  0:00:09  0:00:01  381M
+100 4150M  100 4150M    0     0   385M      0  0:00:10  0:00:10 --:--:--  394M
+ Installation failed. See log at /tmp/cuda-installer.log for details.
+   the installer exited 1 (a step it lacks root for); the toolkit is judged by its nvcc
+   after the installer: bin include lib64 nsight-compute-2026.1.0 nsight-systems-2025.6.3 pkgconfig targets ; bin: crt 
+   no bin/nvcc: extracting the runfile's files instead
+   after the extraction: bin compute-sanitizer cublas_version.txt CUDA_Toolkit_Release_Notes.txt cuda-uninstaller docs DOCS documentation EULA.txt extras gds gds-13.2 gds-tools host host-linux-x64 include ko-uninstaller lib64 LICENSE ncu ncu-ui nsight-compute nsightee_plugins nsight-systems nvml nvvm pkg-config README Sanitizer sections share src target target-linux-x64 targets tools usr 
+   nvcc: Build cuda_13.2.r13.2/compiler.37434383_0
+   CUDA 13 toolkit: 4.7G	/tmp/nbore/kvpd-cache/cuda13
+   IBP built
+== ExANS (the authors' library, CUDA 12.8 toolkit, codec environment)
+  $ cmake -S /tmp/nbore/kvpd/30316/runs/llama32_3b/exans/src -B /tmp/nbore/kvpd/30316/runs/llama32_3b/exans/build -DOPENLAKE_EXPANS_BUILD=ON -DOPENLAKE_CUDA_CODEC_BUILD_TESTS=ON -DCMAKE_CUDA_ARCHITECTURES=86 -DNVCOMP_ROOT=/tmp/nbore/kvpd/30316/home/venv/lib/python3.12/site-packages/nvidia/libnvcomp -Dnvcomp_DIR=/tmp/nbore/kvpd/30316/home/venv/lib/python3.12/site-packages/nvidia/libnvcomp/lib64/cmake/nvcomp -DCUDAToolkit_ROOT=/usr/local/pkgs/cuda/12.6 -DCMAKE_BUILD_TYPE=Release
+  $ cmake --build /tmp/nbore/kvpd/30316/runs/llama32_3b/exans/build --target openlake_expans openlake_expans_test -j 4
+  $ /tmp/nbore/kvpd/30316/runs/llama32_3b/exans/build/openlake_expans_test
+  the authors' ExANS test passed
+   ExANS built: /tmp/nbore/kvpd/30316/runs/llama32_3b/exans/build/libopenlake_expans.so
+== calibration captures in /tmp/nbore/kvpd/30316/runs/llama32_3b
+wikitext2: 4358 rows, 1,294,336 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/wikitext2.txt
+wikitext2_train: 36718 rows, 10,966,424 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/wikitext2_train.txt
+humaneval: 164 rows, 103,886 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/humaneval.txt
+gsm8k: 1319 rows, 730,397 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/gsm8k.txt
+mmlu: 14042 rows, 7,589,641 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/mmlu.txt
+ptb: 3761 rows, 442,422 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/ptb.txt
+wrote /tmp/nbore/kvpd/30316/runs/dataset_texts/manifest.json
+21:27:57 run started: stages ['calcap']; NVIDIA RTX A5000; branch HEAD, commit 2dc34476b0093e650b1bdad5b01e1363ae9b9555; torch 2.11.0+cu128, triton 3.6.0
+21:27:58 GPU memory free 23.3 of 23.5 GB at start
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 171.38it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (2436213 > 131072). Running this sequence through the model will result in indexing errors
+21:28:11 calcap: captured wtrain0 (WikiText-2 train tokens 0-8190)
+21:28:14 calcap: captured wtrain1 (WikiText-2 train tokens 8191-16381)
+21:28:17 calcap: captured wtrain2 (WikiText-2 train tokens 16382-24572)
+21:28:20 calcap: captured wtrain3 (WikiText-2 train tokens 24573-32763)
+21:28:24 calcap: captured wtrain4 (WikiText-2 train tokens 32764-40954)
+21:28:27 calcap: captured wtrain5 (WikiText-2 train tokens 40955-49145)
+21:28:30 calcap: captured wtables (WikiText-2 train tokens 49146-57336)
+21:28:30 calcap: unsloth/Llama-3.2-3B (28 layers, 8 KV heads x 128, 24 query heads)
+21:28:30 run finished in 34 s
+21:28:30 share it: python scripts/package_llama_compare.py /tmp/nbore/kvpd/30316/runs/llama32_3b --destination benchmark_results/<name>
+cal_code: 974 rows, 251,822 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/cal_code.txt
+cal_math: 7473 rows, 4,057,858 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/cal_math.txt
+cal_exam: 1816 rows, 969,320 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/cal_exam.txt
+cal_news: 42068 rows, 5,017,481 characters -> /tmp/nbore/kvpd/30316/runs/dataset_texts/cal_news.txt
+wrote /tmp/nbore/kvpd/30316/runs/dataset_texts/cal_manifest.json
+== codec constants /tmp/nbore/kvpd/30316/runs/llama32_3b/pd_codecs.pt (codec environment)
+  fused one-step predictor prepared for 28 layers
+  reduced-rank one-step predictor (rank 256) prepared for 28 layers
+  head-group predictor (2 groups of 8 heads) prepared for 28 layers
+  head-group predictor (4 groups of 4 heads) prepared for 28 layers
+  head-group predictor (16 groups of 1 heads) prepared for 28 layers
+SplitZip code book from wtrain0: top-16 coverage 99.91%
+  AQUA-KV 2-bit: layer 1 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 2 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 3 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 4 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 5 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 6 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 7 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 8 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 9 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 10 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 11 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 12 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 13 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 14 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 15 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 16 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 17 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 18 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 19 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 20 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 21 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 22 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 23 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 24 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 25 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 26 predictors fitted on their own reconstructions
+  AQUA-KV 2-bit: layer 27 predictors fitted on their own reconstructions
+AQUA-KV 2-bit: predictors for layers 1..27 on 6 documents (goodevening13/aquakv@e744183f2f3a4a90381f20a6975456871fd1ae29)
+  AQUA-KV 3-bit: layer 1 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 2 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 3 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 4 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 5 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 6 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 7 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 8 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 9 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 10 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 11 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 12 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 13 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 14 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 15 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 16 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 17 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 18 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 19 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 20 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 21 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 22 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 23 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 24 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 25 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 26 predictors fitted on their own reconstructions
+  AQUA-KV 3-bit: layer 27 predictors fitted on their own reconstructions
+AQUA-KV 3-bit: predictors for layers 1..27 on 6 documents (goodevening13/aquakv@e744183f2f3a4a90381f20a6975456871fd1ae29)
+T2 set wikitext: the main constants
+[21:31:51] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 170.93it/s]
+[21:31:57] calib: captured cal_code_0
+[21:32:00] calib: captured cal_code_1
+[21:32:04] calib: captured cal_code_2
+[21:32:07] calib: captured cal_code_3
+T2 set code: captured 4 calibration windows
+T2 set code: 3 calibration documents (MBPP, all splits (Python problems and solutions; HumanEval's kind of text))
+   deleted 3.5 GiB of calibration windows
+[21:33:28] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 169.43it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (1212753 > 131072). Running this sequence through the model will result in indexing errors
+[21:33:35] calib: captured cal_math_0
+[21:33:38] calib: captured cal_math_1
+[21:33:41] calib: captured cal_math_2
+[21:33:44] calib: captured cal_math_3
+T2 set math: captured 4 calibration windows
+T2 set math: 3 calibration documents (GSM8K train)
+   deleted 3.5 GiB of calibration windows
+[21:35:03] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 172.50it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (212985 > 131072). Running this sequence through the model will result in indexing errors
+[21:35:07] calib: captured cal_exam_0
+[21:35:11] calib: captured cal_exam_1
+[21:35:14] calib: captured cal_exam_2
+[21:35:17] calib: captured cal_exam_3
+T2 set exam: captured 4 calibration windows
+T2 set exam: 3 calibration documents (MMLU dev and validation (MMLU's prompt format))
+   deleted 3.5 GiB of calibration windows
+[21:36:35] model unsloth/Llama-3.2-3B at d4446454d87d51aa42e1fb174f25acc5f8762331
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 171.67it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (1061071 > 131072). Running this sequence through the model will result in indexing errors
+[21:36:42] calib: captured cal_news_0
+[21:36:45] calib: captured cal_news_1
+[21:36:48] calib: captured cal_news_2
+[21:36:52] calib: captured cal_news_3
+T2 set news: captured 4 calibration windows
+T2 set news: 3 calibration documents (Penn Treebank train)
+   deleted 3.5 GiB of calibration windows
+{
+ "written": "/tmp/nbore/kvpd/30316/runs/llama32_3b/pd_codecs.pt",
+ "model": "unsloth/Llama-3.2-3B",
+ "revision": "d4446454d87d51aa42e1fb174f25acc5f8762331",
+ "train_set": "wikitext",
+ "calibration": [
+  "wtrain0",
+  "wtrain1",
+  "wtrain2",
+  "wtrain3",
+  "wtrain4",
+  "wtrain5"
+ ],
+ "splitzip_book_from": "wtrain0",
+ "rope_layout": "half",
+ "L": 28,
+ "W": 2048,
+ "C": 1024,
+ "hd": 128,
+ "rank": 256,
+ "groups": [
+  2,
+  4,
+  16
+ ],
+ "max_positions": 32768,
+ "aqua_bits": [
+  2,
+  3
+ ],
+ "t2_sets": [
+  "wikitext",
+  "code",
+  "math",
+  "exam",
+  "news"
+ ]
+}
+== self-test in the vLLM environment (every codec through the paced transport)
+{"codec": "raw", "tokens": 8192, "encode_ms": 0.015951693058013916, "bits": 16.0, "decode_ms": 2.8378814458847046, "exact": true}
+{"codec": "ours-dense", "tokens": 8192, "encode_ms": 91.38569235801697, "bits": 8.745545251028878, "decode_ms": 58.46679210662842, "exact": true}
+{"codec": "ours-kv", "tokens": 8192, "encode_ms": 117.06892400979996, "bits": 8.380765642438616, "decode_ms": 67.65683554112911, "exact": true}
+{"codec": "ours-4g", "tokens": 8192, "encode_ms": 117.18982458114624, "bits": 8.145614079066686, "decode_ms": 77.10827514529228, "exact": true}
+{"codec": "ours-hbh", "tokens": 8192, "encode_ms": 117.42487922310829, "bits": 8.009789875575475, "decode_ms": 179.64725568890572, "exact": true}
+{"codec": "ours-rank256", "tokens": 8192, "encode_ms": 67.13716126978397, "bits": 9.219076974051339, "decode_ms": 55.02917617559433, "exact": true}
+{"codec": "t2-dense", "tokens": 8192, "encode_ms": 102.02304273843765, "bits": 8.745545251028878, "set": "wikitext", "layer0": "coded", "decode_ms": 60.960059985518456, "exact": true}
+{"codec": "t2-hbh", "tokens": 8192, "encode_ms": 127.0567961037159, "bits": 8.009789875575475, "set": "wikitext", "layer0": "coded", "decode_ms": 180.3364772349596, "exact": true}
+{"codec": "t2-rank256", "tokens": 8192, "encode_ms": 76.73109695315361, "bits": 9.219076974051339, "set": "wikitext", "layer0": "coded", "decode_ms": 55.34721724689007, "exact": true}
+{"codec": "splitzip", "tokens": 8192, "encode_ms": 7.537137717008591, "bits": 12.049286961555481, "decode_ms": 5.439119413495064, "exact": true}
+{"codec": "adacode", "tokens": 8192, "encode_ms": 21.912915632128716, "bits": 11.37075240271432, "decode_ms": 8.261140435934067, "exact": true}
+{"codec": "exactkv", "tokens": 8192, "encode_ms": 17.72397570312023, "bits": 12.575496128627233, "decode_ms": 26.126619428396225, "exact": true}
+{"codec": "exans", "tokens": 8192, "encode_ms": 184.4613440334797, "bits": 10.905555759157453, "decode_ms": 29.61334027349949, "exact": true}
+{"codec": "ibp", "tokens": 8192, "error": "RuntimeError('Output tensor device does not match specified output device')"}
+[W1116 21:38:38.208593378 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 3758096384 bytes (free: 1916076032, total: 25285623808).
+{"codec": "aquakv-2", "tokens": 8192, "encode_ms": 563.9482289552689, "bits": 2.109464372907366, "decode_ms": 161.14753857254982, "exact": null, "lossy": true, "rel_err": 0.08662944460126866, "rel_err_received": 0.08662944460126887}
+{"codec": "aquakv-3", "tokens": 8192, "encode_ms": 916.3391720503569, "bits": 3.073279244559152, "decode_ms": 183.01414512097836, "exact": null, "lossy": true, "rel_err": 0.04638151640626951, "rel_err_received": 0.046381516406269516}
+{"codec": "raw", "tokens": 3000, "encode_ms": 0.016648322343826294, "bits": 16.0, "decode_ms": 1.0852459818124771, "exact": true}
+{"codec": "ours-dense", "tokens": 3000, "encode_ms": 34.85700488090515, "bits": 9.269865327380952, "decode_ms": 25.48883855342865, "exact": true}
+{"codec": "ours-kv", "tokens": 3000, "encode_ms": 46.24963738024235, "bits": 8.90550669642857, "decode_ms": 30.358929187059402, "exact": true}
+{"codec": "ours-4g", "tokens": 3000, "encode_ms": 46.19160853326321, "bits": 8.668667410714285, "decode_ms": 38.55558857321739, "exact": true}
+{"codec": "ours-hbh", "tokens": 3000, "encode_ms": 46.441949903964996, "bits": 8.531450892857142, "decode_ms": 162.84729167819023, "exact": true}
+{"codec": "ours-rank256", "tokens": 3000, "encode_ms": 27.687080204486847, "bits": 9.74771800595238, "decode_ms": 22.81402051448822, "exact": true}
+{"codec": "t2-dense", "tokens": 3000, "encode_ms": 44.55147311091423, "bits": 9.269865327380952, "set": "wikitext", "layer0": "coded", "decode_ms": 25.59630014002323, "exact": true}
+{"codec": "t2-hbh", "tokens": 3000, "encode_ms": 56.18368275463581, "bits": 8.531450892857142, "set": "wikitext", "layer0": "coded", "decode_ms": 161.22154891490936, "exact": true}
+{"codec": "t2-rank256", "tokens": 3000, "encode_ms": 37.02777251601219, "bits": 9.74771800595238, "set": "wikitext", "layer0": "coded", "decode_ms": 22.706840187311172, "exact": true}
+{"codec": "splitzip", "tokens": 3000, "encode_ms": 3.5118404775857925, "bits": 12.04319921875, "decode_ms": 2.1127015352249146, "exact": true}
+{"codec": "adacode", "tokens": 3000, "encode_ms": 11.890692636370659, "bits": 11.372570824032739, "decode_ms": 3.2487772405147552, "exact": true}
+{"codec": "exactkv", "tokens": 3000, "encode_ms": 13.542905449867249, "bits": 12.612559523809523, "decode_ms": 9.104432538151741, "exact": true}
+{"codec": "exans", "tokens": 3000, "encode_ms": 68.82311403751373, "bits": 10.918740420386905, "decode_ms": 12.103993445634842, "exact": true}
+{"codec": "ibp", "tokens": 3000, "error": "RuntimeError('Output tensor device does not match specified output device')"}
+{"codec": "aquakv-2", "tokens": 3000, "encode_ms": 222.74362854659557, "bits": 2.121208333333333, "decode_ms": 66.34199805557728, "exact": null, "lossy": true, "rel_err": 0.08997521961700125, "rel_err_received": 0.08997521961700129}
+{"codec": "aquakv-3", "tokens": 3000, "encode_ms": 349.05400313436985, "bits": 3.084208333333333, "decode_ms": 73.55533167719841, "exact": null, "lossy": true, "rel_err": 0.04816976613506609, "rel_err_received": 0.04816976613506603}
+{"transport": "ring", "codec": "ours-dense", "bytes": 199339184, "gbps_set": 100.0, "exact": true, "wall_s": 0.20882841758430004, "achieved_gbps": 7.636477307291019, "link_s": 0.016378870233893394}
+{"transport": "tcp", "codec": "ours-dense", "bytes": 199339184, "gbps_set": 100.0, "exact": true, "wall_s": 0.17257198318839073, "achieved_gbps": 9.240859625858896, "link_s": 0.14773522131145}
+SELFTEST FAILED (32 codec runs, errors: none)
+{"codec": "nvcomp-ans", "tokens": 8192, "encode_ms": 43.85887458920479, "bits": 13.359218869890485, "decode_ms": 42.288631200790405, "exact": true}
+{"codec": "nvcomp-zstd", "tokens": 8192, "encode_ms": 549.2041353136301, "bits": 12.903557641165596, "decode_ms": 99.10018369555473, "exact": true}
+{"codec": "nvcomp-bitcomp", "tokens": 8192, "encode_ms": 40.74341803789139, "bits": 13.793133326939174, "decode_ms": 43.880464509129524, "exact": true}
+{"codec": "nvcomp-ans", "tokens": 3000, "encode_ms": 18.41764524579048, "bits": 13.349644345238096, "decode_ms": 15.285469591617584, "exact": true}
+{"codec": "nvcomp-zstd", "tokens": 3000, "encode_ms": 204.82027903199196, "bits": 12.900041666666667, "decode_ms": 37.59521245956421, "exact": true}
+{"codec": "nvcomp-bitcomp", "tokens": 3000, "encode_ms": 18.521597608923912, "bits": 13.77544494047619, "decode_ms": 16.304636374115944, "exact": true}
+{"transport": "ring", "codec": "nvcomp-ans", "bytes": 287070752, "gbps_set": 100.0, "exact": true, "wall_s": 0.23098048940300941, "achieved_gbps": 9.942683998703478, "link_s": 0.023654863238334656}
+{"transport": "tcp", "codec": "nvcomp-ans", "bytes": 287070752, "gbps_set": 100.0, "exact": true, "wall_s": 0.2547631524503231, "achieved_gbps": 9.014514045345756, "link_s": 0.23771721497178078}
+SELFTEST OK (6 codec runs, errors: none)
+WARNING: a codec failed the self-test (above, and /tmp/nbore/kvpd/30316/runs/llama32_3b/pd_selftest*.json); the runs leave it out
+   deleting the captures: 6.2G	/tmp/nbore/kvpd/30316/runs/llama32_3b/captures
+PD SETUP DONE
+KVPD_SPECS=0: no node specs this run
+
+==== run 1 of 2: SMOKE=1 LAYOUT=1p3d TRANSPORT=ring CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh,aquakv-2
+== PD run /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2138_1p3d_tkv_ring: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit 2dc3447 Card smoke 30304 read back: room for the codecs, AQUA-KV's transform on the GPU, the CUDA 13 toolkit
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3745.25it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+{"out": "/tmp/nbore/kvpd/30316/runs/llama32_3b/pd/prompts_2048_check_1000_3000_5000_8192", "datasets": ["wikitext2", "humaneval", "gsm8k", "mmlu", "ptb"], "tokens": "2048", "per_length": 8}
+   ports 58000-58453 free
+   prefill1 on GPU 0 (visible 0), port 58101 (log /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2138_1p3d_tkv_ring/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 58201 (log /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2138_1p3d_tkv_ring/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 58202 (log /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2138_1p3d_tkv_ring/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 58203 (log /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2138_1p3d_tkv_ring/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=36900) INFO 11-16 21:40:08 [kv_cache_utils.py:2327] GPU KV cache size: 60,720 tokens, Maximum concurrency for 16,384 tokens per request: 3.71x
+   (EngineCore pid=36893) INFO 11-16 21:40:08 [kv_cache_utils.py:2327] GPU KV cache size: 60,720 tokens, Maximum concurrency for 16,384 tokens per request: 3.71x
+   (EngineCore pid=36907) INFO 11-16 21:40:08 [kv_cache_utils.py:2327] GPU KV cache size: 60,720 tokens, Maximum concurrency for 16,384 tokens per request: 3.71x
+   (EngineCore pid=36914) INFO 11-16 21:40:08 [kv_cache_utils.py:2327] GPU KV cache size: 49,696 tokens, Maximum concurrency for 16,384 tokens per request: 3.03x
+21:40:37 == check
+21:40:46 check raw: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 16.000
+21:40:51 check splitzip: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 12.044
+21:40:55 check exans: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 10.923
+21:40:59 check adacode: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 11.371
+21:41:04 check exactkv: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 12.629
+21:41:09 check ours-hbh: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 9.053
+21:41:14 check t2-hbh: OK - 4/4 transfers bit-exact, 4/4 outputs equal to local prefill, bits 8.489
+21:41:19 check aquakv-2: OK - lossy, KV error 10.50% (relative L2), 2/4 outputs equal to local prefill, bits 2.126
+21:41:19 == sweep
+21:41:37 sweep_raw_10gbps_rinf: exit 0, 1.87 req/s, TTFT p50 2404 / p99 2815 ms, goodput 0.70; bits 16.000, the link carried 10.0 Gb/s while busy (set 10)
+21:41:53 sweep_splitzip_10gbps_rinf: exit 0, 1.93 req/s, TTFT p50 2375 / p99 2670 ms, goodput 0.72; bits 12.042, the link carried 10.0 Gb/s while busy (set 10)
+21:42:08 sweep_exans_10gbps_rinf: exit 0, 2.06 req/s, TTFT p50 2090 / p99 2408 ms, goodput 1.03; bits 10.884, the link carried 10.0 Gb/s while busy (set 10)
+21:42:23 sweep_adacode_10gbps_rinf: exit 0, 2.08 req/s, TTFT p50 2053 / p99 2372 ms, goodput 0.78; bits 11.372, the link carried 10.0 Gb/s while busy (set 10)
+21:42:39 sweep_exactkv_10gbps_rinf: exit 0, 2.01 req/s, TTFT p50 2189 / p99 2514 ms, goodput 0.75; bits 12.590, the link carried 10.0 Gb/s while busy (set 10)
+21:42:55 sweep_ours-hbh_10gbps_rinf: exit 0, 2.12 req/s, TTFT p50 2021 / p99 2276 ms, goodput 1.06; bits 8.684, the link carried 10.0 Gb/s while busy (set 10)
+21:43:11 sweep_t2-hbh_10gbps_rinf: exit 0, 2.14 req/s, TTFT p50 2001 / p99 2233 ms, goodput 1.07; bits 8.146, the link carried 10.0 Gb/s while busy (set 10)
+21:43:27 sweep_aquakv-2_10gbps_rinf: exit 0, 1.99 req/s, TTFT p50 2033 / p99 2540 ms, goodput 1.00; bits 2.130, the link carried 9.8 Gb/s while busy (set 10)
+21:43:27 == report
+21:43:27 report: /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2138_1p3d_tkv_ring/summary.md
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261117T022308Z/repo/benchmark_results/pd_card/pd_smoke_20261117T022308Z/matrix/llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261116_2138_smoke
+
+==== run 2 of 2: SMOKE=1 LAYOUT=colo4 TIER_CODECS=raw,exans,ibp,ours-hbh,t2-hbh,t2-rank256
+== PD run /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2143_colo4_tkv: colo4 (0 prefill on GPUs none, 4 colocated on 0 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit 2dc3447 Card smoke 30304 read back: room for the codecs, AQUA-KV's transform on the GPU, the CUDA 13 toolkit
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3418.62it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+   ports 58000-58454 free
+   engine1 on GPU 0 (visible 0), port 58201 (log /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2143_colo4_tkv/engine_engine1.log)
+   engine2 on GPU 1 (visible 1), port 58202 (log /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2143_colo4_tkv/engine_engine2.log)
+   engine3 on GPU 2 (visible 2), port 58203 (log /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2143_colo4_tkv/engine_engine3.log)
+   engine4 on GPU 3 (visible 3), port 58204 (log /tmp/nbore/kvpd/30316/runs/llama32_3b/pd/20261116_2143_colo4_tkv/engine_engine4.log)
+== waiting for the engines
+   (EngineCore pid=39136) INFO 11-16 21:44:15 [kv_cache_utils.py:2327] GPU KV cache size: 4,800 tokens, Maximum concurrency for 4,096 tokens per request: 1.17x
+   (EngineCore pid=39129) INFO 11-16 21:44:15 [kv_cache_utils.py:2327] GPU KV cache size: 4,800 tokens, Maximum concurrency for 4,096 tokens per request: 1.17x
+   (EngineCore pid=39143) INFO 11-16 21:44:15 [kv_cache_utils.py:2327] GPU KV cache size: 4,800 tokens, Maximum concurrency for 4,096 tokens per request: 1.17x
+   (EngineCore pid=39122) INFO 11-16 21:44:15 [kv_cache_utils.py:2327] GPU KV cache size: 4,800 tokens, Maximum concurrency for 4,096 tokens per request: 1.17x
+21:44:30 == tier
+21:44:51 tier_raw_c8: exit 0, 56 requests, 5.87 req/s, TTFT p50 85 / p99 163 ms; tier 9 loads (3536 tokens, 51.8 ms each, bits 16.000), 89 chunks stored
+21:45:09 tier_exans_c8: exit 0, 54 requests, 5.87 req/s, TTFT p50 67 / p99 191 ms; tier 8 loads (2464 tokens, 35.6 ms each, bits 11.023), 85 chunks stored
+21:47:27 tier_ibp_c8: exit 0, 47 requests, 4.71 req/s, TTFT p50 93 / p99 204 ms; tier 36679 loads (0 tokens, - ms each, bits -), 79 chunks stored
+PD RUN STOPPED at line 430 (exit 124)
+STOP: the bench ran past RUN_TIMEOUT_S=1200 s; packaged as _partial
+RESULTS /tmp/nbore/kvpd-evidence/pd_smoke_20261117T022308Z/repo/benchmark_results/pd_card/pd_smoke_20261117T022308Z/matrix/llama32_3b_pd_colo4_tkv_rtxa5000x4_20261116_2143_smoke_partial
+==== run 2 did not finish (its results, if any, are kept as _partial); going on
+wrote /tmp/nbore/kvpd-evidence/pd_smoke_20261117T022308Z/repo/benchmark_results/pd_card/pd_smoke_20261117T022308Z/matrix/pd_matrix_smoke_rtxa5000_20261116_2138/summary.md
+PD MATRIX smoke: 2 runs (1 not finished); results in /tmp/nbore/kvpd-evidence/pd_smoke_20261117T022308Z/repo/benchmark_results/pd_card/pd_smoke_20261117T022308Z/matrix

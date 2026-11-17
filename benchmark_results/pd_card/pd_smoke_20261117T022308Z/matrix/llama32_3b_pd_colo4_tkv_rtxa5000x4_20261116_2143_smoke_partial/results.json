@@ -1,0 +1,256 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 0,
+  "decodes": 4,
+  "layout": "colo4",
+  "connector": "tkv",
+  "transport": "ring",
+  "eager": false,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl_all_gpus": false,
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "tier": {
+  "tier_raw_c8": {
+   "codec": "raw",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 56,
+    "duration_s": 9.540562858581543,
+    "request_throughput": 5.869674654428709,
+    "mean_ttft_ms": 91.42775553571428,
+    "median_ttft_ms": 84.743695,
+    "p90_ttft_ms": 137.928353,
+    "p99_ttft_ms": 163.043577,
+    "median_tpot_ms": 11.864845678899083,
+    "mean_latency_ms": 1270.0401667499998,
+    "input_tokens": 1400.392857142857
+   },
+   "tier": {
+    "loads": 9,
+    "load_errors": 0,
+    "exact_chunks": 18,
+    "chunks_loaded": 18,
+    "loaded_tokens": 3536,
+    "load_ms": 51.82490601307816,
+    "h2d_ms": 2.3993183341291218,
+    "decode_ms": 14.834199514653948,
+    "bits": 16.0,
+    "needed_pct": 76.73611111111111,
+    "stores": 55,
+    "store_errors": 0,
+    "stored_chunks": 89,
+    "store_ms": 70.30097317289223,
+    "tier_chunks": 20,
+    "evicted": 0
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794883473,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": 79111.0,
+     "vllm:prefix_cache_queries_created": 0.0,
+     "vllm:prefix_cache_hits_total": 52848.0,
+     "vllm:prefix_cache_hits_created": 0.0,
+     "vllm:external_prefix_cache_queries_total": 26263.0,
+     "vllm:external_prefix_cache_queries_created": 0.0,
+     "vllm:external_prefix_cache_hits_total": 3536.0,
+     "vllm:external_prefix_cache_hits_created": 0.0,
+     "vllm:cache_config_info": 0.0
+    },
+    "gpu_hit_pct": 66.80234101452389,
+    "external_hit_pct": 13.463808399649697
+   },
+   "t0": 1794883473.4287145,
+   "t1": 1794883491.0616336,
+   "logs0": {
+    "engine_engine4.log": 28033,
+    "engine_engine3.log": 27942,
+    "engine_engine1.log": 27942,
+    "engine_engine2.log": 27942
+   },
+   "logs1": {
+    "engine_engine4.log": 29657,
+    "engine_engine3.log": 29566,
+    "engine_engine1.log": 29628,
+    "engine_engine2.log": 29566
+   }
+  },
+  "tier_exans_c8": {
+   "codec": "exans",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 54,
+    "duration_s": 9.198460025787353,
+    "request_throughput": 5.870547879603119,
+    "mean_ttft_ms": 97.71095592592593,
+    "median_ttft_ms": 67.277562,
+    "p90_ttft_ms": 143.337512,
+    "p99_ttft_ms": 190.577434,
+    "median_tpot_ms": 11.545884436781611,
+    "mean_latency_ms": 1221.9015400925925,
+    "input_tokens": 1401.9259259259259
+   },
+   "tier": {
+    "loads": 8,
+    "load_errors": 0,
+    "exact_chunks": 14,
+    "chunks_loaded": 14,
+    "loaded_tokens": 2464,
+    "load_ms": 35.58710147626698,
+    "h2d_ms": 1.359886722639203,
+    "decode_ms": 14.468476176261902,
+    "bits": 11.022726954246053,
+    "needed_pct": 68.75,
+    "stores": 50,
+    "store_errors": 0,
+    "stored_chunks": 85,
+    "store_ms": 46.10449194908142,
+    "tier_chunks": null,
+    "evicted": null
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794883474,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": 76351.0,
+     "vllm:prefix_cache_queries_created": 0.0,
+     "vllm:prefix_cache_hits_total": 51504.0,
+     "vllm:prefix_cache_hits_created": 0.0,
+     "vllm:external_prefix_cache_queries_total": 24847.0,
+     "vllm:external_prefix_cache_queries_created": 0.0,
+     "vllm:external_prefix_cache_hits_total": 2464.0,
+     "vllm:external_prefix_cache_hits_created": 0.0,
+     "vllm:cache_config_info": 0.0
+    },
+    "gpu_hit_pct": 67.45687679270736,
+    "external_hit_pct": 9.916690143679318
+   },
+   "t0": 1794883492.1061215,
+   "t1": 1794883509.4537795,
+   "logs0": {
+    "engine_engine4.log": 29989,
+    "engine_engine3.log": 29898,
+    "engine_engine1.log": 29960,
+    "engine_engine2.log": 29898
+   },
+   "logs1": {
+    "engine_engine4.log": 31616,
+    "engine_engine3.log": 31524,
+    "engine_engine1.log": 31576,
+    "engine_engine2.log": 31453
+   }
+  },
+  "tier_ibp_c8": {
+   "codec": "ibp",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 47,
+    "duration_s": 9.988960338592529,
+    "request_throughput": 4.705194375275939,
+    "mean_ttft_ms": 101.85419638297871,
+    "median_ttft_ms": 93.180776,
+    "p90_ttft_ms": 168.441624,
+    "p99_ttft_ms": 204.006018,
+    "median_tpot_ms": 12.973854982142857,
+    "mean_latency_ms": 1401.294063829787,
+    "input_tokens": 1336.1063829787233
+   },
+   "tier": {
+    "loads": 36679,
+    "load_errors": 36679,
+    "exact_chunks": 0,
+    "chunks_loaded": 0,
+    "loaded_tokens": 0,
+    "load_ms": null,
+    "h2d_ms": null,
+    "decode_ms": null,
+    "bits": null,
+    "needed_pct": null,
+    "stores": 44,
+    "store_errors": 0,
+    "stored_chunks": 79,
+    "store_ms": 271.351933775639,
+    "tier_chunks": 21,
+    "evicted": 0
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794883475,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": -102527.0,
+     "vllm:prefix_cache_queries_created": -5384650395.713992,
+     "vllm:prefix_cache_hits_total": -67264.0,
+     "vllm:prefix_cache_hits_created": -5384650395.714306,
+     "vllm:external_prefix_cache_queries_total": -35263.0,
+     "vllm:external_prefix_cache_queries_created": -5384650395.714336,
+     "vllm:external_prefix_cache_hits_total": -3984.0,
+     "vllm:external_prefix_cache_hits_created": -5384650395.71437,
+     "vllm:cache_config_info": -3.0
+    },
+    "gpu_hit_pct": null,
+    "external_hit_pct": null
+   },
+   "t0": 1794883510.5071583,
+   "t1": 1794883647.5840874,
+   "logs0": {
+    "engine_engine4.log": 31948,
+    "engine_engine3.log": 31856,
+    "engine_engine1.log": 31908,
+    "engine_engine2.log": 31785
+   },
+   "logs1": {
+    "engine_engine4.log": 64095,
+    "engine_engine3.log": 2961356,
+    "engine_engine1.log": 33868,
+    "engine_engine2.log": 2963274
+   }
+  }
+ }
+}

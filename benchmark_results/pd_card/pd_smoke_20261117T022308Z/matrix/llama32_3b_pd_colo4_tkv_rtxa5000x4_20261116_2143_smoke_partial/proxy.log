@@ -1,0 +1,542 @@
+/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py:197: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py:201: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1322, in _wrap_create_connection
+    sock = await aiohappyeyeballs.start_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 124, in start_connection
+    raise first_exception
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 75, in start_connection
+    sock = await _connect_sock(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 210, in _connect_sock
+    await loop.sock_connect(sock, address)
+  File "uvloop/loop.pyx", line 2644, in sock_connect
+  File "uvloop/loop.pyx", line 1100, in uvloop.loop.Loop._sock_connect_cb
+ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 58202)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 683, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 704, in app
+    await route.handle(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 289, in handle
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 211, in chat
+    return await px.handle(raw, "/v1/chat/completions")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 140, in handle
+    resp = await self.session.post(durl + path, json=d_body, headers=headers)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 900, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 854, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 665, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1263, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1641, in _create_direct_connection
+    raise last_exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1610, in _create_direct_connection
+    transp, proto = await self._wrap_create_connection(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1345, in _wrap_create_connection
+    raise client_error(req.connection_key, exc) from exc
+aiohttp.client_exceptions.ClientConnectorError: Cannot connect to host 127.0.0.1:58202 ssl:default [Connect call failed ('127.0.0.1', 58202)]
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1322, in _wrap_create_connection
+    sock = await aiohappyeyeballs.start_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 124, in start_connection
+    raise first_exception
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 75, in start_connection
+    sock = await _connect_sock(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 210, in _connect_sock
+    await loop.sock_connect(sock, address)
+  File "uvloop/loop.pyx", line 2644, in sock_connect
+  File "uvloop/loop.pyx", line 1100, in uvloop.loop.Loop._sock_connect_cb
+ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 58203)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 683, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 704, in app
+    await route.handle(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 289, in handle
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 211, in chat
+    return await px.handle(raw, "/v1/chat/completions")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 140, in handle
+    resp = await self.session.post(durl + path, json=d_body, headers=headers)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 900, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 854, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 665, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1263, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1641, in _create_direct_connection
+    raise last_exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1610, in _create_direct_connection
+    transp, proto = await self._wrap_create_connection(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1345, in _wrap_create_connection
+    raise client_error(req.connection_key, exc) from exc
+aiohttp.client_exceptions.ClientConnectorError: Cannot connect to host 127.0.0.1:58203 ssl:default [Connect call failed ('127.0.0.1', 58203)]
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1322, in _wrap_create_connection
+    sock = await aiohappyeyeballs.start_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 124, in start_connection
+    raise first_exception
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 75, in start_connection
+    sock = await _connect_sock(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 210, in _connect_sock
+    await loop.sock_connect(sock, address)
+  File "uvloop/loop.pyx", line 2644, in sock_connect
+  File "uvloop/loop.pyx", line 1100, in uvloop.loop.Loop._sock_connect_cb
+ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 58204)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 683, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 704, in app
+    await route.handle(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 289, in handle
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 211, in chat
+    return await px.handle(raw, "/v1/chat/completions")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 140, in handle
+    resp = await self.session.post(durl + path, json=d_body, headers=headers)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 900, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 854, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 665, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1263, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1641, in _create_direct_connection
+    raise last_exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1610, in _create_direct_connection
+    transp, proto = await self._wrap_create_connection(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1345, in _wrap_create_connection
+    raise client_error(req.connection_key, exc) from exc
+aiohttp.client_exceptions.ClientConnectorError: Cannot connect to host 127.0.0.1:58204 ssl:default [Connect call failed ('127.0.0.1', 58204)]
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1322, in _wrap_create_connection
+    sock = await aiohappyeyeballs.start_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 124, in start_connection
+    raise first_exception
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 75, in start_connection
+    sock = await _connect_sock(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 210, in _connect_sock
+    await loop.sock_connect(sock, address)
+  File "uvloop/loop.pyx", line 2644, in sock_connect
+  File "uvloop/loop.pyx", line 1100, in uvloop.loop.Loop._sock_connect_cb
+ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 58202)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 683, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 704, in app
+    await route.handle(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 289, in handle
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 211, in chat
+    return await px.handle(raw, "/v1/chat/completions")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 140, in handle
+    resp = await self.session.post(durl + path, json=d_body, headers=headers)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 900, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 854, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 665, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1263, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1641, in _create_direct_connection
+    raise last_exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1610, in _create_direct_connection
+    transp, proto = await self._wrap_create_connection(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1345, in _wrap_create_connection
+    raise client_error(req.connection_key, exc) from exc
+aiohttp.client_exceptions.ClientConnectorError: Cannot connect to host 127.0.0.1:58202 ssl:default [Connect call failed ('127.0.0.1', 58202)]
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1322, in _wrap_create_connection
+    sock = await aiohappyeyeballs.start_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 124, in start_connection
+    raise first_exception
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 75, in start_connection
+    sock = await _connect_sock(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 210, in _connect_sock
+    await loop.sock_connect(sock, address)
+  File "uvloop/loop.pyx", line 2644, in sock_connect
+  File "uvloop/loop.pyx", line 1100, in uvloop.loop.Loop._sock_connect_cb
+ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 58203)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 683, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 704, in app
+    await route.handle(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 289, in handle
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 211, in chat
+    return await px.handle(raw, "/v1/chat/completions")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 140, in handle
+    resp = await self.session.post(durl + path, json=d_body, headers=headers)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 900, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 854, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 665, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1263, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1641, in _create_direct_connection
+    raise last_exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1610, in _create_direct_connection
+    transp, proto = await self._wrap_create_connection(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1345, in _wrap_create_connection
+    raise client_error(req.connection_key, exc) from exc
+aiohttp.client_exceptions.ClientConnectorError: Cannot connect to host 127.0.0.1:58203 ssl:default [Connect call failed ('127.0.0.1', 58203)]
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1322, in _wrap_create_connection
+    sock = await aiohappyeyeballs.start_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 124, in start_connection
+    raise first_exception
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 75, in start_connection
+    sock = await _connect_sock(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohappyeyeballs/impl.py", line 210, in _connect_sock
+    await loop.sock_connect(sock, address)
+  File "uvloop/loop.pyx", line 2644, in sock_connect
+  File "uvloop/loop.pyx", line 1100, in uvloop.loop.Loop._sock_connect_cb
+ConnectionRefusedError: [Errno 111] Connect call failed ('127.0.0.1', 58204)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 422, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 63, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/applications.py", line 96, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 683, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 704, in app
+    await route.handle(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/routing.py", line 289, in handle
+    await self.app(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 211, in chat
+    return await px.handle(raw, "/v1/chat/completions")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555/scripts/pd_proxy.py", line 140, in handle
+    resp = await self.session.post(durl + path, json=d_body, headers=headers)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 900, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/client.py", line 854, in _connect_and_send_request
+    conn = await self._connector.connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 665, in connect
+    proto = await self._create_connection(req, traces, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1263, in _create_connection
+    _, proto = await self._create_direct_connection(req, traces, timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1641, in _create_direct_connection
+    raise last_exc
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1610, in _create_direct_connection
+    transp, proto = await self._wrap_create_connection(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30316/home/venv_vllm/lib/python3.12/site-packages/aiohttp/connector.py", line 1345, in _wrap_create_connection
+    raise client_error(req.connection_key, exc) from exc
+aiohttp.client_exceptions.ClientConnectorError: Cannot connect to host 127.0.0.1:58204 ssl:default [Connect call failed ('127.0.0.1', 58204)]

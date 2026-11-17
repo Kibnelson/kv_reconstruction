@@ -1,0 +1,4 @@
+set -Eeuo pipefail
+umask 077
+cd '/tmp/nbore/kvpd-tools/2dc34476b0093e650b1bdad5b01e1363ae9b9555'
+echo 'KVPD_SPECS=0: no node specs this run'
