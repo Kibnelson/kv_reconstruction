@@ -804,6 +804,36 @@ class BenchAndReportTests(unittest.TestCase):
         self.assertIn("| aquakv-2 (lossy) | 2.130 |", text)
         self.assertIn("## Note on the lossy reference", text)
 
+    def test_checkout_leaves_a_clone_at_its_commit_and_serialises_changes(self):
+        """Job 30293: four engines ran `git checkout` on one clone at once and collided on git's index lock."""
+        from kv_compare.more_baselines import checkout
+        d = Path(tempfile.mkdtemp())
+        src = d / "src"
+        git = lambda *a, cwd=src: subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *a], cwd=cwd,
+                                                 check=True, capture_output=True, text=True).stdout.strip()
+        src.mkdir()
+        git("init", "-q")
+        (src / "f").write_text("1")
+        git("add", "f")
+        git("commit", "-q", "-m", "1")
+        first = git("rev-parse", "HEAD")
+        (src / "f").write_text("2")
+        git("commit", "-q", "-am", "2")
+        clone = d / "clone"
+        checkout(str(src), first, clone, log=lambda *a: None)
+        self.assertEqual((clone / "f").read_text(), "1")
+        mtime = (clone / ".git" / "index").stat().st_mtime_ns
+        checkout(str(src), first, clone, log=lambda *a: None)            # already there: nothing touched
+        self.assertEqual((clone / ".git" / "index").stat().st_mtime_ns, mtime)
+        second = git("rev-parse", "HEAD")
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); from kv_compare.more_baselines import checkout; "
+                "checkout(sys.argv[2], sys.argv[3], sys.argv[4], log=lambda *a: None)")
+        procs = [subprocess.Popen([sys.executable, "-c", code, str(ROOT), str(src), second, str(clone)],
+                                  stderr=subprocess.PIPE, text=True) for _ in range(6)]
+        errs = [(p.wait(), p.stderr.read()) for p in procs]
+        self.assertEqual([e[0] for e in errs], [0] * 6, errs)
+        self.assertEqual((clone / "f").read_text(), "2")
+
     def test_aquakv_index_packing(self):
         from kv_compare.pd import codecs as cd
         g = torch.Generator().manual_seed(1)
@@ -820,6 +850,13 @@ class BenchAndReportTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"IBP_SKIP_REASON": "KVPD_IBP=0 in the login shell"}), \
                 mock.patch.dict(sys.modules, {"ibp": None}):
             with self.assertRaisesRegex(ImportError, "IBP left out: KVPD_IBP=0 in the login shell"):
+                codecs.IBP("cpu")
+        home = Path(tempfile.mkdtemp())                       # the setup's build failed: its reason, from KV_HOME
+        (home / "ibp_unavailable.txt").write_text("the CUDA 13 toolkit did not install (setup: cuda13_installer.log)\n")
+        env = {k: v for k, v in os.environ.items() if k != "IBP_SKIP_REASON"}
+        with mock.patch.dict(os.environ, dict(env, KV_HOME=str(home)), clear=True), \
+                mock.patch.dict(sys.modules, {"ibp": None}):
+            with self.assertRaisesRegex(ImportError, "IBP left out: the CUDA 13 toolkit did not install"):
                 codecs.IBP("cpu")
 
     def test_compiles_placed_by_log_position(self):

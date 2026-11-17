@@ -624,6 +624,9 @@ class IBP:
             import ibp
         except ImportError:
             why = os.environ.get("IBP_SKIP_REASON")
+            f = os.path.join(os.environ.get("KV_HOME", ""), "ibp_unavailable.txt")
+            if not why and os.environ.get("KV_HOME") and os.path.isfile(f):
+                why = open(f).read().strip()
             if why:                                  # left out on purpose: say so, not "No module named 'ibp'"
                 raise ImportError(f"IBP left out: {why}") from None
             raise

@@ -46,15 +46,29 @@ NVCOMP_ALGORITHMS = {"LZ4": {}, "Cascaded": {"data_type": "<u2"}, "Bitcomp": {"d
                      "Zstd": {}}
 
 
+def _head(path):
+    r = subprocess.run(["git", "-C", str(path), "rev-parse", "HEAD"], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
 def checkout(repo, commit, path, log=print):
-    """A clone of repo at commit in path (cloned if missing)."""
+    """A clone of repo at commit in path (cloned if missing). Left alone when it is already at commit: the setup
+    checks it out once, and the engines only read it. Four engines checking out one clone at once collided on git's
+    index lock (job 30293: exactkv left out, git exit 128), so any change is made under a lock of our own."""
     path = Path(path)
-    if not (path / ".git").exists():
-        log(f"  cloning {repo} into {path}")
-        subprocess.run(["git", "clone", "-q", repo, str(path)], check=True)
-    if subprocess.run(["git", "-C", str(path), "cat-file", "-e", commit], capture_output=True).returncode:
-        subprocess.run(["git", "-C", str(path), "fetch", "-q", "origin", commit], check=True)
-    subprocess.run(["git", "-C", str(path), "checkout", "-q", commit], check=True)
+    if (path / ".git").exists() and _head(path) == commit:
+        return path
+    import fcntl
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(f"{path}.kvpd-lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not (path / ".git").exists():
+            log(f"  cloning {repo} into {path}")
+            subprocess.run(["git", "clone", "-q", repo, str(path)], check=True)
+        if _head(path) != commit:
+            if subprocess.run(["git", "-C", str(path), "cat-file", "-e", commit], capture_output=True).returncode:
+                subprocess.run(["git", "-C", str(path), "fetch", "-q", "origin", commit], check=True)
+            subprocess.run(["git", "-C", str(path), "checkout", "-q", commit], check=True)
     return path
 
 

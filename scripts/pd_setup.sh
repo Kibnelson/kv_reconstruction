@@ -116,9 +116,14 @@ if [ "${IBP:-1}" = 1 ]; then
             URL=${CUDA13_RUNFILE_URL:-https://developer.download.nvidia.com/compute/cuda/13.2.0/local_installers/cuda_13.2.0_595.45.04_linux.run}
             echo "   the CUDA 13 toolkit from $URL into $TK13"
             rm -rf "$TK13"
+            # the runfile installs the toolkit and then fails to link /usr/local/cuda to it without root (job 30293:
+            # "Failed to create symlink"), so the toolkit is judged by its nvcc, not the installer's exit status
             if curl -fL --retry 3 -o "$KV_HOME/tmp/cuda13.run" "$URL" && \
-                sh "$KV_HOME/tmp/cuda13.run" --silent --toolkit --installpath="$TK13" --no-opengl-libs --no-man-page \
-                    --no-drm --override --tmpdir="$KV_HOME/tmp"; then
+                { sh "$KV_HOME/tmp/cuda13.run" --silent --toolkit --installpath="$TK13" --no-opengl-libs --no-man-page \
+                    --no-drm --override --tmpdir="$KV_HOME/tmp" ||
+                  echo "   the installer exited $? (a system step it lacks root for); the toolkit is checked by nvcc"; } && \
+                [ -x "$TK13/bin/nvcc" ] && "$TK13/bin/nvcc" --version | tail -n 1 | sed 's/^/   nvcc: /' && \
+                [ -f "$TK13/include/cuda_runtime.h" ]; then
                 # what a torch extension's build never uses: the profilers and the static libraries (about 4 GB)
                 rm -rf "$TK13"/nsight-compute* "$TK13"/nsight-systems* "$TK13"/nsightee_plugins "$TK13"/libnvvp \
                     "$TK13"/extras/demo_suite "$TK13"/share/doc "$TK13"/gds* "$TK13"/tools
@@ -147,9 +152,13 @@ if [ "${IBP:-1}" = 1 ]; then
                 pip_in "$VPY" -v . --no-build-isolation) > "$KV_HOME/ibp_vllm_build.log" 2>&1 && \
                 "$VPY" -c "import torch, ibp"; then
             echo "   IBP built"
+            rm -f "$KV_HOME/ibp_unavailable.txt"
         else
             echo "   WARNING: IBP did not build (tail of $KV_HOME/ibp_vllm_build.log below); the tier runs leave it out"
             tail -n 15 "$KV_HOME/ibp_vllm_build.log" 2>/dev/null || true
+            # the reason the engines give for leaving it out, instead of "No module named 'ibp'"
+            if [ -x "$TK13/bin/nvcc" ]; then echo "its build failed (setup: ibp_vllm_build.log)"
+            else echo "the CUDA 13 toolkit did not install (setup: cuda13_installer.log)"; fi > "$KV_HOME/ibp_unavailable.txt"
         fi
     fi
 fi

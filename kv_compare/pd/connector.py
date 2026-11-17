@@ -537,9 +537,19 @@ class _WorkerSide:
                 p2, m2 = unbundle(h, blob)
                 back = torch.empty_like(words)
                 c.decode(p2, m2, lambda l, w: back[l].copy_(w))
-                out[n] = bool(torch.equal(back, words))
-                if not out[n]:
-                    raise ValueError("round trip not exact")
+                if getattr(c, "lossy", False):
+                    # AQUA-KV (job 30293: left out as "not exact"): the receiver must rebuild the sender's own
+                    # reconstruction, whose error the sender reports
+                    a, b = back.view(torch.bfloat16).double(), words.view(torch.bfloat16).double()
+                    err = float((a - b).norm() / b.norm())
+                    want = float(meta.get("rel_err", float("nan")))
+                    out[n] = bool(abs(err - want) <= 1e-6 * max(1.0, want))
+                    if not out[n]:
+                        raise ValueError(f"lossy round trip: the receiver's error {err:.6g}, the sender's {want:.6g}")
+                else:
+                    out[n] = bool(torch.equal(back, words))
+                    if not out[n]:
+                        raise ValueError("round trip not exact")
             except Exception as exc:
                 out[n] = repr(exc)[:200]
                 logger.warning("TKVConnector: codec %s failed its warm-up (%s); left out", n, out[n])

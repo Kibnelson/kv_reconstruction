@@ -414,6 +414,31 @@ class ConnectorFlowTests(unittest.TestCase):
     def test_whole_prompt_moves_exactly(self):
         self.flow()
 
+    def test_warm_up_keeps_a_lossy_codec_that_rebuilds_its_own_reconstruction(self):
+        """Job 30293 left AQUA-KV out at the warm-up ("round trip not exact"): a lossy codec passes when the receiver
+        rebuilds the sender's reconstruction (the error it reports), and fails when it does not."""
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make()
+        from kv_compare.pd.codecs import Raw
+
+        class Lossy(Raw):
+            lossy = True
+
+            def __init__(self, report):
+                self.report = report
+
+            def encode(self, words, pos0=0):
+                bad = words ^ 1
+                a, b = bad.view(torch.bfloat16).double(), words.view(torch.bfloat16).double()
+                err = float((a - b).norm() / b.norm())
+                parts, meta = Raw.encode(self, bad, pos0)
+                return parts, dict(meta, rel_err=err * self.report)
+        w = Pw.w
+        w.codecs = {"raw": w.codecs["raw"], "aquakv-2": Lossy(1.0), "aquakv-3": Lossy(1.5)}
+        out = w.warm_up()
+        self.assertEqual((out["raw"], out["aquakv-2"]), (True, True))
+        self.assertIn("lossy round trip", out["aquakv-3"])
+        self.assertEqual(sorted(w.codecs), ["aquakv-2", "raw"])
+
     def test_a_lossy_codec_installs_without_a_checksum(self):
         """AQUA-KV is lossy: with the check on, its sender sends no checksum and the receiver installs what came."""
         self.flow(lossy=True)
