@@ -106,17 +106,36 @@ shapes: how many requests at once, how long, how much output.
 ExANS reports a codec benchmark on one 256K-token KV snapshot (no model or data named) and AdaCode accuracy and
 memory at batch 1, with no serving or transfer test; nvCOMP is a library. Their codecs run on all of the above.
 
-The `workloads` campaign (about 7 hours):
-1. host memory at 10 and 100 Gb/s: raw, SplitZip, ExANS, AdaCode, exactkv, T (hbh), T2 (hbh, rank 256), and
-   AQUA-KV 2- and 3-bit (lossy, for speed);
+The `workloads` campaign (about 9 hours):
+1. host memory at 10 and 100 Gb/s: raw, T (hbh), T2 (hbh, rank 256), SplitZip, ExANS, AdaCode, and AQUA-KV 2- and
+   3-bit (lossy, for speed);
 2. GPU to GPU, unpaced: the same codecs;
 3. vLLM's NIXL, every GPU visible;
-4. nVIDIA nvCOMP (ANS, Zstd, Bitcomp) on its own engines, host memory at 10 and 100 Gb/s.
+4. nVIDIA nvCOMP (ANS, Zstd, Bitcomp) on its own engines, host memory at 10 and 100 Gb/s;
+5. exactkv on its own engines, with raw beside it: host memory at 10 and 100 Gb/s, then GPU to GPU.
 
-The `wlong` campaign (about 3 hours): the biggest workloads, host memory and GPU to GPU, with AQUA-KV 2-bit:
-32K-token prompts, 16 at once of 8K and 16K tokens, 128 and 256 at once of 1,024. Where more are at once than the
-decode engines hold, vLLM queues them, as it would in service. Apart, so that an engine lost there costs nothing of
-the main campaign.
+The `wlong` campaign (about 4 hours): the biggest workloads, host memory and GPU to GPU, with AQUA-KV 2-bit, then
+exactkv apart: 32K-token prompts, 16 at once of 8K and 16K tokens, 128 and 256 at once of 1,024. Where more are at
+once than the decode engines hold, vLLM queues them, as it would in service. Apart, so that an engine lost there costs
+nothing of the main campaign.
+
+Why exactkv runs apart (job 30334): on 128-token prompts, 16 at once, at 10 Gb/s, an install of exactkv hit an
+illegal memory access on all three decode GPUs within half a second (10:38:09), after 5 to 7 installs of the same
+shape had succeeded on each; it had passed every earlier point (its check, the 2,048-token sweep at every rate, and
+512 and 1,024 tokens one at a time). A CUDA error of that kind poisons the engine's GPU, so every engine died. The
+logs do not say whether exactkv's tile decoder read outside the rows it was sent or an earlier kernel on the GPU had
+failed. The receiver now checks, before exactkv's decoder runs, that every raw row a page names was sent and that
+each buffer has its page shape (one GPU sync for all layers). A bad transfer then fails alone and vLLM computes the
+prompt, and a CUDA error at that check is named as one from earlier work on the GPU. Such an error is no longer
+retried either, so the record keeps its first message.
+
+A run also stops at a dead engine now. Before each point the bench asks every engine's `/health`, and it asks
+again every 30 s while requests stay in flight. A point whose requests are still in flight 10 minutes after its
+benchmark ended (`IDLE_TIMEOUT_S`) stops the run too, and so does a benchmark that runs past an hour
+(`POINT_TIMEOUT_S`). The points measured before stay, the run's report is written and says where it stopped, and the
+run is packaged as `_partial`. The matrix then goes on to its next run, with new engines. In job 30334 the bench
+instead waited 30 minutes after each of the next points. Within each run, T and T2 come first and exactkv last, so a
+crash costs the others nothing.
 
 The report gives one table per path and link: a row per workload, a column per codec, TTFT p50 with its speedup
 over raw (SplitZip's measure), then requests per second with the gain over raw.
@@ -298,9 +317,9 @@ The matrices (the times are estimates until the smoke has measured them):
 | ring1p3d | 1+3 through host memory at 3/10/25/100 Gb/s: the in-process baselines, T and T2; then nvCOMP |
 | ring2p2d | the same with 2+2 |
 | direct | GPU to GPU for 1+3 and 2+2, every codec, nvCOMP apart; NIXL for both layouts with every GPU visible, and 2+2 with its own GPU only |
-| workloads | 1+3, every codec on the baselines' published workloads and ours (above, "Workloads"), AQUA-KV 2- and 3-bit beside them: host memory at 10 and 100 Gb/s, GPU to GPU, NIXL, nvCOMP |
-| wlong | the biggest published workloads (32K-token prompts, 16 at once of 8K and 16K, 128 and 256 at once of 1,024): host memory at 10 and 100 Gb/s, GPU to GPU |
-| links | 1+3 over 10, 25, 50, ... 400 Gb/s (steps of 25), through host memory and GPU to GPU (paced, then unpaced), 16 requests at once: raw, SplitZip, ExANS, AdaCode, exactkv, T (hbh) and T2 (hbh, rank 256). One table per path: TTFT p50 per codec and speed, what the link carried, where each codec beats raw, and where a request's time goes |
+| workloads | 1+3, every codec on the baselines' published workloads and ours (above, "Workloads"), AQUA-KV 2- and 3-bit beside them: host memory at 10 and 100 Gb/s, GPU to GPU, NIXL, nvCOMP; exactkv in runs of its own, last |
+| wlong | the biggest published workloads (32K-token prompts, 16 at once of 8K and 16K, 128 and 256 at once of 1,024): host memory at 10 and 100 Gb/s, GPU to GPU; exactkv apart |
+| links | 1+3 over 10, 25, 50, ... 400 Gb/s (steps of 25), through host memory and GPU to GPU (paced, then unpaced), 16 requests at once: raw, T (hbh), T2 (hbh, rank 256), SplitZip, ExANS, AdaCode, AQUA-KV 2-bit and exactkv (last). One table per path: TTFT p50 per codec and speed, what the link carried, where each codec beats raw, and where a request's time goes |
 | tier | the CPU tier with every codec, nvCOMP apart; LMCache |
 | t2eager | T and T2 in eager engines: host memory at 10 and 100 Gb/s, GPU to GPU, the CPU tier |
 

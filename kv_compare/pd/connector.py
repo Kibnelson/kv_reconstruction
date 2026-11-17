@@ -211,6 +211,17 @@ class TKVConnector(KVConnectorBase_V1):
         return True
 
 
+STICKY = ("illegal memory access", "illegal address", "unspecified launch failure", "device-side assert",
+          "misaligned address", "an illegal instruction")
+
+
+def _sticky(exc):
+    """A CUDA error that poisons the GPU context (the engine cannot go on): no retry, and its own message kept
+    (job 30334: the retry's synchronize raised it again and the record kept only the second copy)."""
+    m = str(exc)
+    return any(s in m for s in STICKY)
+
+
 def _retry_once(fn, device, rec):
     """fn(), and once more after PyTorch gives its cached GPU memory back: nvCOMP and ExANS allocate their scratch
     outside PyTorch, and next to vLLM's KV cache that can fail only because PyTorch's cache holds the free memory
@@ -218,7 +229,7 @@ def _retry_once(fn, device, rec):
     try:
         return fn()
     except Exception as exc:
-        if getattr(device, "type", None) != "cuda":
+        if getattr(device, "type", None) != "cuda" or _sticky(exc):
             raise
         rec["retried"] = repr(exc)[:200]
         torch.cuda.synchronize(device)

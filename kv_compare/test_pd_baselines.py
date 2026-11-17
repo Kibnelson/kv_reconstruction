@@ -758,6 +758,115 @@ class BenchAndReportTests(unittest.TestCase):
         self.assertIn("NIXL (vLLM), own GPU only", mr.path_of({"connector": "nixl"}))
         self.assertIn("every GPU visible", mr.path_of({"connector": "nixl", "nixl_all_gpus": True}))
 
+    def test_a_dead_engine_stops_the_run_and_what_was_measured_is_reported(self):
+        """Job 30334: exactkv's install killed all three decode engines at 10:38; the bench then waited 30 minutes
+        after each later point. Now a dead engine (or a point still in flight after --idle-timeout) stops the run:
+        the points before stay, the report is written, the exit is 3 (packaged as _partial)."""
+        import socket
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_bench as pb
+        import pd_matrix_report as mr
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        dead = f"http://127.0.0.1:{s.getsockname()[1]}"
+        s.close()                                   # nothing listens there: connection refused
+        state = {"inflight": [1]}
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *x):
+                pass
+
+            def do_GET(self):
+                if self.path == "/t/status":
+                    b = json.dumps({"inflight": state["inflight"], "prefill_inflight": [0], "prefills": [alive],
+                                    "decodes": [[dead, 0], [alive, 0]]}).encode()
+                elif self.path == "/health":
+                    b = b""
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("content-length", str(len(b)))
+                self.end_headers()
+                self.wfile.write(b)
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.shutdown)
+        alive = f"http://127.0.0.1:{srv.server_address[1]}"
+        a = SimpleNamespace(proxy=alive)
+        self.assertEqual(list(pb.dead_engines(a)), [dead])
+        t = time.time()
+        with self.assertRaises(pb.RunStopped) as cm:     # in flight, and an engine gone: stops at the first look
+            pb.wait_idle(a.proxy, timeout=60, health=lambda: pb.dead_engines(a), every=0.2)
+        self.assertLess(time.time() - t, 10)
+        self.assertEqual(list(cm.exception.engines), [dead])
+        ok, stop = pb.after_point(a)                     # recorded first, raised after
+        self.assertFalse(ok)
+        with self.assertRaises(pb.RunStopped) as cm:
+            pb.end_point(a, "shape_exactkv_10gbps_t128_b16_o128", ok, stop)
+        self.assertIn("shape_exactkv_10gbps_t128_b16_o128: engines stopped answering", cm.exception.why)
+        old = pb.IDLE_TIMEOUT                            # every engine answers, the requests never finish
+        self.addCleanup(setattr, pb, "IDLE_TIMEOUT", old)
+        pb.IDLE_TIMEOUT = 1.5
+        state["inflight"] = [0]
+        self.assertTrue(pb.settle(SimpleNamespace(proxy=alive), "p"))
+        state["inflight"] = [2]
+        with self.assertRaises(pb.RunStopped) as cm:
+            pb.stuck(SimpleNamespace(proxy=alive), "sweep_raw_10gbps_rinf")
+        self.assertIn("still in flight 1.5 s", cm.exception.why)
+        # main: the stage that stops, the stages after it skipped but the report, exit 3
+        out = Path(tempfile.mkdtemp())
+        calls = []
+
+        def shapes(a, res):
+            res.setdefault("shapes", {})["shape_raw_10gbps_t512_b1_o128"] = {
+                "codec": "raw", "tokens": 512, "batch": 1, "output": 128, "rounds": 8, "families": ["sz1"],
+                "link_gbps": 10, "requests": 8, "exit": 0, "bench": {"median_ttft_ms": 128}, "transfers": {}}
+            raise pb.RunStopped("engines not answering before shape_exactkv_10gbps_t1024_b2_o128", {dead: "refused"})
+        orig = {k: getattr(pb, k) for k in ("stage_shapes", "stage_sweep", "stage_report")}
+        self.addCleanup(lambda: [setattr(pb, k, v) for k, v in orig.items()])
+        pb.stage_shapes = shapes
+        pb.stage_sweep = lambda a, res, colocated=False: calls.append("sweep")
+        pb.stage_report = lambda a, res: calls.append(("report", pb.stopped_note(res["stopped"])))
+        argv = sys.argv
+        self.addCleanup(setattr, sys, "argv", argv)
+        sys.argv = ["pd_bench.py", "--model", "m", "--out", str(out), "--prompts", str(out), "--log-dir", str(out),
+                    "--link-control", str(out / "l.json"), "--stages", "shapes,sweep,report"]
+        self.assertEqual(pb.main(), 3)
+        self.assertEqual(calls[0][0], "report")
+        self.assertNotIn("sweep", calls)
+        self.assertIn("**The run stopped early** in its shapes stage", calls[0][1])
+        self.assertIn(f"(not answering: {dead})", calls[0][1])
+        res = json.loads((out / "results.json").read_text())
+        self.assertEqual((res["stopped"]["stage"], list(res["shapes"])), ("shapes", ["shape_raw_10gbps_t512_b1_o128"]))
+        # the combined report says which run stopped
+        root = Path(tempfile.mkdtemp())
+        (root / "r").mkdir()
+        (root / "r" / "env.json").write_text(json.dumps({"layout": "1p3d", "connector": "tkv", "transport": "ring"}))
+        (root / "r" / "results.json").write_text(json.dumps(res))
+        mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
+        self.assertIn("`r` stopped early in its shapes stage: engines not answering", (root / "s.md").read_text())
+
+    def test_the_point_timeout_stops_a_benchmark_that_hangs(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_bench as pb
+        d = Path(tempfile.mkdtemp())
+        fake = d / "vllm"
+        fake.write_text(f"#!{sys.executable}\nimport time\ntime.sleep(60)\n")
+        fake.chmod(0o755)
+        exe = sys.executable
+        self.addCleanup(setattr, sys, "executable", exe)
+        sys.executable = str(d / "python")           # bench_serve runs the vllm beside the interpreter
+        a = SimpleNamespace(proxy="http://x", model="m", served_name="s", output_len=4, ttft_slo_ms=1, point_timeout=1)
+        t = time.time()
+        rc, r, t0, t1 = pb.bench_serve(a, "data.jsonl", "inf", 2, d, "p")
+        self.assertEqual((rc, r), (124, {}))
+        self.assertLess(time.time() - t, 20)
+        self.assertIn("--point-timeout 1 s", (d / "p.log").read_text())
+
     def test_failed_transfers_marked_in_the_sweep(self):
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_matrix_report as mr
@@ -896,6 +1005,54 @@ class BenchAndReportTests(unittest.TestCase):
             self.assertEqual(b.dtype, torch.uint8)
             self.assertEqual(b.numel(), idx.numel() * bits // 8)
             self.assertTrue(torch.equal(cd._unpack(b, bits, idx.numel()).reshape(idx.shape), idx))
+
+    def test_exactkv_checks_its_raw_rows_before_decoding(self):
+        """Job 30334: an illegal memory access in exactkv's install killed every decode engine. The receiver now checks
+        that every raw row a page names was sent (and the buffers' shapes) before the tile decoder reads them."""
+        install_vllm_stub()
+        from kv_compare.pd import codecs as cd
+        from kv_compare.pd import connector as cn
+        for x in (0, 1, 0x8000, 0xFFFF, 0x5A5A, 12345):
+            self.assertEqual(int(cd._popc16(torch.tensor([x]))[0]), bin(x).count("1"))
+        x = cd.ExactKV.__new__(cd.ExactKV)
+        x.P, x.hd = 16, 128
+        Tp, H, NP = 32, 2, 2
+
+        def parts(raw_rows=5):
+            p = {}
+            for t in ("0k", "0v"):
+                p["sm" + t] = torch.zeros(1, Tp, H, 128, dtype=torch.uint8)
+                p["code" + t] = torch.zeros(1, Tp, H, 64, dtype=torch.uint8)
+                p["base" + t] = torch.zeros(1, NP, H, 128, dtype=torch.uint8)
+                rm = torch.zeros(1, NP, H, dtype=torch.int32)
+                ro = torch.zeros(1, NP, H, dtype=torch.int32)
+                rm[0, 0, 0], ro[0, 0, 0] = 0b101, 0          # rows 0 and 2 of page 0, head 0: raw rows 0, 1
+                rm[0, 1, 1], ro[0, 1, 1] = 0b1110, 2         # three in page 1, head 1: raw rows 2..4
+                ro[0, 1, 0] = 99                             # a page with no raw row: its offset is not read
+                p["rowmask" + t], p["rowoff" + t] = rm, ro
+                p["raw" + t] = torch.zeros(raw_rows, 128, dtype=torch.bfloat16)
+            return p
+        x.check(parts(), 1, Tp, H)
+        with self.assertRaisesRegex(ValueError, "0k names raw rows up to 5, 4 sent"):
+            x.check(parts(4), 1, Tp, H)
+        p = parts()
+        p["rowmask0v"][0, 0, 1] = 1 << 16
+        with self.assertRaisesRegex(ValueError, "0v names raw rows"):
+            x.check(p, 1, Tp, H)
+        p = parts()
+        p["code0k"] = torch.zeros(1, Tp, H, 128, dtype=torch.uint8)
+        with self.assertRaisesRegex(ValueError, r"code0k is \(1, 32, 2, 128\)"):
+            x.check(p, 1, Tp, H)
+        # a CUDA error that poisons the GPU: not retried, its own message kept
+        rec = {}
+        calls = []
+
+        def boom():
+            calls.append(1)
+            raise RuntimeError("CUDA error: an illegal memory access was encountered")
+        with self.assertRaisesRegex(RuntimeError, "illegal memory access"):
+            cn._retry_once(boom, SimpleNamespace(type="cuda"), rec)
+        self.assertEqual((calls, rec), ([1], {}))
 
     def test_ibp_left_out_says_why(self):
         from kv_compare.pd import codecs
@@ -1181,25 +1338,33 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertIn("LINKS=10,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400 RATES=inf", runs[0])
         self.assertIn("TRANSPORT=p2p LINKS=10,25", runs[1])
         self.assertIn(",400,native", runs[1])
+        self.assertTrue(all(x.endswith("CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip,exans,adacode,aquakv-2,exactkv")
+                            for x in runs[:2]))
         # the workloads matrix: the published shapes in every main run, the 32K ones last on their own
         r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                            env=dict(os.environ, MATRIX="workloads", PRINT_RUNS="1"))
         runs = [x for x in r.stdout.split("\n") if x]
-        self.assertEqual(len(runs), 4)
+        self.assertEqual(len(runs), 6)
         self.assertTrue(all("STAGES=check,sweep,shapes,report" in x for x in runs))
-        self.assertTrue(all("CODECS=raw,splitzip,exans,adacode,exactkv,ours-hbh,t2-hbh,t2-rank256,aquakv-2,aquakv-3 "
+        # ours first; exactkv (its install killed every decode engine in job 30334) in runs of its own, last
+        self.assertTrue(all("CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip,exans,adacode,aquakv-2,aquakv-3 "
                             in x for x in runs[:2]))
         self.assertIn("1920:20:128:2:ibp,4096:16:256:2:exactkv", runs[0])
         self.assertIn("1024:64:128:2:sz1024", runs[0])
         self.assertIn("CONNECTOR=nixl NIXL_ALL_GPUS=1", runs[2])
         self.assertIn("CODECS=raw,nvcomp-ans", runs[3])
+        self.assertTrue(runs[4].startswith("TRANSPORT=ring LINKS=10,100 CODECS=raw,exactkv "))
+        self.assertTrue(runs[5].startswith("TRANSPORT=p2p LINKS=native CODECS=raw,exactkv "))
+        self.assertFalse(any("exactkv" in x.split("SHAPES=")[0] for x in runs[:4]))
         r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                            env=dict(os.environ, MATRIX="wlong", PRINT_RUNS="1"))
         long = [x for x in r.stdout.split("\n") if x]
-        self.assertEqual(len(long), 2)
+        self.assertEqual(len(long), 4)
+        self.assertTrue(all("CODECS=raw,exactkv " in x for x in long[2:]))
         self.assertTrue(all("SHAPES=32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,"
                             "8192:16:128:2:sz16,16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024" in x
                             for x in long))
+        sys.path.insert(0, str(ROOT / "scripts"))
         import pd_bench as pb
         parsed = pb.parse_shapes(runs[0].split("SHAPES=")[1].split()[0])
         self.assertEqual(len(parsed), 19)                         # 21 entries; 2 shared by two families

@@ -427,10 +427,13 @@ PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
     --stages "$STAGES" --vllm-source "$KV_HOME/sources/vllm" --env "$OUT/env.json" \
     --tier-codecs "$TIER_CODECS" --tier-clients "$TIER_CLIENTS" --tier-conversations "$TIER_CONVERSATIONS" \
     --tier-max-turns "$TIER_MAX_TURNS" --tier-prefix-max "$TIER_PREFIX_MAX" --tier-control "$TIERFILE" \
-    --engine-logs "$OUT" --shapes "$SHAPES" 2>&1 | tee "$OUT/bench.log"
+    --engine-logs "$OUT" --shapes "$SHAPES" --idle-timeout "${IDLE_TIMEOUT_S:-600}" \
+    --point-timeout "${POINT_TIMEOUT_S:-3600}" 2>&1 | tee "$OUT/bench.log"
 STATUS=${PIPESTATUS[0]}
 set -e
 if [ "$STATUS" = 124 ]; then echo "STOP: the bench ran past RUN_TIMEOUT_S=$RUN_TIMEOUT_S s; packaged as _partial"; fi
+if [ "$STATUS" = 3 ]; then echo "STOP: an engine stopped answering, or a point never finished (bench.log: RUN STOPPED);" \
+    "the points before it are kept; packaged as _partial"; fi
 else
     STATUS=1                       # packaged below all the same: the engine logs are the evidence
 fi

@@ -31,6 +31,7 @@ import re
 import math
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import time
@@ -54,14 +55,111 @@ def log(msg):
     print(time.strftime("%H:%M:%S ") + msg, flush=True)
 
 
-def wait_idle(proxy, timeout=1800):
-    end = time.time() + timeout
+class RunStopped(Exception):
+    """An engine stopped answering, or a point's requests never finished: the rest of the run would measure nothing.
+    Job 30334: exactkv's install hit an illegal memory access on all three decode GPUs at 10:38 (128-token prompts,
+    16 at once); every later point then waited 30 minutes for requests that the dead engines would never finish."""
+
+    def __init__(self, why, engines=None):
+        super().__init__(why)
+        self.why, self.engines = why, engines or {}
+
+
+IDLE_TIMEOUT = 600      # s a point's requests may stay in flight after its benchmark ended (--idle-timeout)
+
+
+def wait_idle(proxy, timeout=None, health=None, every=30):
+    """True once the proxy has no request in flight; False after timeout (IDLE_TIMEOUT). health(): {engine: why}
+    of engines not answering, asked every `every` s while requests stay in flight; any stops the run then."""
+    t = time.time()
+    end = t + (IDLE_TIMEOUT if timeout is None else timeout)
+    ask = t + every
     while time.time() < end:
-        st = get(proxy + "/t/status")
+        try:
+            st = get(proxy + "/t/status")
+        except Exception as exc:
+            raise RunStopped(f"the proxy does not answer ({exc!r})"[:300], {"proxy": repr(exc)[:200]})
         if sum(st["inflight"]) + sum(st.get("prefill_inflight") or [0]) == 0:
             return True
+        if health is not None and time.time() >= ask:
+            bad = health()
+            if bad:
+                raise RunStopped("engines stopped answering while requests were in flight", bad)
+            ask = time.time() + every
         time.sleep(1)
     return False
+
+
+def drained(a):
+    return wait_idle(a.proxy, health=lambda: dead_engines(a))
+
+
+def after_point(a):
+    """(drained, why the run stops or None), without raising: the point is recorded first."""
+    try:
+        return drained(a), None
+    except RunStopped as exc:
+        return False, exc
+
+
+def end_point(a, name, ok, stop):
+    if stop is not None:
+        raise RunStopped(f"{name}: {stop.why}", stop.engines)
+    if not ok:
+        stuck(a, name)
+
+
+def engine_urls(a):
+    st = get(a.proxy + "/t/status")
+    return list(dict.fromkeys(list(st.get("prefills") or []) + [d[0] for d in st["decodes"]]))
+
+
+def dead_engines(a):
+    """{engine url: why} for every engine whose GET /health is not 200 (vLLM answers 503 once its engine core is
+    dead, and nothing once its server has exited too)."""
+    try:
+        urls = engine_urls(a)
+    except Exception as exc:
+        return {"proxy": repr(exc)[:200]}
+    bad = {}
+    for u in urls:
+        try:
+            with urllib.request.urlopen(u + "/health", timeout=30) as r:
+                if r.status != 200:
+                    bad[u] = f"HTTP {r.status}"
+        except Exception as exc:
+            bad[u] = repr(exc)[:200]
+    return bad
+
+
+def ensure_alive(a, where):
+    bad = dead_engines(a)
+    if bad:
+        raise RunStopped(f"engines not answering {where}", bad)
+
+
+def settle(a, name):
+    """After a point: its requests finished (True), or the run stops (an engine died, or still in flight after
+    IDLE_TIMEOUT s)."""
+    if drained(a):
+        return True
+    stuck(a, name)
+
+
+def stopped_note(s):
+    """One line for the reports: where the run stopped and why."""
+    eng = s.get("engines") or {}
+    return (f"**The run stopped early** in its {s.get('stage')} stage at "
+            f"{time.strftime('%H:%M:%S', time.localtime(s.get('time') or 0))}: {s.get('why')}"
+            + (f" (not answering: {', '.join(sorted(eng))})" if eng else "")
+            + ". The points before are measured; the rest were not run.")
+
+
+def stuck(a, name):
+    """The run stops: name's requests were still in flight IDLE_TIMEOUT s after its benchmark ended."""
+    bad = dead_engines(a)
+    raise RunStopped(f"{name}: requests still in flight {IDLE_TIMEOUT} s after its benchmark ended"
+                     + ("" if bad else " (every engine answers)"), bad)
 
 
 def reset_caches(a, tries=30):
@@ -106,7 +204,7 @@ def warm_pairs(a):
             except Exception as exc:
                 log(f"warm-up of prefill {j} -> decode {i} failed: {exc!r}"[:300])
             n += 1
-    wait_idle(a.proxy)
+    drained(a)
     return n
 
 
@@ -143,7 +241,7 @@ def warm_burst(a, n=16, greedy=False):
         errs = [e for e in ex.map(one, range(n)) if e]
     if errs:
         log(f"warm-up burst: {len(errs)} of {n} failed: {errs[0]}")
-    wait_idle(a.proxy)
+    drained(a)
 
 
 JIT_RE = re.compile(r"(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d) \[jit_monitor\.py:\d+\] (.*)")
@@ -338,14 +436,22 @@ def bench_serve(a, dataset, rate, n, out_dir, name, concurrency=None, output_len
            "--goodput", f"ttft:{a.ttft_slo_ms}", "--seed", "0", "--disable-tqdm",
            "--save-result", "--result-dir", str(out_dir), "--result-filename", name + ".json"] + greedy_args()
     t0 = time.time()
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=getattr(a, "point_timeout", None))
+        rc, out, err = r.returncode, r.stdout, r.stderr
+    except subprocess.TimeoutExpired as exc:        # killed: its requests are aborted with the client
+        rc = 124
+        out = (exc.stdout or b"").decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        err = ((exc.stderr or b"").decode(errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")) \
+            + f"\n[stopped after --point-timeout {a.point_timeout} s]"
+        log(f"{name}: the benchmark ran past --point-timeout {a.point_timeout} s; stopped")
     t1 = time.time()
-    (out_dir / (name + ".log")).write_text(r.stdout[-20000:] + "\n" + r.stderr[-20000:])
+    (out_dir / (name + ".log")).write_text(out[-20000:] + "\n" + err[-20000:])
     res = {}
     p = out_dir / (name + ".json")
     if p.is_file():
         res = json.loads(p.read_text())
-    return r.returncode, res, t0, t1
+    return rc, res, t0, t1
 
 
 KEEP = ("completed", "duration", "request_throughput", "request_goodput", "output_throughput", "total_token_throughput",
@@ -361,9 +467,10 @@ def stage_check(a, res):
     reset_caches(a)
     ref = [completion(a, r["prompt"], r["output_tokens"]) for r in rows]
     for codec in usable(a, res, a.codecs):
+        ensure_alive(a, f"before the check of {codec}")
         post(a.proxy + "/t/config", {"mode": "nixl"} if codec == "nixl" else {"mode": "pd", "codec": codec,
                                                                                 "verify": True})
-        wait_idle(a.proxy)
+        settle(a, f"check {codec}")
         resets = reset_caches(a)
         t0 = time.time()
         got = []
@@ -372,7 +479,7 @@ def stage_check(a, res):
                 got.append(completion(a, r["prompt"], r["output_tokens"]))
             except Exception as exc:
                 got.append({"error": repr(exc)[:300]})
-        wait_idle(a.proxy)
+        idle, stop = after_point(a)
         time.sleep(1)
         st = transfer_stats(records(a.log_dir, t0, time.time()))
         same = sum(1 for x, y in zip(got, ref) if x.get("text") is not None and x.get("text") == y.get("text"))
@@ -390,6 +497,8 @@ def stage_check(a, res):
              f"lossy, KV error {fmt(100 * (st.get('rel_err') or 0), 2)}% (relative L2), " if is_lossy(codec) else
              "transfers n/a (vLLM's connector: no checksums), ") +
             f"{same}/{len(rows)} outputs equal to local prefill, bits {fmt(st['bits'])}")
+        res["check"] = out
+        end_point(a, f"check {codec}", idle, stop)
     post(a.proxy + "/t/config", {"verify": False})
     res["check"] = out
 
@@ -431,7 +540,8 @@ def stage_sweep(a, res, colocated=False):
                 name = f"{key}_{codec}_{link}gbps_r{rate}" if not colocated else f"{key}_r{rate}"
                 if name in runs and not a.rerun:
                     continue
-                wait_idle(a.proxy)
+                settle(a, f"before {name}")
+                ensure_alive(a, f"before {name}")
                 if rate == a.rates[0]:
                     if not colocated:
                         warm_pairs(a)
@@ -441,12 +551,12 @@ def stage_sweep(a, res, colocated=False):
                 logs0 = log_marks(a)
                 rc, r, t0, t1 = bench_serve(a, str(a.dataset), rate, n, out_dir, name)
                 logs1 = log_marks(a)
-                wait_idle(a.proxy)
+                idle, stop = after_point(a)
                 time.sleep(1)
                 st = transfer_stats(records(a.log_dir, t0, time.time())) if not colocated and codec != "nixl" else {}
                 runs[name] = {"link_gbps": link, "codec": codec, "rate": rate, "exit": rc,
                               "bench": {k: r.get(k) for k in KEEP}, "transfers": st, "resets": resets,
-                              "t0": t0, "t1": t1, "logs0": logs0, "logs1": logs1}
+                              "t0": t0, "t1": t1, "logs0": logs0, "logs1": logs1, "idle": idle}
                 b = runs[name]["bench"]
                 log(f"{name}: exit {rc}, {fmt(b.get('request_throughput'), 2)} req/s, TTFT p50 "
                     f"{fmt(b.get('median_ttft_ms'), 0)} / p99 {fmt(b.get('p99_ttft_ms'), 0)} ms, goodput "
@@ -454,6 +564,7 @@ def stage_sweep(a, res, colocated=False):
                     f"{fmt(st.get('wire_gbps'), 1)} Gb/s while busy" + (f" (set {link})" if link != "native" else "")
                     if st else ""))
                 save(a, res)
+                end_point(a, name, idle, stop)
     if colocated:
         post(a.proxy + "/t/config", {"mode": "pd"})
 
@@ -506,7 +617,8 @@ def stage_shapes(a, res):
                 if name in runs and not a.rerun:
                     continue
                 data = a.prompts / f"prompts_{sh['tokens']}.jsonl"
-                wait_idle(a.proxy)
+                settle(a, f"before {name}")
+                ensure_alive(a, f"before {name}")
                 if first:
                     warm_pairs(a)
                     warm_burst(a, greedy=True)
@@ -517,12 +629,12 @@ def stage_shapes(a, res):
                 rc, r, t0, t1 = bench_serve(a, str(data), "inf", n, out_dir, name, concurrency=sh["batch"],
                                             output_len=sh["output"])
                 logs1 = log_marks(a)
-                wait_idle(a.proxy)
+                idle, stop = after_point(a)
                 time.sleep(1)
                 st = transfer_stats(records(a.log_dir, t0, time.time())) if codec != "nixl" else {}
                 runs[name] = dict(sh, link_gbps=link, codec=codec, requests=n, exit=rc,
                                   bench={k: r.get(k) for k in KEEP}, transfers=st, resets=resets,
-                                  t0=t0, t1=t1, logs0=logs0, logs1=logs1)
+                                  t0=t0, t1=t1, logs0=logs0, logs1=logs1, idle=idle)
                 b = runs[name]["bench"]
                 log(f"{name} ({'/'.join(sh['families'])}, {n} requests): exit {rc}, TTFT p50 "
                     f"{fmt(b.get('median_ttft_ms'), 0)} / p99 {fmt(b.get('p99_ttft_ms'), 0)} ms, "
@@ -531,6 +643,7 @@ def stage_shapes(a, res):
                     + (f"; {st.get('install_errors', 0) + st.get('send_errors', 0) + st.get('timeouts', 0)} transfers "
                        "failed" if st and (st.get('install_errors') or st.get('send_errors') or st.get('timeouts')) else ""))
                 save(a, res)
+                end_point(a, name, idle, stop)
 
 
 def stage_multiturn(a, res):
@@ -545,8 +658,9 @@ def stage_multiturn(a, res):
     cfile.write_text(json.dumps(conf, indent=1))
     out = {}
     for k, codec in enumerate(a.mt_codecs):
+        ensure_alive(a, f"before multiturn {codec}")
         post(a.proxy + "/t/config", {"mode": "pd", "codec": codec, "policy": a.mt_policy, "reset_conversations": True})
-        wait_idle(a.proxy)
+        settle(a, f"before multiturn {codec}")
         if k == 0:
             warm_burst(a)
         reset_caches(a)                            # the same conversations (seed 0) for every codec
@@ -561,11 +675,13 @@ def stage_multiturn(a, res):
         (a.out / "runs" / (name + ".log")).write_text(r.stdout[-30000:] + "\n" + r.stderr[-30000:])
         if r.returncode != 0:
             log(f"{name}: the multi-turn benchmark exited {r.returncode}:\n" + tail_of(r.stderr or r.stdout))
-        wait_idle(a.proxy)
+        ok, stop = after_point(a)
         t1 = time.time()
         st = transfer_stats(records(a.log_dir, t0, t1))
         out[name] = {"exit": r.returncode, "t0": t0, "t1": t1, "transfers": st}
         log(f"{name}: exit {r.returncode}, {st['sends']} transfers, bits {fmt(st['bits'])}")
+        res["multiturn"] = out
+        end_point(a, name, ok, stop)
     post(a.proxy + "/t/config", {"policy": "round_robin"})
     res["multiturn"] = out
     p = subprocess.run([sys.executable, str(ROOT / "scripts" / "pd_opportunity.py"), "--log-dir", a.log_dir,
@@ -643,6 +759,8 @@ def stage_tier(a, res):
             name = f"tier_{codec}_c{clients}"
             if name in runs and not a.rerun:
                 continue
+            settle(a, f"before {name}")
+            ensure_alive(a, f"before {name}")
             gen += 1
             if ctl is not None:
                 ctl.write_text(json.dumps({"generation": gen, "codec": codec}))
@@ -668,7 +786,7 @@ def stage_tier(a, res):
             (a.out / "runs" / (name + ".log")).write_text(r.stdout[-30000:] + "\n" + r.stderr[-30000:])
             if r.returncode != 0:
                 log(f"{name}: the multi-turn benchmark exited {r.returncode}:\n" + tail_of(r.stderr or r.stdout))
-            wait_idle(a.proxy)
+            ok, stop = after_point(a)
             time.sleep(2)
             hits = hit_rates(m0, prefix_metrics(engines))
             t1 = time.time()
@@ -693,6 +811,7 @@ def stage_tier(a, res):
                 f"{st['loads']} loads ({st['loaded_tokens']} tokens, {fmt(st['load_ms'], 1)} ms each, bits "
                 f"{fmt(st['bits'])}), {st['stored_chunks']} chunks stored")
             save(a, res)
+            end_point(a, name, ok, stop)
     post(a.proxy + "/t/config", {"policy": "round_robin"})
 
 
@@ -727,6 +846,8 @@ def stage_report(a, res):
              f"1 prefill engine, {env.get('decodes')} decode engine(s); prompts {env.get('dataset')}, "
              f"{a.output_len} output tokens; TTFT SLO {a.ttft_slo_ms} ms (goodput).")
     L.append("")
+    if res.get("stopped"):
+        L += [stopped_note(res["stopped"]), ""]
     if "check" in res:
         L += ["## Correctness (every transfer checked bit-exact on the decode GPU)", "",
               "| Codec | Transfers bit-exact | Outputs equal to local prefill | Bits per value |", "| --- | --- | --- | --- |"]
@@ -821,6 +942,7 @@ def stage_report(a, res):
 
 
 def main():
+    global IDLE_TIMEOUT
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--proxy", default="http://127.0.0.1:8000")
     ap.add_argument("--model", required=True, help="the model folder the engines serve (also the tokenizer)")
@@ -854,7 +976,13 @@ def main():
     ap.add_argument("--engine-logs", default=None, help="folder of the engine logs (engine_*.log), for the JIT report")
     ap.add_argument("--shapes", default="", help="T:B:O:R:label,... the published workloads (stage shapes)")
     ap.add_argument("--rerun", action="store_true")
+    ap.add_argument("--idle-timeout", type=float, default=IDLE_TIMEOUT,
+                    help="s a point's requests may stay in flight after its benchmark ended before the run stops")
+    ap.add_argument("--point-timeout", type=float, default=3600,
+                    help="s one vllm bench serve may run before it is stopped (0: no limit)")
     a = ap.parse_args()
+    IDLE_TIMEOUT = a.idle_timeout
+    a.point_timeout = a.point_timeout or None
     a.out = Path(a.out)
     a.out.mkdir(parents=True, exist_ok=True)
     a.prompts = Path(a.prompts)
@@ -870,23 +998,42 @@ def main():
     res = json.loads(p.read_text()) if p.is_file() else {}
     if a.env:
         res["env"] = dict(json.loads(Path(a.env).read_text()), dataset=a.dataset.name)
+    res.pop("stopped", None)
+
+    def on_term(signum, frame):              # the run's time limit (RUN_TIMEOUT_S, then 60 s to the kill):
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)   # what is measured is saved and reported
+        raise RunStopped("stopped by SIGTERM (the run's time limit)")
+    signal.signal(signal.SIGTERM, on_term)
     for stage in a.stages.split(","):
+        if res.get("stopped") and stage != "report":
+            log(f"== {stage}: not run (the run stopped)")
+            continue
         log(f"== {stage}")
-        if stage == "check":
-            stage_check(a, res)
-        elif stage == "sweep":
-            stage_sweep(a, res)
-        elif stage == "colocated":
-            stage_sweep(a, res, colocated=True)
-        elif stage == "multiturn":
-            stage_multiturn(a, res)
-        elif stage == "tier":
-            stage_tier(a, res)
-        elif stage == "shapes":
-            stage_shapes(a, res)
-        elif stage == "report":
-            stage_report(a, res)
+        try:
+            if stage == "check":
+                stage_check(a, res)
+            elif stage == "sweep":
+                stage_sweep(a, res)
+            elif stage == "colocated":
+                stage_sweep(a, res, colocated=True)
+            elif stage == "multiturn":
+                stage_multiturn(a, res)
+            elif stage == "tier":
+                stage_tier(a, res)
+            elif stage == "shapes":
+                stage_shapes(a, res)
+            elif stage == "report":
+                stage_report(a, res)
+        except RunStopped as exc:
+            # what is measured stays; the rest of this run is skipped and the matrix goes on to its next run,
+            # with engines of its own
+            res["stopped"] = {"stage": stage, "why": exc.why, "engines": exc.engines, "time": time.time()}
+            log(f"RUN STOPPED in {stage}: {exc.why}" +
+                ("; not answering: " + ", ".join(f"{u} ({w[:80]})" for u, w in exc.engines.items())
+                 if exc.engines else ""))
         save(a, res)
+    if res.get("stopped"):
+        return 3
     if "check" in res and not all(v["ok"] for v in res["check"].values()):
         log("CHECK FAILED for: " + ", ".join(c for c, v in res["check"].items() if not v["ok"]))
         return 2

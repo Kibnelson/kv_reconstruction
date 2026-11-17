@@ -215,6 +215,13 @@ def main(argv=None):
     if failed:
         L.append("")
         L.append("Runs that did not finish: " + "; ".join(f"`{f.strip()}`" for f in failed) + ".")
+    for r in runs:
+        s = r["res"].get("stopped")
+        if s:
+            eng = s.get("engines") or {}
+            L += ["", f"`{r['name']}` stopped early in its {s.get('stage')} stage: {s.get('why')}"
+                  + (f" (not answering: {', '.join(sorted(eng))})" if eng else "")
+                  + "; its later points were not run."]
     L.append("")
 
     # correctness

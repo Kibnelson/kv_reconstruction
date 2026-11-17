@@ -267,6 +267,14 @@ def _pad_tokens(words, Tp):
     return torch.cat([words, torch.zeros(L, Tp - T, W, dtype=words.dtype, device=words.device)], 1).contiguous()
 
 
+def _popc16(x):
+    """Set bits of each value's low 16 bits (int64 tensor), as exactkv's _popc16."""
+    x = x - ((x >> 1) & 0x5555)
+    x = (x & 0x3333) + ((x >> 2) & 0x3333)
+    x = (x + (x >> 4)) & 0x0F0F
+    return (x + (x >> 8)) & 0x1F
+
+
 class ExactKV:
     """The authors' exactkv (CompressedKV.prefill_slot, decode_to_bf16) per layer for keys and values; tokens padded
     to its 16-token pages (zero rows, dropped by the receiver)."""
@@ -306,9 +314,42 @@ class ExactKV:
                 used.append(n)
         return parts, {"codec": self.name, "T": int(T), "Tpad": int(Tp), "H": int(H), "raw_rows": used}
 
+    def check(self, parts, L, Tp, H):
+        """Before a kernel reads them: the received buffers have the shapes of (1, Tp, H, 128) pages, and every raw
+        row a page names is among the rows sent; one GPU sync for all layers. A bad transfer then fails with a
+        ValueError (the decode engine computes the prompt) rather than the tile decoder reading past the raw rows:
+        an illegal memory access poisons the engine's GPU for good. In job 30334 all three decode engines died that
+        way at once (128-token prompts, 16 at once). A CUDA error raised here came from earlier work on this GPU
+        (vLLM's step, or another transfer), not from exactkv's decoder, and is named so."""
+        NP = Tp // self.P
+        tags = [f"{l}{'kv'[j]}" for l in range(L) for j in range(2)]
+        want = {"sm": (1, Tp, H, self.hd), "code": (1, Tp, H, self.hd // 2), "base": (1, NP, H, self.hd),
+                "rowmask": (1, NP, H), "rowoff": (1, NP, H)}
+        for t in tags:
+            for k, shp in want.items():
+                if tuple(parts[k + t].shape) != shp:
+                    raise ValueError(f"exactkv: {k}{t} is {tuple(parts[k + t].shape)}, not {shp}")
+            if parts["raw" + t].dim() != 2 or parts["raw" + t].shape[1] != self.hd:
+                raise ValueError(f"exactkv: raw{t} is {tuple(parts['raw' + t].shape)}, not (rows, {self.hd})")
+        dev = parts["rowmask" + tags[0]].device
+        rows = torch.tensor([parts["raw" + t].shape[0] for t in tags], dtype=torch.int64, device=dev)
+        rm = torch.stack([parts["rowmask" + t].reshape(-1) for t in tags]).to(torch.int64)
+        ro = torch.stack([parts["rowoff" + t].reshape(-1) for t in tags]).to(torch.int64)
+        n = _popc16(rm & 0xFFFF)
+        end = torch.where(n > 0, ro + n, torch.zeros_like(ro)).amax(1)
+        bad = (end > rows) | (rm < 0).any(1) | ((rm >> 16) != 0).any(1) | ((ro < 0) & (n > 0)).any(1)
+        try:
+            got = torch.stack([bad.to(torch.int64), end, rows]).cpu()
+        except Exception as exc:
+            raise RuntimeError(f"exactkv: this GPU had failed before exactkv's decode ran ({exc!r})"[:400]) from exc
+        for i in torch.nonzero(got[0]).flatten().tolist()[:1]:
+            raise ValueError(f"exactkv: {tags[i]} names raw rows up to {int(got[1, i])}, {int(got[2, i])} sent "
+                             "(or a row mask outside 16 bits)")
+
     def decode(self, parts, meta, sink):
         T, Tp, H = int(meta["T"]), int(meta["Tpad"]), int(meta["H"])
         L = len(meta["raw_rows"]) // 2
+        self.check(parts, L, Tp, H)
         for l in range(L):
             halves = []
             for j in range(2):
