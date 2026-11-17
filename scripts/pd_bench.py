@@ -604,6 +604,10 @@ def tier_stats(recs):
             "bits": (16 * sum(r.get("loaded_bytes") or 0 for r in ok) / sum(r.get("chunk_raw_bytes") or 0 for r in ok)
                      if ok and all(r.get("chunk_raw_bytes") for r in ok) else
                      16 * sum(r.get("loaded_bytes") or 0 for r in ok) / raw if raw else None),
+            # what crossed to the GPU, where it differs from what the tier holds (IBP: in place, the raw size held)
+            "moved_bits": (16 * sum(r.get("moved_bytes", r.get("loaded_bytes")) or 0 for r in ok) /
+                           sum(r.get("chunk_raw_bytes") or 0 for r in ok)
+                           if ok and all(r.get("chunk_raw_bytes") for r in ok) else None),
             "needed_pct": (100 * raw / sum(r.get("chunk_raw_bytes") or 0 for r in ok)
                            if ok and all(r.get("chunk_raw_bytes") for r in ok) else None),
             "stores": len(stores), "store_errors": sum(1 for r in stores if r.get("error")),

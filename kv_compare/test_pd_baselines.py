@@ -377,6 +377,7 @@ class TierFlowTests(unittest.TestCase):
         loads = [x for x in recs if x.get("event") == "install" and x.get("kind") == "tier"]
         self.assertEqual(len(loads), 1)
         self.assertEqual((loads[0]["exact_chunks"], loads[0]["chunks"]), (2, 2))
+        self.assertEqual(loads[0]["moved_bytes"], loads[0]["loaded_bytes"])    # a coded chunk moves what it holds
         stores = [x for x in recs if x.get("event") == "tier_store"]
         self.assertEqual(stores[0]["stored"], 2)
         # a request whose prefix hit covers part of a chunk: only the full chunks count
@@ -881,6 +882,10 @@ class BenchAndReportTests(unittest.TestCase):
             c.tier_load(state, lambda l, w: back[l].copy_(w))
         self.assertTrue(torch.equal(back, words))
         self.assertEqual((len(calls), coded), (3, 3 * 16 * 8))
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_matrix_report as mr
+        self.assertEqual(mr.moved({"bits": 16.125, "moved_bits": 12.86}), " held, 12.860 moved")
+        self.assertEqual(mr.moved({"bits": 11.0, "moved_bits": 11.0}), "")
 
     def test_aquakv_index_packing(self):
         from kv_compare.pd import codecs as cd

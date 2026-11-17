@@ -46,6 +46,12 @@ def label(env):
     return f"{lay}, {path_of(env)}" + (", eager" if env.get("eager") else "")
 
 
+def moved(st):
+    """IBP holds each chunk at its raw size and moves its coded size: both, where they differ."""
+    b, m = st.get("bits"), st.get("moved_bits")
+    return f" held, {m:.3f} moved" if b is not None and m is not None and abs(b - m) > 0.01 else ""
+
+
 def lossy(c):
     return str(c).startswith("aquakv-")
 
@@ -228,7 +234,7 @@ def main(argv=None):
             st = v["tier"]
             rows.append((label(r["env"]) + " tier", f"{v['codec']} (c{v['clients']})",
                          f"{st.get('exact_chunks')}/{st.get('chunks_loaded')} chunks", "-",
-                         "yes" if not st.get("load_errors") else "NO", fmt(st.get("bits"), 3)))
+                         "yes" if not st.get("load_errors") else "NO", fmt(st.get("bits"), 3) + moved(st)))
     if rows:
         L += ["## Correctness", "", "| Run | Codec | Bit-exact | Outputs equal to local prefill | OK | Bits per value |",
               "| --- | --- | --- | --- | --- | --- |"]
@@ -316,7 +322,8 @@ def main(argv=None):
                      f"{fmt(hc.get('gpu_hit_pct'), 1)} / {fmt(hc.get('external_hit_pct'), 1)} | "
                      f"{dash(st.get('loads'))} | {dash(st.get('loaded_tokens'))} | {dash(fmt(st.get('load_ms'), 1))} "
                      f"({dash(fmt(st.get('h2d_ms'), 1))} / {dash(fmt(st.get('decode_ms'), 1))}) | "
-                     f"{dash(fmt(st.get('bits'), 3))} | {dash(fmt(st.get('needed_pct'), 0))} | {dash(st.get('stored_chunks'))} |")
+                     f"{dash(fmt(st.get('bits'), 3) + moved(st))} | {dash(fmt(st.get('needed_pct'), 0))} | "
+                     f"{dash(st.get('stored_chunks'))} |")
         L.append("")
 
     # T2

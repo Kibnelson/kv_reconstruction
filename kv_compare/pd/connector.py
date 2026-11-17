@@ -757,8 +757,9 @@ class _WorkerSide:
                         w = words[:, a:a + c]
                         check = word_checksum(w) if self.tier_cfg.get("verify", True) else None
                         if getattr(codec, "tier_only", False):
-                            state, nb, _ = codec.tier_store(w.contiguous())
-                            entry = {"codec": cname, "state": state, "t0": i * c}
+                            state, nb, cb = codec.tier_store(w.contiguous())
+                            # IBP compresses in place: it holds the raw size (nb) and moves its coded size (cb)
+                            entry = {"codec": cname, "state": state, "t0": i * c, "moved": int(cb)}
                         else:
                             ctx = self._ctx(codec, spec.prompt, spec.steps)
                             parts, meta = (codec.encode(w, pos0=i * c, ctx=ctx) if ctx is not None
@@ -797,7 +798,7 @@ class _WorkerSide:
             sync = torch.cuda.synchronize if self.device.type == "cuda" else (lambda *x: None)
             t = time.perf_counter()
             h2d = dec = 0.0
-            nbytes = exact = 0
+            nbytes = exact = moved = 0
             for i, h in spec.chunks:
                 cur = h
                 e = self.tier.get(h)
@@ -834,12 +835,13 @@ class _WorkerSide:
                         sync(self.device)
                         dec += time.perf_counter() - t2
                 nbytes += e["bytes"]
+                moved += e.get("moved", e["bytes"])
                 if ck is not None:
                     if ck.value() != e["checksum"]:
                         raise ValueError(f"chunk {i}: the decoded words differ from the stored ones")
                     exact += 1
             rec.update(exact_chunks=exact, codec=self.tier_codec, decode_install_ms=1e3 * (time.perf_counter() - t), h2d_ms=1e3 * h2d,
-                       decode_ms=1e3 * dec, loaded_bytes=nbytes, raw_bytes=(spec.t1 - spec.t0) * 2 *
+                       decode_ms=1e3 * dec, loaded_bytes=nbytes, moved_bytes=moved, raw_bytes=(spec.t1 - spec.t0) * 2 *
                        self.paged.heads * self.paged.hd * 2 * len(self.paged.caches),
                        chunk_raw_bytes=len(spec.chunks or ()) * c * 2 * self.paged.heads * self.paged.hd * 2 *
                        len(self.paged.caches))
