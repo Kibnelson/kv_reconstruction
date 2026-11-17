@@ -1,0 +1,124 @@
+----------------------------------------------------------------------------------------------------
+[93mParameters:[0m
+model=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+num_clients=8
+num_conversations=16
+active_conversations=16
+seed=76012
+[93mConversations Generation Parameters:[0m
+text_files=/tmp/nbore/kvpd/30304/runs/dataset_texts/wikitext2.txt
+input_num_turns=UniformDistribution[12, 18]
+input_common_prefix_num_tokens=Constant[500]
+input_prefix_num_tokens=LognormalDistribution[600, 0.85, 2000]
+input_num_tokens=UniformDistribution[120, 160]
+output_num_tokens=UniformDistribution[80, 120]
+----------------------------------------------------------------------------------------------------
+[93mStatistics summary:[0m
+runtime_sec = 9.457
+requests_per_sec = 5.816
+----------------------------------------------------------------------------------------------------
+                   count     mean     std  ...      75%      90%      max
+ttft_ms             55.0    86.18   42.36  ...   112.40   146.33   223.53
+tpot_ms             55.0    11.69    0.40  ...    11.94    12.14    12.80
+latency_ms          55.0  1277.81  152.89  ...  1389.88  1456.57  1578.28
+input_num_turns     55.0     3.51    2.04  ...     5.00     7.00     7.00
+input_num_tokens    55.0  1429.95  397.85  ...  1717.50  1989.40  2445.00
+output_num_tokens   55.0   102.84   11.19  ...   112.00   115.00   118.00
+output_num_chunks   55.0   101.89   11.23  ...   111.00   114.00   117.00
+
+[7 rows x 9 columns]
+----------------------------------------------------------------------------------------------------
+
+16-11-2026 19:40:33 [INFO] - Namespace(input_file='/tmp/nbore/kvpd/30304/runs/llama32_3b/pd/20261116_1939_colo4_tkv/tier_conversations_config.json', output_file=None, seed=76012, model='/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', served_model_name='llama', url='http://127.0.0.1:52000', api_key=None, header=None, num_clients=8, max_active_conversations=16, max_num_requests=None, warmup_step=False, max_turns=8, no_early_stop=False, limit_max_tokens=0, limit_min_tokens=0, request_rate=0, max_retries=0, conversation_sampling=<ConversationSampling.ROUND_ROBIN: 'round_robin'>, verify_output=False, request_timeout_sec=120, no_stream=False, send_conversation_id=True, excel_output=False, stats_json_output='/tmp/nbore/kvpd/30304/runs/llama32_3b/pd/20261116_1939_colo4_tkv/runs/tier_exans_c8.json', verbose=False, print_content=False, warmup_percentages='0%', trust_remote_code=False)
+16-11-2026 19:40:33 [INFO] - [92mInput parameters:[0m
+16-11-2026 19:40:33 [INFO] - url=http://127.0.0.1:52000
+16-11-2026 19:40:33 [INFO] - model=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+16-11-2026 19:40:33 [INFO] - num_clients=8
+16-11-2026 19:40:33 [INFO] - Warmup percentages (percentage of samples): [0.0]
+16-11-2026 19:40:33 [INFO] - Loading tokenizer
+16-11-2026 19:40:34 [INFO] - [94mCollecting information from server: http://127.0.0.1:52000[0m
+16-11-2026 19:40:34 [INFO] - [94mModels:[0m
+16-11-2026 19:40:34 [INFO] - [94m	model_id='llama', max_model_len=4096[0m
+16-11-2026 19:40:34 [INFO] - Reading input file: /tmp/nbore/kvpd/30304/runs/llama32_3b/pd/20261116_1939_colo4_tkv/tier_conversations_config.json
+16-11-2026 19:40:34 [INFO] - Using input file with filetype: generate_conversations
+16-11-2026 19:40:34 [INFO] - [95mGenerating conversations...[0m
+16-11-2026 19:40:34 [INFO] - GenConvArgs(num_conversations=16, text_files=['/tmp/nbore/kvpd/30304/runs/dataset_texts/wikitext2.txt'], input_num_turns=UniformDistribution[12, 18], input_common_prefix_num_tokens=Constant[500], input_prefix_num_tokens=LognormalDistribution[600, 0.85, 2000], input_num_tokens=UniformDistribution[120, 160], output_num_tokens=UniformDistribution[80, 120], print_stats=False)
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+16-11-2026 19:40:35 [INFO] - Loaded 289076 tokens from file /tmp/nbore/kvpd/30304/runs/dataset_texts/wikitext2.txt, total tokens so far: 289076
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+
+Generating conversations:   0%|          | 0/16 [00:00<?, ?conv/s]
+Generating conversations: 100%|██████████| 16/16 [00:00<00:00, 698.40conv/s]
+16-11-2026 19:40:35 [INFO] - [95mMax turns per conversation is limited to 8[0m
+16-11-2026 19:40:35 [INFO] - [92mStarting 8 clients[0m
+16-11-2026 19:40:35 [INFO] - [96mStarted client 0: max_num_requests=None, max_active_conversations=2[0m
+16-11-2026 19:40:35 [INFO] - [96mStarted client 1: max_num_requests=None, max_active_conversations=2[0m
+16-11-2026 19:40:35 [INFO] - [96mStarted client 2: max_num_requests=None, max_active_conversations=2[0m
+16-11-2026 19:40:35 [INFO] - [96mStarted client 3: max_num_requests=None, max_active_conversations=2[0m
+16-11-2026 19:40:35 [INFO] - [96mStarted client 4: max_num_requests=None, max_active_conversations=2[0m
+16-11-2026 19:40:35 [INFO] - [96mStarted client 5: max_num_requests=None, max_active_conversations=2[0m
+16-11-2026 19:40:35 [INFO] - [96mStarted client 6: max_num_requests=None, max_active_conversations=2[0m
+16-11-2026 19:40:35 [INFO] - [96mStarted client 7: max_num_requests=None, max_active_conversations=2[0m
+16-11-2026 19:40:43 [INFO] - [93mClient 2 has no more work[0m
+16-11-2026 19:40:43 [INFO] - [96mClient 2 is done (num_successes=7, num_failures=0)[0m
+16-11-2026 19:40:43 [INFO] - [96m1 out of 8 clients finished[0m
+16-11-2026 19:40:43 [INFO] - [93mSending termination signal to clients[0m
+16-11-2026 19:40:43 [INFO] - [93mClient 5 received a termination signal[0m
+16-11-2026 19:40:43 [INFO] - [96mClient 5 is done (num_successes=6, num_failures=0)[0m
+16-11-2026 19:40:43 [INFO] - [96m2 out of 8 clients finished[0m
+16-11-2026 19:40:43 [INFO] - [93mClient 1 received a termination signal[0m
+16-11-2026 19:40:43 [INFO] - [96mClient 1 is done (num_successes=7, num_failures=0)[0m
+16-11-2026 19:40:43 [INFO] - [96m3 out of 8 clients finished[0m
+16-11-2026 19:40:43 [INFO] - [93mClient 4 received a termination signal[0m
+16-11-2026 19:40:43 [INFO] - [96mClient 4 is done (num_successes=7, num_failures=0)[0m
+16-11-2026 19:40:43 [INFO] - [96mFinished 3 out of 16 conversations (19%), 3 out of 8 clients finished, collected 51 measurements, runtime 8.852 sec[0m
+16-11-2026 19:40:43 [INFO] - [96mEstimated req/sec 5.762, estimated runtime left 38.357 sec[0m
+16-11-2026 19:40:43 [INFO] - --------------------------------------------------
+16-11-2026 19:40:43 [INFO] - [moving_avg_ttft_ms       ] avg:     83.930 (51 samples)
+16-11-2026 19:40:43 [INFO] - [moving_avg_tpot_ms       ] avg:     11.700 (51 samples)
+16-11-2026 19:40:43 [INFO] - [ttft_ms                  ] avg:     83.930, min:     43.394, max:    223.527
+16-11-2026 19:40:43 [INFO] - [tpot_ms                  ] avg:     11.700, min:     10.855, max:     12.803
+16-11-2026 19:40:43 [INFO] - [latency_ms               ] avg:   1272.310, min:    962.575, max:   1578.276
+16-11-2026 19:40:43 [INFO] - [input_num_turns          ] avg:      3.235, min:      1.000, max:      7.000
+16-11-2026 19:40:43 [INFO] - [input_num_tokens         ] avg:   1378.451, min:    734.000, max:   2233.000
+16-11-2026 19:40:43 [INFO] - [output_num_tokens        ] avg:    102.490, min:     80.000, max:    118.000
+16-11-2026 19:40:43 [INFO] - --------------------------------------------------
+16-11-2026 19:40:43 [INFO] - [96m4 out of 8 clients finished[0m
+16-11-2026 19:40:44 [INFO] - [93mClient 7 received a termination signal[0m
+16-11-2026 19:40:44 [INFO] - [96mClient 7 is done (num_successes=7, num_failures=0)[0m
+16-11-2026 19:40:44 [INFO] - [96m5 out of 8 clients finished[0m
+16-11-2026 19:40:44 [INFO] - [93mClient 6 received a termination signal[0m
+16-11-2026 19:40:44 [INFO] - [96mClient 6 is done (num_successes=7, num_failures=0)[0m
+16-11-2026 19:40:44 [INFO] - [96m6 out of 8 clients finished[0m
+16-11-2026 19:40:44 [INFO] - [93mClient 3 received a termination signal[0m
+16-11-2026 19:40:44 [INFO] - [96mFinished 6 out of 16 conversations (38%), 6 out of 8 clients finished, collected 54 measurements, runtime 9.548 sec[0m
+16-11-2026 19:40:44 [INFO] - [96mClient 3 is done (num_successes=7, num_failures=0)[0m
+16-11-2026 19:40:44 [INFO] - [96mEstimated req/sec 5.655, estimated runtime left 15.914 sec[0m
+16-11-2026 19:40:44 [INFO] - --------------------------------------------------
+16-11-2026 19:40:44 [INFO] - [moving_avg_ttft_ms       ] avg:     86.739 (54 samples)
+16-11-2026 19:40:44 [INFO] - [moving_avg_tpot_ms       ] avg:     11.685 (54 samples)
+16-11-2026 19:40:44 [INFO] - [ttft_ms                  ] avg:     86.739, min:     43.394, max:    223.527
+16-11-2026 19:40:44 [INFO] - [tpot_ms                  ] avg:     11.685, min:     10.855, max:     12.803
+16-11-2026 19:40:44 [INFO] - [latency_ms               ] avg:   1274.482, min:    962.575, max:   1578.276
+16-11-2026 19:40:44 [INFO] - [input_num_turns          ] avg:      3.444, min:      1.000, max:      7.000
+16-11-2026 19:40:44 [INFO] - [input_num_tokens         ] avg:   1419.056, min:    734.000, max:   2445.000
+16-11-2026 19:40:44 [INFO] - [output_num_tokens        ] avg:    102.574, min:     80.000, max:    118.000
+16-11-2026 19:40:44 [INFO] - --------------------------------------------------
+16-11-2026 19:40:44 [INFO] - [96m7 out of 8 clients finished[0m
+16-11-2026 19:40:44 [INFO] - [93mClient 0 received a termination signal[0m
+16-11-2026 19:40:44 [INFO] - [96mClient 0 is done (num_successes=7, num_failures=0)[0m
+16-11-2026 19:40:44 [INFO] - [96m8 out of 8 clients finished[0m
+16-11-2026 19:40:44 [INFO] - [96mAll 8 clients finished[0m
+16-11-2026 19:40:44 [INFO] - Collected 55 samples from all the clients
+16-11-2026 19:40:44 [INFO] - [96mWaiting for client client_0 (is alive: True)[0m
+16-11-2026 19:40:44 [INFO] - [96mWaiting for client client_1 (is alive: False)[0m
+16-11-2026 19:40:44 [INFO] - [96mWaiting for client client_2 (is alive: False)[0m
+16-11-2026 19:40:44 [INFO] - [96mWaiting for client client_3 (is alive: False)[0m
+16-11-2026 19:40:44 [INFO] - [96mWaiting for client client_4 (is alive: False)[0m
+16-11-2026 19:40:44 [INFO] - [96mWaiting for client client_5 (is alive: False)[0m
+16-11-2026 19:40:44 [INFO] - [96mWaiting for client client_6 (is alive: False)[0m
+16-11-2026 19:40:44 [INFO] - [96mWaiting for client client_7 (is alive: False)[0m
+16-11-2026 19:40:44 [INFO] - All 8 clients exited (successfully finished 7 out of 16 conversations)
+16-11-2026 19:40:44 [INFO] - [92mAll clients finished, benchmark runtime: 9.595 sec (9594.764 ms), requests per second: 5.732[0m
+16-11-2026 19:40:44 [INFO] - Processing 55 samples...
+16-11-2026 19:40:44 [INFO] - [92mWriting per-request stats JSON: /tmp/nbore/kvpd/30304/runs/llama32_3b/pd/20261116_1939_colo4_tkv/runs/tier_exans_c8.json[0m
