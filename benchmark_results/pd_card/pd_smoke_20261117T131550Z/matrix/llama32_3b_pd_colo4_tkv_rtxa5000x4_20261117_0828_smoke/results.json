@@ -1,0 +1,567 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 0,
+  "decodes": 4,
+  "layout": "colo4",
+  "connector": "tkv",
+  "transport": "ring",
+  "eager": false,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl_all_gpus": false,
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "tier": {
+  "tier_raw_c8": {
+   "codec": "raw",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 54,
+    "duration_s": 8.862714366912842,
+    "request_throughput": 6.092941480952846,
+    "mean_ttft_ms": 100.55050446296296,
+    "median_ttft_ms": 82.397358,
+    "p90_ttft_ms": 140.247132,
+    "p99_ttft_ms": 271.530773,
+    "median_tpot_ms": 11.705090079545453,
+    "mean_latency_ms": 1229.1154667222222,
+    "input_tokens": 1369.5
+   },
+   "tier": {
+    "loads": 9,
+    "load_errors": 0,
+    "exact_chunks": 23,
+    "chunks_loaded": 23,
+    "loaded_tokens": 4176,
+    "load_ms": 54.08507482045226,
+    "h2d_ms": 3.012819836537043,
+    "decode_ms": 17.6034617341227,
+    "bits": 16.0,
+    "needed_pct": 70.92391304347827,
+    "stores": 53,
+    "store_errors": 0,
+    "stored_chunks": 87,
+    "store_ms": 69.73130972880237,
+    "tier_chunks": null,
+    "evicted": null
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794922233,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": 74598.0,
+     "vllm:prefix_cache_queries_created": 0.0,
+     "vllm:prefix_cache_hits_total": 48256.0,
+     "vllm:prefix_cache_hits_created": 0.0,
+     "vllm:external_prefix_cache_queries_total": 26342.0,
+     "vllm:external_prefix_cache_queries_created": 0.0,
+     "vllm:external_prefix_cache_hits_total": 4176.0,
+     "vllm:external_prefix_cache_hits_created": 0.0,
+     "vllm:cache_config_info": 0.0
+    },
+    "gpu_hit_pct": 64.68806134212713,
+    "external_hit_pct": 15.853010401639967
+   },
+   "t0": 1794922233.3553286,
+   "t1": 1794922250.9545467,
+   "logs0": {
+    "engine_engine4.log": 28030,
+    "engine_engine3.log": 28129,
+    "engine_engine1.log": 28129,
+    "engine_engine2.log": 28027
+   },
+   "logs1": {
+    "engine_engine4.log": 29305,
+    "engine_engine3.log": 29404,
+    "engine_engine1.log": 29537,
+    "engine_engine2.log": 29374
+   }
+  },
+  "tier_exans_c8": {
+   "codec": "exans",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 55,
+    "duration_s": 9.135766695022584,
+    "request_throughput": 6.020293844627787,
+    "mean_ttft_ms": 89.1901162909091,
+    "median_ttft_ms": 68.724951,
+    "p90_ttft_ms": 162.814626,
+    "p99_ttft_ms": 197.07563,
+    "median_tpot_ms": 11.70037115,
+    "mean_latency_ms": 1223.2082520545455,
+    "input_tokens": 1435.8727272727272
+   },
+   "tier": {
+    "loads": 11,
+    "load_errors": 0,
+    "exact_chunks": 18,
+    "chunks_loaded": 18,
+    "loaded_tokens": 2800,
+    "load_ms": 34.5281855287877,
+    "h2d_ms": 1.2808452275666324,
+    "decode_ms": 14.509753916751254,
+    "bits": 11.023957630944631,
+    "needed_pct": 60.763888888888886,
+    "stores": 54,
+    "store_errors": 0,
+    "stored_chunks": 86,
+    "store_ms": 45.03342950785601,
+    "tier_chunks": 14,
+    "evicted": 0
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794922234,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": 79654.0,
+     "vllm:prefix_cache_queries_created": 0.0,
+     "vllm:prefix_cache_hits_total": 53504.0,
+     "vllm:prefix_cache_hits_created": 0.0,
+     "vllm:external_prefix_cache_queries_total": 26150.0,
+     "vllm:external_prefix_cache_queries_created": 0.0,
+     "vllm:external_prefix_cache_hits_total": 2800.0,
+     "vllm:external_prefix_cache_hits_created": 0.0,
+     "vllm:cache_config_info": 0.0
+    },
+    "gpu_hit_pct": 67.17051246641725,
+    "external_hit_pct": 10.707456978967496
+   },
+   "t0": 1794922251.998976,
+   "t1": 1794922269.23486,
+   "logs0": {
+    "engine_engine4.log": 29917,
+    "engine_engine3.log": 30015,
+    "engine_engine1.log": 30148,
+    "engine_engine2.log": 29987
+   },
+   "logs1": {
+    "engine_engine4.log": 31264,
+    "engine_engine3.log": 31362,
+    "engine_engine1.log": 31556,
+    "engine_engine2.log": 31262
+   }
+  },
+  "tier_ibp_c8": {
+   "codec": "ibp",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 56,
+    "duration_s": 10.752288854599,
+    "request_throughput": 5.208193414190832,
+    "mean_ttft_ms": 116.80111498214285,
+    "median_ttft_ms": 104.263933,
+    "p90_ttft_ms": 172.967783,
+    "p99_ttft_ms": 214.497361,
+    "median_tpot_ms": 12.913074133333334,
+    "mean_latency_ms": 1438.2419934821428,
+    "input_tokens": 1438.267857142857
+   },
+   "tier": {
+    "loads": 10,
+    "load_errors": 0,
+    "exact_chunks": 25,
+    "chunks_loaded": 25,
+    "loaded_tokens": 4960,
+    "load_ms": 65.16897231340408,
+    "h2d_ms": 0.0,
+    "decode_ms": 48.18707872182131,
+    "bits": 16.12548828125,
+    "needed_pct": 77.5,
+    "stores": 55,
+    "store_errors": 0,
+    "stored_chunks": 89,
+    "store_ms": 300.96704475581646,
+    "tier_chunks": null,
+    "evicted": null
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794922235,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": 81245.0,
+     "vllm:prefix_cache_queries_created": 0.0,
+     "vllm:prefix_cache_hits_total": 53168.0,
+     "vllm:prefix_cache_hits_created": 0.0,
+     "vllm:external_prefix_cache_queries_total": 28077.0,
+     "vllm:external_prefix_cache_queries_created": 0.0,
+     "vllm:external_prefix_cache_hits_total": 4960.0,
+     "vllm:external_prefix_cache_hits_created": 0.0,
+     "vllm:cache_config_info": 0.0
+    },
+    "gpu_hit_pct": 65.4415656348083,
+    "external_hit_pct": 17.665705025465684
+   },
+   "t0": 1794922270.2882366,
+   "t1": 1794922289.147852,
+   "logs0": {
+    "engine_engine4.log": 31596,
+    "engine_engine3.log": 31694,
+    "engine_engine1.log": 31888,
+    "engine_engine2.log": 31594
+   },
+   "logs1": {
+    "engine_engine4.log": 33223,
+    "engine_engine3.log": 33321,
+    "engine_engine1.log": 33575,
+    "engine_engine2.log": 33304
+   }
+  },
+  "tier_ours-hbh_c8": {
+   "codec": "ours-hbh",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 53,
+    "duration_s": 10.874443794250489,
+    "request_throughput": 4.873812491267097,
+    "mean_ttft_ms": 173.70283198113208,
+    "median_ttft_ms": 71.171686,
+    "p90_ttft_ms": 523.477175,
+    "p99_ttft_ms": 815.719658,
+    "median_tpot_ms": 11.7659916,
+    "mean_latency_ms": 1441.040043792453,
+    "input_tokens": 1423.4905660377358
+   },
+   "tier": {
+    "loads": 10,
+    "load_errors": 0,
+    "exact_chunks": 25,
+    "chunks_loaded": 25,
+    "loaded_tokens": 4960,
+    "load_ms": 389.8013401776552,
+    "h2d_ms": 1.5204280614852905,
+    "decode_ms": 371.1332280188799,
+    "bits": 8.34961669921875,
+    "needed_pct": 77.5,
+    "stores": 53,
+    "store_errors": 0,
+    "stored_chunks": 87,
+    "store_ms": 75.12500734542901,
+    "tier_chunks": 0,
+    "evicted": 0
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794922236,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": 76059.0,
+     "vllm:prefix_cache_queries_created": 0.0,
+     "vllm:prefix_cache_hits_total": 47904.0,
+     "vllm:prefix_cache_hits_created": 0.0,
+     "vllm:external_prefix_cache_queries_total": 28155.0,
+     "vllm:external_prefix_cache_queries_created": 0.0,
+     "vllm:external_prefix_cache_hits_total": 4960.0,
+     "vllm:external_prefix_cache_hits_created": 0.0,
+     "vllm:cache_config_info": 0.0
+    },
+    "gpu_hit_pct": 62.98268449493157,
+    "external_hit_pct": 17.61676434025928
+   },
+   "t0": 1794922290.2181463,
+   "t1": 1794922309.2456825,
+   "logs0": {
+    "engine_engine4.log": 33555,
+    "engine_engine3.log": 33653,
+    "engine_engine1.log": 33907,
+    "engine_engine2.log": 33636
+   },
+   "logs1": {
+    "engine_engine4.log": 35110,
+    "engine_engine3.log": 35279,
+    "engine_engine1.log": 35522,
+    "engine_engine2.log": 35191
+   }
+  },
+  "tier_t2-hbh_c8": {
+   "codec": "t2-hbh",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 53,
+    "duration_s": 10.48318928527832,
+    "request_throughput": 5.055713348077059,
+    "mean_ttft_ms": 153.4976113962264,
+    "median_ttft_ms": 68.289315,
+    "p90_ttft_ms": 428.707189,
+    "p99_ttft_ms": 849.936304,
+    "median_tpot_ms": 11.732589193277311,
+    "mean_latency_ms": 1419.6603969433963,
+    "input_tokens": 1399.0566037735848
+   },
+   "tier": {
+    "loads": 9,
+    "load_errors": 0,
+    "exact_chunks": 23,
+    "chunks_loaded": 23,
+    "loaded_tokens": 4640,
+    "load_ms": 401.556852998005,
+    "h2d_ms": 1.687463993827502,
+    "decode_ms": 382.1591194719076,
+    "bits": 8.397984095982142,
+    "needed_pct": 78.80434782608695,
+    "stores": 51,
+    "store_errors": 0,
+    "stored_chunks": 86,
+    "store_ms": 88.29697290910225,
+    "tier_chunks": 23,
+    "evicted": 0
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794922237,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": 74775.0,
+     "vllm:prefix_cache_queries_created": 0.0,
+     "vllm:prefix_cache_hits_total": 47568.0,
+     "vllm:prefix_cache_hits_created": 0.0,
+     "vllm:external_prefix_cache_queries_total": 27207.0,
+     "vllm:external_prefix_cache_queries_created": 0.0,
+     "vllm:external_prefix_cache_hits_total": 4640.0,
+     "vllm:external_prefix_cache_hits_created": 0.0,
+     "vllm:cache_config_info": 0.0
+    },
+    "gpu_hit_pct": 63.6148445336008,
+    "external_hit_pct": 17.054434520527806
+   },
+   "t0": 1794922310.3011205,
+   "t1": 1794922328.927227,
+   "logs0": {
+    "engine_engine4.log": 35442,
+    "engine_engine3.log": 35611,
+    "engine_engine1.log": 35854,
+    "engine_engine2.log": 35523
+   },
+   "logs1": {
+    "engine_engine4.log": 36924,
+    "engine_engine3.log": 37166,
+    "engine_engine1.log": 37542,
+    "engine_engine2.log": 37148
+   }
+  },
+  "tier_t2-rank256_c8": {
+   "codec": "t2-rank256",
+   "clients": 8,
+   "exit": 0,
+   "bench": {
+    "requests": 53,
+    "duration_s": 8.647087236404419,
+    "request_throughput": 6.129231560989565,
+    "mean_ttft_ms": 89.62700205660379,
+    "median_ttft_ms": 66.260265,
+    "p90_ttft_ms": 161.551829,
+    "p99_ttft_ms": 243.388619,
+    "median_tpot_ms": 11.61287833944954,
+    "mean_latency_ms": 1245.2221253396226,
+    "input_tokens": 1358.3962264150944
+   },
+   "tier": {
+    "loads": 8,
+    "load_errors": 0,
+    "exact_chunks": 21,
+    "chunks_loaded": 21,
+    "loaded_tokens": 3936,
+    "load_ms": 88.153196265921,
+    "h2d_ms": 2.1066812332719564,
+    "decode_ms": 70.8180833607912,
+    "bits": 9.392933125398597,
+    "needed_pct": 73.21428571428571,
+    "stores": 52,
+    "store_errors": 0,
+    "stored_chunks": 84,
+    "store_ms": 81.92838653205679,
+    "tier_chunks": 0,
+    "evicted": 0
+   },
+   "resets": [
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    },
+    {
+     "success": true
+    }
+   ],
+   "generation": 1794922238,
+   "prefix_cache": {
+    "counters": {
+     "vllm:prefix_cache_queries_total": 72623.0,
+     "vllm:prefix_cache_queries_created": 0.0,
+     "vllm:prefix_cache_hits_total": 46368.0,
+     "vllm:prefix_cache_hits_created": 0.0,
+     "vllm:external_prefix_cache_queries_total": 26255.0,
+     "vllm:external_prefix_cache_queries_created": 0.0,
+     "vllm:external_prefix_cache_hits_total": 3936.0,
+     "vllm:external_prefix_cache_hits_created": 0.0,
+     "vllm:cache_config_info": 0.0
+    },
+    "gpu_hit_pct": 63.84754141250017,
+    "external_hit_pct": 14.99143020377071
+   },
+   "t0": 1794922329.9849122,
+   "t1": 1794922346.7831194,
+   "logs0": {
+    "engine_engine4.log": 37256,
+    "engine_engine3.log": 37498,
+    "engine_engine1.log": 37874,
+    "engine_engine2.log": 37480
+   },
+   "logs1": {
+    "engine_engine4.log": 38811,
+    "engine_engine3.log": 39123,
+    "engine_engine1.log": 39419,
+    "engine_engine2.log": 39108
+   }
+  }
+ },
+ "jit": [
+  {
+   "time": 1794922229.0,
+   "log": "engine_engine1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922229.0,
+   "log": "engine_engine2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922229.0,
+   "log": "engine_engine3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922229.0,
+   "log": "engine_engine4.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922230.0,
+   "log": "engine_engine1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922230.0,
+   "log": "engine_engine1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922230.0,
+   "log": "engine_engine2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922230.0,
+   "log": "engine_engine2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922230.0,
+   "log": "engine_engine3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922230.0,
+   "log": "engine_engine3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922230.0,
+   "log": "engine_engine4.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794922230.0,
+   "log": "engine_engine4.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  }
+ ]
+}
