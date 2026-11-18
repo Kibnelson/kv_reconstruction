@@ -1,0 +1,1698 @@
+(APIServer pid=147962) INFO 11-17 20:55:55 [api_utils.py:347] 
+(APIServer pid=147962) INFO 11-17 20:55:55 [api_utils.py:347]        █     █     █▄   ▄█
+(APIServer pid=147962) INFO 11-17 20:55:55 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.32.0
+(APIServer pid=147962) INFO 11-17 20:55:55 [api_utils.py:347]   █▄█▀ █     █     █     █  model   /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+(APIServer pid=147962) INFO 11-17 20:55:55 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=147962) INFO 11-17 20:55:55 [api_utils.py:347] 
+(APIServer pid=147962) INFO 11-17 20:55:55 [api_utils.py:286] non-default args: {'model_tag': '/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', 'chat_template': '/tmp/nbore/kvpd-tools/e7572c1b03faa12fbe225e814ca4fbc1c3786e9c/scripts/pd_chat_template.jinja', 'host': '127.0.0.1', 'port': 45701, 'model': '/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', 'max_model_len': 16640, 'served_model_name': ['llama'], 'block_size': 16, 'gpu_memory_utilization': 0.6, 'max_num_batched_tokens': 16384, 'kv_transfer_config': KVTransferConfig(kv_connector='TKVConnector', engine_id='462c452b-2f1f-4c55-b220-480b6b755bb9', kv_buffer_device='cuda', kv_role='kv_consumer', kv_port=14579, kv_connector_extra_config={'codecs_file': '/tmp/nbore/kvpd/30371/runs/llama32_3b/pd_codecs.pt', 'codecs': ['raw', 'exactkv'], 'splitzip_source': '/tmp/nbore/kvpd/30371/home/sources/splitzip', 'adacode_source': '/tmp/nbore/kvpd/30371/home/sources/adacode', 'exactkv_source': '/tmp/nbore/kvpd/30371/home/sources/exactkv', 'log_dir': '/tmp/nbore/kvpd/30371/runs/llama32_3b/pd/20261117_2055_1p3d_tkv_ring/connector', 'exans_info': '/tmp/nbore/kvpd/30371/runs/llama32_3b/exans/exans_info.json', 'listen': '127.0.0.1:45801', 'gpu_recv_budget': 1610612736, 'recv_timeout_s': 600}, kv_connector_module_path='kv_compare.pd.connector', enable_permute_local_kv=False, kv_load_failure_policy='recompute')}
+(APIServer pid=147962) INFO 11-17 20:55:55 [model.py:733] Resolved architecture: LlamaForCausalLM
+(APIServer pid=147962) INFO 11-17 20:55:55 [model.py:2152] Using max model len 16640
+(APIServer pid=147962) INFO 11-17 20:55:55 [scheduler.py:307] Chunked prefill is enabled with max_num_batched_tokens=16384.
+(APIServer pid=147962) INFO 11-17 20:55:55 [kernel.py:467] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=147962) WARNING 11-17 20:55:55 [vllm.py:2179] Turning off hybrid kv cache manager because `--kv-transfer-config` selects a KV connector that does not support it. Impact: hybrid SSM models (e.g. Jamba, Bamba) require HMA and will fail at startup without it; models with sliding window attention will run with reduced performance. To add HMA support to a KV connector, subclass `SupportsHMA` defined in kv_connector/v1/base.py (for MultiConnector, all child connectors must support HMA).
+(EngineCore pid=148192) INFO 11-17 20:56:03 [core.py:133] Initializing a V1 LLM engine (v0.32.0) with config: model='/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', speculative_config=None, tokenizer='/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=16640, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=llama, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::qwen4_exp_ple_short_conv', 'vllm::qwen4_exp_qsa_with_output', 'vllm::qwen4_exp_qsa_prepare_with_output', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::qwen_gdn_attention_core_fused_norm_packed', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'cudagraph_decoder_replay': True, 'decoder_replay_cudagraph_capture_sizes': [], 'decoder_replay_trim_threshold': 768, 'compile_sizes': [], 'compile_ranges_endpoints': [16384], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_rocm_segmented_attn_autotune=False, enable_cutedsl_warmup=True, enable_jit_warmup=True, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=148192) INFO 11-17 20:56:05 [parallel_state.py:1906] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/nbore/kvpd/30371/home/tmp/vllm_dist_6959bc5db6f9473893d2a80fe0c47088 backend=nccl
+(EngineCore pid=148192) INFO 11-17 20:56:05 [parallel_state.py:2350] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, ETP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=148192) INFO 11-17 20:56:05 [gpu_worker.py:518] Using V2 Model Runner
+(EngineCore pid=148192) INFO 11-17 20:56:06 [model_runner.py:392] Loading model from scratch...
+(EngineCore pid=148192) INFO 11-17 20:56:07 [cuda.py:506] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+(EngineCore pid=148192) INFO 11-17 20:56:07 [flash_attn.py:1117] Using FlashAttention version 2
+(EngineCore pid=148192) INFO 11-17 20:56:08 [base_loader.py:82] Initializing model took 1.641713 seconds
+(EngineCore pid=148192) INFO 11-17 20:56:08 [weight_utils.py:1108] Filesystem type for checkpoints: EXT4. Checkpoint size: 5.98 GiB. Available RAM: 455.77 GiB.
+(EngineCore pid=148192) INFO 11-17 20:56:08 [weight_utils.py:1131] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:00<00:00,  1.44it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  2.13it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.99it/s]
+
+(EngineCore pid=148192) INFO 11-17 20:56:09 [default_loader.py:501] Loading weights took 1.05 seconds
+(EngineCore pid=148192) INFO 11-17 20:56:10 [model_runner.py:424] Model loading took 6.04 GiB memory and 4.464259 seconds
+(EngineCore pid=148192) INFO 11-17 20:56:10 [topk_topp_sampler.py:96] FlashInfer top-p/top-k sampling disabled via VLLM_USE_FLASHINFER_SAMPLER=0.
+(EngineCore pid=148192) INFO 11-17 20:56:10 [torch_utils.py:295] Reducing Torch threads from 16 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
+(EngineCore pid=148192) INFO 11-17 20:56:10 [utils.py:347] Using LBNHC KV cache layout.
+(EngineCore pid=148192) INFO 11-17 20:56:11 [caching.py:342] reconstructed serializable fn from standalone compile artifacts. num_artifacts=3 num_submods=29
+(EngineCore pid=148192) INFO 11-17 20:56:11 [decorators.py:319] [backbone] Directly load AOT compilation from path /tmp/nbore/kvpd/30371/home/cache/vllm/torch_compile_cache/torch_aot_compile/177f708af82d6a109a4732a5fcad6588f707db27f08f5c10749f7e045e7af2fa/rank_0_0/model
+(EngineCore pid=148192) INFO 11-17 20:56:11 [monitor.py:62] [backbone] torch.compile took 0.15 s in total
+(EngineCore pid=148192) INFO 11-17 20:56:11 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.12 s
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 10.71it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 11.18it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:03, 11.33it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.42it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 11.73it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:03, 12.00it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:03, 12.23it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.39it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:01<00:02, 13.91it/s]Capturing CUDA graphs (PIECEWISE):  41%|████      | 21/51 [00:01<00:01, 15.86it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:01<00:01, 17.21it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:01<00:01, 18.16it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:02<00:01, 19.00it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:02<00:01, 18.88it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:02<00:00, 20.15it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:02<00:00, 20.95it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:02<00:00, 21.77it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:02<00:00, 22.65it/s]Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:02<00:00, 23.56it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:02<00:00, 24.36it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 17.42it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00, 29.55it/s]
+(EngineCore pid=148192) INFO 11-17 20:56:17 [model_runner.py:1127] Graph capturing finished in 4 secs, took 0.31 GiB
+(EngineCore pid=148192) INFO 11-17 20:56:18 [gpu_worker.py:759] Available KV cache memory: 6.49 GiB
+(EngineCore pid=148192) INFO 11-17 20:56:18 [gpu_worker.py:774] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.6000 is equivalent to --gpu-memory-utilization=0.5847 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.6153. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=148192) INFO 11-17 20:56:18 [kv_cache_utils.py:2327] GPU KV cache size: 60,720 tokens, Maximum concurrency for 16,640 tokens per request: 3.65x
+(EngineCore pid=148192) INFO 11-17 20:56:18 [factory.py:62] Creating v1 connector with name: TKVConnector and engine_id: 462c452b-2f1f-4c55-b220-480b6b755bb9
+(EngineCore pid=148192) WARNING 11-17 20:56:18 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+(EngineCore pid=148192) INFO 11-17 20:56:20 [kernel_warmup.py:176] JIT kernel warmup starting.
+(EngineCore pid=148192) INFO 11-17 20:56:20 [kernel_warmup.py:189] JIT kernel warmup finished in 0.00s.
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 10.85it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 11.27it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:03, 11.43it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.52it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 11.85it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:03, 12.13it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:03, 12.32it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.52it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:01<00:02, 14.81it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:01<00:01, 16.45it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:01<00:01, 17.24it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:01<00:01, 18.53it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:02<00:01, 19.32it/s]Capturing CUDA graphs (PIECEWISE):  65%|██████▍   | 33/51 [00:02<00:00, 20.00it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████   | 36/51 [00:02<00:00, 21.32it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:02<00:00, 22.22it/s]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 42/51 [00:02<00:00, 23.02it/s]Capturing CUDA graphs (PIECEWISE):  88%|████████▊ | 45/51 [00:02<00:00, 23.69it/s]Capturing CUDA graphs (PIECEWISE):  94%|█████████▍| 48/51 [00:02<00:00, 24.25it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 24.96it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 17.85it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/35 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):  11%|█▏        | 4/35 [00:00<00:01, 30.84it/s]Capturing CUDA graphs (FULL):  23%|██▎       | 8/35 [00:00<00:00, 31.15it/s]Capturing CUDA graphs (FULL):  34%|███▍      | 12/35 [00:00<00:00, 33.23it/s]Capturing CUDA graphs (FULL):  46%|████▌     | 16/35 [00:00<00:00, 34.46it/s]Capturing CUDA graphs (FULL):  60%|██████    | 21/35 [00:00<00:00, 38.06it/s]Capturing CUDA graphs (FULL):  74%|███████▍  | 26/35 [00:00<00:00, 40.62it/s]Capturing CUDA graphs (FULL):  91%|█████████▏| 32/35 [00:00<00:00, 44.38it/s]Capturing CUDA graphs (FULL): 100%|██████████| 35/35 [00:00<00:00, 40.22it/s]
+(EngineCore pid=148192) INFO 11-17 20:56:25 [model_runner.py:1127] Graph capturing finished in 5 secs, took 0.22 GiB
+(EngineCore pid=148192) INFO 11-17 20:56:25 [gpu_worker.py:971] CUDA graph pool memory: 0.22 GiB (actual), 0.36 GiB (estimated), difference: 0.14 GiB (65.8%).
+(EngineCore pid=148192) INFO 11-17 20:56:25 [gpu_worker.py:1034] Free memory on device (23.34/23.55 GiB) on startup. Desired GPU memory utilization is (0.6, 14.13 GiB). Actual usage is 6.25 GiB for consumed memory (weights + non-torch), 1.39 GiB for peak activation, and 0.22 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=6575142605` (6.12 GiB) to fit into requested memory, or `--kv-cache-memory=16466110976` (15.34 GiB) to fully utilize gpu memory. Current kv cache memory in use is 6.49 GiB.
+(EngineCore pid=148192) INFO 11-17 20:56:26 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=148192) INFO 11-17 20:56:26 [core.py:395] init engine (profile, create kv cache, warmup model) took 15.72 s (compilation: 0.15 s)
+(EngineCore pid=148192) INFO 11-17 20:56:27 [factory.py:62] Creating v1 connector with name: TKVConnector and engine_id: 462c452b-2f1f-4c55-b220-480b6b755bb9
+(EngineCore pid=148192) WARNING 11-17 20:56:27 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+(EngineCore pid=148192) INFO 11-17 20:56:27 [kernel.py:467] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=147962) INFO 11-17 20:56:27 [entry.py:136] Supported tasks: ['generate']
+(APIServer pid=147962) WARNING 11-17 20:56:27 [__init__.py:44] SECURITY WARNING: Development endpoints are enabled! This should NOT be used in production!
+(APIServer pid=147962) INFO 11-17 20:56:27 [factories.py:89] Scale-out endpoints are disabled. Restart vllm serve with --enable-scale-out to enable them.
+(APIServer pid=147962) INFO 11-17 20:56:27 [hf.py:648] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=147962) WARNING 11-17 20:56:27 [model.py:1893] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 0.6, 'top_p': 0.9}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=147962) INFO 11-17 20:56:27 [entry.py:140] Starting vLLM server on http://127.0.0.1:45701
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:186] Available routes are:
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /openapi.json, Methods: HEAD, GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /docs, Methods: HEAD, GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /docs/oauth2-redirect, Methods: HEAD, GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /redoc, Methods: HEAD, GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /load, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /version, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /kv_event_sources, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /health, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /metrics, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /tokenize, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /detokenize, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/models, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/systemone, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /ping, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /ping, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /invocations, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /reset_prefix_cache, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /reset_mm_cache, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /reset_encoder_cache, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /collective_rpc, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /server_info, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /sleep, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /release_kv_cache_memory, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /wake_up, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /is_sleeping, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /pause, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /resume, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /abort_requests, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /is_paused, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /init_weight_transfer_engine, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /shutdown_weight_transfer_engine, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /start_weight_update, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /start_draft_weight_update, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /update_weights, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /finish_weight_update, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /update_weight_version, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /weight_info, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /weight_checker, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /get_world_size, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/chat/completions, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/chat/completions/batch, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/responses, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/responses/{response_id}, Methods: GET
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/responses/{response_id}/cancel, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/completions, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/messages, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/messages/count_tokens, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /generative_scoring, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /scale_elastic_ep, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /is_scaling_elastic_ep, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/chat/completions/render, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/messages/render, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/completions/render, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/responses/render, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/chat/completions/derender, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /v1/completions/derender, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /inference/v1/generate, Methods: POST
+(APIServer pid=147962) INFO 11-17 20:56:27 [launcher.py:195] Route: /inference/v1/abort_requests, Methods: POST
+INFO:     Started server process [147962]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:49920 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49924 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:56:36 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 20:56:36 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:49932 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49944 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:56:37 [loggers.py:335] Engine 000: Avg prompt throughput: 95.2 tokens/s, Avg generation throughput: 2.3 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 0.0%
+INFO:     127.0.0.1:49944 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53358 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:56:39 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 20:56:39 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:53372 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49944 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53378 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:56:45 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 20:56:45 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:53384 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49944 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:56:47 [loggers.py:335] Engine 000: Avg prompt throughput: 819.2 tokens/s, Avg generation throughput: 7.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 46.5%
+INFO:     127.0.0.1:36954 - "GET /health HTTP/1.1" 200 OK
+(EngineCore pid=148192) WARNING 11-17 20:56:50 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=148192) WARNING 11-17 20:56:50 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=148192) WARNING 11-17 20:56:50 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+INFO:     127.0.0.1:49944 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49944 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36960 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36964 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36970 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36980 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36994 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:56:51 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 20:56:51 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:36996 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:56:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 5.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 49.5%
+INFO:     127.0.0.1:46910 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:57:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 54.6%
+INFO:     127.0.0.1:46910 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:57:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 58.7%
+INFO:     127.0.0.1:32870 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32870 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:57:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 65.2%
+INFO:     127.0.0.1:32870 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32870 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:57:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 69.8%
+INFO:     127.0.0.1:41858 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:57:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 11.5 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 71.7%
+INFO:     127.0.0.1:41858 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41858 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:57:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 26.9 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 74.9%
+INFO:     127.0.0.1:45122 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45124 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:58:07 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 20:58:07 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:45130 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:58:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 76.2%
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:58:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 77.4%
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:58:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 41.5 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 80.4%
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:58:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 48.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 82.7%
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44096 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:58:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 34.2 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 84.5%
+INFO:     127.0.0.1:37434 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:58:52 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 20:58:52 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:37450 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:58:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 17.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 85.0%
+INFO:     127.0.0.1:44548 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44558 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44548 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44558 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:59:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 40.0 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 86.8%
+INFO:     127.0.0.1:44548 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44558 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57540 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44548 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44558 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57540 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44548 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:59:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 82.3 tokens/s, Running: 1 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 6.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 89.0%
+INFO:     127.0.0.1:51766 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:59:20 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 20:59:20 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:51770 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:59:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 18.5 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 89.0%
+INFO:     127.0.0.1:46188 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46198 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46204 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46218 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46234 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46250 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46258 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46262 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46276 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46286 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:59:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 75.0 tokens/s, Running: 2 reqs, Waiting: 3 reqs, Deferred: 3 reqs, KV fetch: 0 waiting to start, 3 in progress, 0 completed waiting, GPU KV cache usage: 17.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 91.2%
+INFO:     127.0.0.1:33240 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46218 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46234 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46250 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46258 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46262 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46276 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46286 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:59:43 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 20:59:43 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:33248 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:59:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 58.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 91.3%
+INFO:     127.0.0.1:42696 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 20:59:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.2 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 91.4%
+INFO:     127.0.0.1:42696 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:00:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 91.6%
+INFO:     127.0.0.1:55688 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55688 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:00:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 22.1 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 91.9%
+INFO:     127.0.0.1:55688 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55688 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:00:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 29.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 92.2%
+(APIServer pid=147962) INFO 11-17 21:00:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 92.2%
+INFO:     127.0.0.1:57306 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57306 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57306 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:00:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 34.9 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 92.6%
+INFO:     127.0.0.1:45346 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:00:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 16.3 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 92.7%
+INFO:     127.0.0.1:46608 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:00:59 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:00:59 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:46614 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:01:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 92.7%
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:01:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 38.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 93.0%
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:01:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 45.2 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 93.4%
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:01:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 31.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 93.6%
+INFO:     127.0.0.1:51322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59354 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59356 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:01:44 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:01:44 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:59364 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:01:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 93.8%
+INFO:     127.0.0.1:38066 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38074 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38066 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:01:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 31.2 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 94.0%
+INFO:     127.0.0.1:38074 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38066 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38074 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44962 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38066 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38074 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:02:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 74.2 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 94.5%
+INFO:     127.0.0.1:44962 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38066 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45074 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:02:12 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:02:12 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:45088 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:02:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 35.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 94.6%
+INFO:     127.0.0.1:51372 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51388 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51404 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51416 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51418 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51422 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51432 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51440 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51450 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51454 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:02:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 33.1 tokens/s, Running: 3 reqs, Waiting: 6 reqs, Deferred: 6 reqs, KV fetch: 0 waiting to start, 6 in progress, 0 completed waiting, GPU KV cache usage: 30.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.2%
+INFO:     127.0.0.1:54000 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51404 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51416 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51418 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51422 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51432 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51440 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51450 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:02:34 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:02:34 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:54008 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:02:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 99.9 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.2%
+(APIServer pid=147962) INFO 11-17 21:02:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.2%
+INFO:     127.0.0.1:38256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38256 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:02:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.3%
+INFO:     127.0.0.1:60424 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60424 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:03:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 15.0 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.4%
+INFO:     127.0.0.1:60424 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60424 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:03:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 33.7 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.5%
+(APIServer pid=147962) INFO 11-17 21:03:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 2.5 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.5%
+INFO:     127.0.0.1:44732 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44732 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44732 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:03:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 27.9 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.6%
+INFO:     127.0.0.1:45562 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:03:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 23.3 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.7%
+INFO:     127.0.0.1:51944 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:03:50 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:03:50 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:51956 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:03:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.7%
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:04:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 38.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 95.8%
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:04:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 39.9 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.0%
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:04:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 36.9 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.0%
+INFO:     127.0.0.1:58228 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57604 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57616 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:04:34 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:04:34 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:57630 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:04:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.1%
+INFO:     127.0.0.1:39276 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39284 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39276 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:04:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 27.1 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.2%
+INFO:     127.0.0.1:39284 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39276 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39284 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39276 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39284 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39276 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:04:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 73.9 tokens/s, Running: 1 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 7.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.4%
+INFO:     127.0.0.1:39284 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39276 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53890 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:05:03 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:05:03 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:53892 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:05:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 39.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.4%
+INFO:     127.0.0.1:38040 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38046 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38058 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38066 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38070 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38084 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38098 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38106 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38114 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38120 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:05:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 52.2 tokens/s, Running: 6 reqs, Waiting: 3 reqs, Deferred: 3 reqs, KV fetch: 0 waiting to start, 3 in progress, 0 completed waiting, GPU KV cache usage: 31.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.7%
+INFO:     127.0.0.1:51790 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38040 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38046 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38058 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38066 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38070 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38084 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38098 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:05:22 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:05:22 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:51794 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:05:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 80.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.7%
+INFO:     127.0.0.1:55520 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:05:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 10.5 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.7%
+INFO:     127.0.0.1:55520 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:05:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 15.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.8%
+INFO:     127.0.0.1:40078 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40078 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:05:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.8%
+INFO:     127.0.0.1:40078 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40078 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:06:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.8%
+INFO:     127.0.0.1:39530 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:06:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 6.0 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.9%
+INFO:     127.0.0.1:39530 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39530 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:06:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 32.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.9%
+INFO:     127.0.0.1:43076 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:06:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.9%
+INFO:     127.0.0.1:43090 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:06:38 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:06:38 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:43096 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:06:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 96.9%
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:06:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 38.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.0%
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:07:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 51.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.1%
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39682 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:07:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 29.0 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.1%
+INFO:     127.0.0.1:36422 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43462 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:07:22 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:07:22 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:43476 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:07:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 22.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.1%
+INFO:     127.0.0.1:45080 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45084 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45080 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45084 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:07:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 38.4 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.2%
+INFO:     127.0.0.1:45080 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45084 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45080 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45084 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45080 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45084 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:07:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 81.0 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.3%
+INFO:     127.0.0.1:45080 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45722 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:07:51 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:07:51 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:45726 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:07:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 21.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.3%
+INFO:     127.0.0.1:39020 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39022 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39032 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39048 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39062 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39070 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39080 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39084 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39092 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39094 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 128.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:36834 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39020 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39022 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39032 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39048 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39062 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39070 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39080 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:10 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:08:10 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:36844 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 5.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:56140 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56140 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 16.4 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:40332 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:33 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:08:33 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:40342 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 9.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:34510 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34510 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 15.8 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 1.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:34510 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41260 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:56 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:08:56 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:41274 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:08:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 22.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:60430 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60442 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60458 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60466 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60472 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60480 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60430 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60442 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60458 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60466 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60472 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 66.3 tokens/s, Running: 2 reqs, Waiting: 4 reqs, Deferred: 4 reqs, KV fetch: 0 waiting to start, 3 in progress, 1 completed waiting, GPU KV cache usage: 1.3%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:45590 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:10 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:09:10 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:45592 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 74.5 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:52050 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52050 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.5%
+INFO:     127.0.0.1:52056 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:28 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:09:28 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:52066 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50514 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.6%
+INFO:     127.0.0.1:50514 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.6%
+INFO:     127.0.0.1:50514 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50444 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:53 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:09:53 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:50458 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:09:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.6%
+INFO:     127.0.0.1:57198 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57202 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57212 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57222 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57228 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57240 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57198 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57202 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57212 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57222 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57228 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.6%
+INFO:     127.0.0.1:57256 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:08 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:10:08 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:57268 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41880 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 1.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.6%
+INFO:     127.0.0.1:59832 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59838 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:22 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:10:22 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:59848 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.6%
+INFO:     127.0.0.1:32860 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.6%
+INFO:     127.0.0.1:32860 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32860 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.7%
+INFO:     127.0.0.1:43826 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:51 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:10:51 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:43834 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:10:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.7%
+INFO:     127.0.0.1:55512 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55522 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55530 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55532 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55546 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55550 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55512 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55522 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55530 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55532 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55546 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55556 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:06 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:11:06 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:55570 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.7%
+INFO:     127.0.0.1:40782 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40796 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 15.2 tokens/s, Running: 2 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.7%
+INFO:     127.0.0.1:40808 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40782 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40796 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56338 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:22 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:11:22 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:56352 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 48.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.7%
+INFO:     127.0.0.1:47332 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.8%
+INFO:     127.0.0.1:35632 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.8%
+INFO:     127.0.0.1:52670 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.9%
+INFO:     127.0.0.1:52678 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:11:57 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:11:57 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:52686 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43382 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43390 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43406 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43410 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43422 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:12:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 5 reqs, Deferred: 5 reqs, KV fetch: 0 waiting to start, 5 in progress, 0 completed waiting, GPU KV cache usage: 8.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.9%
+INFO:     127.0.0.1:43866 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43382 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43390 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43406 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43410 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43880 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:12:14 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:12:14 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:43894 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:12:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 128.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 97.9%
+INFO:     127.0.0.1:35480 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:12:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 27.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.0%
+(APIServer pid=147962) INFO 11-17 21:12:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.0%
+INFO:     127.0.0.1:37156 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:12:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 6.1 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 27.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.1%
+INFO:     127.0.0.1:40978 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:12:50 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:12:50 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:40984 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:12:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 6.7 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.1%
+INFO:     127.0.0.1:48688 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48700 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48714 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48724 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48726 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48738 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48748 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48758 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48772 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48782 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48784 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48688 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48700 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48714 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48724 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48726 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48738 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48748 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48758 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48772 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48782 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 215.8 tokens/s, Running: 6 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 12.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.2%
+INFO:     127.0.0.1:48810 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:10 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:13:10 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:48816 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 53.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.2%
+INFO:     127.0.0.1:54260 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54272 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54276 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54290 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54300 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54310 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54260 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54272 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54276 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54290 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54300 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 97.2 tokens/s, Running: 3 reqs, Waiting: 2 reqs, Deferred: 2 reqs, KV fetch: 0 waiting to start, 2 in progress, 0 completed waiting, GPU KV cache usage: 17.3%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.2%
+INFO:     127.0.0.1:49930 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:31 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:13:31 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:49946 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 43.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.2%
+INFO:     127.0.0.1:37874 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37878 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37888 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37902 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37918 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37930 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37942 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37874 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37878 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37888 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 66.7 tokens/s, Running: 3 reqs, Waiting: 3 reqs, Deferred: 3 reqs, KV fetch: 0 waiting to start, 3 in progress, 0 completed waiting, GPU KV cache usage: 19.3%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.3%
+INFO:     127.0.0.1:37902 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37918 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37930 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47932 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:53 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:13:53 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:47940 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:13:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 99.7 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.3%
+INFO:     127.0.0.1:36308 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36324 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36340 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36348 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36354 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36370 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36372 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36380 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36392 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36398 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36402 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36418 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36420 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36424 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36426 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36442 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36446 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36448 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36462 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36464 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36472 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36308 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:14:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 19.7 tokens/s, Running: 2 reqs, Waiting: 20 reqs, Deferred: 20 reqs, KV fetch: 0 waiting to start, 20 in progress, 0 completed waiting, GPU KV cache usage: 37.2%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.4%
+INFO:     127.0.0.1:36322 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36324 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36340 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36348 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36354 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36370 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36372 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36380 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36392 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36398 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36402 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36418 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36420 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36424 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36426 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36442 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36446 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36448 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36462 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36464 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:14:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 443.8 tokens/s, Running: 6 reqs, Waiting: 4 reqs, Deferred: 4 reqs, KV fetch: 0 waiting to start, 4 in progress, 0 completed waiting, GPU KV cache usage: 17.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.4%
+INFO:     127.0.0.1:56486 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:14:21 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:14:21 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:56490 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:14:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 86.9 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.4%
+INFO:     127.0.0.1:54716 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54720 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54728 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54736 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54716 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:14:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 21.6 tokens/s, Running: 2 reqs, Waiting: 3 reqs, Deferred: 3 reqs, KV fetch: 0 waiting to start, 3 in progress, 0 completed waiting, GPU KV cache usage: 33.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.5%
+INFO:     127.0.0.1:54720 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54728 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39560 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:14:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 101.6 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 6.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.5%
+INFO:     127.0.0.1:48972 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:14:50 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:14:50 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:48980 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:14:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 4.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.5%
+INFO:     127.0.0.1:39980 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39986 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40002 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40008 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40010 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40020 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:15:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 72.3 tokens/s, Running: 2 reqs, Waiting: 2 reqs, Deferred: 2 reqs, KV fetch: 0 waiting to start, 2 in progress, 0 completed waiting, GPU KV cache usage: 27.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.6%
+INFO:     127.0.0.1:39980 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39986 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40002 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40008 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40010 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:15:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 198.3 tokens/s, Running: 2 reqs, Waiting: 0 reqs, GPU KV cache usage: 14.2%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.6%
+INFO:     127.0.0.1:42654 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40002 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40008 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40010 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40002 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42668 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42670 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:15:21 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:15:21 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:42676 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:15:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 15.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.6%
+INFO:     127.0.0.1:60914 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60914 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:15:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.6%
+INFO:     127.0.0.1:60914 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34998 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:15:44 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:15:44 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:35002 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:15:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.6%
+INFO:     127.0.0.1:55182 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:15:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.6%
+INFO:     127.0.0.1:55182 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55182 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.6%
+INFO:     127.0.0.1:38412 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:08 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:16:08 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:38426 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44152 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44162 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44168 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44170 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44186 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 15.0 tokens/s, Running: 5 reqs, Waiting: 0 reqs, GPU KV cache usage: 1.3%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.6%
+INFO:     127.0.0.1:44188 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44152 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44162 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44168 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44170 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52140 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:22 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:16:22 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:52148 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 113.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:41488 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41488 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41488 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 35.2 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 1.8%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:50114 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:39 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:16:39 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:50124 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 3.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:43124 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43124 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:16:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 24.7 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:43124 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59164 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:04 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:17:04 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:59174 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 13.7 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:43956 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43964 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43980 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43992 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43996 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44006 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43956 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43964 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43980 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43992 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 127.9 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:44864 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:19 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:17:19 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:44876 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:44884 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44898 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44884 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40110 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:33 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:17:33 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:40114 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 38.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:56190 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:56190 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:17:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:56190 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41210 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:18:02 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:18:02 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:41216 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:18:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:44866 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44872 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44876 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44880 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44888 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44900 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44866 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44872 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44876 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44880 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44906 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:18:17 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:18:17 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:44920 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:18:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 128.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:44366 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44376 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44386 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:18:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 4.8 tokens/s, Running: 2 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 5.2%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:44366 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44376 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44386 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50174 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:18:32 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:18:32 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:50184 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:18:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 72.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+(APIServer pid=147962) INFO 11-17 21:18:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.7%
+INFO:     127.0.0.1:39068 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42030 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:18:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 13.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+INFO:     127.0.0.1:59046 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:19:07 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:19:07 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:59058 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:19:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+INFO:     127.0.0.1:48062 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48076 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48084 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48092 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48096 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48102 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:19:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 6 reqs, Deferred: 6 reqs, KV fetch: 0 waiting to start, 6 in progress, 0 completed waiting, GPU KV cache usage: 10.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+INFO:     127.0.0.1:48062 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48076 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48084 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48092 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48096 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41982 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:19:24 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:19:24 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:41994 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:19:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+(APIServer pid=147962) INFO 11-17 21:19:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+INFO:     127.0.0.1:37516 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:19:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+INFO:     127.0.0.1:43090 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:19:57 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:19:57 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:43094 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:19:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+INFO:     127.0.0.1:53626 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53628 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53634 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53638 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53646 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53654 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53666 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53686 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53694 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53706 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53626 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53628 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53634 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53638 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53646 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53654 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53666 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53686 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53694 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53706 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33690 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:20:17 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:20:17 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:33698 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:20:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 281.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+INFO:     127.0.0.1:44716 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44718 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44734 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44744 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44752 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:20:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 5 reqs, Deferred: 5 reqs, KV fetch: 0 waiting to start, 5 in progress, 0 completed waiting, GPU KV cache usage: 16.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.8%
+INFO:     127.0.0.1:39488 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44716 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44718 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44734 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44744 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39502 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:20:37 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:20:37 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:39514 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:20:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 128.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.9%
+INFO:     127.0.0.1:37116 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37124 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37140 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37156 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37160 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37166 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37174 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:20:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 7 reqs, Deferred: 7 reqs, KV fetch: 0 waiting to start, 7 in progress, 0 completed waiting, GPU KV cache usage: 22.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.9%
+INFO:     127.0.0.1:37116 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37124 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37140 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37156 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37160 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37166 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37174 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:20:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 179.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.9%
+INFO:     127.0.0.1:35682 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:20:58 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:20:58 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:35692 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:21:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 98.9%
+INFO:     127.0.0.1:40242 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40272 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40278 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40288 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40296 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40312 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40326 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40332 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40348 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40356 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40364 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40366 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40370 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40384 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40386 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40398 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40408 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40410 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40422 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40436 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35698 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40242 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40256 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40272 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40278 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40288 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40296 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40312 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40326 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40332 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40348 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40356 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40364 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40366 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40370 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40384 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40386 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40398 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40408 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40410 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:21:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 268.0 tokens/s, Running: 5 reqs, Waiting: 17 reqs, Deferred: 17 reqs, KV fetch: 0 waiting to start, 17 in progress, 0 completed waiting, GPU KV cache usage: 37.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.0%
+INFO:     127.0.0.1:40422 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54766 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:21:24 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:21:24 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:54774 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:21:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 269.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.0%
+INFO:     127.0.0.1:38644 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38650 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38664 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38680 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38696 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38708 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:21:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 5 reqs, Deferred: 5 reqs, KV fetch: 0 waiting to start, 5 in progress, 0 completed waiting, GPU KV cache usage: 33.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.0%
+INFO:     127.0.0.1:38644 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38650 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38664 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38680 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38696 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:21:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 81.9 tokens/s, Running: 1 reqs, Waiting: 3 reqs, Deferred: 3 reqs, KV fetch: 0 waiting to start, 3 in progress, 0 completed waiting, GPU KV cache usage: 27.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.0%
+INFO:     127.0.0.1:56588 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:21:53 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:21:53 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:56600 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:21:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 46.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.0%
+INFO:     127.0.0.1:37164 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37174 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37190 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37198 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37204 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:22:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 14.2 tokens/s, Running: 1 reqs, Waiting: 4 reqs, Deferred: 4 reqs, KV fetch: 0 waiting to start, 4 in progress, 0 completed waiting, GPU KV cache usage: 34.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.0%
+INFO:     127.0.0.1:37216 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37164 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37174 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37190 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37198 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37204 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:22:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 216.6 tokens/s, Running: 3 reqs, Waiting: 0 reqs, GPU KV cache usage: 20.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.0%
+INFO:     127.0.0.1:41394 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37190 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37198 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37204 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37190 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41408 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41412 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:22:23 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:22:23 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:41422 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:22:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 55.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.0%
+INFO:     127.0.0.1:34382 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:22:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:34382 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34382 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40386 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:22:45 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:22:45 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:40398 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:22:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+(APIServer pid=147962) INFO 11-17 21:22:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:42074 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42074 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:46576 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:08 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:23:08 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:46586 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:53266 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53278 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53286 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53288 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53300 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53308 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53266 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53278 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53286 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53288 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53300 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58994 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:22 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:23:22 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:59002 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:34388 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34388 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34388 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 35.4 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 1.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:50654 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:39 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:23:39 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:50660 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 3.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:47554 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47554 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:23:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 13.6 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:34322 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:03 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:24:03 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:34338 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:60836 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60842 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60858 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60870 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60878 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60890 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60836 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60842 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60858 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60870 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60878 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:60898 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:18 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:24:18 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:60906 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57828 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 2.4 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 1.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:57828 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45502 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45516 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:32 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:24:32 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:45520 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 36.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:55452 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:55452 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:36774 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:24:58 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:24:58 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:36784 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:56918 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56928 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56936 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56946 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56950 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56958 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56918 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56928 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56936 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56946 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56950 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32840 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:13 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:25:13 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:32848 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:51652 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51662 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51670 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51652 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51662 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 64.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:51674 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:28 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:25:28 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:51686 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43538 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 13.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:43538 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:43538 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:47232 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:25:58 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:25:58 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:47234 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:26:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:52938 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52946 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52962 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52964 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52980 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52938 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52976 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52946 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52962 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52964 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52980 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52990 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:26:15 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:26:15 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:53004 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:26:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+(APIServer pid=147962) INFO 11-17 21:26:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:40542 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:26:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:47540 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:26:47 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:26:47 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:47552 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49818 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49820 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49824 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49838 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49848 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49860 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49866 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49870 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49876 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49890 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49904 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:26:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 11 reqs, Deferred: 11 reqs, KV fetch: 0 waiting to start, 11 in progress, 0 completed waiting, GPU KV cache usage: 18.6%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:40498 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49818 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49820 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49824 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49838 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49848 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49860 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49866 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49870 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49876 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40508 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:07 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:27:07 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:40512 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 268.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.1%
+INFO:     127.0.0.1:46592 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46604 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46606 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46612 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46628 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46640 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 6 reqs, Deferred: 6 reqs, KV fetch: 0 waiting to start, 6 in progress, 0 completed waiting, GPU KV cache usage: 20.2%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:46592 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46604 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46606 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46612 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46628 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46212 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:26 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:27:26 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:46228 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:46858 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46868 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46882 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46888 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46892 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46908 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46924 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 7 reqs, Deferred: 7 reqs, KV fetch: 0 waiting to start, 7 in progress, 0 completed waiting, GPU KV cache usage: 22.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:46858 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58542 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46868 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46882 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46888 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46892 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58554 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:46 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:27:46 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:58568 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 166.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:53906 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53916 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53932 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53942 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53952 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53956 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53962 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53968 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53976 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53990 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54000 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54010 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54026 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54040 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54052 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54062 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54070 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54076 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54088 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54092 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54094 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54098 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:27:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.8 tokens/s, Running: 1 reqs, Waiting: 21 reqs, Deferred: 21 reqs, KV fetch: 0 waiting to start, 21 in progress, 0 completed waiting, GPU KV cache usage: 37.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:53906 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53916 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53932 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53942 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53952 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53956 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53962 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53968 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53976 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53990 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54000 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54010 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54026 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54040 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54052 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54062 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54070 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54076 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54088 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54092 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54094 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:28:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 496.3 tokens/s, Running: 10 reqs, Waiting: 0 reqs, GPU KV cache usage: 18.2%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:43874 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:28:10 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:28:10 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:43876 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:28:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 53.2 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:42176 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42184 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42200 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42208 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42218 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42220 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42176 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42184 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42200 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:28:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 51.2 tokens/s, Running: 0 reqs, Waiting: 5 reqs, Deferred: 5 reqs, KV fetch: 0 waiting to start, 5 in progress, 0 completed waiting, GPU KV cache usage: 33.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:42208 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42218 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60248 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:28:35 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:28:35 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:60254 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:28:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 89.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.2%
+INFO:     127.0.0.1:45556 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45570 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45578 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45590 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45602 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:28:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 5 reqs, Deferred: 5 reqs, KV fetch: 0 waiting to start, 5 in progress, 0 completed waiting, GPU KV cache usage: 33.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:42956 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45556 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45570 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45578 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45590 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:28:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 182.4 tokens/s, Running: 2 reqs, Waiting: 2 reqs, Deferred: 2 reqs, KV fetch: 0 waiting to start, 2 in progress, 0 completed waiting, GPU KV cache usage: 27.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:56850 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45556 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45570 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45578 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45590 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45556 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56862 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56870 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:04 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:29:04 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:56882 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 78.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:46338 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.5 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 1.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:46338 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42728 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:26 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:29:26 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:42732 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 13.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:57004 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:57004 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57004 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:34290 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:49 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:29:49 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:34292 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:29:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:56680 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56686 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56688 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56704 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56712 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56728 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56680 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56686 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56688 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56704 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56712 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56740 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:03 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:30:03 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:56746 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:54250 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54250 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 24.5 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 1.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:56402 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:21 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:30:21 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:56412 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 1.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:39452 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39452 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:39452 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36460 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:45 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:30:45 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:36470 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:36558 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36570 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36580 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36586 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36594 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36558 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36570 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36580 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36610 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36586 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36594 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 134.7 tokens/s, Running: 5 reqs, Waiting: 0 reqs, GPU KV cache usage: 3.1%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:51028 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:30:59 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:30:59 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:51042 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 6.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:51050 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33664 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33680 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:13 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:31:13 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:33682 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:34802 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:34802 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34802 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 25.6 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:60430 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:39 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:31:39 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:60438 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:55962 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55976 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55984 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55986 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55988 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55962 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55976 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55984 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55986 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55988 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56000 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56008 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:55 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:31:55 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:56020 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:31:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 140.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:44994 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45010 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44994 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45010 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45020 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 46.5 tokens/s, Running: 3 reqs, Waiting: 0 reqs, GPU KV cache usage: 5.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:50002 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:10 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:32:10 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:50018 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 17.5 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:55880 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:55880 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55880 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 13.2 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 13.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:42138 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:40 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:32:40 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:42154 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:47576 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47582 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47592 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47606 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47616 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47618 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47576 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47582 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47592 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47606 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47634 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:57 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:32:57 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:47650 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:32:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 128.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:43410 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:33:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 27.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+(APIServer pid=147962) INFO 11-17 21:33:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:46662 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46672 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:33:26 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:33:26 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:46682 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:33:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:33648 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33664 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33674 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33696 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33704 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33710 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33720 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33734 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33738 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:33:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 10 reqs, Deferred: 10 reqs, KV fetch: 0 waiting to start, 10 in progress, 0 completed waiting, GPU KV cache usage: 16.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:33744 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33648 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33664 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33674 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33682 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33696 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33704 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33710 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33720 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33734 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33738 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33742 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:33:45 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:33:45 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:33754 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:33:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 268.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:34290 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34302 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34316 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34328 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34344 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:33:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 1.8 tokens/s, Running: 3 reqs, Waiting: 2 reqs, Deferred: 2 reqs, KV fetch: 0 waiting to start, 2 in progress, 0 completed waiting, GPU KV cache usage: 16.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:34356 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34290 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34302 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34316 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34328 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34344 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33196 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:05 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:34:05 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:33204 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 139.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.3%
+INFO:     127.0.0.1:47374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47386 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47392 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47406 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47420 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47430 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47438 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.9 tokens/s, Running: 6 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 22.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+INFO:     127.0.0.1:47374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47386 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47392 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47406 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47420 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47430 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44252 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:25 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:34:25 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:44256 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 153.5 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+INFO:     127.0.0.1:47444 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47446 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47454 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47462 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47466 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47470 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47476 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47480 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47486 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47492 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47500 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47502 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47508 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47520 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47524 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47538 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47540 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47550 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47558 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47564 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47568 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 21 reqs, Deferred: 21 reqs, KV fetch: 0 waiting to start, 21 in progress, 0 completed waiting, GPU KV cache usage: 35.4%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+INFO:     127.0.0.1:47584 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47444 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47446 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47454 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47462 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47466 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47470 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47476 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47480 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47486 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47492 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47500 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47502 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47508 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47520 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47524 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47538 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47540 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47550 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47558 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47564 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47568 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:47 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 535.0 tokens/s, Running: 9 reqs, Waiting: 0 reqs, GPU KV cache usage: 16.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+INFO:     127.0.0.1:60896 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:49 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:34:49 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:60906 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:34:57 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 15.4 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+INFO:     127.0.0.1:53442 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53444 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53450 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53466 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53480 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53488 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53442 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53444 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53450 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53466 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:35:07 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 64.0 tokens/s, Running: 0 reqs, Waiting: 5 reqs, Deferred: 5 reqs, KV fetch: 0 waiting to start, 5 in progress, 0 completed waiting, GPU KV cache usage: 33.7%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+INFO:     127.0.0.1:56670 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:35:13 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=148192) INFO 11-17 21:35:13 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:56686 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:35:17 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 64.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+INFO:     127.0.0.1:42164 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42174 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42178 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42186 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42202 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42204 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:35:27 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 23.0 tokens/s, Running: 2 reqs, Waiting: 4 reqs, Deferred: 4 reqs, KV fetch: 0 waiting to start, 4 in progress, 0 completed waiting, GPU KV cache usage: 40.9%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+INFO:     127.0.0.1:42164 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42174 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42178 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42186 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42202 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=147962) INFO 11-17 21:35:37 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 214.4 tokens/s, Running: 4 reqs, Waiting: 0 reqs, GPU KV cache usage: 28.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 99.4%
+(APIServer pid=147962) INFO 11-17 21:35:41 [launcher.py:254] [shutdown] API server: shutdown triggered
+(APIServer pid=147962) INFO 11-17 21:35:41 [launcher.py:270] [shutdown] API server: stopping engine client mode=abort timeout=0s
+(APIServer pid=147962) INFO 11-17 21:35:41 [core_client.py:770] [shutdown] MPClient: start timeout=0s
+(APIServer pid=147962) INFO 11-17 21:35:41 [core_client.py:772] [shutdown] MPClient: stopping engine manager
+(APIServer pid=147962) INFO 11-17 21:35:41 [utils.py:628] [shutdown] Process manager: send sigterm to process EngineCore
+(APIServer pid=147962) WARNING 11-17 21:35:41 [utils.py:648] [shutdown] Process manager: force killing remaining processes count=1
+(APIServer pid=147962) WARNING 11-17 21:35:41 [utils.py:653] [shutdown] Process manager: force killing remaining process EngineCore pid 148192
+(EngineCore pid=148192) INFO 11-17 21:35:41 [core.py:1454] [shutdown] EngineCore: trigger received signal=SIGTERM
+(EngineCore pid=148192) INFO 11-17 21:35:41 [core.py:1635] [shutdown] EngineCore: start mode=abort timeout=0s
+(EngineCore pid=148192) INFO 11-17 21:35:41 [core.py:1666] [shutdown] EngineCore: request processing complete; starting resource teardown
+(EngineCore pid=148192) INFO 11-17 21:35:41 [core.py:1499] [shutdown] EngineCore: exiting busy loop
+(APIServer pid=147962) INFO 11-17 21:35:41 [core_client.py:774] [shutdown] MPClient: engine manager stopped
+(APIServer pid=147962) INFO 11-17 21:35:41 [core_client.py:775] [shutdown] MPClient: cleaning up background resources
+(APIServer pid=147962) INFO 11-17 21:35:41 [core_client.py:777] [shutdown] MPClient: complete
+(APIServer pid=147962) INFO 11-17 21:35:41 [launcher.py:279] [shutdown] API server: engine client stopped
+(APIServer pid=147962) INFO 11-17 21:35:41 [launcher.py:282] [shutdown] API server: signalling HTTP server shutdown
+(APIServer pid=147962) INFO 11-17 21:35:41 [launcher.py:304] [shutdown] API server: shutting down FastAPI HTTP server
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

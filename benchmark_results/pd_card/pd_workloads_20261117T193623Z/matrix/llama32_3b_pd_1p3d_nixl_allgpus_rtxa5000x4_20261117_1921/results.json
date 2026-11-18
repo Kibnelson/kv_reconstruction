@@ -1,0 +1,1279 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 1,
+  "decodes": 3,
+  "layout": "1p3d",
+  "connector": "nixl",
+  "transport": "ring",
+  "eager": false,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl_all_gpus": true,
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "nixl": {
+   "prompts": 4,
+   "same_text_as_local": 2,
+   "transfers": {
+    "sends": 0,
+    "send_errors": 0,
+    "installs": 0,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": null,
+    "gather_ms": null,
+    "encode_ms": null,
+    "link_ms": null,
+    "queue_ms": null,
+    "achieved_gbps": null,
+    "wire_gbps": null,
+    "rel_err": null,
+    "install_ms": null,
+    "wait_ms": null,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "lossy": false
+  }
+ },
+ "sweep": {
+  "sweep_nixl_nativegbps_r0.5": {
+   "link_gbps": "native",
+   "codec": "nixl",
+   "rate": 0.5,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 66.04648971185088,
+    "request_throughput": 0.4845072030263883,
+    "request_goodput": 0.4845072030263883,
+    "output_throughput": 62.0169219873777,
+    "total_token_throughput": 1054.2876737854208,
+    "mean_ttft_ms": 689.7942195064388,
+    "median_ttft_ms": 623.8168040290475,
+    "p90_ttft_ms": 870.6022627651693,
+    "p99_ttft_ms": 1546.2044404260819,
+    "mean_tpot_ms": 11.183585960593984,
+    "median_tpot_ms": 11.165853509107444,
+    "p99_tpot_ms": 11.244693584446832,
+    "mean_e2el_ms": 2110.109636501875,
+    "p99_e2el_ms": 2964.330238513649,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961381.866398,
+   "t1": 1794961457.5100641,
+   "logs0": {
+    "engine_prefill1.log": 106699,
+    "engine_decode1.log": 143021,
+    "engine_decode3.log": 143099,
+    "engine_decode2.log": 143310
+   },
+   "logs1": {
+    "engine_prefill1.log": 111072,
+    "engine_decode1.log": 161286,
+    "engine_decode3.log": 160999,
+    "engine_decode2.log": 161281
+   },
+   "idle": true
+  },
+  "sweep_nixl_nativegbps_r1.0": {
+   "link_gbps": "native",
+   "codec": "nixl",
+   "rate": 1.0,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 34.046567687764764,
+    "request_throughput": 0.939889162792165,
+    "request_goodput": 0.939889162792165,
+    "output_throughput": 120.30581283739711,
+    "total_token_throughput": 2045.1988182357509,
+    "mean_ttft_ms": 692.3559078713879,
+    "median_ttft_ms": 614.1160512343049,
+    "p90_ttft_ms": 900.4802463576198,
+    "p99_ttft_ms": 1560.8333111368124,
+    "mean_tpot_ms": 11.194250318606745,
+    "median_tpot_ms": 11.175191000573278,
+    "p99_tpot_ms": 11.264815848526053,
+    "mean_e2el_ms": 2114.0256983344443,
+    "p99_e2el_ms": 2984.17070042342,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961458.527789,
+   "t1": 1794961502.6501555,
+   "logs0": {
+    "engine_prefill1.log": 111385,
+    "engine_decode1.log": 161599,
+    "engine_decode3.log": 161312,
+    "engine_decode2.log": 161594
+   },
+   "logs1": {
+    "engine_prefill1.log": 114645,
+    "engine_decode1.log": 164663,
+    "engine_decode3.log": 164375,
+    "engine_decode2.log": 164882
+   },
+   "idle": true
+  },
+  "sweep_nixl_nativegbps_r2.0": {
+   "link_gbps": "native",
+   "codec": "nixl",
+   "rate": 2.0,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 18.969832802191377,
+    "request_throughput": 1.6868888795004768,
+    "request_goodput": 1.4760277695629171,
+    "output_throughput": 215.92177657606103,
+    "total_token_throughput": 3670.6702017930374,
+    "mean_ttft_ms": 1233.7720788782462,
+    "median_ttft_ms": 1039.9877345189452,
+    "p90_ttft_ms": 2048.493256978691,
+    "p99_ttft_ms": 2954.74321493879,
+    "mean_tpot_ms": 11.252271357967746,
+    "median_tpot_ms": 11.25608795271145,
+    "p99_tpot_ms": 11.392092260964743,
+    "mean_e2el_ms": 2662.81054134015,
+    "p99_e2el_ms": 4390.635010544212,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961503.671468,
+   "t1": 1794961532.147338,
+   "logs0": {
+    "engine_prefill1.log": 114958,
+    "engine_decode1.log": 164976,
+    "engine_decode3.log": 164688,
+    "engine_decode2.log": 165195
+   },
+   "logs1": {
+    "engine_prefill1.log": 117940,
+    "engine_decode1.log": 167698,
+    "engine_decode3.log": 167391,
+    "engine_decode2.log": 167981
+   },
+   "idle": true
+  },
+  "sweep_nixl_nativegbps_rinf": {
+   "link_gbps": "native",
+   "codec": "nixl",
+   "rate": "inf",
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 18.20973983220756,
+    "request_throughput": 1.7573013285671226,
+    "request_goodput": 0.16474699955316774,
+    "output_throughput": 224.9345700565917,
+    "total_token_throughput": 3823.887690962059,
+    "mean_ttft_ms": 13437.134494364727,
+    "median_ttft_ms": 15065.467741340399,
+    "p90_ttft_ms": 15252.868770435452,
+    "p99_ttft_ms": 16655.3956178017,
+    "mean_tpot_ms": 12.940226725896629,
+    "median_tpot_ms": 13.41350856933772,
+    "p99_tpot_ms": 13.55888051838856,
+    "mean_e2el_ms": 15080.5432885536,
+    "p99_e2el_ms": 18100.755325611684,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961533.1681175,
+   "t1": 1794961561.0051765,
+   "logs0": {
+    "engine_prefill1.log": 118253,
+    "engine_decode1.log": 168011,
+    "engine_decode3.log": 167704,
+    "engine_decode2.log": 168294
+   },
+   "logs1": {
+    "engine_prefill1.log": 121237,
+    "engine_decode1.log": 170889,
+    "engine_decode3.log": 170133,
+    "engine_decode2.log": 171164
+   },
+   "idle": true
+  }
+ },
+ "shapes": {
+  "shape_nixl_nativegbps_t512_b1_o128": {
+   "tokens": 512,
+   "batch": 1,
+   "output": 128,
+   "rounds": 8,
+   "families": [
+    "sz1"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 8,
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 12.448483873158693,
+    "request_throughput": 0.6426485411006176,
+    "request_goodput": 0.6426485411006176,
+    "output_throughput": 82.25901326087906,
+    "total_token_throughput": 411.2950663043953,
+    "mean_ttft_ms": 182.85603378899395,
+    "median_ttft_ms": 182.9274957999587,
+    "p90_ttft_ms": 184.97763760387897,
+    "p99_ttft_ms": 185.2038349956274,
+    "mean_tpot_ms": 10.808789356443004,
+    "median_tpot_ms": 10.792361293721388,
+    "p99_tpot_ms": 10.859571907258646,
+    "mean_e2el_ms": 1555.5722820572555,
+    "p99_e2el_ms": 1561.319766473025,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961563.4610224,
+   "t1": 1794961585.4295998,
+   "logs0": {
+    "engine_prefill1.log": 122823,
+    "engine_decode1.log": 171604,
+    "engine_decode3.log": 170915,
+    "engine_decode2.log": 171879
+   },
+   "logs1": {
+    "engine_prefill1.log": 124194,
+    "engine_decode1.log": 173776,
+    "engine_decode3.log": 172644,
+    "engine_decode2.log": 174049
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t1024_b1_o128": {
+   "tokens": 1024,
+   "batch": 1,
+   "output": 128,
+   "rounds": 8,
+   "families": [
+    "sz1",
+    "sz1024"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 8,
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 13.759534442797303,
+    "request_throughput": 0.581415020490592,
+    "request_goodput": 0.581415020490592,
+    "output_throughput": 74.42112262279578,
+    "total_token_throughput": 669.7901036051619,
+    "mean_ttft_ms": 326.6322766430676,
+    "median_ttft_ms": 325.809296220541,
+    "p90_ttft_ms": 330.8340912684798,
+    "p99_ttft_ms": 334.5694356225431,
+    "mean_tpot_ms": 10.967219296080156,
+    "median_tpot_ms": 10.940704861377167,
+    "p99_tpot_ms": 11.016616737690029,
+    "mean_e2el_ms": 1719.4691272452474,
+    "p99_e2el_ms": 1724.022542964667,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961586.4480221,
+   "t1": 1794961609.8084202,
+   "logs0": {
+    "engine_prefill1.log": 124507,
+    "engine_decode1.log": 174089,
+    "engine_decode3.log": 172957,
+    "engine_decode2.log": 174362
+   },
+   "logs1": {
+    "engine_prefill1.log": 125597,
+    "engine_decode1.log": 175221,
+    "engine_decode3.log": 174090,
+    "engine_decode2.log": 175429
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t128_b16_o128": {
+   "tokens": 128,
+   "batch": 16,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz16"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 32,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 3.6664598248898983,
+    "request_throughput": 8.727765072664049,
+    "request_goodput": 8.727765072664049,
+    "output_throughput": 1117.1539293009982,
+    "total_token_throughput": 2234.3078586019965,
+    "mean_ttft_ms": 373.59841755824164,
+    "median_ttft_ms": 409.1066652908921,
+    "p90_ttft_ms": 624.426649697125,
+    "p99_ttft_ms": 625.3662617504597,
+    "mean_tpot_ms": 10.83773426440229,
+    "median_tpot_ms": 10.825972879437481,
+    "p99_tpot_ms": 10.933744799580396,
+    "mean_e2el_ms": 1749.9906691373326,
+    "p99_e2el_ms": 2001.1766763217747,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961610.8261926,
+   "t1": 1794961624.016779,
+   "logs0": {
+    "engine_prefill1.log": 125910,
+    "engine_decode1.log": 175534,
+    "engine_decode3.log": 174403,
+    "engine_decode2.log": 175742
+   },
+   "logs1": {
+    "engine_prefill1.log": 128332,
+    "engine_decode1.log": 176860,
+    "engine_decode3.log": 175796,
+    "engine_decode2.log": 176757
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t1024_b2_o128": {
+   "tokens": 1024,
+   "batch": 2,
+   "output": 128,
+   "rounds": 4,
+   "families": [
+    "sz1024"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 8,
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 7.109428260475397,
+    "request_throughput": 1.1252662952484807,
+    "request_goodput": 1.1252662952484807,
+    "output_throughput": 144.03408579180552,
+    "total_token_throughput": 1296.3067721262496,
+    "mean_ttft_ms": 359.12578273564577,
+    "median_ttft_ms": 334.05203465372324,
+    "p90_ttft_ms": 400.10297372937197,
+    "p99_ttft_ms": 524.239421710372,
+    "mean_tpot_ms": 10.955947682290802,
+    "median_tpot_ms": 10.93938904191096,
+    "p99_tpot_ms": 11.016407771050694,
+    "mean_e2el_ms": 1750.5311383865774,
+    "p99_e2el_ms": 1912.8548813983796,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961625.0338972,
+   "t1": 1794961641.5225494,
+   "logs0": {
+    "engine_prefill1.log": 128923,
+    "engine_decode1.log": 177828,
+    "engine_decode3.log": 176765,
+    "engine_decode2.log": 177726
+   },
+   "logs1": {
+    "engine_prefill1.log": 129737,
+    "engine_decode1.log": 178682,
+    "engine_decode3.log": 177176,
+    "engine_decode2.log": 178582
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t2048_b1_o128": {
+   "tokens": 2048,
+   "batch": 1,
+   "output": 128,
+   "rounds": 8,
+   "families": [
+    "sz1"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 8,
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 16.24068041704595,
+    "request_throughput": 0.4925901990906324,
+    "request_goodput": 0.4925901990906324,
+    "output_throughput": 63.05154548360095,
+    "total_token_throughput": 1071.876273221216,
+    "mean_ttft_ms": 607.54624591209,
+    "median_ttft_ms": 615.1281110942364,
+    "p90_ttft_ms": 617.8909599781036,
+    "p99_ttft_ms": 618.6039980873466,
+    "mean_tpot_ms": 11.19717434378649,
+    "median_tpot_ms": 11.168745757029281,
+    "p99_tpot_ms": 11.253313226991985,
+    "mean_e2el_ms": 2029.587387572974,
+    "p99_e2el_ms": 2047.643257882446,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961642.5380335,
+   "t1": 1794961668.2106001,
+   "logs0": {
+    "engine_prefill1.log": 130050,
+    "engine_decode1.log": 178995,
+    "engine_decode3.log": 177489,
+    "engine_decode2.log": 178895
+   },
+   "logs1": {
+    "engine_prefill1.log": 131421,
+    "engine_decode1.log": 181165,
+    "engine_decode3.log": 179657,
+    "engine_decode2.log": 180618
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t256_b16_o128": {
+   "tokens": 256,
+   "batch": 16,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz16"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 32,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 4.526964334771037,
+    "request_throughput": 7.068754607632331,
+    "request_goodput": 7.068754607632331,
+    "output_throughput": 904.8005897769384,
+    "total_token_throughput": 2714.401769330815,
+    "mean_ttft_ms": 648.7183594144881,
+    "median_ttft_ms": 624.9017911031842,
+    "p90_ttft_ms": 1122.2123213112354,
+    "p99_ttft_ms": 1123.2552073709667,
+    "mean_tpot_ms": 10.932471589863622,
+    "median_tpot_ms": 10.932415995130858,
+    "p99_tpot_ms": 11.149723921557815,
+    "mean_e2el_ms": 2037.1422513271682,
+    "p99_e2el_ms": 2535.5244565196335,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961669.2299738,
+   "t1": 1794961683.3121204,
+   "logs0": {
+    "engine_prefill1.log": 131734,
+    "engine_decode1.log": 181478,
+    "engine_decode3.log": 179970,
+    "engine_decode2.log": 180931
+   },
+   "logs1": {
+    "engine_prefill1.log": 134156,
+    "engine_decode1.log": 182803,
+    "engine_decode3.log": 180985,
+    "engine_decode2.log": 181945
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t1024_b4_o128": {
+   "tokens": 1024,
+   "batch": 4,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz1024"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 8,
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 4.170466210693121,
+    "request_throughput": 1.918250765223301,
+    "request_goodput": 1.918250765223301,
+    "output_throughput": 245.53609794858252,
+    "total_token_throughput": 2209.8248815372426,
+    "mean_ttft_ms": 517.0452920719981,
+    "median_ttft_ms": 367.785532027483,
+    "p90_ttft_ms": 862.3171793296933,
+    "p99_ttft_ms": 973.3169368468224,
+    "mean_tpot_ms": 10.998561245015287,
+    "median_tpot_ms": 10.974982709396542,
+    "p99_tpot_ms": 11.082528465552125,
+    "mean_e2el_ms": 1913.8625701889396,
+    "p99_e2el_ms": 2378.0729516781867,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961684.3293092,
+   "t1": 1794961697.9908946,
+   "logs0": {
+    "engine_prefill1.log": 134469,
+    "engine_decode1.log": 183116,
+    "engine_decode3.log": 181298,
+    "engine_decode2.log": 182258
+   },
+   "logs1": {
+    "engine_prefill1.log": 135561,
+    "engine_decode1.log": 184629,
+    "engine_decode3.log": 182448,
+    "engine_decode2.log": 183769
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t4096_b1_o128": {
+   "tokens": 4096,
+   "batch": 1,
+   "output": 128,
+   "rounds": 8,
+   "families": [
+    "sz1"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 8,
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 21.442088214680552,
+    "request_throughput": 0.37309798933308724,
+    "request_goodput": 0.37309798933308724,
+    "output_throughput": 47.75654263463517,
+    "total_token_throughput": 1575.9659069429604,
+    "mean_ttft_ms": 1212.678206851706,
+    "median_ttft_ms": 1218.7423976138234,
+    "p90_ttft_ms": 1241.051205061376,
+    "p99_ttft_ms": 1262.5369543768466,
+    "mean_tpot_ms": 11.551762934715494,
+    "median_tpot_ms": 11.528879448067485,
+    "p99_tpot_ms": 11.603836282853067,
+    "mean_e2el_ms": 2679.7520995605737,
+    "p99_e2el_ms": 2727.0979561284184,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961699.0114467,
+   "t1": 1794961729.886731,
+   "logs0": {
+    "engine_prefill1.log": 135874,
+    "engine_decode1.log": 184942,
+    "engine_decode3.log": 182761,
+    "engine_decode2.log": 184082
+   },
+   "logs1": {
+    "engine_prefill1.log": 137246,
+    "engine_decode1.log": 187109,
+    "engine_decode3.log": 184930,
+    "engine_decode2.log": 186184
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t512_b16_o128": {
+   "tokens": 512,
+   "batch": 16,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz16"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 32,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 6.386698745191097,
+    "request_throughput": 5.010413247390852,
+    "request_goodput": 3.4446591075812103,
+    "output_throughput": 641.332895666029,
+    "total_token_throughput": 3206.664478330145,
+    "mean_ttft_ms": 1478.9210464223288,
+    "median_ttft_ms": 1382.4900100007653,
+    "p90_ttft_ms": 2309.094951674342,
+    "p99_ttft_ms": 2317.6206110045314,
+    "mean_tpot_ms": 11.09987277653083,
+    "median_tpot_ms": 11.116519526351155,
+    "p99_tpot_ms": 11.291913811088078,
+    "mean_e2el_ms": 2888.604889041744,
+    "p99_e2el_ms": 3736.391393672675,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961730.9052305,
+   "t1": 1794961746.873796,
+   "logs0": {
+    "engine_prefill1.log": 137559,
+    "engine_decode1.log": 187422,
+    "engine_decode3.log": 185243,
+    "engine_decode2.log": 186497
+   },
+   "logs1": {
+    "engine_prefill1.log": 140261,
+    "engine_decode1.log": 189403,
+    "engine_decode3.log": 187375,
+    "engine_decode2.log": 188250
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t1024_b8_o128": {
+   "tokens": 1024,
+   "batch": 8,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz1024"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 16,
+   "exit": 0,
+   "bench": {
+    "completed": 16,
+    "duration": 5.714348627254367,
+    "request_throughput": 2.7999691729847584,
+    "request_goodput": 2.624971099673211,
+    "output_throughput": 358.3960541420491,
+    "total_token_throughput": 3225.564487278442,
+    "mean_ttft_ms": 1044.4306026911363,
+    "median_ttft_ms": 941.9178804382682,
+    "p90_ttft_ms": 1773.546414449811,
+    "p99_ttft_ms": 2065.6408153474326,
+    "mean_tpot_ms": 11.058200284560012,
+    "median_tpot_ms": 11.055284179747105,
+    "p99_tpot_ms": 11.143174122168324,
+    "mean_e2el_ms": 2448.822038830258,
+    "p99_e2el_ms": 3476.167878974229,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961747.8949182,
+   "t1": 1794961763.1347435,
+   "logs0": {
+    "engine_prefill1.log": 140574,
+    "engine_decode1.log": 189716,
+    "engine_decode3.log": 187688,
+    "engine_decode2.log": 188563
+   },
+   "logs1": {
+    "engine_prefill1.log": 141922,
+    "engine_decode1.log": 190396,
+    "engine_decode3.log": 188679,
+    "engine_decode2.log": 189552
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t8192_b1_o128": {
+   "tokens": 8192,
+   "batch": 1,
+   "output": 128,
+   "rounds": 8,
+   "families": [
+    "sz1"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 8,
+   "exit": 0,
+   "bench": {
+    "completed": 8,
+    "duration": 31.734129710122943,
+    "request_throughput": 0.25209451379560166,
+    "request_goodput": 0.0,
+    "output_throughput": 32.26809776583701,
+    "total_token_throughput": 2097.4263547794058,
+    "mean_ttft_ms": 2418.9938907511532,
+    "median_ttft_ms": 2412.3369567096233,
+    "p90_ttft_ms": 2459.2911306768656,
+    "p99_ttft_ms": 2475.6495744362473,
+    "mean_tpot_ms": 12.18306008858357,
+    "median_tpot_ms": 12.155439308661176,
+    "p99_tpot_ms": 12.247851439348358,
+    "mean_e2el_ms": 3966.2425220012665,
+    "p99_e2el_ms": 4031.126707233488,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961764.1512425,
+   "t1": 1794961805.4997485,
+   "logs0": {
+    "engine_prefill1.log": 142235,
+    "engine_decode1.log": 190709,
+    "engine_decode3.log": 188992,
+    "engine_decode2.log": 189865
+   },
+   "logs1": {
+    "engine_prefill1.log": 144167,
+    "engine_decode1.log": 193454,
+    "engine_decode3.log": 192101,
+    "engine_decode2.log": 193058
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t1024_b16_o128": {
+   "tokens": 1024,
+   "batch": 16,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz16",
+    "sz1024"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 32,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 9.15710518322885,
+    "request_throughput": 3.4945541587321385,
+    "request_goodput": 1.8564818968264485,
+    "output_throughput": 447.3029323177137,
+    "total_token_throughput": 4025.7263908594236,
+    "mean_ttft_ms": 2443.609025212936,
+    "median_ttft_ms": 1977.9053274542093,
+    "p90_ttft_ms": 4690.809408202768,
+    "p99_ttft_ms": 4864.958087615669,
+    "mean_tpot_ms": 11.346504435504192,
+    "median_tpot_ms": 11.27421975458466,
+    "p99_tpot_ms": 11.720682342250752,
+    "mean_e2el_ms": 3884.6150885219686,
+    "p99_e2el_ms": 6341.206836830825,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961806.5170572,
+   "t1": 1794961825.2277374,
+   "logs0": {
+    "engine_prefill1.log": 144480,
+    "engine_decode1.log": 193767,
+    "engine_decode3.log": 192414,
+    "engine_decode2.log": 193371
+   },
+   "logs1": {
+    "engine_prefill1.log": 147179,
+    "engine_decode1.log": 195440,
+    "engine_decode3.log": 194020,
+    "engine_decode2.log": 195044
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t16384_b1_o128": {
+   "tokens": 16384,
+   "batch": 1,
+   "output": 128,
+   "rounds": 4,
+   "families": [
+    "sz1"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 4,
+   "exit": 0,
+   "bench": {
+    "completed": 4,
+    "duration": 28.4048164896667,
+    "request_throughput": 0.14082118789449485,
+    "request_goodput": 0.0,
+    "output_throughput": 18.02511205049534,
+    "total_token_throughput": 2325.239454513899,
+    "mean_ttft_ms": 5377.986595965922,
+    "median_ttft_ms": 5391.183546744287,
+    "p90_ttft_ms": 5426.008829846978,
+    "p99_ttft_ms": 5430.395373143256,
+    "mean_tpot_ms": 13.563510954497367,
+    "median_tpot_ms": 13.578226716499628,
+    "p99_tpot_ms": 13.632402874852025,
+    "mean_e2el_ms": 7100.5524871870875,
+    "p99_e2el_ms": 7161.328302118927,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961826.2457998,
+   "t1": 1794961864.1458693,
+   "logs0": {
+    "engine_prefill1.log": 147492,
+    "engine_decode1.log": 195753,
+    "engine_decode3.log": 194333,
+    "engine_decode2.log": 195357
+   },
+   "logs1": {
+    "engine_prefill1.log": 148596,
+    "engine_decode1.log": 196759,
+    "engine_decode3.log": 195683,
+    "engine_decode2.log": 195701
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t1024_b32_o128": {
+   "tokens": 1024,
+   "batch": 32,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz1024"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 64,
+   "exit": 0,
+   "bench": {
+    "completed": 64,
+    "duration": 17.748028183355927,
+    "request_throughput": 3.606034390908794,
+    "request_goodput": 0.22537714943179962,
+    "output_throughput": 461.5724020363256,
+    "total_token_throughput": 4154.1516183269305,
+    "mean_ttft_ms": 6337.886878289282,
+    "median_ttft_ms": 6529.459334909916,
+    "p90_ttft_ms": 8646.65387272835,
+    "p99_ttft_ms": 8688.242402616888,
+    "mean_tpot_ms": 12.052685983468022,
+    "median_tpot_ms": 12.171138195306296,
+    "p99_tpot_ms": 12.535891414832646,
+    "mean_e2el_ms": 7868.577998189721,
+    "p99_e2el_ms": 10279.3036217615,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961865.166936,
+   "t1": 1794961892.5596135,
+   "logs0": {
+    "engine_prefill1.log": 149188,
+    "engine_decode1.log": 197349,
+    "engine_decode3.log": 196657,
+    "engine_decode2.log": 196292
+   },
+   "logs1": {
+    "engine_prefill1.log": 154036,
+    "engine_decode1.log": 200220,
+    "engine_decode3.log": 199085,
+    "engine_decode2.log": 198719
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t2048_b16_o128": {
+   "tokens": 2048,
+   "batch": 16,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz16"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 32,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 18.66731313429773,
+    "request_throughput": 1.7142263468654164,
+    "request_goodput": 0.1607087200186328,
+    "output_throughput": 219.4209723987733,
+    "total_token_throughput": 3730.156530779146,
+    "mean_ttft_ms": 6822.937725577503,
+    "median_ttft_ms": 6525.933459401131,
+    "p90_ttft_ms": 9108.86847935617,
+    "p99_ttft_ms": 9154.123802948743,
+    "mean_tpot_ms": 12.20815152197519,
+    "median_tpot_ms": 12.215523518563256,
+    "p99_tpot_ms": 12.912842337276757,
+    "mean_e2el_ms": 8373.372968868352,
+    "p99_e2el_ms": 10750.56524662301,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961893.5806296,
+   "t1": 1794961921.7701452,
+   "logs0": {
+    "engine_prefill1.log": 154349,
+    "engine_decode1.log": 200533,
+    "engine_decode3.log": 199398,
+    "engine_decode2.log": 199032
+   },
+   "logs1": {
+    "engine_prefill1.log": 157332,
+    "engine_decode1.log": 202962,
+    "engine_decode3.log": 201894,
+    "engine_decode2.log": 201903
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t1920_b20_o128": {
+   "tokens": 1920,
+   "batch": 20,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "ibp"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 40,
+   "exit": 0,
+   "bench": {
+    "completed": 40,
+    "duration": 19.651031835004687,
+    "request_throughput": 2.0355165232976407,
+    "request_goodput": 0.05088791308244102,
+    "output_throughput": 260.546114982098,
+    "total_token_throughput": 4168.737839713568,
+    "mean_ttft_ms": 7564.8679924197495,
+    "median_ttft_ms": 7143.539654091001,
+    "p90_ttft_ms": 11339.013743586838,
+    "p99_ttft_ms": 11580.674640834332,
+    "mean_tpot_ms": 11.87709659176666,
+    "median_tpot_ms": 11.832081742115378,
+    "p99_tpot_ms": 12.69729543330632,
+    "mean_e2el_ms": 9073.259259574115,
+    "p99_e2el_ms": 13097.043261490762,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961922.7926598,
+   "t1": 1794961952.1082938,
+   "logs0": {
+    "engine_prefill1.log": 157645,
+    "engine_decode1.log": 203275,
+    "engine_decode3.log": 202207,
+    "engine_decode2.log": 202216
+   },
+   "logs1": {
+    "engine_prefill1.log": 161164,
+    "engine_decode1.log": 206354,
+    "engine_decode3.log": 204838,
+    "engine_decode2.log": 204847
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t1024_b64_o128": {
+   "tokens": 1024,
+   "batch": 64,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz1024"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 128,
+   "exit": 0,
+   "bench": {
+    "completed": 128,
+    "duration": 32.226078080013394,
+    "request_throughput": 3.971938492862573,
+    "request_goodput": 0.12412307790195541,
+    "output_throughput": 508.40812708640937,
+    "total_token_throughput": 4575.673143777684,
+    "mean_ttft_ms": 12979.736147506628,
+    "median_ttft_ms": 12903.399594128132,
+    "p90_ttft_ms": 19743.68295520544,
+    "p99_ttft_ms": 25591.913408748806,
+    "mean_tpot_ms": 12.075387278762388,
+    "median_tpot_ms": 11.761244496433283,
+    "p99_tpot_ms": 14.545850865836218,
+    "mean_e2el_ms": 14513.310331909452,
+    "p99_e2el_ms": 26989.190955292434,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961953.129737,
+   "t1": 1794961995.0463953,
+   "logs0": {
+    "engine_prefill1.log": 161477,
+    "engine_decode1.log": 206667,
+    "engine_decode3.log": 205151,
+    "engine_decode2.log": 205160
+   },
+   "logs1": {
+    "engine_prefill1.log": 171455,
+    "engine_decode1.log": 213030,
+    "engine_decode3.log": 211582,
+    "engine_decode2.log": 211593
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t4096_b16_o128": {
+   "tokens": 4096,
+   "batch": 16,
+   "output": 128,
+   "rounds": 2,
+   "families": [
+    "sz16"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 32,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 36.780484134331346,
+    "request_throughput": 0.8700266120241418,
+    "request_goodput": 0.0,
+    "output_throughput": 111.36340633909015,
+    "total_token_throughput": 3674.9924091899748,
+    "mean_ttft_ms": 14257.405498239677,
+    "median_ttft_ms": 12690.266884863377,
+    "p90_ttft_ms": 25153.165083378564,
+    "p99_ttft_ms": 26374.874506294727,
+    "mean_tpot_ms": 13.150250037772741,
+    "median_tpot_ms": 13.297659300971688,
+    "p99_tpot_ms": 13.38222690777281,
+    "mean_e2el_ms": 15927.487253036816,
+    "p99_e2el_ms": 28065.228680744767,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794961996.068529,
+   "t1": 1794962042.4085681,
+   "logs0": {
+    "engine_prefill1.log": 171768,
+    "engine_decode1.log": 213343,
+    "engine_decode3.log": 211895,
+    "engine_decode2.log": 211906
+   },
+   "logs1": {
+    "engine_prefill1.log": 175028,
+    "engine_decode1.log": 215843,
+    "engine_decode3.log": 214328,
+    "engine_decode2.log": 214407
+   },
+   "idle": true
+  },
+  "shape_nixl_nativegbps_t4096_b16_o256": {
+   "tokens": 4096,
+   "batch": 16,
+   "output": 256,
+   "rounds": 2,
+   "families": [
+    "exactkv"
+   ],
+   "link_gbps": "native",
+   "codec": "nixl",
+   "requests": 32,
+   "exit": 0,
+   "bench": {
+    "completed": 32,
+    "duration": 35.458144165575504,
+    "request_throughput": 0.9024724997047974,
+    "request_goodput": 0.056404531231549836,
+    "output_throughput": 231.03295992442813,
+    "total_token_throughput": 3927.560318715278,
+    "mean_ttft_ms": 12474.163896229584,
+    "median_ttft_ms": 12414.798952639103,
+    "p90_ttft_ms": 15352.049983851612,
+    "p99_ttft_ms": 21764.677747432153,
+    "mean_tpot_ms": 13.307728183309674,
+    "median_tpot_ms": 13.36823453505834,
+    "p99_tpot_ms": 14.88960809961838,
+    "mean_e2el_ms": 15867.634582973551,
+    "p99_e2el_ms": 25063.138992376636,
+    "failed": 0
+   },
+   "transfers": {},
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "t0": 1794962043.431389,
+   "t1": 1794962088.5901747,
+   "logs0": {
+    "engine_prefill1.log": 175341,
+    "engine_decode1.log": 216156,
+    "engine_decode3.log": 214641,
+    "engine_decode2.log": 214720
+   },
+   "logs1": {
+    "engine_prefill1.log": 178879,
+    "engine_decode1.log": 220058,
+    "engine_decode3.log": 218453,
+    "engine_decode2.log": 218551
+   },
+   "idle": true
+  }
+ },
+ "jit": [
+  {
+   "time": 1794961380.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961380.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961380.0,
+   "log": "engine_decode1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961380.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961380.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961380.0,
+   "log": "engine_prefill1.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961381.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961381.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961381.0,
+   "log": "engine_decode2.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961381.0,
+   "log": "engine_decode3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_stats_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961381.0,
+   "log": "engine_decode3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_step_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  },
+  {
+   "time": 1794961381.0,
+   "log": "engine_decode3.log",
+   "text": "Triton kernel JIT compilation during inference: _topp_sb_mask_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.",
+   "point": null
+  }
+ ]
+}
