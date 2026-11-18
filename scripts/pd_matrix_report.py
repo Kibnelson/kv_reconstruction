@@ -70,6 +70,43 @@ def speed_key(x):
     return (1, 0.0) if x in ("native", "None") else (0, float(x))
 
 
+def capacity(by, codec, rates, share=0.9):
+    """(the highest offered request rate whose goodput reached `share` of it, the most requests per second at any
+    rate): how many requests a codec carries within the TTFT target. None where no rate qualified."""
+    cap = top = None
+    for rt in rates:
+        b = ((by.get((codec, rt)) or {}).get("bench") or {})
+        thr = b.get("request_throughput")
+        if thr is not None:
+            top = thr if top is None else max(top, thr)
+        try:
+            r = float(rt)
+        except (TypeError, ValueError):
+            continue
+        if r == float("inf"):
+            continue
+        g = b.get("request_goodput")
+        if g is not None and g >= share * r:
+            cap = r if cap is None else max(cap, r)
+    return cap, top
+
+
+def numeric_rates(rates):
+    out = []
+    for r in rates:
+        try:
+            if float(r) != float("inf"):
+                out.append(r)
+        except (TypeError, ValueError):
+            pass
+    return out
+
+
+CAPACITY_NOTE = ("Capacity: the highest request rate (per second) at which at least 90 % of the requests met the "
+                 "run's TTFT target (goodput at least 0.9 x the rate); *most*: the most requests per second at any "
+                 "rate, the target aside.")
+
+
 def link_tables(key, vs):
     """One layout and path over many link speeds: TTFT p50 per codec and speed (the best in bold), what the link
     carried, the speeds where each codec beats raw, and where a request's time goes."""
@@ -129,6 +166,19 @@ def link_tables(key, vs):
                          f"{fmt(ttft(c, l), 0)} |")
             if len(links) == 1:
                 break
+        L.append("")
+    rates_all = sorted({str(v["rate"]) for v in vs}, key=lambda x: (x == "inf", float(x) if x != "inf" else 0))
+    if len(numeric_rates(rates_all)) >= 3:
+        head = [("native" if l in ("native", "None") else f"{float(l):g}") for l in links]
+        L += [f"## {lay}, {path}{', eager engines' if eager else ''}: capacity per link speed", "", CAPACITY_NOTE, "",
+              "| Codec | " + " | ".join(head) + " |", "|" + " --- |" * (len(links) + 1)]
+        for c in codecs:
+            cells = []
+            for l in links:
+                by = {(v["codec"], str(v["rate"])): v for v in vs if str(v.get("link_gbps")) == l}
+                cap, _ = capacity(by, c, rates_all)
+                cells.append(fmt(cap, 1) if cap else "-")
+            L.append(f"| {cname(c)} | " + " | ".join(cells) + " |")
         L.append("")
     return L
 
@@ -304,6 +354,15 @@ def main(argv=None):
                 best.append(f"rate {rt}: {cname(c)} (goodput {g:.2f}/s, TTFT p50 {-t:.0f} ms)")
         if best:
             L += ["Best by goodput, then TTFT p50: " + "; ".join(best) + ".", ""]
+        if len(numeric_rates(rates)) >= 3:
+            L += [CAPACITY_NOTE, "", "| Codec | Capacity (req/s) | Most (req/s) | vs raw |", "| --- | --- | --- | --- |"]
+            raw_cap = capacity(by, "raw", rates)[0] if "raw" in codecs else None
+            for c in codecs:
+                cap, top = capacity(by, c, rates)
+                rel = (f"{cap / raw_cap:.2f}x" if cap and raw_cap and c != "raw" else "")
+                L.append(f"| {cname(c)} | {fmt(cap, 1) if cap else 'below ' + str(numeric_rates(rates)[0])} | "
+                         f"{fmt(top)} | {rel} |")
+            L.append("")
 
     L += workload_tables(runs)
 

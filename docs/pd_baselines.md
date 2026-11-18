@@ -165,6 +165,21 @@ What the workloads campaign showed (job 30371, all six runs complete), and what 
 The `wlours` campaign (about 3.5 hours) measures the changes: raw, T (hbh), T2 (hbh, rank 256), SplitZip and
 AdaCode on the same workloads, host memory at 10 and 100 Gb/s and GPU to GPU.
 
+After `wlours` (branch pd-decode until it is measured):
+- The receiver decodes T's and T2's stream as sent (wire.compact_starts): a segment's states and words keep their
+  distance from its first used word in the dense array, so the S x cap slot buffer (twice the request's KV) and the
+  loop of masked copies and host syncs that filled it are gone. The sender packs the tails with one kernel.
+- Installs run on a thread and CUDA stream of their own (`async_install`, on in scripts/run_pd_vllm.sh;
+  ASYNC_INSTALL=false restores the step): the engine's step goes on while a transfer decodes, and the request is
+  reported loaded once its install has finished on the GPU; a request that ends meanwhile is reported after it, so
+  vLLM never frees blocks that are being written. T2 transfers whose receiver recomputes layer 0 still install in
+  the step (the recompute runs the engine's own modules).
+- The `capacity` campaign (about 3.5 hours) asks how many requests each codec carries: 96 prompts of 2,048 tokens
+  at 1 to 8 per second, and for each codec and link speed the highest rate at which 90 % of the requests meet a
+  1 s TTFT target; host memory at 10, 25, 50 and 100 Gb/s and GPU to GPU. One A5000 prefill makes KV at about
+  8-10 Gb/s, so above that the link is idle most of the time and only the GPUs' work decides; the speeds that
+  matter for a datacenter are those per prefill GPU sharing a link.
+
 The report gives one table per path and link: a row per workload, a column per codec, TTFT p50 with its speedup
 over raw (SplitZip's measure), then requests per second with the gain over raw.
 
@@ -348,6 +363,7 @@ The matrices (the times are estimates until the smoke has measured them):
 | workloads | 1+3, every codec on the baselines' published workloads and ours (above, "Workloads"), AQUA-KV 2- and 3-bit beside them: host memory at 10 and 100 Gb/s, GPU to GPU, NIXL, nvCOMP; exactkv in runs of its own, last |
 | wlong | the biggest published workloads (32K-token prompts, 16 at once of 8K and 16K, 128 and 256 at once of 1,024): host memory at 10 and 100 Gb/s, GPU to GPU; exactkv apart |
 | wlours | the workloads campaign again for T and T2 after job 30371 (decoder in one chunk, pieces over 4K tokens, one transfer over the GPU budget kept on the GPU), with raw, SplitZip and AdaCode: host memory at 10 and 100 Gb/s, GPU to GPU |
+| capacity | 96 prompts of 2,048 tokens at 1-8 per second: the highest rate at which 90 % meet a 1 s TTFT target, per codec, host memory at 10, 25, 50 and 100 Gb/s and GPU to GPU |
 | links | 1+3 over 10, 25, 50, ... 400 Gb/s (steps of 25), through host memory and GPU to GPU (paced, then unpaced), 16 requests at once: raw, T (hbh), T2 (hbh, rank 256), SplitZip, ExANS, AdaCode, AQUA-KV 2-bit and exactkv (last). One table per path: TTFT p50 per codec and speed, what the link carried, where each codec beats raw, and where a request's time goes |
 | tier | the CPU tier with every codec, nvCOMP apart; LMCache |
 | t2eager | T and T2 in eager engines: host memory at 10 and 100 Gb/s, GPU to GPU, the CPU tier |

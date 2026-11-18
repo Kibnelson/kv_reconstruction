@@ -237,6 +237,9 @@ else
     [ "$EAGER" = 1 ] && ENGINE_ARGS+=(--enforce-eager)
 fi
 [ "$COLO" = 1 ] && ENGINE_ARGS+=(--num-gpu-blocks-override "${GPU_BLOCKS:-2048}" --distributed-executor-backend uni)
+# decode: installs on a thread and CUDA stream of their own, not inside the engine's step (ASYNC_INSTALL=false:
+# inside it, as up to job 30371)
+case "${ASYNC_INSTALL:-true}" in true|1) ASYNC_INSTALL=true ;; *) ASYNC_INSTALL=false ;; esac
 if [ "$SHAPE_NEED" -gt "$MAXLEN" ]; then           # the longest workload's prompt and output
     MAXLEN=$(( (SHAPE_NEED + 255) / 256 * 256 ))
     echo "   context $MAXLEN tokens for the workloads (SHAPES)"
@@ -360,7 +363,7 @@ for ((i = 1; i <= NUM_DECODE; i++)); do
     else
         case "$CONNECTOR" in
             tkv) serve "decode$i" "$pos" "$port" "$D_MEM" \
-                     "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_consumer\",\"kv_connector_extra_config\":{$COMMON,\"listen\":\"127.0.0.1:$kv\",\"gpu_recv_budget\":$RECV_BUDGET,\"recv_timeout_s\":600}}" ;;
+                     "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_consumer\",\"kv_connector_extra_config\":{$COMMON,\"listen\":\"127.0.0.1:$kv\",\"gpu_recv_budget\":$RECV_BUDGET,\"recv_timeout_s\":600,\"async_install\":$ASYNC_INSTALL}}" ;;
             nixl) serve "decode$i" "$pos" "$port" "$D_MEM" '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
                       VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT=$((PORT_BASE + 450 + i)) UCX_NET_DEVICES=all \
                       UCX_PROTO_INFO=y ;;
@@ -404,7 +407,7 @@ nohup "$CPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_AR
 PIDS+=($!)
 for _ in $(seq 1 30); do curl -sf "$PROXY/health" >/dev/null && break; sleep 1; done
 "$VPY" - "$OUT/env.json" "$MODEL_ID" "$NUM_PREFILL" "$NUM_DECODE" "$LAYOUT" "$CONNECTOR" "$TRANSPORT" "$EAGER" \
-    "${NIXL_ALL_GPUS:-0}" <<'EOF'
+    "${NIXL_ALL_GPUS:-0}" "$ASYNC_INSTALL" <<'EOF'
 import json, os, subprocess, sys, torch, vllm
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
 extra = {}
@@ -418,7 +421,8 @@ json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sy
            "torch": torch.__version__, "gpus": ", ".join(sorted(set(gpus.split("\n")) - {""})),
            "nixl_all_gpus": sys.argv[6] == "nixl" and sys.argv[9] == "1",
            "decode_chunks": int(os.environ.get("TKV_DECODE_CHUNKS", "1")),
-           "piece_tokens": int(os.environ.get("TKV_PIECE_TOKENS", "4096")), **extra},
+           "piece_tokens": int(os.environ.get("TKV_PIECE_TOKENS", "4096")),
+           "async_install": sys.argv[10] == "true", **extra},
           open(sys.argv[1], "w"))
 EOF
 set +e

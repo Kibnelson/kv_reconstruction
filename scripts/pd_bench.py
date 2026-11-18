@@ -415,6 +415,8 @@ def transfer_stats(recs):
             "queue_ms": mean([1e3 * (r["send_begin"] - r["queued"]) for r in s if r.get("send_begin")]),
             "achieved_gbps": mean(ach), "wire_gbps": wire_gbps(s), "rel_err": mean([r.get("rel_err") for r in s]),
             "install_ms": mean([r.get("decode_install_ms") for r in d]),
+            "issue_ms": mean([r.get("issue_ms") for r in d]),
+            "install_queued_ms": mean([r.get("install_queued_ms") for r in d]),
             "wait_ms": mean([1e3 * (r["done_at"] - r["admitted_at"]) for r in d if r.get("admitted_at")]),
             "exact": sum(1 for r in d if r.get("exact") is True), "inexact": sum(1 for r in d if r.get("exact") is False),
             "spilled_to_host": sum(1 for r in s if r.get("queued_on") == "host"),

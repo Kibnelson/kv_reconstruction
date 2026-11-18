@@ -958,6 +958,32 @@ class BenchAndReportTests(unittest.TestCase):
         text = (root / "s.md").read_text()
         self.assertIn("| 3743 (host) | **2730** (1.37x) |", text)
 
+    def test_capacity_is_the_highest_rate_most_requests_meet_the_target(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_matrix_report as mr
+        good = {"raw": {1.0: 1.0, 2.0: 1.95, 3.0: 2.5, 4.0: 1.0}, "ours-hbh": {1.0: 1.0, 2.0: 2.0, 3.0: 2.9, 4.0: 3.7}}
+        sw = {f"s_{c}_{r}": {"link_gbps": 10, "codec": c, "rate": r, "bench": {
+            "request_goodput": g, "request_throughput": r * 0.98, "median_ttft_ms": 300}, "transfers": {"bits": 8.6}}
+            for c, gs in good.items() for r, g in gs.items()}
+        root = Path(tempfile.mkdtemp())
+        (root / "r").mkdir()
+        (root / "r" / "env.json").write_text(json.dumps({"layout": "1p3d", "connector": "tkv", "transport": "ring"}))
+        (root / "r" / "results.json").write_text(json.dumps({"sweep": sw}))
+        mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
+        text = (root / "s.md").read_text()
+        self.assertIn("| raw | 2.0 | 3.92 |  |", text)          # 2.5 of 3 per second met the target: not 3
+        self.assertIn("| ours-hbh | 4.0 | 3.92 | 2.00x |", text)
+        # many link speeds: a capacity table across them
+        sw = {f"s_{c}_{l}_{r}": dict(v, link_gbps=l) for l in (10, 25, 50, 100, 200)
+              for c, gs in good.items() for r, v in ((r, {"codec": c, "rate": r, "bench": {
+                  "request_goodput": g, "request_throughput": r, "median_ttft_ms": 300}, "transfers": {}})
+                  for r, g in gs.items())}
+        (root / "r" / "results.json").write_text(json.dumps({"sweep": sw}))
+        mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
+        text = (root / "s.md").read_text()
+        self.assertIn("capacity per link speed", text)
+        self.assertIn("| ours-hbh | 4.0 | 4.0 | 4.0 | 4.0 | 4.0 |", text)
+
     def test_wire_rate_and_link_speed_tables(self):
         """Job 30280: three transfers sharing a 10 Gb/s link each ran at about a third of it; the link carried 10."""
         sys.path.insert(0, str(ROOT / "scripts"))
@@ -1446,6 +1472,12 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertEqual([x.split(" CODECS=")[0] for x in again], ["TRANSPORT=ring LINKS=10,100", "TRANSPORT=p2p LINKS=native"])
         self.assertTrue(all("CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip,adacode " in x and "SHAPES=" in x
                             for x in again))
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="capacity", PRINT_RUNS="1"))
+        cap = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual([x.split(" CODECS=")[0] for x in cap],
+                         ["TRANSPORT=ring LINKS=10,25,50,100", "TRANSPORT=p2p LINKS=native"])
+        self.assertTrue(all("RATES=1,2,3,4,5,6,8 NUM_PROMPTS=96 TTFT_SLO_MS=1000" in x for x in cap))
         self.assertTrue(all("SHAPES=32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,"
                             "8192:16:128:2:sz16,16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024" in x
                             for x in long))

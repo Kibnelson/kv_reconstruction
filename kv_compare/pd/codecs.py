@@ -105,6 +105,18 @@ def _decode_pieces(one, parts, meta, sink, L, W, device):
     del full
 
 
+def _stream(parts, cap, hd):
+    """T's and T2's stream as the decoder reads it: the dense tails as sent, with their starts in that array
+    (wire.compact_starts). Job 30371's receiver first expanded them to S x cap words (twice the request's KV) in
+    a loop of masked copies and host syncs, a part of the fixed cost of every install."""
+    from .wire import compact_starts
+    words = parts["words"]
+    starts, n = compact_starts(parts["starts"], cap, hd)
+    if n != words.numel():
+        raise ValueError(f"{words.numel()} words for segments that use {n}")
+    return words.contiguous(), starts
+
+
 def _pieces_meta(pm):
     """The fields the sender and the reports read, for a request in pieces: T2's set and layer 0 (recomputed only
     if every piece's was)."""
@@ -239,17 +251,13 @@ class Ours:
         return _decode_pieces(self._decode_one, parts, meta, sink, self.L, self.W, self.device)
 
     def _decode_one(self, parts, meta, sink):
-        from .wire import expand_segments
         T, pos0 = int(meta["T"]), int(meta.get("pos0", 0))
         codec, _, Tp = self.codec(T, pos0, chunks=DECODE_CHUNKS)
         _, cap = codec.layout(Tp)
         if cap != int(meta["cap"]) or Tp != int(meta["Tpad"]):
             raise ValueError("the sender's codec layout differs from the receiver's (different constants?)")
-        starts = parts["starts"]
-        buf = expand_segments(parts["words"], starts, cap, self.hd,
-                              out=torch.empty(starts.numel() * cap, dtype=torch.int16, device=self.device))
+        buf, starts = _stream(parts, cap, self.hd)
         codec.decode(buf, starts, Tp, sink=lambda l, w: sink(l, w[:T]))
-        del buf
 
 
 class SplitZip:
@@ -749,7 +757,6 @@ class T2Codec:
                               self.device)
 
     def _decode_one(self, parts, meta, sink, ctx=None):
-        from .wire import expand_segments
         T, pos0 = int(meta["T"]), int(meta.get("pos0", 0))
         o = self.sets[meta["set"]]
         rec = meta["layer0"] == "recomputed"
@@ -757,9 +764,7 @@ class T2Codec:
         _, cap = codec.layout(Tp)
         if cap != int(meta["cap"]) or Tp != int(meta["Tpad"]):
             raise ValueError("the sender's codec layout differs from the receiver's (different constants?)")
-        starts = parts["starts"]
-        buf = expand_segments(parts["words"], starts, cap, self.hd,
-                              out=torch.empty(starts.numel() * cap, dtype=torch.int16, device=self.device))
+        buf, starts = _stream(parts, cap, self.hd)
         if rec:
             if ctx is None:
                 raise ValueError("the stream's layer 0 is recomputed by the receiver, which has no layer-0 context")
@@ -768,7 +773,6 @@ class T2Codec:
             codec.decode(buf, starts, Tp, l0, sink=lambda l, w: sink(l, w[:T]))
         else:
             codec.decode(buf, starts, Tp, sink=lambda l, w: sink(l, w[:T]))
-        del buf
 
 
 class IBP:

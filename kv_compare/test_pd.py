@@ -318,10 +318,11 @@ class ConnectorFlowTests(unittest.TestCase):
         from vllm.v1.request import RequestStatus
         cls.Role, cls.Status = KVConnectorRole, RequestStatus
 
-    def make(self, codecs=("raw",), timeout=600):
+    def make(self, codecs=("raw",), timeout=600, async_install=False):
         log_dir = tempfile.mkdtemp()
         L, H, bs, hd = 3, 2, 16, 8
-        d_extra = {"codecs": list(codecs), "listen": "127.0.0.1:0", "log_dir": log_dir, "recv_timeout_s": timeout}
+        d_extra = {"codecs": list(codecs), "listen": "127.0.0.1:0", "log_dir": log_dir, "recv_timeout_s": timeout,
+                   "async_install": async_install}
         p_extra = {"codecs": list(codecs), "log_dir": log_dir, "transport": "ring", "ring_bytes": 1 << 20}
         Ps, Pw = (self.cn.TKVConnector(_vcfg(True, p_extra), r) for r in (self.Role.SCHEDULER, self.Role.WORKER))
         Ds, Dw = (self.cn.TKVConnector(_vcfg(False, dict(d_extra, ring_bytes=1 << 20)), r)
@@ -345,8 +346,8 @@ class ConnectorFlowTests(unittest.TestCase):
                                                       failed_recving=r.failed_recving))
         return r
 
-    def flow(self, local_hit=0, codec="raw", lossy=False):
-        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make()
+    def flow(self, local_hit=0, codec="raw", lossy=False, async_install=False):
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(async_install=async_install)
         if lossy:                                     # a lossy stand-in for AQUA-KV: every word's lowest bit flipped
             from kv_compare.pd.codecs import Raw
 
@@ -413,6 +414,54 @@ class ConnectorFlowTests(unittest.TestCase):
 
     def test_whole_prompt_moves_exactly(self):
         self.flow()
+
+    def test_the_installer_thread_moves_it_exactly_and_reports_it_once_done(self):
+        """async_install: the install runs on a thread (and CUDA stream) of its own, so the engine's step goes on;
+        the request is reported loaded once the install has finished."""
+        recs = self.flow(async_install=True)
+        inst = next(x for x in recs if x.get("event") == "install")
+        self.assertTrue(inst["async"])
+        self.assertGreaterEqual(inst["install_queued_ms"], 0)
+
+    def test_a_request_that_ends_during_its_install_is_reported_after_it(self):
+        """Its blocks are being written: vLLM may free them only once the install has finished."""
+        import threading
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(async_install=True)
+        gate, started = threading.Event(), threading.Event()
+        install = Dw.w._install
+
+        def slow(*a, **k):
+            started.set()
+            gate.wait(20)
+            return install(*a, **k)
+        Dw.w._install = slow
+        prompt = list(range(100, 140))
+        dreq = SimpleNamespace(request_id="d-9", prompt_token_ids=prompt, num_computed_tokens=0,
+                               kv_transfer_params={"t_recv": True, "t_key": "K9"})
+        n, _ = Ds.get_num_new_matched_tokens(dreq, 0)
+        Ds.update_state_after_alloc(dreq, SimpleNamespace(get_block_ids=lambda: ([1, 7, 3],)), n)
+        self.step(Ds, Dw)
+        preq = SimpleNamespace(request_id="p-9", prompt_token_ids=prompt, num_computed_tokens=40,
+                               status=self.Status.FINISHED_LENGTH_CAPPED,
+                               kv_transfer_params={"t_send": True, "t_key": "K9", "t_dest": dest, "t_codec": "raw"})
+        Ps.request_finished(preq, [5, 2, 9])
+        self.step(Ps, Pw, finished={"p-9"})
+        end = time.time() + 20
+        while not started.is_set() and time.time() < end:
+            self.step(Ds, Dw)
+            time.sleep(0.02)
+        self.assertTrue(started.is_set())
+        dreq.status = self.Status.FINISHED_ABORTED
+        Ds.request_finished(dreq, [1, 7, 3])
+        r = self.step(Ds, Dw, finished={"d-9"})
+        self.assertEqual(r.finished_recving, set())             # not while its blocks are being written
+        gate.set()
+        got = set()
+        while time.time() < end and not got:
+            got = self.step(Ds, Dw).finished_recving
+            time.sleep(0.02)
+        self.assertEqual(got, {"d-9"})
+        self.assertEqual(Dw.w.installing, set())
 
     def test_warm_up_keeps_a_lossy_codec_that_rebuilds_its_own_reconstruction(self):
         """Job 30293 left AQUA-KV out at the warm-up ("round trip not exact"): a lossy codec passes when the receiver
@@ -566,6 +615,19 @@ for T, pos0 in ((96, 0), (50, 7)):
             c.decode(p2, m2, lambda l, x: got.__setitem__(l, x.clone()))
             codecs.DECODE_CHUNKS = 1
             assert torch.equal(torch.stack([got[l] for l in range(L)]), w), n
+# the GPU packing kernel (here interpreted) packs exactly what the torch loop packs
+c = built["ours-4g"]
+codec, kp, Tp = c.codec(96, 0)
+wp = torch.cat([words, torch.zeros(L, Tp - 96, W, dtype=words.dtype)], 1).contiguous()
+xall, prior = c.model(codec, kp, wp)
+buf, starts = codec.encode(wp, xall, prior)
+_, cap = codec.layout(Tp)
+a = wire.compact_segments(buf, starts, cap, c.hd, kernel=False)
+b = wire.compact_segments(buf, starts, cap, c.hd, kernel=True)
+assert torch.equal(a, b), "tail copy"
+sc, n = wire.compact_starts(starts, cap, c.hd)
+assert n == a.numel() and int(sc[0]) == int(starts[0]) - int(wire.segment_bases(starts, cap, c.hd)[0])
+print("ok tail copy", a.numel())
 # a request longer than a piece: coded in pieces, decoded bit-exact
 codecs.PIECE_TOKENS = 64
 for n, c in built.items():

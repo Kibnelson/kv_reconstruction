@@ -211,6 +211,12 @@ class TKVConnector(KVConnectorBase_V1):
         return True
 
 
+def _layer0_recomputed(header):
+    """A transfer whose receiver recomputes T2's layer 0 (with the engine's own modules)."""
+    m = (header or {}).get("meta") or {}
+    return m.get("layer0") == "recomputed"
+
+
 def _fits(held, n, budget):
     """A transfer of n bytes stays on the GPU: within the budget, or when it is the only one held."""
     return budget is None or held == 0 or held + n <= budget
@@ -434,6 +440,14 @@ class _WorkerSide:
         self.recv_ok: set[str] = set()
         self.recv_failed: set[str] = set()
         self.failed_blocks: set[int] = set()
+        # decode, async_install: installs run on a thread and CUDA stream of their own, so the engine's step goes on
+        # (job 30371: T's 135-190 ms installs ran inside the step, and every request's time per token went from 12
+        # to 17-18 ms). A request is reported loaded only once its install has finished on the GPU.
+        self.async_install = bool(cfg.get("async_install", False))
+        self.install_q = None
+        self.rlock = threading.Lock()                # recv_ok, recv_failed, installing, cancelled
+        self.installing: set[str] = set()
+        self.cancelled: set[str] = set()
         self.timeout = float(cfg.get("recv_timeout_s", 600))
         self.gpu_budget = int(cfg.get("gpu_send_budget", 2 << 30))
         self.gpu_queued = 0
@@ -498,6 +512,10 @@ class _WorkerSide:
             self.receiver = Receiver(host, int(port), device, ring_bytes=int(self.cfg.get("ring_bytes", 1 << 30)),
                                      log=logger.warning, gpu_budget=self.cfg.get("gpu_recv_budget"),
                                      gpu_ring_bytes=int(self.cfg.get("gpu_ring_bytes", 512 << 20)))
+            if self.async_install:
+                import queue
+                self.install_q = queue.Queue()
+                threading.Thread(target=self._install_loop, daemon=True, name="tkv-install").start()
         logger.info("TKVConnector worker ready: %s codecs %s", "prefill" if self.producer else "decode",
                     sorted(self.codecs))
 
@@ -635,11 +653,51 @@ class _WorkerSide:
                 logger.warning("TKVConnector: could not tell %s: %r", spec.dest, exc2)
 
     # ------------------------------------------------------------------------------------------------- decode
-    def _install(self, spec: RecvSpec, got):
+    def _install_loop(self):
+        """The installer thread (async_install): installs one at a time on a stream of its own."""
+        stream = None
+        if self.device.type == "cuda":
+            torch.cuda.set_device(self.device)
+            stream = torch.cuda.Stream(self.device)
+        while True:
+            item = self.install_q.get()
+            if item is None:
+                return
+            spec, got, put_at = item
+            try:
+                if stream is not None:
+                    with torch.cuda.stream(stream):
+                        self._install(spec, got, queued_ms=1e3 * (time.time() - put_at), on_stream=True)
+                else:
+                    self._install(spec, got, queued_ms=1e3 * (time.time() - put_at))
+            except BaseException as exc:          # _install reports its own errors; this is a last resort
+                logger.warning("TKVConnector: installer: %r", exc)
+                self._done(spec.req_id, False)
+
+    def _done(self, rid, ok):
+        """Report a request's load: ok, or failed (vLLM computes it); a request that ended during its install is
+        reported loaded (its blocks may be freed now, not while they were being written)."""
+        with self.rlock:
+            self.installing.discard(rid)
+            if rid in self.cancelled:
+                self.cancelled.discard(rid)
+                self.recv_ok.add(rid)
+            elif ok:
+                self.recv_ok.add(rid)
+            else:
+                self.recv_failed.add(rid)
+
+    def _install(self, spec: RecvSpec, got, queued_ms=None, on_stream=False):
+        """on_stream: the installer thread's own stream; its work is waited for on that stream (every codec ends
+        its work there: nvCOMP's and IBP's own streams are joined back), not on the whole GPU."""
         from .wire import Checksum, unbundle
         header, blob, trec = got
         rec = {"event": "install", "key": spec.key, "req": spec.req_id, "tokens": spec.t1 - spec.t0,
                "admitted_at": spec.admitted_at, "taken_at": time.time(), **{f"link_{k}": v for k, v in trec.items()}}
+        if queued_ms is not None:
+            rec["install_queued_ms"] = queued_ms
+            rec["async"] = True
+        ok = False
         try:
             parts, meta = unbundle(header, blob if blob.device == self.device else blob.to(self.device))
             codec = self.codecs[meta["codec"]]
@@ -651,7 +709,12 @@ class _WorkerSide:
             a, b = spec.t0 - st0, spec.t1 - st0      # the part this engine does not have yet
             blk, off = self.paged.slots(spec.block_ids, spec.t0, spec.t1)
             want = meta.get("checksum")
-            sync = torch.cuda.synchronize if self.device.type == "cuda" else (lambda *x: None)
+            if self.device.type != "cuda":
+                sync = lambda *x: None
+            elif on_stream:
+                sync = lambda d: torch.cuda.current_stream(d).synchronize()
+            else:
+                sync = torch.cuda.synchronize
             t = time.perf_counter()
             ctx = self._ctx(codec, spec.prompt)
 
@@ -667,6 +730,9 @@ class _WorkerSide:
                         codec.decode(parts, meta, sink, ctx=ctx)
                     else:
                         codec.decode(parts, meta, sink)
+                # the CPU's time to issue the decode and install (the GPU may still be at work): near the whole
+                # install time, the install is launch-bound (what CUDA graphs would remove)
+                rec["issue_ms"] = 1e3 * (time.perf_counter() - t)
                 sync(self.device)
                 return ck
             ck = _retry_once(run, self.device, rec)
@@ -677,16 +743,16 @@ class _WorkerSide:
             rec["exact"] = None if want is None else (ck.value() == want)
             if rec["exact"] is False:
                 raise ValueError("checksum mismatch: the installed KV differs from the sender's")
-            self.recv_ok.add(spec.req_id)
+            ok = True
         except Exception as exc:                     # for the request only (see results: vLLM asserts otherwise)
             rec["error"] = repr(exc)[:300]
-            self.recv_failed.add(spec.req_id)
             logger.warning("TKVConnector: install of %s failed: %s", spec.key, rec["error"])
         finally:
             if self.receiver is not None:
                 self.receiver.release(blob)
         rec["done_at"] = time.time()
         self.log.write(rec)
+        self._done(spec.req_id, ok)
 
     # ------------------------------------------------------------------------------------------------- shared
     def on_metadata(self, meta: TKVMetadata):
@@ -699,7 +765,11 @@ class _WorkerSide:
             if spec is not None and self.receiver is not None and not spec.chunks:
                 self.receiver.drop(spec.key)
                 self.log.write({"event": "cancel", "key": spec.key, "req": rid, "time": time.time()})
-            self.recv_ok.add(rid)                    # lets vLLM free the blocks of the finished request
+            with self.rlock:                         # lets vLLM free the blocks of the finished request (when
+                if rid in self.installing:           # its install ends, if one is running: see _done)
+                    self.cancelled.add(rid)
+                else:
+                    self.recv_ok.add(rid)
 
     # ---------------------------------------------------------------------------------------------------- tier
     def _tier_control(self):
@@ -890,7 +960,12 @@ class _WorkerSide:
                 err = None if got is not None else self.receiver.failure(spec.key)
                 if got is not None:
                     del self.pending[rid]
-                    self._install(spec, got)
+                    if self.install_q is not None and not _layer0_recomputed(got[0]):
+                        with self.rlock:
+                            self.installing.add(rid)
+                        self.install_q.put((spec, got, time.time()))
+                    else:                             # T2's layer-0 recompute runs the engine's own modules: here
+                        self._install(spec, got)
                 # a failed transfer is reported for the request (failed_recving, and finished_recving as vLLM's
                 # connector API asks), not also as invalid blocks. The engines run with kv_load_failure_policy
                 # "recompute" (scripts/run_pd_vllm.sh): under vLLM 0.32's default, "fail", the scheduler finishes
@@ -898,13 +973,15 @@ class _WorkerSide:
                 # killed the engine in jobs 30176 and 30226; under "recompute" the decode engine computes the prompt
                 elif err is not None:                 # the prefill side could not send it
                     del self.pending[rid]
-                    self.recv_failed.add(rid)
+                    with self.rlock:
+                        self.recv_failed.add(rid)
                     self.log.write({"event": "send_failed", "key": spec.key, "req": rid, "error": err, "time": now})
                     logger.warning("TKVConnector: the transfer of %s failed at the sender: %s", spec.key, err)
                 elif now - spec.admitted_at > self.timeout:
                     del self.pending[rid]
                     self.receiver.drop(spec.key)
-                    self.recv_failed.add(rid)
+                    with self.rlock:
+                        self.recv_failed.add(rid)
                     self.log.write({"event": "timeout", "key": spec.key, "req": rid, "time": now})
             if now - self._last_expire > 30:          # transfers whose decode request never came (aborted)
                 self._last_expire = now
@@ -913,8 +990,9 @@ class _WorkerSide:
         sent = self.sent_ready & self.finished_seen
         self.sent_ready -= sent
         self.finished_seen -= sent
-        ok, bad = self.recv_ok, self.recv_failed
-        self.recv_ok, self.recv_failed = set(), set()
+        with self.rlock:
+            ok, bad = self.recv_ok, self.recv_failed
+            self.recv_ok, self.recv_failed = set(), set()
         return KVConnectorTransferResults(finished_sending=sent, finished_recving=ok | bad, failed_recving=bad)
 
     def take_failed_blocks(self):
@@ -924,6 +1002,8 @@ class _WorkerSide:
     def close(self):
         if self.store_q is not None:
             self.store_q.put(None)
+        if self.install_q is not None:
+            self.install_q.put(None)
         for x in (self.sender, self.receiver):
             if x is not None:
                 try:

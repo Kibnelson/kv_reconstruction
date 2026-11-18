@@ -24,6 +24,8 @@
 #   wlours      the workloads campaign again for T and T2 after job 30371 (decoder in one chunk, requests over 4K
 #               in pieces, one transfer over the GPU budget kept on the GPU), with raw, SplitZip and AdaCode
 #               beside them: host memory at 10 and 100 Gb/s and GPU to GPU
+#   capacity    how many requests each codec carries: 96 prompts of 2,048 tokens at 1-8 per second, the highest rate
+#               where 90% meet a 1 s TTFT target; host memory at 10, 25, 50 and 100 Gb/s and GPU to GPU
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
 # PRINT_RUNS=1 prints the list and stops. PD_CARD=1 (scripts/pd_card.sh's run stage): no branch check and no commit;
@@ -42,6 +44,8 @@ T2SET=raw,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256
 BASE=raw,ours-hbh,t2-hbh,t2-rank256,splitzip,exans,adacode
 LINKSET=$BASE,exactkv
 OURSRE=raw,ours-hbh,t2-hbh,t2-rank256,splitzip,adacode   # wlours: ours and the strongest two baselines
+CAPSET=raw,ours-hbh,t2-rank256,splitzip,adacode,exactkv  # capacity
+CAPRUN="LAYOUT=1p3d PROMPT_TOKENS=2048 RATES=1,2,3,4,5,6,8 NUM_PROMPTS=96 TTFT_SLO_MS=1000 STAGES=check,sweep,report RUN_TIMEOUT_S=25200"
 XKV=raw,exactkv                           # exactkv in runs of its own (raw beside it: the same engines' reference)
 AQUA=aquakv-2,aquakv-3                    # AQUA-KV, lossy: a speed and size reference beside the bit-exact codecs
 SPEEDS=10,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400
@@ -87,13 +91,15 @@ if [ -z "${RUNS:-}" ]; then
                          TRANSPORT=ring LINKS=10,100 CODECS=$NV $WLRUN;
                          TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLRUN;
                          TRANSPORT=p2p LINKS=native CODECS=$XKV $WLRUN" ;;
+        capacity) RUNS="TRANSPORT=ring LINKS=10,25,50,100 CODECS=$CAPSET $CAPRUN;
+                        TRANSPORT=p2p LINKS=native CODECS=$CAPSET $CAPRUN" ;;
         wlours) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$OURSRE $WLRUN;
                       TRANSPORT=p2p LINKS=native CODECS=$OURSRE $WLRUN" ;;
         wlong) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$XKV $WLLONG" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong or wlours" \
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours or capacity" \
                 "(or set RUNS)"
            exit 1 ;;
     esac

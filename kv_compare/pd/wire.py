@@ -5,14 +5,21 @@ as raw bytes on the sender's GPU. The header names each tensor (dtype, shape, of
 scalars, so the receiver rebuilds views of the same tensors on its own device with no copy.
 
 Our codec writes each stream segment backwards from the end of a fixed-capacity slot; only its tail (states,
-alignment and data: exactly what LayerwiseOneStep.bits counts) is sent. compact_segments / expand_segments move
-those tails between the slot buffer and a dense array, a few hundred slots at a time so the boolean mask stays small.
+alignment and data: exactly what LayerwiseOneStep.bits counts) is sent. compact_segments packs those tails into a
+dense array (one kernel on the GPU; elsewhere a few hundred slots at a time so the boolean mask stays small). The
+receiver decodes the dense array as it is, with compact_starts; expand_segments (its inverse) is kept for tests.
 """
 from __future__ import annotations
 
 import json
 
 import torch
+
+try:                                                 # the GPU packing kernel; without Triton, the torch loop
+    import triton
+    import triton.language as tl
+except Exception:                                    # pragma: no cover
+    triton = None
 
 ALIGN = 16
 DTYPES = {str(d): d for d in (torch.uint8, torch.int8, torch.int16, torch.int32, torch.int64, torch.uint16,
@@ -84,13 +91,47 @@ def segment_lengths(starts, cap, hd):
     return ends - segment_bases(starts, cap, hd)
 
 
-def compact_segments(buf, starts, cap, hd, rows=256):
-    """The used tail of every segment, in segment order: buf int16 [S x cap] -> int16 [sum of lengths]."""
+if triton is not None:
+    @triton.jit
+    def _tail_copy(src_ptr, dst_ptr, base_ptr, off_ptr, len_ptr, BLOCK: tl.constexpr):
+        """Segment s's used words src[base_s : base_s + len_s] to dst[off_s : off_s + len_s] (one program each)."""
+        s = tl.program_id(0)
+        b = tl.load(base_ptr + s)
+        o = tl.load(off_ptr + s)
+        n = tl.load(len_ptr + s)
+        for i in range(0, n, BLOCK):
+            j = i + tl.arange(0, BLOCK)
+            m = j < n
+            tl.store(dst_ptr + o + j, tl.load(src_ptr + b + j, mask=m), mask=m)
+
+
+def compact_starts(starts, cap, hd):
+    """(starts in compact_segments' dense array, its length): the decoder reads a segment's states 2 x hd words
+    below its start (rounded down to 8 words: the segment's first used word) and its words upward from the start,
+    reading exactly the words the encoder wrote; the dense array keeps each tail in one piece 8-aligned, so the
+    same distances hold there and the receiver decodes it without the S x cap slot buffer (twice the request's KV)
+    or the copy into it."""
+    bases = segment_bases(starts, cap, hd)
+    lens = (torch.arange(starts.numel(), device=starts.device, dtype=torch.int64) + 1) * cap - bases
+    offs = torch.cumsum(lens, 0) - lens
+    return (offs + starts.to(torch.int64) - bases).to(torch.int32), int(lens.sum())
+
+
+def compact_segments(buf, starts, cap, hd, rows=256, kernel=None):
+    """The used tail of every segment, in segment order: buf int16 [S x cap] -> int16 [sum of lengths].
+    kernel: one Triton launch for all segments (default on the GPU) instead of the torch loop."""
     S = starts.numel()
     lens = segment_lengths(starts, cap, hd)
-    if int(lens.min()) < 0 or int(lens.max()) > cap:
+    lo, hi, total = (int(x) for x in torch.stack([lens.min(), lens.max(), lens.sum()]).cpu().tolist())
+    if lo < 0 or hi > cap:
         raise ValueError("segment starts outside their slots")
-    out = torch.empty(int(lens.sum()), dtype=buf.dtype, device=buf.device)
+    out = torch.empty(total, dtype=buf.dtype, device=buf.device)
+    if kernel is None:
+        kernel = buf.is_cuda and triton is not None
+    if kernel:
+        offs = torch.cumsum(lens, 0) - lens
+        _tail_copy[(S,)](buf, out, segment_bases(starts, cap, hd), offs, lens, BLOCK=1024)
+        return out
     b2 = buf.view(S, cap)
     col = torch.arange(cap, device=buf.device)
     o = 0
