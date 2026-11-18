@@ -560,6 +560,24 @@ for T, pos0 in ((96, 0), (50, 7)):
         assert torch.equal(back, w), (n, T, int((back != w).sum()))
         bits = 8 * wire.payload_bytes(h) / w.numel()
         print("ok", n, T, pos0, round(bits, 3))
+        if n == "ours-4g" and T == 96:               # the encoder's own decoder chunks (2 here) decode it too
+            codecs.DECODE_CHUNKS = 0
+            got = {}
+            c.decode(p2, m2, lambda l, x: got.__setitem__(l, x.clone()))
+            codecs.DECODE_CHUNKS = 1
+            assert torch.equal(torch.stack([got[l] for l in range(L)]), w), n
+# a request longer than a piece: coded in pieces, decoded bit-exact
+codecs.PIECE_TOKENS = 64
+for n, c in built.items():
+    w = words[:, :96].contiguous()
+    parts, m = c.encode(w, pos0=0)
+    assert [x["t0"] for x in m["pieces"]] == [0, 64] and m["T"] == 96, m
+    h, blob = wire.bundle(parts, m)
+    p2, m2 = wire.unbundle(wire.header_from_bytes(wire.header_to_bytes(h)), blob.clone())
+    got = {}
+    c.decode(p2, m2, lambda l, x: got.__setitem__(l, x.clone()))
+    assert sorted(got) == list(range(L)) and torch.equal(torch.stack([got[l] for l in range(L)]), w), n
+    print("ok pieces", n, round(8 * wire.payload_bytes(h) / w.numel(), 3))
 print("ok ours wire")
 """
 

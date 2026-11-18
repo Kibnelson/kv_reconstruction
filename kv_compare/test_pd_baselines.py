@@ -204,7 +204,7 @@ class NvcompPieceTests(unittest.TestCase):
 class ExansBatchTests(unittest.TestCase):
     """Our ExANS wrapper's batches over a stand-in library: uniform blocks fit a 66-byte record, the others go raw."""
 
-    def lib(self, ex):
+    def lib(self, ex, bad=b"", fail=False):
         import ctypes
         calls = []
 
@@ -222,6 +222,7 @@ class ExansBatchTests(unittest.TestCase):
                     blk = ctypes.string_at(addrs[i], sizes[i])
                     if blk == blk[:2] * (len(blk) // 2):
                         head = bytearray(64)
+                        head[0:4] = (0 if blk[:2] == bad else 0x31505845).to_bytes(4, "little")   # "EXP1"
                         head[20:24] = (66).to_bytes(4, "little")
                         ctypes.memmove(rec + i * ex.RECORD_BYTES, bytes(head) + blk[:2], 66)
                         fits[i] = 1
@@ -231,6 +232,8 @@ class ExansBatchTests(unittest.TestCase):
 
             def openlake_expans_decode(self, h, rec, idx, n, oaddrs, osizes, ooffs, stream):
                 calls.append(("decode", n))
+                if fail:
+                    return 1
                 for k in range(n):
                     two = ctypes.string_at(rec + idx[k] * ex.RECORD_BYTES + 64, 2)
                     ctypes.memmove(oaddrs[k], two * (osizes[k] // 2), osizes[k])
@@ -259,6 +262,38 @@ class ExansBatchTests(unittest.TestCase):
         self.assertEqual([x for x in calls if x[0] == "decode"], [("decode", 2), ("decode", 1)])
         self.assertTrue(max(x[1] for x in calls if x[0] == "create") <= 64)
         self.assertTrue(torch.equal(got[0], words[0]))
+        self.assertEqual(meta["bad_records"], 0)
+
+    def test_a_record_its_header_does_not_describe_goes_raw_and_a_failed_decode_says_where(self):
+        """Job 30371: ExANS rejected one of its records ("invalid or incompatible ExpANS record header"), twice, on
+        the same prompt. The sender now sends raw any record whose header lacks the magic or a sane size, and a
+        failed decode says whether the headers arrived as the sender made them."""
+        from unittest import mock
+        from kv_compare import exans_official as ex
+        from kv_compare.pd import codecs
+        import ctypes
+        flat = torch.randint(-3000, 3000, (3 * ex.BLOCK_WORDS,), dtype=torch.int16)
+        for i in range(3):
+            flat[i * ex.BLOCK_WORDS:(i + 1) * ex.BLOCK_WORDS] = 1234 + i
+        words = flat.view(1, 1, -1)
+        bad = (1235).to_bytes(2, "little", signed=True)
+        for fail in (False, True):
+            c = codecs.ExANS.__new__(codecs.ExANS)
+            c.ex, c.ct, c.device, c.handles, c.max_blocks, c.batch = ex, ctypes, torch.device("cpu"), {}, 1 << 16, 4
+            c.lib, calls = self.lib(ex, bad=bad, fail=fail)
+            with mock.patch("torch.cuda.current_stream", return_value=types.SimpleNamespace(cuda_stream=0)):
+                parts, meta = c.encode(words)
+                self.assertEqual((meta["fits"], meta["bad_records"]), ([True, False, True], 1))
+                got = {}
+                if not fail:
+                    c.decode(parts, meta, lambda l, w: got.__setitem__(l, w.clone()))
+                    self.assertTrue(torch.equal(got[0], words[0]))
+                    continue
+                with self.assertRaisesRegex(RuntimeError, "stand-in; the headers arrived as the sender made them"):
+                    c.decode(parts, meta, lambda l, w: None)
+                parts["records"][70] ^= 1                # the second record's header
+                with self.assertRaisesRegex(RuntimeError, "a header changed on the way"):
+                    c.decode(parts, meta, lambda l, w: None)
 
 
 class Layer0Tests(unittest.TestCase):
@@ -494,6 +529,20 @@ for T, pos0 in ((64, 0), (50, 7)):
             sizes[(n, ok)] = wire.payload_bytes(h)
             print("ok", n, ok, T, pos0, m.get("set"), m.get("layer0"), sizes[(n, ok)])
     assert sizes[("t2-dense", True)] < sizes[("t2-dense", False)], sizes
+# in pieces: each piece its own set and layer-0 check; the request's record says recomputed only if every piece was
+codecs.PIECE_TOKENS = 64
+c = built["t2-rank256"]
+for ok in (True, False):
+    w = words[:, :96].contiguous()
+    parts, m = c.encode(w, pos0=0, ctx=Ctx(words, ok))
+    assert len(m["pieces"]) == 2 and m["layer0"] == ("recomputed" if ok else "coded"), m
+    assert m["set"] in ("a", "b") and len(m["sets"]) == 2, m
+    h, blob = wire.bundle(parts, m)
+    p2, m2 = wire.unbundle(wire.header_from_bytes(wire.header_to_bytes(h)), blob.clone())
+    got = {}
+    c.decode(p2, m2, lambda l, x: got.__setitem__(l, x.clone()), ctx=Ctx(words))
+    assert torch.equal(torch.stack([got[l] for l in range(L)]), w), ok
+    print("ok t2 pieces", ok, m["sets"])
 print("ok t2 wire")
 """
 
@@ -878,6 +927,36 @@ class BenchAndReportTests(unittest.TestCase):
             "transfers": {"sends": 8, "install_errors": 6, "bits": 12.0}}}}))
         mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
         self.assertIn("**6 of 8 transfers failed, computed locally**", (root / "s.md").read_text())
+
+    def test_one_transfer_over_the_budget_stays_on_the_gpu_and_host_ones_are_marked(self):
+        """Job 30371: raw's 1.88 GB at 16K went through host memory on both ends (budgets 1 and 1.5 GiB) while the
+        coded transfers, just under 1.5 GiB, stayed on the decode GPU: their 1.3-1.4x over raw was mostly that."""
+        install_vllm_stub()
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from kv_compare.pd import connector as cn
+        import pd_bench as pb
+        import pd_matrix_report as mr
+        G = 1 << 30
+        self.assertTrue(cn._fits(0, 2 * G, G))                    # the only one: on the GPU
+        self.assertTrue(cn._fits(G // 2, G // 4, G))
+        self.assertFalse(cn._fits(G // 2, G, G))                  # beside others, over the budget: host memory
+        self.assertTrue(cn._fits(5 * G, G, None))
+        st = pb.transfer_stats([{"log": "tkv_Dw_1.jsonl", "event": "install", "link_on_host": True, "done_at": 2,
+                                 "admitted_at": 1, "decode_install_ms": 3},
+                                {"log": "tkv_Dw_1.jsonl", "event": "install", "done_at": 2, "admitted_at": 1,
+                                 "decode_install_ms": 3}])
+        self.assertEqual(st["recv_on_host"], 1)
+        root = Path(tempfile.mkdtemp())
+        (root / "r").mkdir()
+        (root / "r" / "env.json").write_text(json.dumps({"layout": "1p3d", "connector": "tkv", "transport": "ring"}))
+        sh = {f"shape_{c}": {"codec": c, "tokens": 16384, "batch": 1, "output": 128, "rounds": 4, "families": ["sz1"],
+                             "link_gbps": 100, "requests": 4, "exit": 0, "bench": {"median_ttft_ms": t},
+                             "transfers": {"recv_on_host": h, "spilled_to_host": 0}}
+              for c, t, h in (("raw", 3743, 4), ("splitzip", 2730, 0))}
+        (root / "r" / "results.json").write_text(json.dumps({"shapes": sh}))
+        mr.main(["--runs", "r", "--root", str(root), "--output", str(root / "s.md")])
+        text = (root / "s.md").read_text()
+        self.assertIn("| 3743 (host) | **2730** (1.37x) |", text)
 
     def test_wire_rate_and_link_speed_tables(self):
         """Job 30280: three transfers sharing a 10 Gb/s link each ran at about a third of it; the link carried 10."""
@@ -1361,6 +1440,12 @@ class RunnerDryRunTests(unittest.TestCase):
         long = [x for x in r.stdout.split("\n") if x]
         self.assertEqual(len(long), 4)
         self.assertTrue(all("CODECS=raw,exactkv " in x for x in long[2:]))
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="wlours", PRINT_RUNS="1"))
+        again = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual([x.split(" CODECS=")[0] for x in again], ["TRANSPORT=ring LINKS=10,100", "TRANSPORT=p2p LINKS=native"])
+        self.assertTrue(all("CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip,adacode " in x and "SHAPES=" in x
+                            for x in again))
         self.assertTrue(all("SHAPES=32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,"
                             "8192:16:128:2:sz16,16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024" in x
                             for x in long))

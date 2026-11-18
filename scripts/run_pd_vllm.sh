@@ -405,7 +405,7 @@ PIDS+=($!)
 for _ in $(seq 1 30); do curl -sf "$PROXY/health" >/dev/null && break; sleep 1; done
 "$VPY" - "$OUT/env.json" "$MODEL_ID" "$NUM_PREFILL" "$NUM_DECODE" "$LAYOUT" "$CONNECTOR" "$TRANSPORT" "$EAGER" \
     "${NIXL_ALL_GPUS:-0}" <<'EOF'
-import json, subprocess, sys, torch, vllm
+import json, os, subprocess, sys, torch, vllm
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
 extra = {}
 for m in ("lmcache", "nixl"):
@@ -416,7 +416,9 @@ for m in ("lmcache", "nixl"):
 json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sys.argv[4]), "layout": sys.argv[5],
            "connector": sys.argv[6], "transport": sys.argv[7], "eager": sys.argv[8] == "1", "vllm": vllm.__version__,
            "torch": torch.__version__, "gpus": ", ".join(sorted(set(gpus.split("\n")) - {""})),
-           "nixl_all_gpus": sys.argv[6] == "nixl" and sys.argv[9] == "1", **extra},
+           "nixl_all_gpus": sys.argv[6] == "nixl" and sys.argv[9] == "1",
+           "decode_chunks": int(os.environ.get("TKV_DECODE_CHUNKS", "1")),
+           "piece_tokens": int(os.environ.get("TKV_PIECE_TOKENS", "4096")), **extra},
           open(sys.argv[1], "w"))
 EOF
 set +e

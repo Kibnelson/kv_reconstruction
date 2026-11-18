@@ -418,6 +418,7 @@ def transfer_stats(recs):
             "wait_ms": mean([1e3 * (r["done_at"] - r["admitted_at"]) for r in d if r.get("admitted_at")]),
             "exact": sum(1 for r in d if r.get("exact") is True), "inexact": sum(1 for r in d if r.get("exact") is False),
             "spilled_to_host": sum(1 for r in s if r.get("queued_on") == "host"),
+            "recv_on_host": sum(1 for r in d if r.get("link_on_host")),
             "layer0_recomputed": sum(1 for r in l0 if r["layer0"] == "recomputed") if l0 else None,
             "layer0_coded": sum(1 for r in l0 if r["layer0"] == "coded") if l0 else None,
             "layer0_checks": sorted({str(r.get("layer0_check")) for r in l0})[:5] if l0 else None,

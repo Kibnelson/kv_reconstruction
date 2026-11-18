@@ -183,7 +183,8 @@ def workload_tables(runs):
                     rx = vals.get(ref) if ref else None
                     if rx and c != ref:
                         cell += f" ({(rx / x) if better == 'low' else (x / rx):.2f}x)"
-                    cells.append(cell + (" (failed)" if bad else ""))
+                    host = (st.get("spilled_to_host") or 0) + (st.get("recv_on_host") or 0)
+                    cells.append(cell + (" (failed)" if bad else "") + (" (host)" if host else ""))
                 fam = " + ".join(FAMILIES.get(f, f) for f in sorted(shapes[k], key=lambda f: order.index(f)
                                                                          if f in order else 99))
                 out.append(f"| {fam} | {k[0]} x {k[1]}, {k[2]} | " + " | ".join(cells) + " |")
@@ -191,7 +192,9 @@ def workload_tables(runs):
         L += [f"## Published workloads: {lay}, {path}{', eager engines' if eager else ''}, link {link_s}", "",
               "Each baseline's own workload, as its authors reported it (docs/pd_baselines.md, \"Workloads\"), for "
               "every codec: B requests at once, B x R in all, T-token prompts, O tokens out. TTFT p50 in ms, the best "
-              "in bold, and in brackets the speedup over raw (raw's time / the codec's).", ""]
+              "in bold, and in brackets the speedup over raw (raw's time / the codec's). (failed): some of the point's "
+              "transfers failed and vLLM computed those prompts; (host): some went through host memory (a transfer "
+              "over the GPU budget while others were held), which costs copies the others did not pay.", ""]
         L += table("median_ttft_ms", "ms", "low") + [""]
         L += ["Requests per second, and in brackets the gain over raw:", ""]
         L += table("request_throughput", "req/s", "high") + [""]

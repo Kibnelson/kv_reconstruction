@@ -137,6 +137,34 @@ run is packaged as `_partial`. The matrix then goes on to its next run, with new
 instead waited 30 minutes after each of the next points. Within each run, T and T2 come first and exactkv last, so a
 crash costs the others nothing.
 
+What the workloads campaign showed (job 30371, all six runs complete), and what changed after it:
+- T's and T2's decoder took a fixed 135-190 ms per request in head by head, from 128 tokens to 8K (the other codecs:
+  5-45 ms), while their link time was the lowest of all (half of SplitZip's). The decoder issued about 7,000 small
+  launches per request (4 token chunks x 16 head groups x 28 layers, each group with its product of the groups
+  before it): launch-bound, not data-bound. It also runs in the decode engine's step, so the time per output token
+  of every request went from 12 to 17-18 ms. The receiver now decodes in one chunk (`TKV_DECODE_CHUNKS`, default 1;
+  0 restores the encoder's choice). The chunks only split the decoder's launches across CUDA streams; the stream is
+  the same, and the round trips are checked bit-exact both ways.
+- Every 16K transfer of T and T2 ran out of memory on the prefill GPU (and 5 of 8 of T's at 8K, 100 Gb/s): the
+  encoder's scratch is about 4x the request's KV (a stream buffer of twice its words, its features, its padded
+  words). Requests longer than 4,096 tokens are now coded in pieces of 4,096 (`TKV_PIECE_TOKENS`), each from its
+  own position, with nothing changed in any segment of the stream; the receiver decodes them one after another into
+  the request's words and installs those layer by layer.
+- At 16K, raw's 1.88 GB transfer was over both GPU budgets (1 GiB to send, 1.5 GiB to receive) and went through
+  host memory, while SplitZip's, exactkv's and AdaCode's, just under 1.5 GiB, stayed on the decode GPU: their
+  1.3-1.4x over raw there was mostly that. A transfer now stays on the GPU when it is the only one held, whatever
+  its size; the reports mark a point "(host)" when any of its transfers still went through host memory.
+- ExANS rejected one of its own records ("invalid or incompatible ExpANS record header") twice, on the same
+  128-token prompt, once through host memory at 100 Gb/s and once GPU to GPU; the retry failed the same way, and
+  vLLM computed that prompt. The sender now sends raw any block whose record header lacks the magic or a sane size
+  (counted as `bad_records`), and a failed decode says whether the headers arrived as the sender made them.
+- exactkv did not fail at all (the 128-token, 16-at-once workload that killed job 30334 included), nor did its check.
+- T2's receiver never recomputed layer 0 (its recompute differs from the compiled engine's cache in about 47 % of the
+  words), so T2 coded layer 0 in every request; that is still open.
+
+The `wlours` campaign (about 3.5 hours) measures the changes: raw, T (hbh), T2 (hbh, rank 256), SplitZip and
+AdaCode on the same workloads, host memory at 10 and 100 Gb/s and GPU to GPU.
+
 The report gives one table per path and link: a row per workload, a column per codec, TTFT p50 with its speedup
 over raw (SplitZip's measure), then requests per second with the gain over raw.
 
@@ -319,6 +347,7 @@ The matrices (the times are estimates until the smoke has measured them):
 | direct | GPU to GPU for 1+3 and 2+2, every codec, nvCOMP apart; NIXL for both layouts with every GPU visible, and 2+2 with its own GPU only |
 | workloads | 1+3, every codec on the baselines' published workloads and ours (above, "Workloads"), AQUA-KV 2- and 3-bit beside them: host memory at 10 and 100 Gb/s, GPU to GPU, NIXL, nvCOMP; exactkv in runs of its own, last |
 | wlong | the biggest published workloads (32K-token prompts, 16 at once of 8K and 16K, 128 and 256 at once of 1,024): host memory at 10 and 100 Gb/s, GPU to GPU; exactkv apart |
+| wlours | the workloads campaign again for T and T2 after job 30371 (decoder in one chunk, pieces over 4K tokens, one transfer over the GPU budget kept on the GPU), with raw, SplitZip and AdaCode: host memory at 10 and 100 Gb/s, GPU to GPU |
 | links | 1+3 over 10, 25, 50, ... 400 Gb/s (steps of 25), through host memory and GPU to GPU (paced, then unpaced), 16 requests at once: raw, T (hbh), T2 (hbh, rank 256), SplitZip, ExANS, AdaCode, AQUA-KV 2-bit and exactkv (last). One table per path: TTFT p50 per codec and speed, what the link carried, where each codec beats raw, and where a request's time goes |
 | tier | the CPU tier with every codec, nvCOMP apart; LMCache |
 | t2eager | T and T2 in eager engines: host memory at 10 and 100 Gb/s, GPU to GPU, the CPU tier |

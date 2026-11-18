@@ -34,6 +34,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import zlib
 from pathlib import Path
 
 import torch
@@ -41,6 +42,81 @@ import torch
 OUR_MODES = {"dense": None, "kv": 2, "4g": 4, "hbh": 16, "rank256": "rank"}
 PAD = 256
 _TABLES = {}
+EXANS_MAGIC = 0x31505845                       # "EXP1", the first word of every ExANS record
+# The receiver decodes T and T2 in this many token chunks (0: the encoder's own choice, from the measured 8K sweep).
+# Chunks change nothing in the stream: they only split the decoder's launches across CUDA streams. In head by head,
+# 4 chunks x 16 head groups x 28 layers made about 7,000 launches per request, a fixed 135-190 ms from 128 tokens
+# to 8K in job 30371 (the other codecs: 5-45 ms); one chunk makes a quarter of them.
+DECODE_CHUNKS = int(os.environ.get("TKV_DECODE_CHUNKS", "1"))
+# T and T2 code a request longer than this in pieces of this many tokens (0: one piece). The encoder's scratch is
+# about 4x the request's KV (a stream buffer of twice its words, its features, the padded words), and the prefill GPU
+# had not that much beside vLLM's share: every 16K transfer of T and T2 ran out of memory in job 30371 (and 5 of 8
+# at 8K). Pieces are coded apart (their positions from pos0), which changes no segment of the stream.
+PIECE_TOKENS = int(os.environ.get("TKV_PIECE_TOKENS", "4096"))
+
+
+def _pieces(T):
+    """Token bounds [(a, b)] of a request's pieces: one when T <= PIECE_TOKENS."""
+    P = PIECE_TOKENS
+    if P <= 0 or T <= P:
+        return [(0, T)]
+    if P % PAD:
+        raise ValueError(f"TKV_PIECE_TOKENS={P} is not a multiple of {PAD}")
+    return [(a, min(a + P, T)) for a in range(0, T, P)]
+
+
+def _encode_pieces(one, words, pos0, name):
+    """one(words of a piece, its pos0) -> (parts, meta). A single piece is as before; several: each piece's parts
+    as '<part>@<i>' and meta {"codec", "T", "pos0", "pieces": [{"t0": first token, "meta": its meta}, ...]}."""
+    T = int(words.shape[1])
+    bounds = _pieces(T)
+    if len(bounds) == 1:
+        return one(words, pos0)
+    parts, pm = {}, []
+    for i, (a, b) in enumerate(bounds):
+        p, m = one(words[:, a:b], pos0 + a)
+        parts.update({f"{k}@{i}": v for k, v in p.items()})
+        pm.append({"t0": a, "meta": m})
+        del p
+    return parts, {"codec": name, "T": T, "pos0": int(pos0), "pieces": pm}
+
+
+def _decode_pieces(one, parts, meta, sink, L, W, device):
+    """one(parts, meta, sink) decodes a piece. Several pieces are decoded one after another into the request's words,
+    which then go to sink layer by layer (the receiver holds the decoded request once); a single piece goes to sink
+    as it decodes, as before."""
+    pm = meta.get("pieces")
+    if not pm:
+        return one(parts, meta, sink)
+    T = int(meta["T"])
+    full = torch.empty(L, T, W, dtype=torch.int16, device=device)
+    by = {}
+    for k, v in parts.items():
+        name, i = k.rsplit("@", 1)
+        by.setdefault(int(i), {})[name] = v
+    for i, x in enumerate(pm):
+        a, n = int(x["t0"]), int(x["meta"]["T"])
+
+        def put(l, w, a=a, n=n):
+            full[l, a:a + n] = w
+        one(by.get(i, {}), x["meta"], put)
+    for l in range(L):
+        sink(l, full[l])
+    del full
+
+
+def _pieces_meta(pm):
+    """The fields the sender and the reports read, for a request in pieces: T2's set and layer 0 (recomputed only
+    if every piece's was)."""
+    ms = [x["meta"] for x in pm]
+    out = {}
+    if "set" in ms[0]:
+        out["set"] = ms[0]["set"]
+        out["sets"] = [m["set"] for m in ms]
+    if "layer0" in ms[0]:
+        out["layer0"] = "recomputed" if all(m["layer0"] == "recomputed" for m in ms) else "coded"
+        out["layer0_check"] = ms[0].get("layer0_check")
+    return out
 
 
 def _cache_slice_tables():
@@ -119,9 +195,12 @@ class Ours:
         tiles = (128, 128, 64, 4) if (Tp % 256 == 0 and r % 128 == 0 and self.W % 64 == 0) else (16, 16, 32, 4)
         return Tp, TB, ch, tiles
 
-    def codec(self, T, pos0=0, cls=None):
-        """The codec for T tokens at positions pos0.. (cls: LayerwiseOneStep, or kv_compare.t2.Layer0Recomputed)."""
+    def codec(self, T, pos0=0, cls=None, chunks=None):
+        """The codec for T tokens at positions pos0.. (cls: LayerwiseOneStep, or kv_compare.t2.Layer0Recomputed;
+        chunks: the decoder's, see DECODE_CHUNKS; the stream does not depend on them)."""
         Tp, TB, ch, tiles = self.params(T)
+        if chunks:
+            ch = int(chunks)
         if pos0 + Tp > self.cos.shape[0]:
             raise ValueError(f"positions {pos0}..{pos0 + Tp} beyond the exported RoPE tables ({self.cos.shape[0]})")
         base = self.group if self.group is not None else self.base
@@ -139,6 +218,9 @@ class Ours:
         return codec.model(wp)
 
     def encode(self, words, pos0=0):
+        return _encode_pieces(self._encode_one, words, pos0, self.name)
+
+    def _encode_one(self, words, pos0=0):
         from .wire import compact_segments
         L, T, W = words.shape
         codec, kp, Tp = self.codec(T, pos0)
@@ -154,9 +236,12 @@ class Ours:
                 {"codec": self.name, "T": int(T), "Tpad": int(Tp), "cap": int(cap), "pos0": int(pos0)})
 
     def decode(self, parts, meta, sink):
+        return _decode_pieces(self._decode_one, parts, meta, sink, self.L, self.W, self.device)
+
+    def _decode_one(self, parts, meta, sink):
         from .wire import expand_segments
         T, pos0 = int(meta["T"]), int(meta.get("pos0", 0))
-        codec, _, Tp = self.codec(T, pos0)
+        codec, _, Tp = self.codec(T, pos0, chunks=DECODE_CHUNKS)
         _, cap = codec.layout(Tp)
         if cap != int(meta["cap"]) or Tp != int(meta["Tpad"]):
             raise ValueError("the sender's codec layout differs from the receiver's (different constants?)")
@@ -513,6 +598,7 @@ class ExANS:
         data = flat[:nb * ex.BLOCK_WORDS].view(nb, ex.BLOCK_WORDS)
         stream = torch.cuda.current_stream(flat.device)
         kept, raw, fit, used_all = [], [], [], []
+        bad, crc = 0, 0
         for b0 in range(0, nb, self.batch):
             n = min(self.batch, nb - b0)
             handle = self._handle(n)
@@ -527,21 +613,43 @@ class ExANS:
                 raise RuntimeError("ExANS encode failed: " + self.lib.openlake_expans_last_error(handle).decode())
             hdr = records.view(n, ex.RECORD_BYTES)[:, :ex.HEADER_BYTES].cpu()
             used = hdr[:, 20:24].contiguous().view(torch.int32).flatten().tolist()
+            magic = hdr[:, 0:4].contiguous().view(torch.int32).flatten().tolist()
             rec = records.view(n, ex.RECORD_BYTES)
             for i in range(n):
                 ok = bool(fits[i])
+                if ok and (magic[i] != EXANS_MAGIC or not ex.HEADER_BYTES <= used[i] <= ex.RECORD_BYTES):
+                    ok = False                       # a record its own header does not describe: the block raw
+                    bad += 1
                 fit.append(ok)
                 used_all.append(int(used[i]) if ok else 0)
                 if ok:
                     kept.append(rec[i, :used[i]].clone())
+                    crc = zlib.crc32(hdr[i].numpy().tobytes(), crc)
                 else:
                     raw.append(data[b0 + i])
             del records, rec
         parts["records"] = torch.cat(kept) if kept else torch.zeros(1, dtype=torch.uint8, device=flat.device)
         if raw:
             parts["raw"] = torch.cat(raw)
-        meta.update(fits=fit, sizes=used_all, batch=self.batch)
+        meta.update(fits=fit, sizes=used_all, batch=self.batch, hdr_crc=crc, bad_records=bad)
         return parts, meta
+
+    def _headers_arrived(self, parts, meta, idx, starts):
+        """After a failed decode: do the received records' headers match the ones the sender made (meta hdr_crc)?
+        Tells a header changed on the way from one the library rejects as it made it (job 30371: twice, the same
+        128-token prompt, ring and GPU to GPU)."""
+        if "hdr_crc" not in meta:
+            return "no header checksum sent"
+        ex = self.ex
+        try:
+            h = torch.cat([parts["records"][starts[i]:starts[i] + ex.HEADER_BYTES] for i in idx]).cpu()
+            crc = 0
+            for j in range(len(idx)):
+                crc = zlib.crc32(h[j * ex.HEADER_BYTES:(j + 1) * ex.HEADER_BYTES].numpy().tobytes(), crc)
+        except Exception as exc:
+            return f"headers not readable ({exc!r})"[:120]
+        return ("the headers arrived as the sender made them" if crc == int(meta["hdr_crc"])
+                else "a header changed on the way")
 
     def decode(self, parts, meta, sink):
         ex, ct = self.ex, self.ct
@@ -569,7 +677,8 @@ class ExANS:
                                                      self._u(ct.c_uint32, list(range(n + 1))),
                                                      torch.cuda.current_stream(self.device).cuda_stream)
                 if st:
-                    raise RuntimeError("ExANS decode failed: " + self.lib.openlake_expans_last_error(handle).decode())
+                    raise RuntimeError("ExANS decode failed: " + self.lib.openlake_expans_last_error(handle).decode()
+                                       + "; " + self._headers_arrived(parts, meta, idx, starts))
                 del records, rec
             raw = [i for i in range(nb) if not fit[i]]
             if raw:
@@ -611,6 +720,12 @@ class T2Codec:
         return self.names[min(range(len(cost)), key=cost.__getitem__)], cost
 
     def encode(self, words, pos0=0, ctx=None):
+        parts, meta = _encode_pieces(lambda w, p: self._encode_one(w, p, ctx), words, pos0, self.name)
+        if "pieces" in meta:
+            meta.update(_pieces_meta(meta["pieces"]))
+        return parts, meta
+
+    def _encode_one(self, words, pos0=0, ctx=None):
         from .wire import compact_segments
         L, T, W = words.shape
         name, cost = self.pick(words, pos0) if len(self.names) > 1 else (self.names[0], [0.0])
@@ -630,11 +745,15 @@ class T2Codec:
         return {"words": packed, "starts": starts}, meta
 
     def decode(self, parts, meta, sink, ctx=None):
+        return _decode_pieces(lambda p, m, s: self._decode_one(p, m, s, ctx), parts, meta, sink, self.L, self.W,
+                              self.device)
+
+    def _decode_one(self, parts, meta, sink, ctx=None):
         from .wire import expand_segments
         T, pos0 = int(meta["T"]), int(meta.get("pos0", 0))
         o = self.sets[meta["set"]]
         rec = meta["layer0"] == "recomputed"
-        codec, _, Tp = o.codec(T, pos0, cls=self.t2.Layer0Recomputed if rec else None)
+        codec, _, Tp = o.codec(T, pos0, cls=self.t2.Layer0Recomputed if rec else None, chunks=DECODE_CHUNKS)
         _, cap = codec.layout(Tp)
         if cap != int(meta["cap"]) or Tp != int(meta["Tpad"]):
             raise ValueError("the sender's codec layout differs from the receiver's (different constants?)")

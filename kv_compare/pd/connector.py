@@ -211,6 +211,11 @@ class TKVConnector(KVConnectorBase_V1):
         return True
 
 
+def _fits(held, n, budget):
+    """A transfer of n bytes stays on the GPU: within the budget, or when it is the only one held."""
+    return budget is None or held == 0 or held + n <= budget
+
+
 STICKY = ("illegal memory access", "illegal address", "unspecified launch failure", "device-side assert",
           "misaligned address", "an illegal instruction")
 
@@ -604,8 +609,8 @@ class _WorkerSide:
             rec["blob_bytes"] = int(blob.numel())
             rec["bits"] = 8.0 * rec["coded_bytes"] / words.numel()
             del words, parts
-            with self.qlock:
-                on_gpu = self.gpu_queued + blob.numel() <= self.gpu_budget
+            with self.qlock:                          # within the budget, or the only one queued (see
+                on_gpu = _fits(self.gpu_queued, blob.numel(), self.gpu_budget)     # transport.Receiver._alloc)
                 if on_gpu:
                     self.gpu_queued += blob.numel()
             if not on_gpu:

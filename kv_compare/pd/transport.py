@@ -195,8 +195,11 @@ class Receiver:
         return path, mm, t, pinned
 
     def _alloc(self, total):
+        """The blob of a transfer: on the GPU within the budget, and always when it is the only one held (a single
+        request longer than the budget: raw's 1.88 GB at 16K went through host memory in job 30371 while the coded
+        ones, just under 1.5 GiB, did not); else in host memory."""
         if self.device.type == "cuda":
-            if self.gpu_budget is None or self.gpu_bytes + total <= self.gpu_budget:
+            if self.gpu_budget is None or self.gpu_bytes == 0 or self.gpu_bytes + total <= self.gpu_budget:
                 try:
                     b = torch.empty(total, dtype=torch.uint8, device=self.device)
                     with self.cv:
@@ -239,7 +242,10 @@ class Receiver:
                 op = m["op"]
                 if op == "begin":
                     rec = {"key": m["key"], "bytes": m["total"], "recv_begin": time.time(), "mode": mode}
-                    cur[m["key"]] = (m["header"], self._alloc(m["total"]), rec)
+                    blob = self._alloc(m["total"])
+                    if self.device.type == "cuda" and not blob.is_cuda:
+                        rec["on_host"] = True
+                    cur[m["key"]] = (m["header"], blob, rec)
                 elif op == "data":
                     header, blob, rec = cur[m["key"]]
                     off, n = m["off"], m["n"]
