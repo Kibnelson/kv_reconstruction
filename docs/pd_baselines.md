@@ -189,9 +189,10 @@ After `wlours` (branch pd-decode until it is measured):
   reported loaded once its install has finished on the GPU; a request that ends meanwhile is reported after it, so
   vLLM never frees blocks that are being written. T2 transfers whose receiver recomputes layer 0 still install in
   the step (the recompute runs the engine's own modules).
-- The `capacity` campaign (about 3.5 hours) asks how many requests each codec carries: 96 prompts of 2,048 tokens
+- The `capacity` campaign asks how many requests each codec carries: 96 prompts of 2,048 tokens
   at 1 to 8 per second, and for each codec and link speed the highest rate at which 90 % of the requests meet a
-  1 s TTFT target; host memory at 10, 25, 50 and 100 Gb/s and GPU to GPU. One A5000 prefill makes KV at about
+  1 s TTFT target, for raw, T, T2 rank 256, SplitZip, AdaCode, ExANS, AQUA-KV 2-bit (lossy) and exactkv; host
+  memory at 10, 25, 50 and 100 Gb/s and GPU to GPU (about 4.5 hours). One A5000 prefill makes KV at about
   8-10 Gb/s, so above that the link is idle most of the time and only the GPUs' work decides; the speeds that
   matter for a datacenter are those per prefill GPU sharing a link.
 

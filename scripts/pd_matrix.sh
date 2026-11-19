@@ -44,7 +44,7 @@ T2SET=raw,ours-hbh,ours-dense,ours-rank256,t2-hbh,t2-dense,t2-rank256
 BASE=raw,ours-hbh,t2-hbh,t2-rank256,splitzip,exans,adacode
 LINKSET=$BASE,exactkv
 OURSRE=raw,ours-hbh,t2-hbh,t2-rank256,splitzip,adacode   # wlours: ours and the strongest two baselines
-CAPSET=raw,ours-hbh,t2-rank256,splitzip,adacode,exactkv  # capacity
+CAPSET=raw,ours-hbh,t2-rank256,splitzip,adacode,exans,aquakv-2,exactkv  # capacity (AQUA-KV lossy, for speed)
 CAPRUN="LAYOUT=1p3d PROMPT_TOKENS=2048 RATES=1,2,3,4,5,6,8 NUM_PROMPTS=96 TTFT_SLO_MS=1000 STAGES=check,sweep,report RUN_TIMEOUT_S=25200"
 XKV=raw,exactkv                           # exactkv in runs of its own (raw beside it: the same engines' reference)
 AQUA=aquakv-2,aquakv-3                    # AQUA-KV, lossy: a speed and size reference beside the bit-exact codecs

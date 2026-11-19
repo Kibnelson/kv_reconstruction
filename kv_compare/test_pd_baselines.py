@@ -1478,6 +1478,7 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertEqual([x.split(" CODECS=")[0] for x in cap],
                          ["TRANSPORT=ring LINKS=10,25,50,100", "TRANSPORT=p2p LINKS=native"])
         self.assertTrue(all("RATES=1,2,3,4,5,6,8 NUM_PROMPTS=96 TTFT_SLO_MS=1000" in x for x in cap))
+        self.assertTrue(all("CODECS=raw,ours-hbh,t2-rank256,splitzip,adacode,exans,aquakv-2,exactkv " in x for x in cap))
         self.assertTrue(all("SHAPES=32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,"
                             "8192:16:128:2:sz16,16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024" in x
                             for x in long))
