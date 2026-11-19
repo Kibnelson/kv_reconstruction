@@ -43,7 +43,17 @@ def path_of(env):
 
 def label(env):
     lay = env.get("layout") or f"{env.get('prefills')}p{env.get('decodes')}d"
-    return f"{lay}, {path_of(env)}" + (", eager" if env.get("eager") else "")
+    return f"{lay}, {path_of(env)}" + (", one link shared" if env.get("shared_link") else "") + \
+        (", eager" if env.get("eager") else "")
+
+
+def per_gpu(env, link):
+    """The link's speed per prefill GPU: the whole link, or its share when the prefill engines share it."""
+    try:
+        g = float(link)
+    except (TypeError, ValueError):
+        return None
+    return g / max(1, int(env.get("prefills") or 1)) if env.get("shared_link") else g
 
 
 def moved(st):
@@ -184,7 +194,54 @@ def link_tables(key, vs):
 
 
 FAMILIES = {"sz1": "SplitZip, 1 at a time", "sz16": "SplitZip, 16 at once", "sz1024": "SplitZip, 1,024 tokens",
-            "sz32k": "SplitZip, 32K tokens", "ibp": "IBP", "exactkv": "exactkv"}
+            "sz32k": "SplitZip, 32K tokens", "ibp": "IBP", "exactkv": "exactkv", "long": "Long prompt, 1 at a time",
+            "share": "Shared link, many at once"}
+# "same as raw": a TTFT within this share of raw's either way (the run-to-run noise of a point is about 1-2%)
+TIE = 0.03
+
+
+def regime_tables(runs):
+    """Both regimes, per codec: at each link speed (per prefill GPU), on how many workloads its TTFT p50 beats raw's
+    by more than TIE, matches it, or loses, and its speedup over raw from the worst workload to the best."""
+    groups = {}
+    for r in runs:
+        for v in (r["res"].get("shapes") or {}).values():
+            g = per_gpu(r["env"], v.get("link_gbps"))
+            key = (label(r["env"]), str(v.get("link_gbps")), g)
+            groups.setdefault(key, {}).setdefault(v["codec"], {})[(v["tokens"], v["batch"], v["output"])] = v
+    if not groups:
+        return []
+    codecs = []
+    for g in groups.values():
+        for c in g:
+            if c != "raw" and c not in codecs:
+                codecs.append(c)
+    L = ["## Where compression helps and where it does not", "",
+         f"Per layout and link speed (and its share per prefill GPU when the engines share one link), per codec: the "
+         f"workloads (stage shapes) where its TTFT p50 beats raw's by more than {100 * TIE:.0f}% (helps), is within "
+         f"{100 * TIE:.0f}% (same) or is slower (hurts), as helps / same / hurts, then its speedup over raw (raw's "
+         "TTFT / the codec's) from its worst workload to its best.", "",
+         "| Run | Link | Per prefill GPU | " + " | ".join(cname(c) for c in codecs) + " |",
+         "| --- | --- | --- |" + " --- |" * len(codecs)]
+    for (lab, link, g), by in sorted(groups.items(), key=lambda kv: (kv[0][0], speed_key(kv[0][1]))):
+        raw = by.get("raw") or {}
+        cells = []
+        for c in codecs:
+            sp = []
+            for k, v in (by.get(c) or {}).items():
+                a = ((raw.get(k) or {}).get("bench") or {}).get("median_ttft_ms")
+                b = (v.get("bench") or {}).get("median_ttft_ms")
+                if a and b:
+                    sp.append(a / b)
+            if not sp:
+                cells.append("-")
+                continue
+            h = sum(1 for x in sp if x > 1 + TIE)
+            t = sum(1 for x in sp if 1 - TIE <= x <= 1 + TIE)
+            cells.append(f"{h} / {t} / {len(sp) - h - t}, {min(sp):.2f}-{max(sp):.2f}x")
+        link_s = "unpaced" if link in ("native", "None") else f"{float(link):g} Gb/s"
+        L.append(f"| {lab} | {link_s} | {'-' if g is None else f'{g:g} Gb/s'} | " + " | ".join(cells) + " |")
+    return L + [""]
 
 
 def workload_tables(runs):
@@ -364,6 +421,7 @@ def main(argv=None):
                          f"{fmt(top)} | {rel} |")
             L.append("")
 
+    L += regime_tables(runs)
     L += workload_tables(runs)
 
     # CPU tier

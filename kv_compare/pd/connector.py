@@ -97,6 +97,8 @@ class RecvSpec:
     admitted_at: float = 0.0
     prompt: list | None = None                       # token ids from position 0 (T2's layer 0)
     chunks: list | None = None                       # tier load: [(chunk index, hash)]
+    pieces: int = 0                                  # decode worker: the transfer's pieces (0: none arrived yet)
+    taken: int = 0                                   # decode worker: pieces taken from the receiver so far
 
 
 @dataclass
@@ -215,6 +217,28 @@ def _layer0_recomputed(header):
     """A transfer whose receiver recomputes T2's layer 0 (with the engine's own modules)."""
     m = (header or {}).get("meta") or {}
     return m.get("layer0") == "recomputed"
+
+
+class _Skip(Exception):
+    """A piece with nothing to install here."""
+
+
+def _pieces_of(header):
+    """How many pieces the transfer this header starts has (1: the request in one transfer)."""
+    m = (header or {}).get("meta") or {}
+    return max(1, int(m.get("pieces") or 1))
+
+
+def piece_key(key, i):
+    """The receiver's key of piece i of the transfer `key` (piece 0 is the transfer's own key)."""
+    return key if i == 0 else f"{key}#{i}"
+
+
+def piece_bounds(T, P):
+    """Token bounds [(a, b)] of a request's pieces of at most P tokens (one piece when P <= 0 or T <= P)."""
+    if P <= 0 or T <= P:
+        return [(0, T)]
+    return [(a, min(a + P, T)) for a in range(0, T, P)]
 
 
 def _fits(held, n, budget):
@@ -448,6 +472,21 @@ class _WorkerSide:
         self.rlock = threading.Lock()                # recv_ok, recv_failed, installing, cancelled
         self.installing: set[str] = set()
         self.cancelled: set[str] = set()
+        # Pieces: the sender gathers, codes and sends a request of more than pipeline_tokens tokens in pieces of that
+        # many (every codec alike, raw included), each a transfer of its own; the receiver installs each piece when it
+        # arrives. Piece i+1 is coded while piece i is on the link, and installed while piece i+2 is on it; the sender
+        # holds one piece's words at a time, not the request's (job 30436: 16K requests took 4.1x a 4K one end to end,
+        # coding, link and install one after another). 0: the request in one transfer, as up to job 30436.
+        self.piece_tokens = int(cfg.get("pipeline_tokens", 0) or 0)
+        # prefill, async_encode: gather, code and hand to the link on a thread and CUDA stream of their own, so the
+        # engine's step goes on (job 30436: T's 33 ms at 2K and 253 ms at 16K ran inside the prefill engine's step)
+        self.async_encode = bool(cfg.get("async_encode", False))
+        self.encode_q = None
+        # async_encode: a request of at most this many bytes of KV is copied out in the engine's step (its blocks
+        # free at once); a longer one piece by piece on the encoder thread (one piece's words held at a time)
+        self.gather_budget = int(cfg.get("gather_budget", 2 << 30))
+        self.slock = threading.Lock()                # sent_ready (the encoder thread adds to it)
+        self.req_state: dict[str, dict] = {}         # decode: per request, its pieces dispatched / installed / ok
         self.timeout = float(cfg.get("recv_timeout_s", 600))
         self.gpu_budget = int(cfg.get("gpu_send_budget", 2 << 30))
         self.gpu_queued = 0
@@ -478,6 +517,9 @@ class _WorkerSide:
             self.layer0_model = type(found).__name__ if found is not None else None
         except Exception as exc:
             self.layer0_model = f"not found: {exc!r}"[:200]
+        from . import codecs as cdm
+        if self.producer or not self.cfg.get("decode_graphs", True):
+            cdm.DECODE_GRAPHS = False                # the graph arena (about 460 MB) only where installs run
         names = layer_order([n for n, t in kv_caches.items() if torch.is_tensor(t) and t.dim() == 4])
         caches = [kv_caches[n] for n in names]
         device = caches[0].device
@@ -504,8 +546,13 @@ class _WorkerSide:
             self._tier_control()
         elif self.producer:
             from .transport import Link, Sender
-            link = Link(gbps=self.cfg.get("gbps"), control=self.cfg.get("link_control"))
+            link = Link(gbps=self.cfg.get("gbps"), control=self.cfg.get("link_control"),
+                        shared=self.cfg.get("link_shared"))
             self.sender = Sender(link, device, mode=self.cfg.get("transport", "ring"), log=logger.warning)
+            if self.async_encode:
+                import queue
+                self.encode_q = queue.Queue()
+                threading.Thread(target=self._encode_loop, daemon=True, name="tkv-encode").start()
         else:
             from .transport import Receiver
             host, port = self.cfg["listen"].rsplit(":", 1)
@@ -588,69 +635,159 @@ class _WorkerSide:
                 out[n] = repr(exc)[:200]
                 logger.warning("TKVConnector: codec %s failed its warm-up (%s); left out", n, out[n])
                 self.codecs.pop(n, None)
+        from . import codecs as cdm
+        if not self.producer and cdm.DECODE_GRAPHS:   # record the decoders' graphs now, not at a first request
+            sizes = [int(x) for x in str(self.cfg.get("graph_tokens", ",".join(
+                str(256 * i) for i in range(1, max(1, cdm.PIECE_TOKENS // 256) + 1)))).split(",") if x.strip()]
+            for n, c in list(self.codecs.items()):
+                if hasattr(c, "warm_graphs") and sizes:
+                    try:
+                        out[f"{n} graphs"] = c.warm_graphs(sizes)
+                    except Exception as exc:
+                        out[f"{n} graphs"] = repr(exc)[:200]
+            cdm.graph_events()
         return out
 
     # ------------------------------------------------------------------------------------------------ prefill
     def _send(self, spec: SendSpec):
         if spec.dest == "tier":
             return self._tier_gather(spec)
-        from .wire import bundle, payload_bytes, word_checksum
-        rec = {"event": "send", "key": spec.key, "req": spec.req_id, "codec": spec.codec, "dest": spec.dest,
-               "tokens": spec.t1 - spec.t0, "t0": spec.t0, "conv": spec.conv, "finished_at": spec.finished_at,
-               "picked_at": time.time()}
-        codec = self.codecs.get(spec.codec)
-        try:
-            if codec is None:
-                raise ValueError(f"codec {spec.codec} not loaded here")
-            sync = torch.cuda.synchronize if self.device.type == "cuda" else (lambda *a: None)
-            t = time.perf_counter()
-            words = self.paged.gather(spec.block_ids, spec.t0, spec.t1)
-            sync(self.device)
-            rec["gather_ms"] = 1e3 * (time.perf_counter() - t)
-            self.sent_ready.add(spec.req_id)         # the blocks are copied out: vLLM may free them
-            lossy = getattr(codec, "lossy", False)    # AQUA-KV: a speed reference; its own error, no checksum
-            check = word_checksum(words) if spec.verify and not lossy else None
-            t = time.perf_counter()
-            ctx = self._ctx(codec, spec.prompt, spec.steps)
-            parts, meta = _retry_once(lambda w=words, c=ctx: (codec.encode(w, pos0=spec.t0, ctx=c) if c is not None
-                                                             else codec.encode(w, pos0=spec.t0)), self.device, rec)
-            header, blob = bundle(parts, dict(meta, checksum=check, key=spec.key, t0=spec.t0, sent_at=time.time()))
-            for k in ("set", "layer0", "layer0_check", "rel_err"):
-                if k in meta:
-                    rec[k] = meta[k]
-            if lossy:
-                rec["lossy"] = True
-            sync(self.device)
-            rec["encode_ms"] = 1e3 * (time.perf_counter() - t)
-            rec["raw_bytes"] = int(words.numel() * 2)
-            rec["coded_bytes"] = int(payload_bytes(header))
-            rec["blob_bytes"] = int(blob.numel())
-            rec["bits"] = 8.0 * rec["coded_bytes"] / words.numel()
-            del words, parts
-            with self.qlock:                          # within the budget, or the only one queued (see
-                on_gpu = _fits(self.gpu_queued, blob.numel(), self.gpu_budget)     # transport.Receiver._alloc)
-                if on_gpu:
-                    self.gpu_queued += blob.numel()
-            if not on_gpu:
-                blob = blob.cpu()
-            rec["queued_on"] = "gpu" if on_gpu else "host"
-            nbytes = int(blob.numel())
+        if self.encode_q is not None:
+            put_at = time.time()
+            got = None
+            L, W = len(self.paged.caches), 2 * self.paged.heads * self.paged.hd
+            if (spec.t1 - spec.t0) * L * W * 2 <= self.gather_budget:
+                # copied out here, on the engine's stream, so vLLM frees the blocks in this step as without the
+                # encoder thread (an engine with nothing to run takes no step that would report them later)
+                t = time.perf_counter()
+                got = [self.paged.gather(spec.block_ids, spec.t0 + a, spec.t0 + b)
+                       for a, b in piece_bounds(spec.t1 - spec.t0, self.piece_tokens)]
+                got = (got, 1e3 * (time.perf_counter() - t))
+                self._sent(spec.req_id)
+            ev = None
+            if self.device.type == "cuda":           # the step's KV writes (and the gather) come before this on the
+                ev = torch.cuda.Event()              # engine's stream
+                ev.record()
+            self.encode_q.put((spec, ev, put_at, got))
+            return
+        self._send_now(spec)
 
-            def done(r, on_gpu=on_gpu, nbytes=nbytes, base=rec):
-                if on_gpu:
-                    with self.qlock:
-                        self.gpu_queued -= nbytes
-                self.log.write(dict(base, **r))
-            self.sender.send(spec.dest, spec.key, header, blob, on_done=done)
-        except Exception as exc:
-            self.sent_ready.add(spec.req_id)
-            rec["error"] = repr(exc)[:300]
-            self.log.write(rec)
-            logger.warning("TKVConnector: send of %s failed: %s", spec.key, rec["error"])
-            try:                                       # the decode engine fails it now, not at its timeout
-                self.sender.abort(spec.dest, spec.key, rec["error"])
-            except Exception as exc2:
-                logger.warning("TKVConnector: could not tell %s: %r", spec.dest, exc2)
+    def _sent(self, rid):
+        """The request's blocks are copied out: vLLM may free them."""
+        with self.slock:
+            self.sent_ready.add(rid)
+
+    def _encode_loop(self):
+        """The encoder thread (async_encode): one request at a time, on a stream of its own."""
+        stream = None
+        if self.device.type == "cuda":
+            torch.cuda.set_device(self.device)
+            stream = torch.cuda.Stream(self.device)
+        while True:
+            item = self.encode_q.get()
+            if item is None:
+                return
+            spec, ev, put_at, got = item
+            try:
+                with torch.inference_mode():
+                    if stream is not None:
+                        with torch.cuda.stream(stream):
+                            if ev is not None:
+                                stream.wait_event(ev)
+                            self._send_now(spec, put_at=put_at, on_stream=True, gathered=got)
+                    else:
+                        self._send_now(spec, put_at=put_at, gathered=got)
+            except BaseException as exc:          # _send_now reports its own errors; this is a last resort
+                logger.warning("TKVConnector: encoder: %r", exc)
+                self._sent(spec.req_id)
+
+    def _send_now(self, spec: SendSpec, put_at=None, on_stream=False, gathered=None):
+        """Gather, code and hand to the link each piece of the request (piece_bounds), in order. gathered: (the
+        pieces' words, copied out already, and the time that took)."""
+        from .wire import bundle, payload_bytes, word_checksum
+        codec = self.codecs.get(spec.codec)
+        cuda = self.device.type == "cuda"
+        if not cuda:
+            sync = lambda: None
+        elif on_stream:                              # the encoder's own work, not the engine's
+            sync = lambda: torch.cuda.current_stream(self.device).synchronize()
+        else:
+            sync = lambda: torch.cuda.synchronize(self.device)
+        bounds = piece_bounds(spec.t1 - spec.t0, self.piece_tokens)
+        n = len(bounds)
+        picked = time.time()
+        ctx = None
+        for i, (a, b) in enumerate(bounds):
+            key, t0 = piece_key(spec.key, i), spec.t0 + a
+            rec = {"event": "send", "key": key, "req": spec.req_id, "codec": spec.codec, "dest": spec.dest,
+                   "tokens": b - a, "t0": t0, "conv": spec.conv, "finished_at": spec.finished_at,
+                   "picked_at": picked if i == 0 else time.time()}
+            if n > 1:
+                rec.update(piece=i, pieces=n, req_key=spec.key)
+            if put_at is not None and i == 0:
+                rec["encode_wait_ms"] = 1e3 * (picked - put_at)
+                rec["async"] = True
+            try:
+                if codec is None:
+                    raise ValueError(f"codec {spec.codec} not loaded here")
+                if gathered is not None:             # copied out in the engine's step (its CPU time, here once)
+                    words = gathered[0][i]
+                    gathered[0][i] = None
+                    rec["gather_ms"] = gathered[1] if i == 0 else 0.0
+                    rec["gathered_in_step"] = True
+                else:
+                    t = time.perf_counter()
+                    words = self.paged.gather(spec.block_ids, t0, spec.t0 + b)
+                    sync()
+                    rec["gather_ms"] = 1e3 * (time.perf_counter() - t)
+                    if i == n - 1:
+                        self._sent(spec.req_id)      # every piece is copied out: vLLM may free the blocks
+                lossy = getattr(codec, "lossy", False)    # AQUA-KV: a speed reference; its own error, no checksum
+                check = word_checksum(words) if spec.verify and not lossy else None
+                t = time.perf_counter()
+                if ctx is None:
+                    ctx = self._ctx(codec, spec.prompt, spec.steps)
+                parts, meta = _retry_once(lambda w=words, c=ctx, p=t0: (codec.encode(w, pos0=p, ctx=c) if c is not None
+                                                                       else codec.encode(w, pos0=p)), self.device, rec)
+                extra = {"piece": i, "pieces": n} if n > 1 else {}
+                header, blob = bundle(parts, dict(meta, checksum=check, key=key, t0=t0, sent_at=time.time(), **extra))
+                for k in ("set", "layer0", "layer0_check", "rel_err"):
+                    if k in meta:
+                        rec[k] = meta[k]
+                if lossy:
+                    rec["lossy"] = True
+                sync()
+                rec["encode_ms"] = 1e3 * (time.perf_counter() - t)
+                rec["raw_bytes"] = int(words.numel() * 2)
+                rec["coded_bytes"] = int(payload_bytes(header))
+                rec["blob_bytes"] = int(blob.numel())
+                rec["bits"] = 8.0 * rec["coded_bytes"] / words.numel()
+                del words, parts
+                with self.qlock:                      # within the budget, or the only one queued (see
+                    on_gpu = _fits(self.gpu_queued, blob.numel(), self.gpu_budget)     # transport.Receiver._alloc)
+                    if on_gpu:
+                        self.gpu_queued += blob.numel()
+                if not on_gpu:
+                    blob = blob.cpu()
+                rec["queued_on"] = "gpu" if on_gpu else "host"
+                nbytes = int(blob.numel())
+
+                def done(r, on_gpu=on_gpu, nbytes=nbytes, base=rec):
+                    if on_gpu:
+                        with self.qlock:
+                            self.gpu_queued -= nbytes
+                    self.log.write(dict(base, **r))
+                self.sender.send(spec.dest, key, header, blob, on_done=done)
+            except Exception as exc:
+                self._sent(spec.req_id)
+                rec["error"] = repr(exc)[:300]
+                self.log.write(rec)
+                logger.warning("TKVConnector: send of %s failed: %s", key, rec["error"])
+                try:                                   # the decode engine fails it now, not at its timeout (and
+                    self.sender.abort(spec.dest, key, rec["error"])     # takes no later piece)
+                except Exception as exc2:
+                    logger.warning("TKVConnector: could not tell %s: %r", spec.dest, exc2)
+                return
 
     # ------------------------------------------------------------------------------------------------- decode
     def _install_loop(self):
@@ -664,6 +801,12 @@ class _WorkerSide:
             if item is None:
                 return
             spec, got, put_at = item
+            with self.rlock:
+                gone = spec.req_id in self.cancelled
+            if gone:                                 # the request ended: its blocks are not written any more
+                self.receiver.release(got[1])
+                self._piece_done(spec.req_id, True)
+                continue
             try:
                 if stream is not None:
                     with torch.cuda.stream(stream):
@@ -672,42 +815,98 @@ class _WorkerSide:
                     self._install(spec, got, queued_ms=1e3 * (time.time() - put_at))
             except BaseException as exc:          # _install reports its own errors; this is a last resort
                 logger.warning("TKVConnector: installer: %r", exc)
-                self._done(spec.req_id, False)
+                self._piece_done(spec.req_id, False)
+
+    def _dispatch(self, spec, got, inline):
+        """Install one piece of spec's transfer (got: header, blob, link record): here, or on the installer."""
+        with self.rlock:
+            st = self.req_state.setdefault(spec.req_id, {"queued": 0, "done": 0, "ok": True, "closed": False})
+            st["queued"] += 1
+            self.installing.add(spec.req_id)
+        if inline:
+            self._install(spec, got)
+        else:
+            self.install_q.put((spec, got, time.time()))
+
+    def _piece_done(self, rid, ok):
+        with self.rlock:
+            st = self.req_state.get(rid)
+            if st is None:
+                return self._done_locked(rid, ok)
+            st["done"] += 1
+            st["ok"] = st["ok"] and ok
+            if st["closed"] and st["done"] == st["queued"]:
+                del self.req_state[rid]
+                self._done_locked(rid, st["ok"])
+
+    def _close(self, rid, ok=True):
+        """No more pieces of rid will be installed: it is reported once those dispatched have ended (failed if
+        ok is False or any of them failed)."""
+        with self.rlock:
+            st = self.req_state.get(rid)
+            if st is None:                           # none dispatched
+                (self.recv_ok if ok else self.recv_failed).add(rid)
+                return
+            st["closed"] = True
+            st["ok"] = st["ok"] and ok
+            if st["done"] == st["queued"]:
+                del self.req_state[rid]
+                self._done_locked(rid, st["ok"])
+
+    def _drop_rest(self, spec):
+        """The transfer's pieces not taken yet are discarded (now, or when they arrive)."""
+        if spec.pieces:
+            for i in range(spec.taken, spec.pieces):
+                self.receiver.drop(piece_key(spec.key, i))
+        else:
+            self.receiver.drop(spec.key)
+            self.receiver.drop_pieces(spec.key)
 
     def _done(self, rid, ok):
+        with self.rlock:
+            self._done_locked(rid, ok)
+
+    def _done_locked(self, rid, ok):
         """Report a request's load: ok, or failed (vLLM computes it); a request that ended during its install is
         reported loaded (its blocks may be freed now, not while they were being written)."""
-        with self.rlock:
-            self.installing.discard(rid)
-            if rid in self.cancelled:
-                self.cancelled.discard(rid)
-                self.recv_ok.add(rid)
-            elif ok:
-                self.recv_ok.add(rid)
-            else:
-                self.recv_failed.add(rid)
+        self.installing.discard(rid)
+        if rid in self.cancelled:
+            self.cancelled.discard(rid)
+            self.recv_ok.add(rid)
+        elif ok:
+            self.recv_ok.add(rid)
+        else:
+            self.recv_failed.add(rid)
 
     def _install(self, spec: RecvSpec, got, queued_ms=None, on_stream=False):
         """on_stream: the installer thread's own stream; its work is waited for on that stream (every codec ends
         its work there: nvCOMP's and IBP's own streams are joined back), not on the whole GPU."""
         from .wire import Checksum, unbundle
         header, blob, trec = got
-        rec = {"event": "install", "key": spec.key, "req": spec.req_id, "tokens": spec.t1 - spec.t0,
+        hm = header.get("meta") or {}
+        rec = {"event": "install", "key": trec.get("key", spec.key), "req": spec.req_id, "tokens": spec.t1 - spec.t0,
                "admitted_at": spec.admitted_at, "taken_at": time.time(), **{f"link_{k}": v for k, v in trec.items()}}
+        if hm.get("pieces"):
+            rec.update(piece=int(hm.get("piece", 0)), pieces=int(hm["pieces"]), req_key=spec.key)
         if queued_ms is not None:
             rec["install_queued_ms"] = queued_ms
             rec["async"] = True
         ok = False
         try:
+            st0, sT = int(hm.get("t0", 0)), int(hm.get("T", 0))
+            lo, hi = max(spec.t0, st0), min(spec.t1, st0 + sT)    # the part this engine does not have yet
+            if hm.get("pieces"):
+                rec["tokens"] = max(0, hi - lo)
+                if lo >= hi:                         # a piece of the prefix this engine has cached
+                    rec.update(skipped=True, decode_install_ms=0.0, exact=None)
+                    raise _Skip()
+            elif lo != spec.t0 or hi != spec.t1:
+                raise ValueError(f"transfer holds tokens {st0}..{st0 + sT}, request needs {spec.t0}..{spec.t1}")
             parts, meta = unbundle(header, blob if blob.device == self.device else blob.to(self.device))
             codec = self.codecs[meta["codec"]]
             rec["codec"] = meta["codec"]
-            st0 = int(meta.get("t0", 0))
-            if st0 > spec.t0 or st0 + int(meta["T"]) < spec.t1:
-                raise ValueError(f"transfer holds tokens {st0}..{st0 + int(meta['T'])}, request needs "
-                                 f"{spec.t0}..{spec.t1}")
-            a, b = spec.t0 - st0, spec.t1 - st0      # the part this engine does not have yet
-            blk, off = self.paged.slots(spec.block_ids, spec.t0, spec.t1)
+            a, b = lo - st0, hi - st0
+            blk, off = self.paged.slots(spec.block_ids, lo, hi)
             want = meta.get("checksum")
             if self.device.type != "cuda":
                 sync = lambda *x: None
@@ -744,15 +943,20 @@ class _WorkerSide:
             if rec["exact"] is False:
                 raise ValueError("checksum mismatch: the installed KV differs from the sender's")
             ok = True
+        except _Skip:
+            ok = True
         except Exception as exc:                     # for the request only (see results: vLLM asserts otherwise)
             rec["error"] = repr(exc)[:300]
-            logger.warning("TKVConnector: install of %s failed: %s", spec.key, rec["error"])
+            logger.warning("TKVConnector: install of %s failed: %s", rec["key"], rec["error"])
         finally:
             if self.receiver is not None:
                 self.receiver.release(blob)
         rec["done_at"] = time.time()
         self.log.write(rec)
-        self._done(spec.req_id, ok)
+        self._piece_done(spec.req_id, ok)
+        from .codecs import graph_events
+        for e in graph_events():                     # graphs recorded at this install (a size not warmed up)
+            self.log.write(dict(e, event="graphs", time=time.time()))
 
     # ------------------------------------------------------------------------------------------------- shared
     def on_metadata(self, meta: TKVMetadata):
@@ -763,11 +967,14 @@ class _WorkerSide:
         for rid in meta.cancels:
             spec = self.pending.pop(rid, None)
             if spec is not None and self.receiver is not None and not spec.chunks:
-                self.receiver.drop(spec.key)
+                self._drop_rest(spec)
                 self.log.write({"event": "cancel", "key": spec.key, "req": rid, "time": time.time()})
             with self.rlock:                         # lets vLLM free the blocks of the finished request (when
-                if rid in self.installing:           # its install ends, if one is running: see _done)
+                if rid in self.installing:           # its installs end, if any is queued or running: see _done)
                     self.cancelled.add(rid)
+                    st = self.req_state.get(rid)
+                    if st is not None:
+                        st["closed"] = True
                 else:
                     self.recv_ok.add(rid)
 
@@ -816,7 +1023,7 @@ class _WorkerSide:
         except Exception as exc:
             rec["error"] = repr(exc)[:300]
             self.log.write(rec)
-        self.sent_ready.add(spec.req_id)
+        self._sent(spec.req_id)
 
     def _store_loop(self):
         from .wire import bundle, payload_bytes, word_checksum
@@ -956,39 +1163,50 @@ class _WorkerSide:
         if self.receiver is not None:
             now = time.time()
             for rid, spec in list(self.pending.items()):
-                got = self.receiver.take(spec.key)
-                err = None if got is not None else self.receiver.failure(spec.key)
-                if got is not None:
-                    del self.pending[rid]
-                    if self.install_q is not None and not _layer0_recomputed(got[0]):
-                        with self.rlock:
-                            self.installing.add(rid)
-                        self.install_q.put((spec, got, time.time()))
-                    else:                             # T2's layer-0 recompute runs the engine's own modules: here
-                        self._install(spec, got)
-                # a failed transfer is reported for the request (failed_recving, and finished_recving as vLLM's
-                # connector API asks), not also as invalid blocks. The engines run with kv_load_failure_policy
-                # "recompute" (scripts/run_pd_vllm.sh): under vLLM 0.32's default, "fail", the scheduler finishes
-                # the request with an error and then asserts it still has it (_update_from_kv_xfer_finished), which
-                # killed the engine in jobs 30176 and 30226; under "recompute" the decode engine computes the prompt
-                elif err is not None:                 # the prefill side could not send it
-                    del self.pending[rid]
-                    with self.rlock:
-                        self.recv_failed.add(rid)
-                    self.log.write({"event": "send_failed", "key": spec.key, "req": rid, "error": err, "time": now})
-                    logger.warning("TKVConnector: the transfer of %s failed at the sender: %s", spec.key, err)
-                elif now - spec.admitted_at > self.timeout:
-                    del self.pending[rid]
-                    self.receiver.drop(spec.key)
-                    with self.rlock:
-                        self.recv_failed.add(rid)
-                    self.log.write({"event": "timeout", "key": spec.key, "req": rid, "time": now})
+                while True:                          # the pieces that have arrived, in order
+                    k = piece_key(spec.key, spec.taken)
+                    got = self.receiver.take(k)
+                    err = None if got is not None else self.receiver.failure(k)
+                    if got is not None:
+                        if spec.taken == 0:
+                            spec.pieces = _pieces_of(got[0])
+                        spec.taken += 1
+                        last = spec.taken >= spec.pieces
+                        if last:
+                            del self.pending[rid]
+                        # T2's layer-0 recompute runs the engine's own modules: here, on the engine's thread
+                        self._dispatch(spec, got, inline=self.install_q is None or _layer0_recomputed(got[0]))
+                        if last:
+                            self._close(rid)
+                            break
+                        continue
+                    # a failed transfer is reported for the request (failed_recving, and finished_recving as
+                    # vLLM's connector API asks), not also as invalid blocks. The engines run with
+                    # kv_load_failure_policy "recompute" (scripts/run_pd_vllm.sh): under vLLM 0.32's default,
+                    # "fail", the scheduler finishes the request with an error and then asserts it still has it
+                    # (_update_from_kv_xfer_finished), which killed the engine in jobs 30176 and 30226; under
+                    # "recompute" the decode engine computes the prompt
+                    if err is not None:              # the prefill side could not send it
+                        del self.pending[rid]
+                        self._drop_rest(spec)
+                        self._close(rid, ok=False)
+                        self.log.write({"event": "send_failed", "key": k, "req": rid, "error": err, "time": now})
+                        logger.warning("TKVConnector: the transfer of %s failed at the sender: %s", k, err)
+                    elif now - spec.admitted_at > self.timeout:
+                        del self.pending[rid]
+                        self._drop_rest(spec)
+                        self._close(rid, ok=False)
+                        self.log.write({"event": "timeout", "key": k, "req": rid, "time": now})
+                    break
             if now - self._last_expire > 30:          # transfers whose decode request never came (aborted)
                 self._last_expire = now
-                for k in self.receiver.expire(self.timeout, keep={s.key for s in self.pending.values()}):
+                keep = {piece_key(x.key, i) for x in self.pending.values()
+                        for i in range(x.taken, max(x.pieces, x.taken + 1))}
+                for k in self.receiver.expire(self.timeout, keep=keep):
                     self.log.write({"event": "expired", "key": k, "time": now})
-        sent = self.sent_ready & self.finished_seen
-        self.sent_ready -= sent
+        with self.slock:
+            sent = self.sent_ready & self.finished_seen
+            self.sent_ready -= sent
         self.finished_seen -= sent
         with self.rlock:
             ok, bad = self.recv_ok, self.recv_failed
@@ -1000,6 +1218,8 @@ class _WorkerSide:
         return b
 
     def close(self):
+        if self.encode_q is not None:
+            self.encode_q.put(None)
         if self.store_q is not None:
             self.store_q.put(None)
         if self.install_q is not None:

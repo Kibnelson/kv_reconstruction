@@ -103,15 +103,20 @@ def open_cuda(desc):
 
 
 class Link:
-    """A FIFO virtual link; gbps fixed, or read from the control file (JSON {"gbps": x}) when it changes."""
+    """A FIFO virtual link; gbps fixed, or read from the control file (JSON {"gbps": x}) when it changes.
 
-    def __init__(self, gbps=None, control=None):
+    shared: a file every sender on the link books its chunks in (several prefill engines, one per GPU, behind one
+    link: a node's NIC); without it each sender has a link of its own."""
+
+    def __init__(self, gbps=None, control=None, shared=None):
         self.fixed = gbps
         self.control = control
         self._mtime = None
         self._gbps = gbps
         self.busy_until = 0.0
         self.lock = threading.Lock()
+        self.shared = shared
+        self._fd = None
 
     def gbps(self):
         if self.control:
@@ -133,10 +138,30 @@ class Link:
             now = time.monotonic() if now is None else now
             if not g:
                 return now, now
+            if self.shared:
+                return self._book(now, 8.0 * nbytes / (g * 1e9))
             start = max(now, self.busy_until)
             end = start + 8.0 * nbytes / (g * 1e9)
             self.busy_until = end
             return start, end
+
+    def _book(self, now, dt):
+        """(start, end) of dt seconds on the shared link: its busy-until time (a float64 at offset 0 of the file,
+        time.monotonic: one clock for the node's processes) read and moved under an exclusive lock."""
+        import fcntl
+        import struct
+        if self._fd is None:
+            self._fd = os.open(self.shared, os.O_RDWR | os.O_CREAT, 0o600)
+        fcntl.flock(self._fd, fcntl.LOCK_EX)
+        try:
+            raw = os.pread(self._fd, 8, 0)
+            busy = struct.unpack("<d", raw)[0] if len(raw) == 8 else 0.0
+            start = max(now, busy)
+            end = start + dt
+            os.pwrite(self._fd, struct.pack("<d", end), 0)
+        finally:
+            fcntl.flock(self._fd, fcntl.LOCK_UN)
+        return start, end
 
 
 def _sleep_until(t):
@@ -160,6 +185,7 @@ class Receiver:
         self.log = log
         self.done = {}                               # key -> (header, blob, record)
         self.dropped = set()                         # keys to discard on arrival
+        self.dropped_pieces = {}                     # transfer key -> when: its pieces (key#i) are discarded too
         self.failed = {}                             # key -> the sender's error (the transfer will not come)
         self.cv = threading.Condition()
         self.gpu_budget = gpu_budget                 # bytes of GPU blobs at once before falling back to host
@@ -282,6 +308,8 @@ class Receiver:
                         if m["key"] in self.dropped:
                             self.dropped.discard(m["key"])
                             self.release(blob)
+                        elif "#" in m["key"] and m["key"].split("#", 1)[0] in self.dropped_pieces:
+                            self.release(blob)
                         else:
                             self.done[m["key"]] = (header, blob, rec)
                         self.cv.notify_all()
@@ -329,7 +357,17 @@ class Receiver:
                     del self.done[k]
                     self.release(b)
                     gone.append(k)
+            for k, t in list(self.dropped_pieces.items()):
+                if now - t > older_than_s:
+                    del self.dropped_pieces[k]
         return gone
+
+    def drop_pieces(self, key):
+        """Discard the pieces key#1, key#2, ... of a transfer (its request is gone; how many is not known yet)."""
+        with self.cv:
+            self.dropped_pieces[key] = time.time()
+            for k in [k for k in self.done if k.startswith(key + "#")]:
+                self.release(self.done.pop(k)[1])
 
     def drop(self, key):
         """Discard a transfer (its request is gone): now if it arrived, else when it does."""

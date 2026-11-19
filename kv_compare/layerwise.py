@@ -14,12 +14,19 @@ for the whole document. Tokens can be split into chunks decoded on separate CUDA
 depends on the same chunk's previous layer, so one chunk's product runs while another chunk decodes."""
 from __future__ import annotations
 
+import os
+
 import torch
 
 from . import fused as fu
 from . import gpu_coder as gc
 
 triton, tl = gc.triton, gc.tl
+# Head groups, decoder: a group's sums from the groups decoded before it in one Triton launch ("fused"), or as a copy
+# of those feature columns, a cuBLAS product and an add ("torch", three launches; the same integers). In head by
+# head, 15 groups x 28 layers x 3 launches were half the decoder's 1,736 launches per piece, and the install cost
+# about the same 62-76 ms from 512 to 4,096 tokens (job 30436): launches, not data.
+GROUP_PRODUCT = os.environ.get("TKV_GROUP_PRODUCT", "fused")
 
 
 def int_mm(x, A, out=None):
@@ -95,6 +102,27 @@ if triton is not None:
             at = tl.load(a_ptr + rn[:, None] * K + (k0 + rk)[None, :])
             acc = tl.dot(xt, tl.trans(at), acc, out_dtype=tl.int32)
         tl.store(c_ptr + rm[:, None] * N + rn[None, :], acc)
+
+    @triton.jit
+    def _gacc_kernel(x_ptr, a_ptr, acc_ptr, M, N, K, SX, SACC, BM: tl.constexpr, BN: tl.constexpr,
+                     BK: tl.constexpr):
+        """A head group's sums from the groups decoded before it, added in place: acc [M, N] (int32, row stride
+        SACC) += X [M, K] (int8, row stride SX: the first K feature columns of the layer) times A [N, K] (int8)
+        transposed."""
+        pid = tl.program_id(0)
+        nn = N // BN
+        pm = pid // nn
+        pn = pid % nn
+        rm = pm * BM + tl.arange(0, BM)
+        rn = pn * BN + tl.arange(0, BN)
+        rk = tl.arange(0, BK)
+        s = tl.zeros([BM, BN], dtype=tl.int32)
+        for k0 in range(0, K, BK):
+            xt = tl.load(x_ptr + rm[:, None] * SX + (k0 + rk)[None, :])
+            at = tl.load(a_ptr + rn[:, None] * K + (k0 + rk)[None, :])
+            s = tl.dot(xt, tl.trans(at), s, out_dtype=tl.int32)
+        p = acc_ptr + rm[:, None] * SACC + rn[None, :]
+        tl.store(p, tl.load(p) + s)
 
     @triton.jit
     def _lane_mu(acc_row, own, part, sao, bo, sap, bp, cs, sn, low, key):
@@ -311,6 +339,20 @@ if triton is not None:
         tl.store(prior_ptr + t, sacc.to(tl.float32) * PRIOR_SCALE, mask=m)
 
 
+_AG = {}
+
+
+def _group_rows(Acq, ng, gw):
+    """[None, then per group j >= 1 its rows of Acq on the groups before it, [L, gw, j * gw] contiguous]: made once
+    per constant set and kept (a codec object is made per transfer: 15 copies and, in head by head on Llama-3.2-3B,
+    55 MB each time otherwise)."""
+    key = (id(Acq), ng, gw)
+    hit = _AG.get(key)
+    if hit is None or hit[0] is not Acq:
+        hit = _AG[key] = (Acq, [None] + [Acq[:, j * gw:(j + 1) * gw, :j * gw].contiguous() for j in range(1, ng)])
+    return hit[1]
+
+
 def _requant_ref(z, m1, m0):
     """PyTorch mirror of _requant_kernel (calibration statistics only)."""
     q = torch.floor(z.to(torch.float32) * m1[None, :] + m0[None, :])
@@ -441,8 +483,7 @@ class LayerwiseOneStep:
                 raise ValueError("the head groups must divide the heads")
             self.GN = self.G // self.ng
             gw = self.GN * hd                        # lanes per group
-            self.Ag = [None] + [consts["Acq"][:, j * gw:(j + 1) * gw, :j * gw].contiguous()
-                                for j in range(1, self.ng)]   # group j's rows on the groups before it
+            self.Ag = _group_rows(consts["Acq"], self.ng, gw)    # group j's rows on the groups before it
 
     def _launch(self, kernel, grid, *args, warps=1, **kw):
         try:
@@ -546,6 +587,53 @@ class LayerwiseOneStep:
             layer_words[0] = (self.bits(starts, T) - 32 * S) // 16 - layer_words[1:].sum()
         return out, starts
 
+    def encode_once(self, words, out=None, first=0):
+        """encode(words, *model(words)) with each layer's int32 sums made once. model() makes every layer's sums
+        for the priors (a forward pass), then encode() makes them again (the coding pass, last layer first): in
+        head-group modes two dense int8 products per layer, each made twice (jobs 30371 and 30436: 46 ms at 3,000
+        tokens against 36 for the one-group mode). Here the coding pass goes last layer first and makes the sums of
+        the layer below one step ahead, since a layer's prior comes from the surprise of the layer below; two
+        [T, W] buffers hold them. The same kernels on the same values, so the same streams bit for bit.
+        Reduced-rank and head-group modes (the dense mode's priors come from the fused forward pass); first: the
+        first coded layer (1: t2.Layer0Recomputed)."""
+        if self.ng == 1 and self.rank is None:
+            raise ValueError("encode_once is for the reduced-rank and head-group modes")
+        L, T, W = words.shape
+        S, cap = self.layout(T)
+        dev, k, t = self.device, self.k, self.tables
+        xall = torch.zeros(L, T, W, dtype=torch.int8, device=dev)
+        for l in range(L if self.ng > 1 else L - 1):  # head groups: a layer's later groups read its own features
+            self._launch(_lfeat_kernel, (triton.cdiv(T * W, 1024),), words[l], xall[l], k["isx"][l], k["cos"],
+                         k["sin"], 0, T * W, W, self.C, HD=self.hd, BLOCK=1024, warps=4)
+        if out is None:
+            out = torch.empty(S * cap, dtype=torch.int16, device=dev)
+        starts = torch.empty(S, dtype=torch.int32, device=dev)
+        state = torch.full((S * self.hd,), 65536, dtype=torch.int32, device=dev)
+        pos = (torch.arange(S, dtype=torch.int32, device=dev) + 1) * cap
+        smult = torch.empty(S * self.TB, dtype=torch.float32, device=dev)
+        accs = [torch.empty(T, W, dtype=torch.int32, device=dev) for _ in range(2)]
+        ssum = torch.zeros(self.G, T, dtype=torch.int32, device=dev)
+        prior = torch.empty(T, dtype=torch.float32, device=dev)
+        ones = torch.ones(T, dtype=torch.float32, device=dev)
+        cur, spare = accs
+        self._acc_full(xall, L - 1, cur)
+        for layer in reversed(range(first, L)):
+            if layer > 0:                            # this layer's prior: the surprise of the layer below
+                self._acc_full(xall, layer - 1, spare)
+                self._launch(_lsurp_kernel, ((T // self.TB) * self.G,), words[layer - 1], spare, k["sa"][layer - 1],
+                             k["b"][layer - 1], k["inv"][layer - 1], k["cos"], k["sin"], ssum, T, W, self.G,
+                             self.HG, TB=self.TB, H2=self.hd // 2)
+                self._launch(_lprior_kernel, (triton.cdiv(T, 256),), ssum, prior, T, self.G, self.prior_scale,
+                             BLOCK=256, warps=4)
+            # the kernels of one stream run in order: this layer's coding reads cur and prior before the next
+            # step overwrites them
+            self._launch(_lenc_kernel, (S,), words[layer], prior if layer > 0 else ones, state, pos, out, starts,
+                         cur, k["sa"][layer], k["b"][layer], k["sp"][layer], k["cos"], k["sin"], smult, t["cumf"],
+                         t["ko"], T, W, self.G, self.HG, FLUSH=layer == first, TB=self.TB, H2=self.hd // 2,
+                         UNIFORM=self.mode == "uniform")
+            cur, spare = spare, cur
+        return out, starts
+
     def buffers(self, T):
         """Decoder working memory, reusable across calls."""
         S, _ = self.layout(T)
@@ -607,11 +695,9 @@ class LayerwiseOneStep:
                     continue
                 ctx = torch.cuda.stream(streams[c]) if streams else _null()
                 with ctx:
-                    gw = self.GN * self.hd if self.ng > 1 else W
                     for j in range(self.ng):             # head groups in order (one launch for all heads if 1)
                         if j > 0:                        # the group's sums from the groups decoded before it
-                            xin = bufs["xbuf"][layer % 2][rows, :j * gw].contiguous()
-                            acc[:, j * gw:(j + 1) * gw] += int_mm(xin, self.Ag[j][layer])
+                            self._group_acc(bufs["xbuf"][layer % 2][rows], j, layer, acc)
                         GN = self.GN if self.ng > 1 else self.G
                         self._launch(_ldec_kernel, ((Tc // self.TB) * GN,), buf, starts, bufs["state"], bufs["pos"],
                                      wl, acc, bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer],
@@ -635,6 +721,62 @@ class LayerwiseOneStep:
         for s in (streams or []) + (gstreams or []):
             cur.wait_stream(s)
         return words
+
+    def steps_ok(self):
+        """Whether decode can run as per-layer steps (layer_step): one chunk, inline features, no split streams."""
+        return self.chunks == 1 and self.features == "inline" and not self.split
+
+    def layer_step(self, layer, buf, starts, T, wl, bufs, first=0):
+        """One layer of the one-chunk decoder, the launches decode() makes for it: the layer's products (zero for
+        layer 0), then the head groups in order, each its sums from the groups before it and its coding kernel.
+        The words go to wl [T, W]; the next layer's features to bufs["xbuf"][layer % 2]. first: the first layer the
+        stream codes (its states come from the stream). The launches depend on nothing but these buffers and the
+        codec's constants, so a CUDA graph can replay them (kv_compare.pd.codecs)."""
+        L, W = self.L, self.W
+        k, t = self.k, self.tables
+        acc = bufs["acc"][0]
+        if layer == 0:
+            acc.zero_()
+        else:
+            self._product(bufs["xbuf"][(layer + 1) % 2], layer, acc, bufs["scratch"][0])
+        GN = self.GN if self.ng > 1 else self.G
+        for j in range(self.ng):
+            if j > 0:
+                self._group_acc(bufs["xbuf"][layer % 2], j, layer, acc)
+            self._launch(_ldec_kernel, ((T // self.TB) * GN,), buf, starts, bufs["state"], bufs["pos"], wl, acc,
+                         bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer], k["sp"][layer], k["inv"][layer],
+                         k["isx"][layer], k["cos"], k["sin"], bufs["ssum"][(layer + 1) % 2], bufs["ssum"][layer % 2],
+                         bufs["smult"], t["cumf"], t["lut"], t["tail"], 0, T, W, self.G, self.HG,
+                         j * GN if self.ng > 1 else 0, GN, self.prior_scale, FIRST=layer == first,
+                         LAST=layer == L - 1, TB=self.TB, H2=self.hd // 2, LUT_SHIFT=16 - gc.LUT_BITS, LUT_W=gc.LUT_W,
+                         REFINE=gc.REFINE, UNIFORM=self.mode == "uniform", SEARCH=self.search, FEAT=True,
+                         LEAN=self.lean, ONES=layer == 0)
+
+    def decode_steps(self, buf, starts, T, sink, bufs=None, ring=None):
+        """decode(buf, starts, T, sink=sink) as layer_step calls (one chunk): the same launches, the same words."""
+        if not self.steps_ok():
+            raise ValueError("step-wise decoding needs one chunk, inline features and no split streams")
+        bufs = self.buffers(T) if bufs is None else bufs
+        ring = torch.empty(2, T, self.W, dtype=torch.int16, device=self.device) if ring is None else ring
+        for layer in range(self.L):
+            self.layer_step(layer, buf, starts, T, ring[layer % 2], bufs)
+            sink(layer, ring[layer % 2])
+
+    def _group_acc(self, x, j, layer, acc):
+        """acc[:, group j's lanes] += x[:, the lanes of groups 0..j-1] times group j's coefficients on them (x: the
+        layer's features so far [n, W], int8; acc [n, W], int32)."""
+        gw = self.GN * self.hd
+        A = self.Ag[j][layer]                        # [gw, j * gw]
+        n, K = x.shape[0], j * gw
+        dst = acc[:, j * gw:(j + 1) * gw]
+        BM = next((b for b in (64, 32, 16) if n % b == 0), None)
+        BN = next((b for b in (64, 32, 16) if gw % b == 0), None)
+        BK = next((b for b in (64, 32) if K % b == 0), None)
+        if GROUP_PRODUCT == "fused" and None not in (BM, BN, BK) and x.stride(1) == 1 and acc.stride(1) == 1:
+            self._launch(_gacc_kernel, ((n // BM) * (gw // BN),), x, A, dst, n, gw, K, x.stride(0), acc.stride(0),
+                         BM=BM, BN=BN, BK=BK, warps=4)
+        else:
+            dst += int_mm(x[:, :K].contiguous(), A)
 
     def _scratch(self, n):
         """Working memory of the reduced-rank product for n tokens: the int32 and 8-bit intermediates."""

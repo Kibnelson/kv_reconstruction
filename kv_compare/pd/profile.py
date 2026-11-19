@@ -86,6 +86,21 @@ def _kernels(fn, sync):
     return total, n, by_kind, top
 
 
+def _with(flags, fn):
+    """fn() with the codecs' switches (kv_compare.pd.codecs, kv_compare.layerwise) set to flags, then restored."""
+    from .. import layerwise as lw
+    from . import codecs as cd
+    mods = {k: (cd if hasattr(cd, k) else lw) for k in flags}
+    old = {k: getattr(m, k) for k, m in mods.items()}
+    try:
+        for k, v in flags.items():
+            setattr(mods[k], k, v)
+        return fn()
+    finally:
+        for k, v in old.items():
+            setattr(mods[k], k, v)
+
+
 def words_of(doc, T, dev):
     """[L, T, 2C] int16 words of the captured document, repeated when T is longer."""
     n = min(T, doc.tokens)
@@ -104,6 +119,7 @@ def markdown(rows):
          "launches: its kernels. Issue near wall and GPU far below it: bound by issuing launches.", "",
          "| Codec | Tokens | Encode wall / issue / GPU ms | launches | Decode wall / issue / GPU ms | launches | Bits |",
          "| --- | --- | --- | --- | --- | --- | --- |"]
+    before = [r for r in rows if r.get("encode_twice") or r.get("decode_before")]
     f = lambda x: "-" if x is None else f"{x:.1f}"
     for r in rows:
         e, d = r.get("encode") or {}, r.get("decode") or {}
@@ -111,6 +127,17 @@ def markdown(rows):
                  f"{f(e.get('gpu_ms'))} | {e.get('launches', '-')} | {f(d.get('wall_ms'))} / {f(d.get('issue_ms'))} / "
                  f"{f(d.get('gpu_ms'))} | {d.get('launches', '-')} | {f(r.get('bits'))} |"
                  + (f" {r['error']} |" if r.get("error") else ""))
+    if before:
+        L += ["", "## T and T2 against their calls as of job 30436 (wall ms)", "",
+              "Encode: each layer's sums once / twice (TKV_ENCODE_ONCE). Decode: graphs / launches one by one with "
+              "the fused group product / one by one with the column copy, product and add (TKV_DECODE_GRAPHS, "
+              "TKV_GROUP_PRODUCT).", "",
+              "| Codec | Tokens | Encode once | Encode twice | Decode (graphs) | Decode eager | Decode as before |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
+        g = lambda r, k: f((r.get(k) or {}).get("wall_ms"))
+        for r in before:
+            L.append(f"| {r['codec']} | {r['tokens']} | {g(r, 'encode')} | {g(r, 'encode_twice')} | {g(r, 'decode')} | "
+                     f"{g(r, 'decode_eager')} | {g(r, 'decode_before')} |")
     L += ["", "## By kernel kind (count, GPU ms)", ""]
     for r in rows:
         for side in ("encode", "decode"):
@@ -167,6 +194,15 @@ def main(argv=None):
                     wall, issue = _timed(dec, sync, a.reps)
                     row["decode"] = {"wall_ms": wall, "issue_ms": issue}
                     row["exact"] = None if getattr(c, "lossy", False) else bool(torch.equal(back, words))
+                    if name.startswith(("ours-", "t2-")):
+                        # the same calls as of job 30436: each layer's sums made twice by the sender; the receiver
+                        # issuing its launches one by one (no graphs), with or without the fused group product
+                        for label, side, fn, flags in (
+                                ("encode_twice", "encode", enc, {"ENCODE_ONCE": False}),
+                                ("decode_eager", "decode", dec, {"DECODE_GRAPHS": False}),
+                                ("decode_before", "decode", dec, {"DECODE_GRAPHS": False, "GROUP_PRODUCT": "torch"})):
+                            wall, issue = _with(flags, lambda: _timed(fn, sync, a.reps))
+                            row[label] = {"wall_ms": wall, "issue_ms": issue}
                     if dev.type == "cuda":
                         for side, fn in (("encode", enc), ("decode", dec)):
                             try:
@@ -186,7 +222,8 @@ def main(argv=None):
         if dev.type == "cuda":
             torch.cuda.empty_cache()
     out = {"rows": rows, "codec_errors": errors, "meta": meta, "torch": torch.__version__,
-           "decode_chunks": cd.DECODE_CHUNKS, "piece_tokens": cd.PIECE_TOKENS}
+           "decode_chunks": cd.DECODE_CHUNKS, "piece_tokens": cd.PIECE_TOKENS, "encode_once": cd.ENCODE_ONCE,
+           "decode_graphs": cd.DECODE_GRAPHS, "graph_events": cd.graph_events()}
     if a.output:
         with open(a.output, "w") as f:
             json.dump(out, f, indent=1)

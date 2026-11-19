@@ -1433,6 +1433,11 @@ class RunnerDryRunTests(unittest.TestCase):
         p = next(e for e in eng if e["cfg"]["kv_role"] == "kv_producer")
         ex = p["cfg"]["kv_connector_extra_config"]
         self.assertEqual((ex["transport"], ex["codecs"]), ("p2p", ["raw", "ours-hbh"]))
+        # pieces for every codec, the encoder on a thread of its own; a link of its own per prefill engine
+        self.assertEqual((ex["pipeline_tokens"], ex["async_encode"]), (4096, True))
+        self.assertNotIn("link_shared", ex)
+        d = next(e for e in eng if e["cfg"]["kv_role"] == "kv_consumer")["cfg"]["kv_connector_extra_config"]
+        self.assertEqual((d["pipeline_tokens"], d["async_install"]), (4096, True))
         # a failed transfer is computed by the decode engine: under vLLM's default ("fail") it killed the engine
         self.assertTrue(all(e["cfg"]["kv_load_failure_policy"] == "recompute" for e in eng))
         self.assertIn("--host", p["argv"])
@@ -1440,8 +1445,22 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertEqual(len(out), 1, list((self.repo / "benchmark_results").glob("*")))
         env = json.loads((out[0] / "env.json").read_text())
         self.assertEqual((env["layout"], env["connector"], env["transport"], env["prefills"]), ("2p2d", "tkv", "p2p", 2))
+        self.assertEqual((env["pipeline_tokens"], env["async_encode"], env["shared_link"], env["encode_once"],
+                          env["decode_graphs"], env["group_product"]), (4096, True, False, True, True, "fused"))
         res = json.loads((out[0] / "results.json").read_text())
         self.assertIn("raw", res["check"])
+        # three prefill engines behind one link: every one books its chunks in the same file
+        r, eng = self.run_pd(LAYOUT="3p1d", TRANSPORT="ring", CODECS="raw,ours-hbh", SHARED_LINK="1",
+                             PIPELINE_TOKENS="0", ASYNC_ENCODE="false")
+        self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
+        ps = [e["cfg"]["kv_connector_extra_config"] for e in eng if e["cfg"]["kv_role"] == "kv_producer"]
+        self.assertEqual(len(ps), 3)
+        self.assertEqual(len({x["link_shared"] for x in ps}), 1)
+        self.assertTrue(ps[0]["link_shared"].endswith("link_shared.bin"))
+        self.assertEqual({(x["pipeline_tokens"], x["async_encode"]) for x in ps}, {(0, False)})
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_3p1d_tkv_ring_*smoke*"))
+        env = json.loads((out[-1] / "env.json").read_text())
+        self.assertEqual((env["prefills"], env["decodes"], env["shared_link"]), (3, 1, True))
         # NIXL: one GPU each, side channels, the proxy's nixl mode through the bench
         r, eng = self.run_pd(LAYOUT="1p3d", CONNECTOR="nixl")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
@@ -1511,6 +1530,17 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertTrue(all("SHAPES=32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,"
                             "8192:16:128:2:sz16,16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024" in x
                             for x in long))
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="xfer", PRINT_RUNS="1"))
+        xf = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual([x.split(" CODECS=")[0] for x in xf],
+                         ["TRANSPORT=ring LINKS=10,25,50,100", "TRANSPORT=ring LINKS=10,25,50,100",
+                          "TRANSPORT=p2p LINKS=native", "TRANSPORT=ring LINKS=10,25"])
+        self.assertTrue(all("65536:1:128:2:long" in x and "P_MEM=0.68 D_MEM=0.66" in x for x in (xf[0], xf[2], xf[3])))
+        self.assertIn("LAYOUT=3p1d SHARED_LINK=1", xf[1])
+        self.assertTrue(all("CODECS=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,splitzip,adacode,exans " in x
+                            for x in xf[:3]))
+        self.assertIn("CODECS=raw,exactkv ", xf[3])
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_bench as pb
         parsed = pb.parse_shapes(runs[0].split("SHAPES=")[1].split()[0])

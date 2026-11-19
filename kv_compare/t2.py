@@ -63,6 +63,25 @@ class Layer0Recomputed(LayerwiseOneStep):
             layer_words[1] = (self.bits(starts, T) - 32 * S) // 16 - layer_words[2:].sum()
         return out, starts
 
+    def encode_once(self, words, out=None, first=1):
+        """LayerwiseOneStep.encode_once for layers L-1..1 (the same streams as encode(words, *model(words)))."""
+        if words.shape[0] < 2:
+            raise ValueError("Layer0Recomputed needs at least two layers")
+        return super().encode_once(words, out, first=max(1, first))
+
+    def decode_steps(self, buf, starts, T, sink, l0=None, bufs=None, ring=None):
+        """decode(buf, starts, T, l0, sink=sink) as layer_step calls from layer 1 (one chunk): the same words."""
+        if not self.steps_ok():
+            raise ValueError("step-wise decoding needs one chunk, inline features and no split streams")
+        bufs = self.buffers(T) if bufs is None else bufs
+        ring = torch.empty(2, T, self.W, dtype=torch.int16, device=self.device) if ring is None else ring
+        l0 = l0.contiguous()
+        self.layer0_state(l0, bufs)
+        sink(0, l0)
+        for layer in range(1, self.L):
+            self.layer_step(layer, buf, starts, T, ring[layer % 2], bufs, first=1)
+            sink(layer, ring[layer % 2])
+
     def layer0_state(self, l0, bufs):
         """Layer 0's features into bufs["xbuf"][0] and its surprise sums into bufs["ssum"][0], from the receiver's
         layer-0 words l0 [T, W] (int16): T's kernels, so they equal what T's decoder would have made."""
@@ -115,11 +134,9 @@ class Layer0Recomputed(LayerwiseOneStep):
                     streams[c].wait_stream(gstreams[c])
                 ctx = torch.cuda.stream(streams[c]) if streams else _null()
                 with ctx:
-                    gw = self.GN * self.hd if self.ng > 1 else W
                     for j in range(self.ng):
                         if j > 0:
-                            xin = bufs["xbuf"][layer % 2][rows, :j * gw].contiguous()
-                            acc[:, j * gw:(j + 1) * gw] += int_mm(xin, self.Ag[j][layer])
+                            self._group_acc(bufs["xbuf"][layer % 2][rows], j, layer, acc)
                         GN = self.GN if self.ng > 1 else self.G
                         self._launch(_ldec_kernel, ((Tc // self.TB) * GN,), buf, starts, bufs["state"], bufs["pos"],
                                      wl, acc, bufs["xbuf"][layer % 2], k["sa"][layer], k["b"][layer],

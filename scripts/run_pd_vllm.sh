@@ -63,6 +63,7 @@ TRANSPORT=${TRANSPORT:-ring}
 case "$LAYOUT" in
     1p3d) NUM_PREFILL=1; NUM_DECODE=3 ;;
     2p2d) NUM_PREFILL=2; NUM_DECODE=2 ;;
+    3p1d) NUM_PREFILL=3; NUM_DECODE=1 ;;
     1p1d) NUM_PREFILL=1; NUM_DECODE=1 ;;
     colo*) NUM_PREFILL=0; NUM_DECODE=${NUM_COLOCATED:-4} ;;
     *) NUM_PREFILL=${NUM_PREFILL:?LAYOUT $LAYOUT: set NUM_PREFILL and NUM_DECODE}; NUM_DECODE=${NUM_DECODE:?} ;;
@@ -240,6 +241,14 @@ fi
 # decode: installs on a thread and CUDA stream of their own, not inside the engine's step (ASYNC_INSTALL=false:
 # inside it, as up to job 30371)
 case "${ASYNC_INSTALL:-true}" in true|1) ASYNC_INSTALL=true ;; *) ASYNC_INSTALL=false ;; esac
+# prefill: gather, code and hand to the link on a thread and CUDA stream of their own (ASYNC_ENCODE=false: inside
+# the engine's step, as up to job 30436)
+case "${ASYNC_ENCODE:-true}" in true|1) ASYNC_ENCODE=true ;; *) ASYNC_ENCODE=false ;; esac
+# requests longer than PIPELINE_TOKENS go in pieces of that many tokens, every codec alike: coded, sent and
+# installed one after another, so they overlap (0: one transfer per request, as up to job 30436)
+PIPELINE_TOKENS=${PIPELINE_TOKENS:-4096}
+# SHARED_LINK=1: every prefill engine sends over one paced link (a node's NIC behind several GPUs), not one each
+SHARED_LINK=${SHARED_LINK:-0}
 if [ "$SHAPE_NEED" -gt "$MAXLEN" ]; then           # the longest workload's prompt and output
     MAXLEN=$(( (SHAPE_NEED + 255) / 256 * 256 ))
     echo "   context $MAXLEN tokens for the workloads (SHAPES)"
@@ -255,6 +264,11 @@ if [ ! -s "$PROMPTS/check.jsonl" ]; then
 fi
 LINKFILE=$OUT/link.json
 echo '{"gbps": 100}' > "$LINKFILE"
+LINK_SHARED=""
+if [ "$SHARED_LINK" = 1 ]; then
+    LINK_SHARED=$OUT/link_shared.bin          # the link's busy-until time, booked by every sender (node-local)
+    : > "$LINK_SHARED"
+fi
 TIERFILE=$OUT/tier_control.json
 echo '{"generation": 0, "codec": "raw"}' > "$TIERFILE"
 
@@ -335,13 +349,16 @@ json_list() { echo "$1" | tr ',' '\n' | { grep -v '^$' || true; } | sed 's/.*/"&
 EXANS_INFO=$RUN/exans/exans_info.json
 COMMON="\"codecs_file\":\"$RUN/pd_codecs.pt\",\"codecs\":[$(json_list "$LOAD_CODECS")],\"splitzip_source\":\"$KV_HOME/sources/splitzip\",\"adacode_source\":\"$KV_HOME/sources/adacode\",\"exactkv_source\":\"$KV_HOME/sources/exactkv\",\"log_dir\":\"$LOGS\""
 [ -s "$EXANS_INFO" ] && COMMON="$COMMON,\"exans_info\":\"$EXANS_INFO\""
+COMMON="$COMMON,\"pipeline_tokens\":$PIPELINE_TOKENS"
+P_EXTRA="\"async_encode\":$ASYNC_ENCODE"
+[ -n "$LINK_SHARED" ] && P_EXTRA="$P_EXTRA,\"link_shared\":\"$LINK_SHARED\""
 P_URLS=() DECODE_ARGS=()
 STAGGER=$([ "${SHARE_GPU:-0}" = 1 ] && echo "${STAGGER_S:-60}" || echo 0)   # engines on one GPU profile in turn
 for ((i = 1; i <= NUM_PREFILL; i++)); do
     port=$((PORT_BASE + 100 + i))
     case "$CONNECTOR" in
         tkv) serve "prefill$i" "${PPOS[$((i - 1))]}" "$port" "$P_MEM" \
-                 "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_producer\",\"kv_connector_extra_config\":{$COMMON,\"transport\":\"$TRANSPORT\",\"link_control\":\"$LINKFILE\",\"gpu_send_budget\":$SEND_BUDGET}}" ;;
+                 "{\"kv_connector\":\"TKVConnector\",\"kv_connector_module_path\":\"kv_compare.pd.connector\",\"kv_load_failure_policy\":\"recompute\",\"kv_role\":\"kv_producer\",\"kv_connector_extra_config\":{$COMMON,\"transport\":\"$TRANSPORT\",\"link_control\":\"$LINKFILE\",\"gpu_send_budget\":$SEND_BUDGET,$P_EXTRA}}" ;;
         nixl) serve "prefill$i" "${PPOS[$((i - 1))]}" "$port" "$P_MEM" '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
                   VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT=$((PORT_BASE + 400 + i)) UCX_NET_DEVICES=all \
                   UCX_PROTO_INFO=y ;;   # UCX logs the protocol and transports it picks (cuda_ipc: peer to peer)
@@ -407,7 +424,7 @@ nohup "$CPY" scripts/pd_proxy.py --port "$PORT_BASE" "${P_URLS[@]}" "${DECODE_AR
 PIDS+=($!)
 for _ in $(seq 1 30); do curl -sf "$PROXY/health" >/dev/null && break; sleep 1; done
 "$VPY" - "$OUT/env.json" "$MODEL_ID" "$NUM_PREFILL" "$NUM_DECODE" "$LAYOUT" "$CONNECTOR" "$TRANSPORT" "$EAGER" \
-    "${NIXL_ALL_GPUS:-0}" "$ASYNC_INSTALL" <<'EOF'
+    "${NIXL_ALL_GPUS:-0}" "$ASYNC_INSTALL" "$ASYNC_ENCODE" "$PIPELINE_TOKENS" "$SHARED_LINK" <<'EOF'
 import json, os, subprocess, sys, torch, vllm
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
 extra = {}
@@ -422,7 +439,11 @@ json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sy
            "nixl_all_gpus": sys.argv[6] == "nixl" and sys.argv[9] == "1",
            "decode_chunks": int(os.environ.get("TKV_DECODE_CHUNKS", "1")),
            "piece_tokens": int(os.environ.get("TKV_PIECE_TOKENS", "4096")),
-           "async_install": sys.argv[10] == "true", **extra},
+           "async_install": sys.argv[10] == "true", "async_encode": sys.argv[11] == "true",
+           "pipeline_tokens": int(sys.argv[12]), "shared_link": sys.argv[13] == "1",
+           "encode_once": os.environ.get("TKV_ENCODE_ONCE", "1") != "0",
+           "decode_graphs": os.environ.get("TKV_DECODE_GRAPHS", "1") != "0",
+           "group_product": os.environ.get("TKV_GROUP_PRODUCT", "fused"), **extra},
           open(sys.argv[1], "w"))
 EOF
 set +e

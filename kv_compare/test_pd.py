@@ -229,6 +229,18 @@ class TransportTests(unittest.TestCase):
         self._run("ring", None, nbytes=50000, k=4, ring=40000)
         self._run("ring", None, nbytes=23001, k=12, ring=37000)     # many wraps at odd offsets
 
+    def test_a_shared_link_books_every_senders_chunks_in_turn(self):
+        """Two senders (prefill engines) behind one link: the second one's chunk starts when the first one's ends."""
+        from kv_compare.pd.transport import Link
+        path = os.path.join(tempfile.mkdtemp(), "link.bin")
+        a, b = Link(gbps=8.0, shared=path), Link(gbps=8.0, shared=path)
+        s1, e1 = a.reserve(10 ** 9, now=100.0)       # 1 s at 8 Gb/s
+        s2, e2 = b.reserve(10 ** 9, now=100.5)
+        s3, e3 = a.reserve(10 ** 9, now=103.0)
+        self.assertEqual((s1, e1, s2, e2, s3, e3), (100.0, 101.0, 101.0, 102.0, 103.0, 104.0))
+        c = Link(gbps=8.0)                            # a link of its own
+        self.assertEqual(c.reserve(10 ** 9, now=100.5), (100.5, 101.5))
+
     def test_drop_discards_now_or_on_arrival(self):
         tr = self.tr
         rx = tr.Receiver("127.0.0.1", 0, "cpu", ring_bytes=1 << 16)
@@ -318,12 +330,14 @@ class ConnectorFlowTests(unittest.TestCase):
         from vllm.v1.request import RequestStatus
         cls.Role, cls.Status = KVConnectorRole, RequestStatus
 
-    def make(self, codecs=("raw",), timeout=600, async_install=False):
+    def make(self, codecs=("raw",), timeout=600, async_install=False, pipeline=0, async_encode=False,
+             gather_budget=2 << 30):
         log_dir = tempfile.mkdtemp()
         L, H, bs, hd = 3, 2, 16, 8
         d_extra = {"codecs": list(codecs), "listen": "127.0.0.1:0", "log_dir": log_dir, "recv_timeout_s": timeout,
-                   "async_install": async_install}
-        p_extra = {"codecs": list(codecs), "log_dir": log_dir, "transport": "ring", "ring_bytes": 1 << 20}
+                   "async_install": async_install, "pipeline_tokens": pipeline}
+        p_extra = {"codecs": list(codecs), "log_dir": log_dir, "transport": "ring", "ring_bytes": 1 << 20,
+                   "pipeline_tokens": pipeline, "async_encode": async_encode, "gather_budget": gather_budget}
         Ps, Pw = (self.cn.TKVConnector(_vcfg(True, p_extra), r) for r in (self.Role.SCHEDULER, self.Role.WORKER))
         Ds, Dw = (self.cn.TKVConnector(_vcfg(False, dict(d_extra, ring_bytes=1 << 20)), r)
                   for r in (self.Role.SCHEDULER, self.Role.WORKER))
@@ -346,8 +360,10 @@ class ConnectorFlowTests(unittest.TestCase):
                                                       failed_recving=r.failed_recving))
         return r
 
-    def flow(self, local_hit=0, codec="raw", lossy=False, async_install=False):
-        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(async_install=async_install)
+    def flow(self, local_hit=0, codec="raw", lossy=False, async_install=False, pipeline=0, async_encode=False,
+             gather_budget=2 << 30):
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(async_install=async_install, pipeline=pipeline,
+                                                          async_encode=async_encode, gather_budget=gather_budget)
         if lossy:                                     # a lossy stand-in for AQUA-KV: every word's lowest bit flipped
             from kv_compare.pd.codecs import Raw
 
@@ -379,6 +395,10 @@ class ConnectorFlowTests(unittest.TestCase):
         self.assertEqual(params["t_tokens"], 40)
         self.assertTrue(Ps.has_pending_push_work())
         r = self.step(Ps, Pw, finished={"p-1"})
+        end = time.time() + 20
+        while async_encode and not r.finished_sending and time.time() < end:   # once the encoder has gathered it
+            time.sleep(0.02)
+            r = self.step(Ps, Pw)
         self.assertEqual(r.finished_sending, {"p-1"})
         self.assertFalse(Ps.has_pending_push_work())
         end = time.time() + 20
@@ -399,8 +419,19 @@ class ConnectorFlowTests(unittest.TestCase):
                                         Paged([before[f"model.layers.{l}.self_attn.attn"] for l in range(L)], 16, 2,
                                               8).gather(d_blocks, 0, local_hit)))
         recs = [json.loads(l) for f in Path(log_dir).glob("tkv_*.jsonl") for l in f.read_text().splitlines()]
-        inst = [x for x in recs if x.get("event") == "install"]
-        self.assertEqual(len(inst), 1)
+        inst = sorted((x for x in recs if x.get("event") == "install"), key=lambda x: x.get("piece", 0))
+        pieces = -(-40 // pipeline) if pipeline else 1
+        self.assertEqual(len(inst), pieces)
+        if pipeline:                                  # one transfer per piece; a piece the engine has is skipped
+            sends = sorted((x for x in recs if x.get("event") == "send"), key=lambda x: x["piece"])
+            self.assertEqual([(x["piece"], x["pieces"], x["t0"], x["tokens"]) for x in sends],
+                             [(i, pieces, i * pipeline, min(pipeline, 40 - i * pipeline)) for i in range(pieces)])
+            self.assertEqual([x["key"] for x in sends], ["K1"] + [f"K1#{i}" for i in range(1, pieces)])
+            self.assertEqual([bool(x.get("skipped")) for x in inst], [(i + 1) * pipeline <= local_hit
+                                                                      for i in range(pieces)])
+            inst = [x for x in inst if not x.get("skipped")]
+            self.assertTrue(all(x["exact"] for x in inst))
+            return recs
         if lossy:                                     # no checksum to compare; the sender's own error recorded
             self.assertIsNone(inst[0]["exact"])
             self.assertNotIn("error", inst[0])
@@ -462,6 +493,56 @@ class ConnectorFlowTests(unittest.TestCase):
             time.sleep(0.02)
         self.assertEqual(got, {"d-9"})
         self.assertEqual(Dw.w.installing, set())
+
+    def test_a_long_request_moves_in_pieces_each_installed_as_it_arrives(self):
+        """pipeline_tokens: 40 tokens in pieces of 16, 16 and 8, each a transfer of its own; the engine's step
+        reports the request once its last piece is installed; on the installer thread too, with the sender's
+        encoder on a thread of its own, and with the first piece already in the decode engine's cache."""
+        self.flow(pipeline=16)
+        recs = self.flow(pipeline=16, async_install=True, async_encode=True)     # copied out in the step
+        self.assertTrue(all(x["gathered_in_step"] for x in recs if x.get("event") == "send"))
+        recs = self.flow(pipeline=16, async_encode=True, gather_budget=0)         # piece by piece on the encoder
+        self.assertFalse(any(x.get("gathered_in_step") for x in recs if x.get("event") == "send"))
+        self.flow(pipeline=16, local_hit=16, async_install=True)
+
+    def test_a_failed_piece_fails_the_request_once_the_others_are_done(self):
+        """The second piece's encode fails: the sender tells the receiver and sends no more; the decode engine
+        reports the request failed (vLLM computes it), not before the first piece's install has ended."""
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(pipeline=16, async_install=True)
+        raw = Pw.w.codecs["raw"]
+        calls = []
+        enc = raw.encode
+
+        def flaky(words, pos0=0):
+            calls.append(pos0)
+            if pos0 == 16:
+                raise RuntimeError("piece broke")
+            return enc(words, pos0)
+        raw.encode = flaky
+        prompt = list(range(100, 140))
+        dreq = SimpleNamespace(request_id="d-5", prompt_token_ids=prompt, num_computed_tokens=0,
+                               kv_transfer_params={"t_recv": True, "t_key": "K5"})
+        n, _ = Ds.get_num_new_matched_tokens(dreq, 0)
+        Ds.update_state_after_alloc(dreq, SimpleNamespace(get_block_ids=lambda: ([1, 7, 3],)), n)
+        self.step(Ds, Dw)
+        preq = SimpleNamespace(request_id="p-5", prompt_token_ids=prompt, num_computed_tokens=40,
+                               status=self.Status.FINISHED_LENGTH_CAPPED,
+                               kv_transfer_params={"t_send": True, "t_key": "K5", "t_dest": dest, "t_codec": "raw"})
+        Ps.request_finished(preq, [5, 2, 9])
+        r = self.step(Ps, Pw, finished={"p-5"})
+        self.assertEqual(r.finished_sending, {"p-5"})
+        self.assertEqual(calls, [0, 16])              # no third piece
+        end = time.time() + 10
+        while time.time() < end:
+            r = self.step(Ds, Dw)
+            if r.failed_recving:
+                break
+            time.sleep(0.02)
+        self.assertEqual((r.failed_recving, r.finished_recving), ({"d-5"}, {"d-5"}))
+        self.assertEqual((Dw.w.installing, Dw.w.req_state), (set(), {}))
+        recs = [json.loads(l) for f in Path(log_dir).glob("tkv_*.jsonl") for l in f.read_text().splitlines()]
+        self.assertEqual([x.get("piece") for x in recs if x.get("event") == "install"], [0])
+        self.assertTrue(any(x.get("event") == "send_failed" and x["key"] == "K5#1" for x in recs))
 
     def test_warm_up_keeps_a_lossy_codec_that_rebuilds_its_own_reconstruction(self):
         """Job 30293 left AQUA-KV out at the warm-up ("round trip not exact"): a lossy codec passes when the receiver
@@ -640,6 +721,82 @@ for n, c in built.items():
     c.decode(p2, m2, lambda l, x: got.__setitem__(l, x.clone()))
     assert sorted(got) == list(range(L)) and torch.equal(torch.stack([got[l] for l in range(L)]), w), n
     print("ok pieces", n, round(8 * wire.payload_bytes(h) / w.numel(), 3))
+codecs.PIECE_TOKENS = 4096
+# the sender's sums made once: the same streams as the forward pass, then the coding pass (and T2's layer 1..L-1)
+from kv_compare import t2 as t2m
+for n in ("ours-kv", "ours-4g", "ours-rank256"):
+    c = built[n]
+    for cls in (None, t2m.Layer0Recomputed):
+        codec, kp, Tp = c.codec(96, 5, cls=cls)
+        wp = torch.cat([words[:, 5:], torch.zeros(L, Tp - 91, W, dtype=words.dtype)], 1).contiguous()
+        xall, prior = c.model(codec, kp, wp)
+        S, cap = codec.layout(Tp)
+        # zeroed buffers: the words between a segment's states and its data (alignment) are never written
+        b1, s1 = codec.encode(wp, xall, prior, out=torch.zeros(S * cap, dtype=torch.int16))
+        b2, s2 = codec.encode_once(wp, out=torch.zeros(S * cap, dtype=torch.int16))
+        assert torch.equal(s1, s2) and torch.equal(b1, b2), (n, cls)
+        print("ok encode once", n, cls is not None)
+# a head group's sums in one Triton launch: the same integers as the column copy, the product and the add
+c = built["ours-4g"]
+codec, kp, Tp = c.codec(96, 0, chunks=1)
+gen = torch.Generator().manual_seed(1)
+x = torch.randint(-127, 128, (Tp, W), dtype=torch.int8, generator=gen)
+for j in range(1, codec.ng):
+    a1 = torch.randint(-1000, 1000, (Tp, W), dtype=torch.int32, generator=gen)
+    a2 = a1.clone()
+    layerwise.GROUP_PRODUCT = "torch"
+    codec._group_acc(x, j, 1, a1)
+    layerwise.GROUP_PRODUCT = "fused"
+    codec._group_acc(x, j, 1, a2)
+    assert torch.equal(a1, a2), j
+print("ok group product")
+
+
+class CpuArena(codecs._Arena):                    # the graph arena with its CUDA calls replaced: a "graph" reruns
+    def _current(self):                           # its step
+        return type("S", (), {"wait_event": lambda self, e: None})()
+
+    def _mark(self, cur):
+        return None
+
+    def _capture(self, steps, cur):
+        return [type("G", (), {"replay": staticmethod(f)})() for f in steps]
+
+
+# the decoder as per-layer steps (what the graphs replay): the same words; through the arena, eagerly at first use,
+# then recorded and checked, then replayed
+for n in ("ours-kv", "ours-4g", "ours-rank256"):
+    c = built[n]
+    for cls in (None, t2m.Layer0Recomputed):
+        codec, kp, Tp = c.codec(96, 5, cls=cls, chunks=1)
+        wp = torch.cat([words[:, 5:], torch.zeros(L, Tp - 91, W, dtype=words.dtype)], 1).contiguous()
+        buf, starts = codec.encode_once(wp)
+        _, cap = codec.layout(Tp)
+        packed = wire.compact_segments(buf, starts, cap, c.hd)
+        cs, _ = wire.compact_starts(starts, cap, c.hd)
+        a, b = {}, {}
+        l0 = wp[0].clone() if cls is not None else None
+        if cls is None:
+            codec.decode(packed, cs, Tp, sink=lambda l, x: a.__setitem__(l, x.clone()))
+            codec.decode_steps(packed, cs, Tp, lambda l, x: b.__setitem__(l, x.clone()))
+        else:
+            codec.decode(packed, cs, Tp, l0, sink=lambda l, x: a.__setitem__(l, x.clone()))
+            codec.decode_steps(packed, cs, Tp, lambda l, x: b.__setitem__(l, x.clone()), l0=l0)
+        assert torch.equal(torch.stack([a[l] for l in range(L)]), wp), (n, cls)
+        assert torch.equal(torch.stack([b[l] for l in range(L)]), wp), (n, cls)
+        if codec.ng > 1:
+            codecs.GRAPH_STREAM_SHARE = 1.5           # the tiny model's streams are larger than its raw words
+            arena = CpuArena(c, 128)
+            make = lambda cv, sn: c.codec(Tp, 0, cls=cls, chunks=1, rope=(cv, sn))[0]
+            for rep in range(3):
+                got = {}
+                ok = arena.decode((n, id(c), Tp, cls is not None), make, packed, cs, Tp, 5, c.cos, c.sin,
+                                  lambda l, x: got.__setitem__(l, x.clone()), l0=l0)
+                assert ok and torch.equal(torch.stack([got[l] for l in range(L)]), wp), (n, cls, rep)
+            assert len(arena.events) == 1 and arena.events[0]["ok"] and arena.events[0]["graphs"] == L - (cls is not None), arena.events
+            big = torch.zeros(arena.cap + 1, dtype=torch.int16)      # a stream over the static buffer: eagerly
+            assert not arena.decode((n, id(c), Tp, cls is not None), make, big, cs, Tp, 5, c.cos, c.sin, None, l0=l0)
+        print("ok steps", n, cls is not None)
 print("ok ours wire")
 """
 
@@ -813,6 +970,33 @@ class BenchReportTests(unittest.TestCase):
         self.assertIn("## Link 10 Gb/s", text)
         self.assertIn("| raw | 1.0 | 0.90 |", text)
         self.assertIn("Without disaggregation", text)
+
+    def test_a_request_sent_in_pieces_counts_once(self):
+        """Its pieces' records make one send and one install: sizes and times summed, the link from the first
+        piece's start to the last one's end, done with the last piece."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_bench as pb
+        base = {"req_key": "K", "pieces": 2}
+        recs = [dict(base, event="send", key="K", piece=0, tokens=4096, encode_ms=60.0, gather_ms=7.0, raw_bytes=800,
+                     coded_bytes=400, blob_bytes=416, link_s=0.2, queued=1.0, send_begin=1.1, send_end=1.3,
+                     queued_on="gpu"),
+                dict(base, event="send", key="K#1", piece=1, tokens=1000, encode_ms=20.0, gather_ms=2.0, raw_bytes=200,
+                     coded_bytes=150, blob_bytes=160, link_s=0.05, queued=1.2, send_begin=1.3, send_end=1.35,
+                     queued_on="host"),
+                dict(base, event="install", key="K#1", piece=1, tokens=1000, decode_install_ms=10.0, admitted_at=0.5,
+                     done_at=1.5, exact=True),
+                dict(base, event="install", key="K", piece=0, tokens=4096, decode_install_ms=40.0, admitted_at=0.5,
+                     done_at=1.4, exact=True),
+                {"event": "send", "key": "J", "bits": 16.0}]
+        m = pb.merge_pieces(recs)
+        s = next(r for r in m if r["event"] == "send" and r["key"] == "K")
+        i = next(r for r in m if r["event"] == "install")
+        self.assertEqual((s["tokens"], s["encode_ms"], s["raw_bytes"], s["blob_bytes"], s["send_begin"], s["send_end"],
+                          s["queued_on"]), (5096, 80.0, 1000, 576, 1.1, 1.35, "host"))
+        self.assertAlmostEqual(s["bits"], 16.0 * 550 / 1000)
+        self.assertEqual((i["tokens"], i["decode_install_ms"], i["done_at"], i["exact"]), (5096, 50.0, 1.5, True))
+        st = pb.transfer_stats(recs)
+        self.assertEqual((st["sends"], st["installs"]), (2, 1))
 
 
 class OpportunityTests(unittest.TestCase):

@@ -34,6 +34,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import threading
 import zlib
 from pathlib import Path
 
@@ -53,6 +54,202 @@ DECODE_CHUNKS = int(os.environ.get("TKV_DECODE_CHUNKS", "1"))
 # had not that much beside vLLM's share: every 16K transfer of T and T2 ran out of memory in job 30371 (and 5 of 8
 # at 8K). Pieces are coded apart (their positions from pos0), which changes no segment of the stream.
 PIECE_TOKENS = int(os.environ.get("TKV_PIECE_TOKENS", "4096"))
+# The sender of T and T2 makes each layer's sums once (LayerwiseOneStep.encode_once) in the head-group and
+# reduced-rank modes, not once for the priors and again for the coding: the same stream, bit for bit (0: as before).
+ENCODE_ONCE = os.environ.get("TKV_ENCODE_ONCE", "1") != "0"
+
+
+# The receiver of T and T2 in head-group modes replays each layer's launches as a CUDA graph: its products, then per
+# head group the sums from the groups before it and the coding kernel (32 launches a layer in head by head). Issued
+# one by one from Python they were the install's cost: 62-76 ms from 512 to 4,096 tokens in job 30436, where the
+# codecs with few launches took 5-17 ms. Graphs are recorded per constant set, padded piece size and first coded
+# layer, on static buffers (_Arena); the first decode of each runs the same steps eagerly and keeps its layers'
+# checksums, then the graphs are recorded and replayed once on the same stream, and kept only if every layer
+# matches (otherwise that size decodes eagerly, as before). 0: always eagerly.
+DECODE_GRAPHS = os.environ.get("TKV_DECODE_GRAPHS", "1") != "0"
+# The static stream buffer holds this share of a piece's raw words (a larger stream decodes eagerly).
+GRAPH_STREAM_SHARE = float(os.environ.get("TKV_GRAPH_STREAM_SHARE", "0.8"))
+
+
+class _Arena:
+    """Static buffers for graph decoding, one set per process, device and model shape, sized for a piece of maxTp
+    tokens (Llama-3.2-3B, 4,096: about 460 MB), and the graphs recorded on them. Decodes on it run one at a time
+    (lock), and each waits for the previous one's work on the GPU (event), whatever stream either ran on."""
+    _all = {}
+    _make = threading.Lock()
+
+    @classmethod
+    def get(cls, o, maxTp):
+        key = (str(o.device), o.L, o.W, o.hd, int(o.cos.shape[1]), str(o.cos.dtype), maxTp)
+        with cls._make:
+            a = cls._all.get(key)
+            if a is None:
+                a = cls._all[key] = cls(o, maxTp)
+        return a
+
+    def __init__(self, o, maxTp):
+        dev, L, W, hd = o.device, o.L, o.W, o.hd
+        self.device, self.L, self.W, self.hd, self.G, self.maxTp = dev, L, W, hd, W // hd, maxTp
+        self.H2 = int(o.cos.shape[1])
+        smax = (maxTp // 16) * self.G               # segments at the smallest tokens per program
+        self.cap = int(GRAPH_STREAM_SHARE * L * maxTp * W)
+        e = lambda n, dt: torch.empty(int(n), dtype=dt, device=dev)
+        self.stream, self.starts = e(self.cap, torch.int16), e(smax, torch.int32)
+        self.cos, self.sin = e(maxTp * self.H2, o.cos.dtype), e(maxTp * self.H2, o.sin.dtype)
+        self.ring = e(2 * maxTp * W, torch.int16)
+        self.xbuf = torch.zeros(2 * maxTp * W, dtype=torch.int8, device=dev)
+        self.ssum = torch.zeros(2 * self.G * maxTp, dtype=torch.int32, device=dev)
+        self.state, self.pos = e(smax * hd, torch.int32), e(smax, torch.int32)
+        self.smult = e(smax * 16, torch.float32)
+        self.acc = e(maxTp * W, torch.int32)
+        self.graphs = {}                             # key -> (codec, [graph per layer]), or None: decode eagerly
+        self.events = []                             # what each key's first decode found (the connector logs it)
+        self.pool = None
+        self.side = None
+        self.done = None                             # the last decode's end on the GPU
+        self.lock = threading.Lock()
+
+    def views(self, Tp, TB):
+        S, W, G = (Tp // TB) * self.G, self.W, self.G
+        bufs = {"xbuf": self.xbuf[:2 * Tp * W].view(2, Tp, W), "ssum": self.ssum[:2 * G * Tp].view(2, G, Tp),
+                "state": self.state[:S * self.hd], "pos": self.pos[:S], "smult": self.smult[:S * TB],
+                "acc": [self.acc[:Tp * W].view(Tp, W)], "scratch": [None], "streams": None, "gemm_streams": None}
+        return bufs, self.ring[:2 * Tp * W].view(2, Tp, W)
+
+    def decode(self, key, make, buf, starts, Tp, pos0, cos, sin, sink, l0=None):
+        """Decode a piece of Tp padded tokens through the graphs of key (made by make(cos view, sin view) -> the
+        codec, on its first use); sink(layer, words [Tp, W]). False: not here (too large, or this key decodes
+        eagerly), and nothing was done."""
+        n, S = int(buf.numel()), int(starts.numel())
+        if n > self.cap or Tp > self.maxTp or S > self.starts.numel() or self.graphs.get(key, 0) is None:
+            return False
+        first = 0 if l0 is None else 1
+        with self.lock:
+            cur = self._current()
+            if self.done is not None:
+                cur.wait_event(self.done)
+            try:
+                self._decode(key, make, buf, starts, Tp, pos0, cos, sin, sink, l0, n, S, first, cur)
+            finally:                                 # the next decode here waits for this one on the GPU
+                self.done = self._mark(cur)
+        return True
+
+    def _decode(self, key, make, buf, starts, Tp, pos0, cos, sin, sink, l0, n, S, first, cur):
+        from .wire import Checksum
+        sv, stv = self.stream[:n], self.starts[:S]
+        sv.copy_(buf)
+        stv.copy_(starts)
+        cv, sn = self.cos[:Tp * self.H2].view(Tp, self.H2), self.sin[:Tp * self.H2].view(Tp, self.H2)
+        cv.copy_(cos[pos0:pos0 + Tp])
+        sn.copy_(sin[pos0:pos0 + Tp])
+        entry = self.graphs.get(key)
+        if entry is None:                            # first use: eagerly, then record and check the graphs
+            codec = make(cv, sn)
+            bufs, ring = self.views(Tp, codec.TB)
+            if l0 is not None:
+                codec.layer0_state(l0, bufs)
+                sink(0, l0)
+            want = Checksum()
+            for layer in range(first, self.L):
+                codec.layer_step(layer, sv, stv, Tp, ring[layer % 2], bufs, first)
+                want.add(ring[layer % 2])
+                sink(layer, ring[layer % 2])
+            self.graphs[key] = self._record(key, codec, sv, stv, Tp, bufs, ring, l0, want, cur)
+        else:
+            codec, graphs = entry
+            bufs, ring = self.views(Tp, codec.TB)
+            if l0 is not None:
+                codec.layer0_state(l0, bufs)
+                sink(0, l0)
+            for layer, g in zip(range(first, self.L), graphs):
+                g.replay()
+                sink(layer, ring[layer % 2])
+
+    def _record(self, key, codec, sv, stv, Tp, bufs, ring, l0, want, cur):
+        """The graphs of every layer's step, replayed once and checked against the eager decode's checksums:
+        (codec, graphs), or None (decode this key eagerly)."""
+        import time
+        from .wire import Checksum
+        first = 0 if l0 is None else 1
+        t = time.perf_counter()
+        rec = {"codec": str(key[0]), "tokens": int(Tp), "layer0": "recomputed" if first else "coded"}
+        try:
+            graphs = self._capture([(lambda layer=layer: codec.layer_step(layer, sv, stv, Tp, ring[layer % 2], bufs,
+                                                                          first)) for layer in range(first, self.L)],
+                                   cur)
+            if l0 is not None:
+                codec.layer0_state(l0, bufs)
+            got = Checksum()
+            for layer, g in zip(range(first, self.L), graphs):
+                g.replay()
+                got.add(ring[layer % 2])
+            ok = got.value() == want.value()
+            rec.update(ok=ok, record_ms=1e3 * (time.perf_counter() - t), graphs=len(graphs))
+            self.events.append(rec)
+            return (codec, graphs) if ok else None
+        except Exception as exc:                     # this key decodes eagerly
+            rec.update(ok=False, error=repr(exc)[:300])
+            self.events.append(rec)
+            return None
+
+    # the CUDA calls (a test replaces them to run the arena on the CPU)
+    def _current(self):
+        return torch.cuda.current_stream(self.device)
+
+    def _mark(self, cur):
+        ev = torch.cuda.Event()
+        ev.record(cur)
+        return ev
+
+    def _capture(self, steps, cur):
+        """One CUDA graph per step, recorded on a side stream (recording runs nothing). One side stream for every
+        recording: cuBLAS keeps a workspace per stream, and in the graphs' pool it would stay, one per recording."""
+        if self.side is None:
+            self.side = torch.cuda.Stream(self.device)
+        side = self.side
+        side.wait_stream(cur)
+        graphs = []
+        try:
+            with torch.cuda.stream(side):
+                for step in steps:
+                    g = torch.cuda.CUDAGraph()
+                    # thread_local: the engine's own thread may use CUDA meanwhile (global mode would fail it)
+                    g.capture_begin(pool=self.pool, capture_error_mode="thread_local")
+                    try:
+                        step()
+                    finally:
+                        g.capture_end()
+                    if self.pool is None:
+                        self.pool = g.pool()
+                    graphs.append(g)
+        finally:
+            cur.wait_stream(side)
+        return graphs
+
+
+def graph_events():
+    """What the graph arenas recorded since the last call (one record per key: ok, or why it decodes eagerly)."""
+    out = []
+    for a in list(_Arena._all.values()):
+        while a.events:
+            out.append(a.events.pop(0))
+    return out
+
+
+def _graphs_for(codec):
+    return (DECODE_GRAPHS and PIECE_TOKENS > 0 and codec.device.type == "cuda" and codec.ng > 1
+            and codec.steps_ok())
+
+
+def _coded(o, codec, kp, wp):
+    """The stream buffer and starts of the padded words wp: encode_once where it applies, else the model's forward
+    pass, then the coding pass."""
+    if ENCODE_ONCE and (codec.ng > 1 or codec.rank is not None):
+        return codec.encode_once(wp)
+    xall, prior = o.model(codec, kp, wp)
+    out = codec.encode(wp, xall, prior)
+    del xall, prior
+    return out
 
 
 def _pieces(T):
@@ -207,16 +404,19 @@ class Ours:
         tiles = (128, 128, 64, 4) if (Tp % 256 == 0 and r % 128 == 0 and self.W % 64 == 0) else (16, 16, 32, 4)
         return Tp, TB, ch, tiles
 
-    def codec(self, T, pos0=0, cls=None, chunks=None):
+    def codec(self, T, pos0=0, cls=None, chunks=None, rope=None):
         """The codec for T tokens at positions pos0.. (cls: LayerwiseOneStep, or kv_compare.t2.Layer0Recomputed;
-        chunks: the decoder's, see DECODE_CHUNKS; the stream does not depend on them)."""
+        chunks: the decoder's, see DECODE_CHUNKS; the stream does not depend on them; rope: (cos, sin) of the
+        padded tokens' positions, in place of slices of the exported tables: the graph arena's static rows)."""
         Tp, TB, ch, tiles = self.params(T)
         if chunks:
             ch = int(chunks)
         if pos0 + Tp > self.cos.shape[0]:
             raise ValueError(f"positions {pos0}..{pos0 + Tp} beyond the exported RoPE tables ({self.cos.shape[0]})")
         base = self.group if self.group is not None else self.base
-        kp = dict(base, cos=self.cos[pos0:pos0 + Tp].contiguous(), sin=self.sin[pos0:pos0 + Tp].contiguous())
+        if rope is None:
+            rope = (self.cos[pos0:pos0 + Tp].contiguous(), self.sin[pos0:pos0 + Tp].contiguous())
+        kp = dict(base, cos=rope[0], sin=rope[1])
         cls = cls or self.lw.LayerwiseOneStep
         c = cls(kp, self.C, self.hd, tokens_per_program=TB, mode="uniform", search=True,
                 chunks=ch, rank=self.rank, requant="epilogue" if self.rank is not None else "kernel",
@@ -239,11 +439,10 @@ class Ours:
         wp = words if Tp == T else torch.cat(
             [words, torch.zeros(L, Tp - T, W, dtype=words.dtype, device=words.device)], 1)
         wp = wp.contiguous()
-        xall, prior = self.model(codec, kp, wp)
-        buf, starts = codec.encode(wp, xall, prior)
+        buf, starts = _coded(self, codec, kp, wp)
         _, cap = codec.layout(Tp)
         packed = compact_segments(buf, starts, cap, self.hd)
-        del buf, xall, prior, wp
+        del buf, wp
         return ({"words": packed, "starts": starts},
                 {"codec": self.name, "T": int(T), "Tpad": int(Tp), "cap": int(cap), "pos0": int(pos0)})
 
@@ -257,7 +456,48 @@ class Ours:
         if cap != int(meta["cap"]) or Tp != int(meta["Tpad"]):
             raise ValueError("the sender's codec layout differs from the receiver's (different constants?)")
         buf, starts = _stream(parts, cap, self.hd)
-        codec.decode(buf, starts, Tp, sink=lambda l, w: sink(l, w[:T]))
+        out = lambda l, w: sink(l, w[:T])
+        if _graphs_for(codec) and self.graph_decode(None, buf, starts, Tp, pos0, out):
+            return
+        codec.decode(buf, starts, Tp, sink=out)
+
+    def graph_decode(self, cls, buf, starts, Tp, pos0, sink, l0=None):
+        """Decode one piece through the graph arena (see DECODE_GRAPHS); False: decode it eagerly."""
+        a = _Arena.get(self, PIECE_TOKENS)
+        if Tp > a.maxTp:
+            return False
+        make = lambda cv, sn: self.codec(Tp, 0, cls=cls, chunks=1, rope=(cv, sn))[0]
+        return a.decode((getattr(self, "label", self.name), id(self), Tp, cls is not None), make, buf, starts, Tp,
+                        pos0, self.cos, self.sin, sink, l0)
+
+    def warm_graphs(self, token_counts, cls=None):
+        """Record the graphs of these token counts now (zero words, coded and decoded through the arena: a graph
+        replays the same launches whatever the words; the engine is starting, nothing else runs): {padded tokens:
+        True, "eager" (decoded, no graphs kept), or why not}."""
+        from .wire import compact_segments, compact_starts
+        out = {}
+        for T in token_counts:
+            codec, kp, Tp = self.codec(int(T), 0, cls=cls, chunks=1)
+            if not _graphs_for(codec):
+                return {"graphs": "not used by this codec here"}
+            try:
+                w = torch.zeros(self.L, Tp, self.W, dtype=torch.int16, device=self.device)
+                buf, starts = _coded(self, codec, kp, w)
+                _, cap = codec.layout(Tp)
+                packed = compact_segments(buf, starts, cap, self.hd)
+                del buf
+                cs, n = compact_starts(starts, cap, self.hd)
+                back = torch.empty_like(w)
+                done = self.graph_decode(cls, packed, cs, Tp, 0, lambda l, x: back[l].copy_(x),
+                                         l0=w[0] if cls is not None else None)
+                a = _Arena.get(self, PIECE_TOKENS)
+                kept = a.graphs.get((getattr(self, "label", self.name), id(self), Tp, cls is not None)) is not None
+                same = bool(torch.equal(back, w)) if done else None
+                out[int(Tp)] = ("over the static stream buffer" if not done else "words differ" if not same else
+                                True if kept else "decodes eagerly (its graphs differed or failed)")
+            except Exception as exc:
+                out[int(Tp)] = repr(exc)[:200]
+        return out
 
 
 class SplitZip:
@@ -715,6 +955,8 @@ class T2Codec:
         self.names = list(t["order"])
         self.sets = {n: Ours(dict(bundle, consts=t["sets"][n]["consts"], rank=t["sets"][n].get("rank"),
                                   groups=t["sets"][n].get("groups", {})), mode, device) for n in self.names}
+        for n in self.names:                         # how its graphs are named in the logs
+            self.sets[n].label = f"{self.name}/{n}"
         first = self.sets[self.names[0]]
         self.C, self.hd, self.L, self.W, self.device = first.C, first.hd, first.L, first.W, first.device
         self.pick_tokens, self.pick_layers = int(t.get("pick_tokens", 1024)), tuple(t.get("pick_layers", (1, 2)))
@@ -741,11 +983,10 @@ class T2Codec:
         ok = bool(ctx is not None and ctx.covers(pos0, T) and ctx.matches(words[0], pos0))
         codec, kp, Tp = o.codec(T, pos0, cls=self.t2.Layer0Recomputed if ok else None)
         wp = _pad_tokens(words, Tp)
-        xall, prior = o.model(codec, kp, wp)
-        buf, starts = codec.encode(wp, xall, prior)
+        buf, starts = _coded(o, codec, kp, wp)
         _, cap = codec.layout(Tp)
         packed = compact_segments(buf, starts, cap, self.hd)
-        del buf, xall, prior, wp
+        del buf, wp
         meta = {"codec": self.name, "set": name, "layer0": "recomputed" if ok else "coded", "T": int(T),
                 "Tpad": int(Tp), "cap": int(cap), "pos0": int(pos0),
                 "steps": ctx.steps_for(pos0, T) if ok else None,
@@ -765,14 +1006,25 @@ class T2Codec:
         if cap != int(meta["cap"]) or Tp != int(meta["Tpad"]):
             raise ValueError("the sender's codec layout differs from the receiver's (different constants?)")
         buf, starts = _stream(parts, cap, self.hd)
+        out = lambda l, w: sink(l, w[:T])
+        graphs = _graphs_for(codec)
         if rec:
             if ctx is None:
                 raise ValueError("the stream's layer 0 is recomputed by the receiver, which has no layer-0 context")
             l0 = torch.zeros(Tp, self.W, dtype=torch.int16, device=self.device)
             l0[:T] = ctx.layer0(pos0, T, meta["steps"])
-            codec.decode(buf, starts, Tp, l0, sink=lambda l, w: sink(l, w[:T]))
+            if graphs and o.graph_decode(self.t2.Layer0Recomputed, buf, starts, Tp, pos0, out, l0=l0):
+                return
+            codec.decode(buf, starts, Tp, l0, sink=out)
         else:
-            codec.decode(buf, starts, Tp, sink=lambda l, w: sink(l, w[:T]))
+            if graphs and o.graph_decode(None, buf, starts, Tp, pos0, out):
+                return
+            codec.decode(buf, starts, Tp, sink=out)
+
+    def warm_graphs(self, token_counts):
+        """Ours.warm_graphs for every constant set, layer 0 recomputed (as the runs send it; a coded layer 0 records
+        its graphs at its first transfer of each size)."""
+        return {n: self.sets[n].warm_graphs(token_counts, cls=self.t2.Layer0Recomputed) for n in self.names}
 
 
 class IBP:

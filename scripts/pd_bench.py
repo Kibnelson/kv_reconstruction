@@ -396,7 +396,53 @@ def mean(xs):
     return sum(xs) / len(xs) if xs else None
 
 
+def merge_pieces(recs):
+    """Per-request records from those of its pieces (a request longer than the connector's pipeline_tokens goes in
+    pieces, each with a send and an install record): sizes and times summed, the link from the first piece's start to
+    the last one's end, the install done with its last piece."""
+    out, groups = [], {}
+    for r in recs:
+        if r.get("pieces") and r.get("req_key") and r.get("event") in ("send", "install"):
+            groups.setdefault((r["event"], r["req_key"]), []).append(r)
+        else:
+            out.append(r)
+    for (ev, key), rs in groups.items():
+        rs.sort(key=lambda r: r.get("piece", 0))
+        m = dict(rs[0], key=key, pieces_seen=len(rs))
+        m.pop("piece", None)
+
+        def tot(f):
+            v = [r[f] for r in rs if r.get(f) is not None]
+            return sum(v) if v else None
+        errs = [r["error"] for r in rs if r.get("error")]
+        if errs:
+            m["error"] = errs[0]
+        if ev == "send":
+            for f in ("tokens", "gather_ms", "encode_ms", "raw_bytes", "coded_bytes", "blob_bytes", "link_s"):
+                m[f] = tot(f)
+            if m.get("raw_bytes") and m.get("coded_bytes") is not None:
+                m["bits"] = 16.0 * m["coded_bytes"] / m["raw_bytes"]
+            ends = [r["send_end"] for r in rs if r.get("send_end")]
+            if ends:
+                m["send_end"] = max(ends)
+            if any(r.get("queued_on") == "host" for r in rs):
+                m["queued_on"] = "host"
+        else:
+            for f in ("tokens", "decode_install_ms", "issue_ms"):
+                m[f] = tot(f)
+            done = [r["done_at"] for r in rs if r.get("done_at")]
+            if done:
+                m["done_at"] = max(done)
+            ex = [r.get("exact") for r in rs if not r.get("skipped")]
+            m["exact"] = False if False in ex else (True if ex and all(x is True for x in ex) else None)
+            if any(r.get("link_on_host") for r in rs):
+                m["link_on_host"] = True
+        out.append(m)
+    return out
+
+
 def transfer_stats(recs):
+    recs = merge_pieces(recs)
     s = [r for r in recs if r.get("event") == "send"]
     d = [r for r in recs if r.get("event") == "install"]
     tmo = [r for r in recs if r.get("event") == "timeout"]
@@ -580,6 +626,8 @@ SHAPE_FAMILIES = {
     "sz32k": "SplitZip: 32,768-token prompts, requests at once swept",
     "ibp": "IBP: 20 at once, 1,920 tokens in, 128 out",
     "exactkv": "exactkv: 4,096 tokens in, 256 out, as many as one decode GPU holds",
+    "long": "transfer-bound: one long prompt at a time (8K-64K tokens)",
+    "share": "transfer-bound: several prefill GPUs behind one link, many requests at once",
 }
 
 

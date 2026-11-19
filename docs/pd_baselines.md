@@ -196,6 +196,60 @@ After `wlours` (branch pd-decode until it is measured):
   8-10 Gb/s, so above that the link is idle most of the time and only the GPUs' work decides; the speeds that
   matter for a datacenter are those per prefill GPU sharing a link.
 
+Where a request's time went, from the runs' own logs (proxy, prefill and decode records joined by transfer key;
+the parts add up to the bench's TTFT within about 2 ms), 2,048 tokens one at a time, job 30436 (ExANS: job 30371),
+in ms:
+
+| Codec | Bits | TTFT 100 Gb/s | Encode | Link | Install | TTFT 10 Gb/s | Link |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| raw | 16.0 | 223 | 1 | 20 | 3 | 394 | 190 |
+| SplitZip | 12.0 | 230 | 8 | 15 | 5 | 356 | 143 |
+| ExANS | 10.9 | 281 | 54 | 14 | 12 | 393 | 129 |
+| T2 rank 256 | 9.3 | 265 | 34 | 12 | 17 | 361 | 110 |
+| T (hbh) | 8.5 | 311 | 33 | 11 | 66 | 400 | 101 |
+
+Prefill (about 169 ms) and the rest (about 29 ms: picking the request up, gathering, the first token) are the same
+for every codec. What that says about T, without a profile:
+- Its install is a fixed cost, not data: 62, 62, 66 and 76 ms at 512, 1K, 2K and 4K tokens, once per piece (8K twice,
+  16K four times). The head-by-head decoder decodes 16 head groups one after another in each of 28 layers, and each
+  group was 4 launches (the earlier groups' feature columns copied, their product, an add, the coding kernel):
+  1,736 per piece. The self-test (no vLLM) shows the same: at 3,000 tokens 24 ms with one group, 28 with 2, 35 with
+  4 and 53 with 16, about 17 us per launch, for bits from 9.27 to 8.53.
+- Its encode grows with the prompt (about 15 ms per 1K tokens): GPU work. In the head-group modes the sender made
+  every layer's int8 products twice (the forward pass for the priors, then the coding pass): 46 ms at 3K against 36
+  for the one-group mode.
+- Encode, link and install ran one after another, and the encode inside the prefill engine's step.
+- With that decoder, head by head's smaller transfer pays over rank 256's faster install only below about 2 Gb/s
+  at 2K.
+
+What changed after it (branch pd-decode until measured; each with a switch back, so a run can compare):
+- The sender makes each layer's sums once (`LayerwiseOneStep.encode_once`, TKV_ENCODE_ONCE): the coding pass goes
+  last layer first and makes the layer below's sums one step ahead, since a layer's prior comes from the layer
+  below's surprise. The same kernels on the same values, so the same stream, bit for bit (tested).
+- The receiver makes a head group's sums from the groups before it in one Triton launch, reading the feature
+  columns in place (TKV_GROUP_PRODUCT=fused; the same integers): 896 launches per piece instead of 1,736.
+- It replays each layer's launches as a CUDA graph (TKV_DECODE_GRAPHS), recorded per constant set, padded piece
+  size and first coded layer on static buffers (about 460 MB on a decode GPU): the first decode of each runs the
+  same steps eagerly and keeps its layers' checksums, then the graphs are recorded, replayed once and kept only if
+  every layer matches; the decode engines record the sizes up to 4K at their warm-up.
+- Requests longer than 4,096 tokens go in pieces for every codec, raw included (PIPELINE_TOKENS): each piece is a
+  transfer of its own, coded while the one before it is on the link and installed as it arrives; the sender holds
+  one piece's words at a time, which 64K-token prompts need.
+- The sender gathers, codes and hands to the link on a thread and CUDA stream of its own (ASYNC_ENCODE), so the
+  prefill engine's step goes on.
+- Several prefill engines can share one paced link (SHARED_LINK=1, layout 3p1d): each books its chunks in one file.
+- The setup profiles every codec (kv_compare/pd/profile.py: wall, CPU issue and GPU time, launches, per kernel
+  kind) and times T and T2 against their calls as of job 30436, so each change's gain is measured.
+
+The `xfer` campaign tests where the transfer dominates, as SplitZip did, and where it does not:
+- Prompts of 8K, 16K, 32K and 64K tokens, one at a time, at 10, 25, 50 and 100 Gb/s per prefill GPU and GPU to
+  GPU (vLLM's share 0.68 of the prefill GPUs and 0.66 of the decode ones: a 64K request is 7.3 GB of KV).
+- Three prefill GPUs behind one link of 10, 25, 50 or 100 Gb/s (3.3 to 33 per GPU), one decode GPU: 2K, 8K and 16K
+  prompts many at once, and 2K prompts at 2-8 per second.
+- raw, T (hbh, rank 256), T2 (hbh, rank 256), SplitZip, AdaCode and ExANS; exactkv apart, last.
+The report adds a table of both regimes: per layout, link and codec, on how many workloads its TTFT beats raw's by
+more than 3 %, is within 3 %, or is slower, and its speedup from its worst workload to its best.
+
 The report gives one table per path and link: a row per workload, a column per codec, TTFT p50 with its speedup
 over raw (SplitZip's measure), then requests per second with the gain over raw.
 
@@ -380,6 +434,7 @@ The matrices (the times are estimates until the smoke has measured them):
 | wlong | the biggest published workloads (32K-token prompts, 16 at once of 8K and 16K, 128 and 256 at once of 1,024): host memory at 10 and 100 Gb/s, GPU to GPU; exactkv apart |
 | wlours | the workloads campaign again for T and T2 after job 30371 (decoder in one chunk, pieces over 4K tokens, one transfer over the GPU budget kept on the GPU), with raw, SplitZip and AdaCode: host memory at 10 and 100 Gb/s, GPU to GPU |
 | capacity | 96 prompts of 2,048 tokens at 1-8 per second: the highest rate at which 90 % meet a 1 s TTFT target, per codec, host memory at 10, 25, 50 and 100 Gb/s and GPU to GPU |
+| xfer | where the transfer dominates and where it does not: prompts of 8K-64K tokens one at a time at 10-100 Gb/s per prefill GPU and GPU to GPU; three prefill GPUs behind one link of 10-100 Gb/s with many requests at once; exactkv apart, last |
 | links | 1+3 over 10, 25, 50, ... 400 Gb/s (steps of 25), through host memory and GPU to GPU (paced, then unpaced), 16 requests at once: raw, T (hbh), T2 (hbh, rank 256), SplitZip, ExANS, AdaCode, AQUA-KV 2-bit and exactkv (last). One table per path: TTFT p50 per codec and speed, what the link carried, where each codec beats raw, and where a request's time goes |
 | tier | the CPU tier with every codec, nvCOMP apart; LMCache |
 | t2eager | T and T2 in eager engines: host memory at 10 and 100 Gb/s, GPU to GPU, the CPU tier |

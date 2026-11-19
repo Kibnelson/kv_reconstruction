@@ -26,6 +26,9 @@
 #               beside them: host memory at 10 and 100 Gb/s and GPU to GPU
 #   capacity    how many requests each codec carries: 96 prompts of 2,048 tokens at 1-8 per second, the highest rate
 #               where 90% meet a 1 s TTFT target; host memory at 10, 25, 50 and 100 Gb/s and GPU to GPU
+#   xfer        where the transfer dominates, and where it does not (SplitZip's regime and its caveats): prompts of
+#               8K-64K tokens one at a time at 10-100 Gb/s per prefill GPU and GPU to GPU; three prefill GPUs behind
+#               one link of 10-100 Gb/s (3.3-33 per GPU) with many requests at once; exactkv apart, last
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
 # PRINT_RUNS=1 prints the list and stops. PD_CARD=1 (scripts/pd_card.sh's run stage): no branch check and no commit;
@@ -62,6 +65,14 @@ WL+="1920:20:128:2:ibp,4096:16:256:2:exactkv"
 WLONG="32768:1:128:4:sz1,32768:1:128:4:sz32k,32768:2:128:2:sz32k,32768:4:128:2:sz32k,8192:16:128:2:sz16,"
 WLONG+="16384:16:128:2:sz16,1024:128:128:2:sz1024,1024:256:128:2:sz1024"
 WLRUN="LAYOUT=1p3d PROMPT_TOKENS=2048 RATES=0.5,1,2,inf NUM_PROMPTS=32 STAGES=check,sweep,shapes,report SHAPES=$WL RUN_TIMEOUT_S=25200"
+# xfer: our modes for slow and fast links beside the baselines. 64K-token prompts need more of each GPU for vLLM's
+# KV cache (a 64K request is 7.3 GB of KV): 0.68 of the prefill GPUs, 0.66 of the decode ones; requests over 4K go in
+# pieces (PIPELINE_TOKENS), so the sender holds one piece's words and coding scratch at a time
+XFER=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,splitzip,adacode,exans
+XLONG="8192:1:128:4:long,16384:1:128:4:long,32768:1:128:2:long,65536:1:128:2:long"
+XLRUN="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$XLONG P_MEM=0.68 D_MEM=0.66 RUN_TIMEOUT_S=16200"
+XSHARE="2048:24:128:2:share,8192:12:128:2:share,16384:6:128:2:share"
+XSRUN="LAYOUT=3p1d SHARED_LINK=1 PROMPT_TOKENS=2048 RATES=2,4,8,inf NUM_PROMPTS=48 STAGES=check,sweep,shapes,report SHAPES=$XSHARE RUN_TIMEOUT_S=18000"
 WLLONG="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$WLONG RUN_TIMEOUT_S=10800"
 MATRIX=${MATRIX:-smoke}
 if [ -z "${RUNS:-}" ]; then
@@ -95,11 +106,15 @@ if [ -z "${RUNS:-}" ]; then
                         TRANSPORT=p2p LINKS=native CODECS=$CAPSET $CAPRUN" ;;
         wlours) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$OURSRE $WLRUN;
                       TRANSPORT=p2p LINKS=native CODECS=$OURSRE $WLRUN" ;;
+        xfer) RUNS="TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XLRUN;
+                    TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XSRUN;
+                    TRANSPORT=p2p LINKS=native CODECS=$XFER $XLRUN;
+                    TRANSPORT=ring LINKS=10,25 CODECS=$XKV $XLRUN" ;;
         wlong) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$XKV $WLLONG" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours or capacity" \
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity or xfer" \
                 "(or set RUNS)"
            exit 1 ;;
     esac

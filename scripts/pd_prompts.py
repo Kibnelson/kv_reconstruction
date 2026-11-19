@@ -50,7 +50,8 @@ def main():
         seq = ids[d]
         a0 = cursor[d] % max(1, len(seq) - n)
         cursor[d] = a0 + n
-        piece = (seq + seq)[a0:a0 + n] if len(seq) < n else seq[a0:a0 + n]
+        # a text shorter than the window repeats (64K-token prompts from texts of fewer tokens)
+        piece = (seq * (2 + n // max(1, len(seq))))[a0:a0 + n] if len(seq) < n else seq[a0:a0 + n]
         text = tok.decode(piece)
         got = tok(text, add_special_tokens=False)["input_ids"]
         return tok.decode(got[:n]) if len(got) > n else text
