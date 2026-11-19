@@ -7,7 +7,7 @@
 #   bash scripts/pd_card.sh create|run|cleanup|verify-cleanup|review|publish PIN TAG
 #
 #   PIN   the 40-hex commit this checkout is at, GitHub's pd-baselines head (for create and run: exactly its head)
-#   TAG   pd_<matrix>_<name>: matrix smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity or xfer
+#   TAG   pd_<matrix>_<name>: matrix smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick or xfer
 #         (scripts/pd_matrix.sh)
 #
 # On the node, under /tmp/$USER (the node's own disk; it survives between jobs, not reboots):
@@ -30,9 +30,9 @@ fi
 export KVPD_STAGE=$1 KVPD_PIN=$2 KVPD_TAG=$3
 case "$KVPD_STAGE" in create|run|cleanup|verify-cleanup|review|publish) ;; *) echo "STOP: unknown stage $KVPD_STAGE" >&2; exit 2 ;; esac
 [[ "$KVPD_PIN" =~ ^[0-9a-f]{40}$ ]] || { echo "STOP: PIN is a full 40-character commit" >&2; exit 2; }
-[[ "$KVPD_TAG" =~ ^pd_(smoke|ring1p3d|ring2p2d|direct|tier|t2eager|links|workloads|wlong|wlours|capacity|xfer)_[A-Za-z0-9_-]+$ ]] || {
+[[ "$KVPD_TAG" =~ ^pd_(smoke|ring1p3d|ring2p2d|direct|tier|t2eager|links|workloads|wlong|wlours|capacity|quick|xfer)_[A-Za-z0-9_-]+$ ]] || {
     echo "STOP: TAG is pd_<matrix>_<name> with matrix smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links," \
-         "workloads, wlong, wlours, capacity or xfer" >&2; exit 2; }
+         "workloads, wlong, wlours, capacity, quick or xfer" >&2; exit 2; }
 export KVPD_MATRIX=${BASH_REMATCH[1]}
 [ -z "${SLURM_JOB_ID:-}" ] || { echo "STOP: run the card on the login host, not inside an allocation" >&2; exit 2; }
 [[ "${USER:-}" =~ ^[A-Za-z0-9_]+$ ]] || { echo "STOP: USER is not set to a plain user name" >&2; exit 2; }

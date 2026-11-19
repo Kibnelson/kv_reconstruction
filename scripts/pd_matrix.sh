@@ -26,6 +26,9 @@
 #               beside them: host memory at 10 and 100 Gb/s and GPU to GPU
 #   capacity    how many requests each codec carries: 96 prompts of 2,048 tokens at 1-8 per second, the highest rate
 #               where 90% meet a 1 s TTFT target; host memory at 10, 25, 50 and 100 Gb/s and GPU to GPU
+#   quick       a check of the speed work before xfer (under an hour with setup, whose profile times T and T2 against
+#               their calls as of job 30436): raw, T, T2 and SplitZip on 2K and 16K prompts one at a time and 16 2K
+#               prompts at once, host memory at 10 and 100 Gb/s
 #   xfer        where the transfer dominates, and where it does not (SplitZip's regime and its caveats): prompts of
 #               8K-64K tokens one at a time at 10-100 Gb/s per prefill GPU and GPU to GPU; three prefill GPUs behind
 #               one link of 10-100 Gb/s (3.3-33 per GPU) with many requests at once; exactkv apart, last
@@ -69,6 +72,7 @@ WLRUN="LAYOUT=1p3d PROMPT_TOKENS=2048 RATES=0.5,1,2,inf NUM_PROMPTS=32 STAGES=ch
 # KV cache (a 64K request is 7.3 GB of KV): 0.68 of the prefill GPUs, 0.66 of the decode ones; requests over 4K go in
 # pieces (PIPELINE_TOKENS), so the sender holds one piece's words and coding scratch at a time
 XFER=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,splitzip,adacode,exans
+QUICK="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=2048:1:128:4:sz1,16384:1:128:2:sz1,2048:16:128:1:sz16 RUN_TIMEOUT_S=5400"
 XLONG="8192:1:128:4:long,16384:1:128:4:long,32768:1:128:2:long,65536:1:128:2:long"
 XLRUN="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$XLONG P_MEM=0.68 D_MEM=0.66 RUN_TIMEOUT_S=16200"
 XSHARE="2048:24:128:2:share,8192:12:128:2:share,16384:6:128:2:share"
@@ -106,6 +110,7 @@ if [ -z "${RUNS:-}" ]; then
                         TRANSPORT=p2p LINKS=native CODECS=$CAPSET $CAPRUN" ;;
         wlours) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$OURSRE $WLRUN;
                       TRANSPORT=p2p LINKS=native CODECS=$OURSRE $WLRUN" ;;
+        quick) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip $QUICK" ;;
         xfer) RUNS="TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XLRUN;
                     TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XSRUN;
                     TRANSPORT=p2p LINKS=native CODECS=$XFER $XLRUN;
@@ -114,7 +119,7 @@ if [ -z "${RUNS:-}" ]; then
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$XKV $WLLONG" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity or xfer" \
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick or xfer" \
                 "(or set RUNS)"
            exit 1 ;;
     esac

@@ -1541,6 +1541,12 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertTrue(all("CODECS=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,splitzip,adacode,exans " in x
                             for x in xf[:3]))
         self.assertIn("CODECS=raw,exactkv ", xf[3])
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="quick", PRINT_RUNS="1"))
+        qk = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual(qk, ["TRANSPORT=ring LINKS=10,100 CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip LAYOUT=1p3d "
+                              "STAGES=check,shapes,report SHAPES=2048:1:128:4:sz1,16384:1:128:2:sz1,2048:16:128:1:sz16 "
+                              "RUN_TIMEOUT_S=5400"])
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_bench as pb
         parsed = pb.parse_shapes(runs[0].split("SHAPES=")[1].split()[0])
