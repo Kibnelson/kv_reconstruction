@@ -165,6 +165,21 @@ What the workloads campaign showed (job 30371, all six runs complete), and what 
 The `wlours` campaign (about 3.5 hours) measures the changes: raw, T (hbh), T2 (hbh, rank 256), SplitZip and
 AdaCode on the same workloads, host memory at 10 and 100 Gb/s and GPU to GPU.
 
+What `wlours` showed (job 30436, both runs complete, no transfer failed):
+- One decoder chunk made T's and T2's head-by-head installs 2.4-2.6x faster: 136-163 ms became 40-68 ms from 128
+  tokens to 4K. Time to first token fell by about 95 ms (2,048 tokens at 10 Gb/s: 495 -> 400 ms, raw 394), and
+  with 16 prompts of 128 tokens at once from 934 to 344 ms. The time per output token under load fell from
+  17-18 ms to 14 (raw 12); one request at a time, it is raw's.
+- 16K prompts now go through for T and T2 (in four pieces), and raw's 16K transfer stays on the GPU: raw's time to
+  first token at 16K went from 3.7-3.9 s to 2.1 s at 100 Gb/s and GPU to GPU, so job 30371's 1.3-1.4x for the
+  coded transfers there is gone (SplitZip and AdaCode within 1 % of raw, T2 rank 256 12 % and T 20 % slower; at
+  10 Gb/s AdaCode 1.13x, SplitZip 1.12x, T2 rank 256 1.10x, T 1.06x).
+- What is left of T's install is about 60 ms for each piece decoded, nearly independent of its size (61 ms at 512
+  tokens, 71 at 4K): 8K, in two pieces, takes 147 ms, 16K, in four, 284. T's encode grows with the prompt (33 ms
+  at 2K, 127 at 8K) and is now the larger of the two from 8K on.
+- Under full load at 10 Gb/s T carries 3.60 requests per second, T2 rank 256 3.68, SplitZip 3.43 and raw 3.00; at
+  100 Gb/s T 4.13 against raw's 4.21 and SplitZip's 4.58.
+
 After `wlours` (branch pd-decode until it is measured):
 - The receiver decodes T's and T2's stream as sent (wire.compact_starts): a segment's states and words keep their
   distance from its first used word in the dense array, so the S x cap slot buffer (twice the request's KV) and the
