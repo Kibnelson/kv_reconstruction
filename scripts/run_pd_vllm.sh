@@ -462,7 +462,7 @@ for f in "$OUT"/engine_*.log; do      # whole when small (a failed start), else 
 done
 [ -s "$OUT/proxy.jsonl" ] && { gzip -c "$OUT/proxy.jsonl" > "$DEST/proxy.jsonl.gz" || true; }
 for f in "$LOGS"/*.jsonl; do [ -f "$f" ] && gzip -c "$f" > "$DEST/connector/$(basename "$f").gz"; done
-cp "$RUN"/pd_selftest*.json "$DEST/" 2>/dev/null || true
+cp "$RUN"/pd_selftest*.json "$RUN"/pd_profile.json "$RUN"/pd_profile.md "$DEST/" 2>/dev/null || true
 if [ "$PD_CARD" = 1 ]; then echo "RESULTS $DEST"; exit "$STATUS"; fi
 git add -f "$DEST"                 # -f: .gitignore drops runs/ folders, and the runs/*.json are the point
 git commit -q -m "Add vLLM PD results ($NAME)"

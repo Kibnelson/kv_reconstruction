@@ -958,6 +958,35 @@ class BenchAndReportTests(unittest.TestCase):
         text = (root / "s.md").read_text()
         self.assertIn("| 3743 (host) | **2730** (1.37x) |", text)
 
+    def test_the_profile_sorts_kernels_by_kind_and_repeats_a_short_document(self):
+        from kv_compare.pd import profile as pf
+        self.assertEqual(pf.kind("_ldec_kernel"), "our decoder")
+        self.assertEqual(pf.kind("_lenc_kernel"), "our encoder")
+        self.assertEqual(pf.kind("_encode_pages_kernel"), "exactkv")
+        self.assertEqual(pf.kind("ampere_int8_gemm_64x64"), "products (int8 GEMM)")
+        self.assertEqual(pf.kind("void at::native::vectorized_elementwise_kernel"), "copies and fills")
+        self.assertEqual(pf.kind("_tail_copy"), "packing")
+
+        class Doc:
+            layers, tokens, columns = 2, 3, 2
+
+            def words(self, l, dev, rows):
+                return torch.arange(rows * 4, dtype=torch.int32).view(rows, 4) + 40000 * l
+        w = pf.words_of(Doc(), 7, torch.device("cpu"))
+        self.assertEqual(tuple(w.shape), (2, 7, 4))
+        self.assertTrue(torch.equal(w[:, 3:6], w[:, 0:3]))
+        self.assertEqual(int(w[1, 0, 0]), 40000 - 65536)          # a word over 32767 as int16
+        calls = []
+        wall, issue = pf._timed(lambda: calls.append(1), lambda: None, 3)
+        self.assertEqual(len(calls), 4)                            # one to compile, three timed
+        self.assertLessEqual(issue, wall + 1e-6)
+        md = pf.markdown([{"codec": "ours-hbh", "tokens": 512, "bits": 8.6,
+                           "encode": {"wall_ms": 13, "issue_ms": 4, "gpu_ms": 9, "launches": 140},
+                           "decode": {"wall_ms": 62, "issue_ms": 58, "gpu_ms": 11, "launches": 1736,
+                                      "kinds": {"our decoder": [448, 6.0], "copies and fills": [840, 3.0]}}}])
+        self.assertIn("| ours-hbh | 512 | 13.0 / 4.0 / 9.0 | 140 | 62.0 / 58.0 / 11.0 | 1736 | 8.6 |", md)
+        self.assertIn("ours-hbh, 512 tokens, decode: our decoder 448 x, 6.0 ms; copies and fills 840 x, 3.0 ms", md)
+
     def test_capacity_is_the_highest_rate_most_requests_meet_the_target(self):
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_matrix_report as mr

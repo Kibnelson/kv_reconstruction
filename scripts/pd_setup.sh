@@ -281,6 +281,17 @@ for part in main nvcomp; do
         --names "$NAMES" --output "$OUTF" || SELFTEST_OK=0
 done
 [ "$SELFTEST_OK" = 1 ] || echo "WARNING: a codec failed the self-test (above, and $RUN/pd_selftest*.json); the runs leave it out"
+if [ "${PD_PROFILE:-1}" = 1 ]; then
+    # where the codecs spend their time: GPU time per kernel kind, the CPU's issue time, launches (pd_profile.md)
+    echo "== profile of encode and decode (kv_compare/pd/profile.py)"
+    PYTHONPATH=$REPO "$VPY" -m kv_compare.pd.profile --codecs "$RUN/pd_codecs.pt" --captures "$RUN/captures" \
+        --doc "$DOC" --tokens "${PROFILE_TOKENS:-512,2048,8192,16384}" \
+        --names "${PROFILE_CODECS:-ours-hbh,t2-hbh,t2-rank256,raw,splitzip,adacode,exactkv,exans,aquakv-2}" \
+        --splitzip-source "$KV_HOME/sources/splitzip" --adacode-source "$KV_HOME/sources/adacode" \
+        --exactkv-source "$KV_HOME/sources/exactkv" "${EXANS_INFO[@]}" \
+        --output "$RUN/pd_profile.json" --markdown "$RUN/pd_profile.md" \
+        || echo "WARNING: the profile did not finish (the runs do not need it)"
+fi
 pip_freeze "$VPY" > "$KV_HOME/pip_freeze_vllm.txt" || true
 [ -x "${LPY:-}" ] && { pip_freeze "$LPY" > "$KV_HOME/pip_freeze_lmcache.txt" || true; }
 if [ "${DROP_CAPTURES:-0}" = 1 ]; then

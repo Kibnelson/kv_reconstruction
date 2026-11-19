@@ -557,6 +557,7 @@ def collect(p, runtime, ev):
     out.mkdir(mode=0o700, exist_ok=True)
     home, runs = runtime / "home", runtime / "runs"
     picks = list(home.glob("pip_freeze*.txt")) + list(runs.glob("*/pd_selftest*.json")) + \
+        list(runs.glob("*/pd_profile.*")) + \
         list(runs.glob("*/exans/exans_info.json")) + list(home.glob("venv*/pyvenv.cfg")) + \
         list(runs.glob("*/captures/meta.json"))
     for f in picks:
