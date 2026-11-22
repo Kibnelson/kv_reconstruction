@@ -1,0 +1,544 @@
+(APIServer pid=330404) INFO 11-22 17:01:13 [api_utils.py:347] 
+(APIServer pid=330404) INFO 11-22 17:01:13 [api_utils.py:347]        █     █     █▄   ▄█
+(APIServer pid=330404) INFO 11-22 17:01:13 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.32.0
+(APIServer pid=330404) INFO 11-22 17:01:13 [api_utils.py:347]   █▄█▀ █     █     █     █  model   /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+(APIServer pid=330404) INFO 11-22 17:01:13 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=330404) INFO 11-22 17:01:13 [api_utils.py:347] 
+(APIServer pid=330404) INFO 11-22 17:01:13 [api_utils.py:286] non-default args: {'model_tag': '/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', 'chat_template': '/tmp/nbore/kvpd-tools/d4987666a39e915bb42160d8f565fd9f2558a944/scripts/pd_chat_template.jinja', 'host': '127.0.0.1', 'port': 57701, 'model': '/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', 'max_model_len': 32768, 'served_model_name': ['llama'], 'block_size': 16, 'gpu_memory_utilization': 0.6, 'max_num_batched_tokens': 16384, 'kv_transfer_config': KVTransferConfig(kv_connector='TKVConnector', engine_id='01c610bb-a30c-47e5-a4ce-86262499ed42', kv_buffer_device='cuda', kv_role='kv_consumer', kv_port=14579, kv_connector_extra_config={'codecs_file': '/tmp/nbore/kvpd/30555/runs/llama32_3b/pd_codecs.pt', 'codecs': ['raw'], 'splitzip_source': '/tmp/nbore/kvpd/30555/home/sources/splitzip', 'adacode_source': '/tmp/nbore/kvpd/30555/home/sources/adacode', 'exactkv_source': '/tmp/nbore/kvpd/30555/home/sources/exactkv', 'log_dir': '/tmp/nbore/kvpd/30555/runs/llama32_3b/pd/20261122_1700_1p3d_tkv_ring/connector', 'exans_info': '/tmp/nbore/kvpd/30555/runs/llama32_3b/exans/exans_info.json', 'pipeline_tokens': 4096, 'trace_pages': True, 'capture_dir': '/tmp/nbore/kvpd-captures/pd_capture_20261122T214636Z', 'capture_gb': 16, 'capture_d_gb': 2, 'model_dir': '/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', 'trace_store_gb': 16, 'trace_max_tokens': 8192, 'trace_sample': 8, 'listen': '127.0.0.1:57801', 'gpu_recv_budget': 1610612736, 'recv_timeout_s': 600, 'async_install': True}, kv_connector_module_path='kv_compare.pd.connector', enable_permute_local_kv=False, kv_load_failure_policy='recompute')}
+(APIServer pid=330404) INFO 11-22 17:01:21 [model.py:733] Resolved architecture: LlamaForCausalLM
+(APIServer pid=330404) INFO 11-22 17:01:21 [model.py:2152] Using max model len 32768
+(APIServer pid=330404) INFO 11-22 17:01:21 [scheduler.py:307] Chunked prefill is enabled with max_num_batched_tokens=16384.
+(APIServer pid=330404) INFO 11-22 17:01:21 [kernel.py:467] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=330404) WARNING 11-22 17:01:21 [vllm.py:2179] Turning off hybrid kv cache manager because `--kv-transfer-config` selects a KV connector that does not support it. Impact: hybrid SSM models (e.g. Jamba, Bamba) require HMA and will fail at startup without it; models with sliding window attention will run with reduced performance. To add HMA support to a KV connector, subclass `SupportsHMA` defined in kv_connector/v1/base.py (for MultiConnector, all child connectors must support HMA).
+(EngineCore pid=330856) INFO 11-22 17:01:30 [core.py:133] Initializing a V1 LLM engine (v0.32.0) with config: model='/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', speculative_config=None, tokenizer='/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=32768, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=llama, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::qwen4_exp_ple_short_conv', 'vllm::qwen4_exp_qsa_with_output', 'vllm::qwen4_exp_qsa_prepare_with_output', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::qwen_gdn_attention_core_fused_norm_packed', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'cudagraph_decoder_replay': True, 'decoder_replay_cudagraph_capture_sizes': [], 'decoder_replay_trim_threshold': 768, 'compile_sizes': [], 'compile_ranges_endpoints': [16384], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_rocm_segmented_attn_autotune=False, enable_cutedsl_warmup=True, enable_jit_warmup=True, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=330856) INFO 11-22 17:01:32 [parallel_state.py:1906] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/nbore/kvpd/30555/home/tmp/vllm_dist_92dad49d43f94b7f917e6e22f53ef842 backend=nccl
+(EngineCore pid=330856) INFO 11-22 17:01:32 [parallel_state.py:2350] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, ETP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=330856) INFO 11-22 17:01:32 [gpu_worker.py:518] Using V2 Model Runner
+(EngineCore pid=330856) INFO 11-22 17:01:33 [model_runner.py:392] Loading model from scratch...
+(EngineCore pid=330856) INFO 11-22 17:01:36 [cuda.py:506] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+(EngineCore pid=330856) INFO 11-22 17:01:36 [flash_attn.py:1117] Using FlashAttention version 2
+(EngineCore pid=330856) INFO 11-22 17:01:37 [base_loader.py:82] Initializing model took 3.426935 seconds
+(EngineCore pid=330856) INFO 11-22 17:01:37 [weight_utils.py:1108] Filesystem type for checkpoints: EXT4. Checkpoint size: 5.98 GiB. Available RAM: 454.71 GiB.
+(EngineCore pid=330856) INFO 11-22 17:01:37 [weight_utils.py:1131] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:00<00:00,  1.11it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.68it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.56it/s]
+
+(EngineCore pid=330856) INFO 11-22 17:01:38 [default_loader.py:501] Loading weights took 1.32 seconds
+(EngineCore pid=330856) INFO 11-22 17:01:39 [model_runner.py:424] Model loading took 6.04 GiB memory and 6.538272 seconds
+(EngineCore pid=330856) INFO 11-22 17:01:39 [topk_topp_sampler.py:96] FlashInfer top-p/top-k sampling disabled via VLLM_USE_FLASHINFER_SAMPLER=0.
+(EngineCore pid=330856) INFO 11-22 17:01:39 [torch_utils.py:295] Reducing Torch threads from 16 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
+(EngineCore pid=330856) INFO 11-22 17:01:39 [utils.py:347] Using LBNHC KV cache layout.
+(EngineCore pid=330856) INFO 11-22 17:01:40 [monitor.py:40] [backbone] Starting torch.compile
+(EngineCore pid=330856) INFO 11-22 17:01:43 [backends.py:1104] [backbone] Using cache directory: /tmp/nbore/kvpd/30555/home/cache/vllm/torch_compile_cache/e29e397940/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=330856) INFO 11-22 17:01:43 [backends.py:1166] [backbone] Dynamo bytecode transform time: 3.16 s
+[rank0]:W1122 17:01:45.148000 330856 torch/_inductor/utils.py:1953] Not enough SMs to use max_autotune_gemm mode
+(EngineCore pid=330856) INFO 11-22 17:01:49 [backends.py:398] [backbone] Compiling a graph for compile range (1, 16384) takes 5.10 s
+(EngineCore pid=330856) INFO 11-22 17:01:51 [backends.py:927] collected artifacts: 29 entries, 3 artifacts, 4763881 bytes total
+(EngineCore pid=330856) INFO 11-22 17:01:51 [decorators.py:743] [backbone] saved AOT compiled function to /tmp/nbore/kvpd/30555/home/cache/vllm/torch_compile_cache/torch_aot_compile/d8dbe02153b901da0e228a0882ac5ddfc7977a7c83b91835086a5d56204b8c6d/rank_0_0/model
+(EngineCore pid=330856) INFO 11-22 17:01:51 [monitor.py:62] [backbone] torch.compile took 11.28 s in total
+(EngineCore pid=330856) INFO 11-22 17:01:52 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.12 s
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 10.52it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 11.05it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:04, 11.20it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.29it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 11.63it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:03, 11.93it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:03, 12.20it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.36it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:01<00:02, 13.81it/s]Capturing CUDA graphs (PIECEWISE):  39%|███▉      | 20/51 [00:01<00:02, 15.14it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:01<00:01, 16.18it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:01<00:01, 17.01it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:01<00:01, 18.29it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:02<00:01, 19.00it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:02<00:01, 18.67it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:02<00:00, 19.78it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:02<00:00, 20.69it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:02<00:00, 21.25it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:02<00:00, 21.97it/s]Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:02<00:00, 22.54it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:02<00:00, 23.38it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 17.04it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00, 28.80it/s]
+(EngineCore pid=330856) INFO 11-22 17:01:58 [model_runner.py:1127] Graph capturing finished in 4 secs, took 0.31 GiB
+(EngineCore pid=330856) INFO 11-22 17:01:59 [gpu_worker.py:759] Available KV cache memory: 6.49 GiB
+(EngineCore pid=330856) INFO 11-22 17:01:59 [gpu_worker.py:774] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.6000 is equivalent to --gpu-memory-utilization=0.5847 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.6153. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=330856) INFO 11-22 17:01:59 [kv_cache_utils.py:2327] GPU KV cache size: 60,720 tokens, Maximum concurrency for 32,768 tokens per request: 1.85x
+(EngineCore pid=330856) INFO 11-22 17:01:59 [factory.py:62] Creating v1 connector with name: TKVConnector and engine_id: 01c610bb-a30c-47e5-a4ce-86262499ed42
+(EngineCore pid=330856) WARNING 11-22 17:01:59 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+(EngineCore pid=330856) INFO 11-22 17:02:01 [kernel_warmup.py:176] JIT kernel warmup starting.
+(EngineCore pid=330856) INFO 11-22 17:02:01 [kernel_warmup.py:189] JIT kernel warmup finished in 0.00s.
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:04, 10.66it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:04, 11.08it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:03, 11.34it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:00<00:03, 11.53it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:00<00:03, 11.86it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:03, 12.14it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:02, 12.38it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:02, 12.48it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:01<00:02, 14.79it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:01<00:01, 16.37it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:01<00:01, 17.55it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 28/51 [00:01<00:01, 18.53it/s]Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:02<00:01, 19.37it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:02<00:00, 20.25it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:02<00:00, 21.30it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 40/51 [00:02<00:00, 21.94it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:02<00:00, 22.68it/s]Capturing CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:02<00:00, 23.38it/s]Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:02<00:00, 24.42it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:02<00:00, 17.77it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/35 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):  11%|█▏        | 4/35 [00:00<00:01, 30.96it/s]Capturing CUDA graphs (FULL):  23%|██▎       | 8/35 [00:00<00:00, 31.35it/s]Capturing CUDA graphs (FULL):  34%|███▍      | 12/35 [00:00<00:00, 33.05it/s]Capturing CUDA graphs (FULL):  46%|████▌     | 16/35 [00:00<00:00, 33.78it/s]Capturing CUDA graphs (FULL):  60%|██████    | 21/35 [00:00<00:00, 36.93it/s]Capturing CUDA graphs (FULL):  74%|███████▍  | 26/35 [00:00<00:00, 39.42it/s]Capturing CUDA graphs (FULL):  89%|████████▊ | 31/35 [00:00<00:00, 42.16it/s]Capturing CUDA graphs (FULL): 100%|██████████| 35/35 [00:00<00:00, 38.77it/s]
+(EngineCore pid=330856) INFO 11-22 17:02:17 [model_runner.py:1127] Graph capturing finished in 5 secs, took 0.22 GiB
+(EngineCore pid=330856) INFO 11-22 17:02:17 [gpu_worker.py:971] CUDA graph pool memory: 0.22 GiB (actual), 0.36 GiB (estimated), difference: 0.14 GiB (65.8%).
+(EngineCore pid=330856) INFO 11-22 17:02:17 [gpu_worker.py:1034] Free memory on device (23.34/23.55 GiB) on startup. Desired GPU memory utilization is (0.6, 14.13 GiB). Actual usage is 6.25 GiB for consumed memory (weights + non-torch), 1.39 GiB for peak activation, and 0.22 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=6575142605` (6.12 GiB) to fit into requested memory, or `--kv-cache-memory=16466110976` (15.34 GiB) to fully utilize gpu memory. Current kv cache memory in use is 6.49 GiB.
+(EngineCore pid=330856) INFO 11-22 17:02:18 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=330856) INFO 11-22 17:02:19 [core.py:395] init engine (profile, create kv cache, warmup model) took 39.44 s (compilation: 11.28 s)
+(EngineCore pid=330856) INFO 11-22 17:02:20 [factory.py:62] Creating v1 connector with name: TKVConnector and engine_id: 01c610bb-a30c-47e5-a4ce-86262499ed42
+(EngineCore pid=330856) WARNING 11-22 17:02:20 [base.py:214] Initializing KVConnectorBase_V1. This API is experimental and subject to change in the future as we iterate the design.
+(EngineCore pid=330856) INFO 11-22 17:02:20 [kernel.py:467] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=330404) INFO 11-22 17:02:20 [entry.py:136] Supported tasks: ['generate']
+(APIServer pid=330404) WARNING 11-22 17:02:20 [__init__.py:44] SECURITY WARNING: Development endpoints are enabled! This should NOT be used in production!
+(APIServer pid=330404) INFO 11-22 17:02:20 [factories.py:89] Scale-out endpoints are disabled. Restart vllm serve with --enable-scale-out to enable them.
+(APIServer pid=330404) INFO 11-22 17:02:20 [hf.py:648] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=330404) WARNING 11-22 17:02:20 [model.py:1893] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 0.6, 'top_p': 0.9}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=330404) INFO 11-22 17:02:20 [entry.py:140] Starting vLLM server on http://127.0.0.1:57701
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:186] Available routes are:
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /openapi.json, Methods: GET, HEAD
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /docs, Methods: GET, HEAD
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /docs/oauth2-redirect, Methods: GET, HEAD
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /redoc, Methods: GET, HEAD
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /load, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /version, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /kv_event_sources, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /health, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /metrics, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /tokenize, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /detokenize, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/models, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/systemone, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /ping, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /ping, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /invocations, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /reset_prefix_cache, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /reset_mm_cache, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /reset_encoder_cache, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /collective_rpc, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /server_info, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /sleep, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /release_kv_cache_memory, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /wake_up, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /is_sleeping, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /pause, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /resume, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /abort_requests, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /is_paused, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /init_weight_transfer_engine, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /shutdown_weight_transfer_engine, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /start_weight_update, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /start_draft_weight_update, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /update_weights, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /finish_weight_update, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /update_weight_version, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /weight_info, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /weight_checker, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /get_world_size, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/chat/completions, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/chat/completions/batch, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/responses, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/responses/{response_id}, Methods: GET
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/responses/{response_id}/cancel, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/completions, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/messages, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/messages/count_tokens, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /generative_scoring, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /scale_elastic_ep, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /is_scaling_elastic_ep, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/chat/completions/render, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/messages/render, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/completions/render, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/responses/render, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/chat/completions/derender, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /v1/completions/derender, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /inference/v1/generate, Methods: POST
+(APIServer pid=330404) INFO 11-22 17:02:20 [launcher.py:195] Route: /inference/v1/abort_requests, Methods: POST
+INFO:     Started server process [330404]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:41360 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41362 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:02:28 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=330856) INFO 11-22 17:02:28 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:41366 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:02:30 [loggers.py:335] Engine 000: Avg prompt throughput: 862.0 tokens/s, Avg generation throughput: 3.5 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 13.5%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 0.0%
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40696 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:02:31 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=330856) INFO 11-22 17:02:31 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:40702 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40718 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:02:37 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=330856) INFO 11-22 17:02:37 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:40732 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:02:40 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 32.4 tokens/s, Running: 2 reqs, Waiting: 0 reqs, GPU KV cache usage: 2.9%, Prefix cache hit rate: 8.5%, External prefix cache hit rate: 45.8%
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:02:50 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 126.9 tokens/s, Running: 1 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 5.5%, Prefix cache hit rate: 7.9%, External prefix cache hit rate: 69.5%
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40802 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40746 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40758 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40764 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40778 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40792 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45802 - "GET /health HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:02:56 [api_router.py:39] Resetting prefix cache...
+(EngineCore pid=330856) INFO 11-22 17:02:56 [block_pool.py:861] Successfully reset prefix cache
+INFO:     127.0.0.1:45818 - "POST /reset_prefix_cache HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:03:00 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 107.1 tokens/s, Running: 2 reqs, Waiting: 0 reqs, GPU KV cache usage: 4.6%, Prefix cache hit rate: 5.9%, External prefix cache hit rate: 76.0%
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40812 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45882 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45822 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45834 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45862 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45868 - "POST /tokenize HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41374 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=330404) INFO 11-22 17:03:10 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 131.1 tokens/s, Running: 0 reqs, Waiting: 1 reqs, Deferred: 1 reqs, KV fetch: 0 waiting to start, 1 in progress, 0 completed waiting, GPU KV cache usage: 2.4%, Prefix cache hit rate: 31.2%, External prefix cache hit rate: 80.3%
+(APIServer pid=330404) INFO 11-22 17:03:20 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 31.2%, External prefix cache hit rate: 80.3%
+(APIServer pid=330404) INFO 11-22 17:03:30 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 31.2%, External prefix cache hit rate: 80.3%
+(APIServer pid=330404) INFO 11-22 17:10:02 [launcher.py:254] [shutdown] API server: shutdown triggered
+(APIServer pid=330404) INFO 11-22 17:10:02 [launcher.py:270] [shutdown] API server: stopping engine client mode=abort timeout=0s
+(APIServer pid=330404) INFO 11-22 17:10:02 [core_client.py:770] [shutdown] MPClient: start timeout=0s
+(APIServer pid=330404) INFO 11-22 17:10:02 [core_client.py:772] [shutdown] MPClient: stopping engine manager
+(APIServer pid=330404) INFO 11-22 17:10:02 [utils.py:628] [shutdown] Process manager: send sigterm to process EngineCore
+(APIServer pid=330404) WARNING 11-22 17:10:02 [utils.py:648] [shutdown] Process manager: force killing remaining processes count=1
+(APIServer pid=330404) WARNING 11-22 17:10:02 [utils.py:653] [shutdown] Process manager: force killing remaining process EngineCore pid 330856
+(EngineCore pid=330856) INFO 11-22 17:10:02 [core.py:1454] [shutdown] EngineCore: trigger received signal=SIGTERM
+(EngineCore pid=330856) INFO 11-22 17:10:02 [core.py:1635] [shutdown] EngineCore: start mode=abort timeout=0s
+(EngineCore pid=330856) INFO 11-22 17:10:02 [core.py:1666] [shutdown] EngineCore: request processing complete; starting resource teardown
+(EngineCore pid=330856) INFO 11-22 17:10:02 [core.py:1499] [shutdown] EngineCore: exiting busy loop
+(APIServer pid=330404) INFO 11-22 17:10:02 [core_client.py:774] [shutdown] MPClient: engine manager stopped
+(APIServer pid=330404) INFO 11-22 17:10:02 [core_client.py:775] [shutdown] MPClient: cleaning up background resources
+(APIServer pid=330404) INFO 11-22 17:10:02 [core_client.py:777] [shutdown] MPClient: complete
+(APIServer pid=330404) INFO 11-22 17:10:02 [launcher.py:279] [shutdown] API server: engine client stopped
+(APIServer pid=330404) INFO 11-22 17:10:02 [launcher.py:282] [shutdown] API server: signalling HTTP server shutdown
+(APIServer pid=330404) INFO 11-22 17:10:02 [launcher.py:304] [shutdown] API server: shutting down FastAPI HTTP server
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
