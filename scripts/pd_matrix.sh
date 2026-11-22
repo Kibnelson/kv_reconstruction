@@ -84,7 +84,7 @@ XFER=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,splitzip,adacode,exans
 QUICK="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=2048:1:128:4:sz1,16384:1:128:2:sz1,2048:16:128:1:sz16 RUN_TIMEOUT_S=5400"
 # trace: interleaved prompts reach about 17K tokens by a conversation's last turn
 TRACERUN="LAYOUT=1p3d STAGES=check,mtrag,report TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800"
-CAPRUN="LAYOUT=1p3d STAGES=check,mtrag,delta,report TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800 CAPTURE_GB=16
+CAPTURERUN="LAYOUT=1p3d STAGES=check,mtrag,delta,report TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800 CAPTURE_GB=16
         MTRAG_LIMIT=6 MTRAG_CAPTURE_CONVS=6 MTRAG_LAYOUTS=docs_first,history_first MTRAG_POLICIES=conversation"
 XLONG="8192:1:128:4:long,16384:1:128:4:long,32768:1:128:2:long,65536:1:128:2:long"
 XLRUN="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$XLONG P_MEM=0.68 D_MEM=0.66 RUN_TIMEOUT_S=16200"
@@ -125,7 +125,7 @@ if [ -z "${RUNS:-}" ]; then
                       TRANSPORT=p2p LINKS=native CODECS=$OURSRE $WLRUN" ;;
         quick) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip $QUICK" ;;
         trace) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $TRACERUN" ;;
-        capture) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $CAPRUN" ;;
+        capture) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $CAPTURERUN" ;;
         xfer) RUNS="TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XLRUN;
                     TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XSRUN;
                     TRANSPORT=p2p LINKS=native CODECS=$XFER $XLRUN;
