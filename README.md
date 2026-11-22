@@ -5,6 +5,10 @@ current work as two separate ideas: T, our lossless predictive KV transfer forma
 `llama32-3b-lossy-lossless-compare`), and the "diff" transfer protocol that sends only the KV a decode engine lacks
 (branch `pd-vllm-protocol`). It covers what was measured, what is unfinished, and the commands to resume.
 
+**PD baselines, then (22 November 2026):** [docs/handover_pd_baselines.md](docs/handover_pd_baselines.md) records
+every baseline run in real vLLM prefill/decode disaggregation on gpu-grad-01 (branch `pd-baselines`): what the
+campaigns showed, the speed work on T not yet measured, and the runbook to start, watch, continue and read a campaign.
+
 Benchmarks for storing a decoder recipe plus exact corrections instead of raw BF16 KV tensors. The default model is **Qwen/Qwen3-4B-Instruct-2507**, pinned to commit `cdbee75f17c01a7cc42f958dc650907174af0554`.
 
 The [prefill metadata and exact coset study](docs/prefill_coset_study.md) adds `--prefill-coset-study`: small actual-hidden codes condition omitted mantissa bit predictions, with verified 31-bit syndrome groups, matched error-position controls and raw escapes. It records real packet/state bytes, DEV width selection, group error histograms and independent restoration. The shareable calibration includes fitted codec parameters. Neural work uses the selected device; initial syndrome/field coding runs on CPU. Local tiny-model validation does not establish pretrained Qwen savings or GPU codec performance.

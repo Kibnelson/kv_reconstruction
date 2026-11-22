@@ -10,6 +10,9 @@ ran between 30 October and 12 November. The work is kept as **two separate ideas
 
 Set aside: **P** (a compressed resident pool read by attention) and the lossy codec work (section 4).
 
+After this note, T and every published baseline were run in real vLLM PD on 4 GPUs (13-22 November):
+[handover_pd_baselines.md](handover_pd_baselines.md) has those results and the runbook.
+
 Everything below refers to Llama-3.2-3B (`unsloth/Llama-3.2-3B`, revision `d4446454d87d51aa42e1fb174f25acc5f8762331`;
 28 layers, 8 KV heads x 128) on the NUC's RTX A4500 unless it says otherwise. A "window" is 8,192 consecutive
 tokens.
