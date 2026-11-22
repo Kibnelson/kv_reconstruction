@@ -87,6 +87,7 @@ class SendSpec:
     chunks: list | None = None                       # tier store: [(chunk index, hash)]
     trace: bool = False                              # trace_pages: hash every page sent (kv_compare.pd.trace)
     kinds: list | None = None                        # trace: the driver's pieces [(kind, start, end)]
+    capture: bool = False                            # capture_dir: store the raw pages sent (trace.PageStore)
 
 
 @dataclass
@@ -101,6 +102,7 @@ class RecvSpec:
     chunks: list | None = None                       # tier load: [(chunk index, hash)]
     pieces: int = 0                                  # decode worker: the transfer's pieces (0: none arrived yet)
     taken: int = 0                                   # decode worker: pieces taken from the receiver so far
+    capture: bool = False                            # capture_dir: store this engine's held pages that differ
 
 
 @dataclass
@@ -348,7 +350,7 @@ class _SchedulerSide:
         T = len(request.prompt_token_ids or [])
         spec = RecvSpec(req_id=request.request_id, key=p["t_key"], block_ids=list(blocks.get_block_ids()[0]),
                         t0=T - num_external, t1=T, admitted_at=time.time(),
-                        prompt=list(request.prompt_token_ids or []))
+                        prompt=list(request.prompt_token_ids or []), capture=bool(p.get("t_capture")))
         self.to_recv[request.request_id] = spec
         self.receiving.add(request.request_id)
         p["_t_alloc"] = True                         # a re-entry (preemption) must not register twice
@@ -382,7 +384,8 @@ class _SchedulerSide:
                         block_ids=list(block_ids), t0=t0, t1=T, conv=p.get("t_conv"), finished_at=time.time(),
                         verify=bool(p.get("t_verify", self.cfg.get("verify", False))),
                         steps=steps if t2 else None, prompt=prompt if (t2 or trace) else None, trace=trace,
-                        kinds=[tuple(x) for x in p.get("t_pieces") or ()] if trace else None)
+                        kinds=[tuple(x) for x in p.get("t_pieces") or ()] if trace else None,
+                        capture=trace and bool(p.get("t_capture")))
         self.to_send[rid] = spec
         self.sending.add(rid)
         rec = {"event": "prefill_done", "key": spec.key, "conv": spec.conv, "dest": spec.dest,
@@ -503,7 +506,7 @@ class _WorkerSide:
         self.req_state: dict[str, dict] = {}         # decode: per request, its pieces dispatched / installed / ok
         # trace_pages (kv_compare.pd.trace): P hashes every page of a traced request; D compares the pages it already
         # held with the ones P sent again
-        self.tlog = self.rindex = self.probe = self.rns = None
+        self.tlog = self.rindex = self.probe = self.rns = self.cstore = None
         self.trace_max_tokens = int(cfg.get("trace_max_tokens", 8192))   # sampled span tokens measured per request
         self.trace_sample = int(cfg.get("trace_sample", 8))  # 1 in this many tokens measured (by content)
         if cfg.get("trace_pages") and cfg.get("log_dir"):
@@ -556,6 +559,12 @@ class _WorkerSide:
             raise ValueError(f"{len(caches)} attention layers, the codec constants have {self.meta['L']}")
         self.paged = Paged(caches, self.bs, heads, hd)
         self.device = device
+        if self.tlog is not None and self.cfg.get("capture_dir"):   # the raw pages, for offline analysis
+            from .trace import PageStore
+            self.cstore = PageStore(self.cfg["capture_dir"], "P" if self.producer else "D",
+                                    float(self.cfg.get("capture_gb" if self.producer else "capture_d_gb",
+                                                       16 if self.producer else 2)),
+                                    len(caches), self.bs, 2 * heads * hd)
         if self.tlog is not None and self.producer:  # trace: how close a request's KV is to earlier KV of its text
             from .trace import RelationIndex, RelationProbe
             self.rindex = RelationIndex()
@@ -778,6 +787,7 @@ class _WorkerSide:
         picked = time.time()
         ctx = None
         rel = self._relate(spec, n) if spec.trace and self.probe is not None else None
+        cap = [] if spec.capture and self.cstore is not None and spec.t0 % self.bs == 0 else None
         for i, (a, b) in enumerate(bounds):
             key, t0 = piece_key(spec.key, i), spec.t0 + a
             rec = {"event": "send", "key": key, "req": spec.req_id, "codec": spec.codec, "dest": spec.dest,
@@ -809,6 +819,13 @@ class _WorkerSide:
                     h = page_hashes(words, self.bs)
                     self.tlog.write({"event": "pages", "key": spec.key, "piece": i, "t0": t0, "tokens": b - a,
                                      "bs": self.bs, "layers": int(h.shape[0]), "h": pack_u64(h)})
+                    if cap is not None:              # the raw blocks, each once (trace.PageStore)
+                        from .trace import capture_blocks
+                        cap.extend(capture_blocks(self.cstore, words, h, self.bs))
+                        if i == n - 1:
+                            self.cstore.record({"event": "request", "key": spec.key, "conv": spec.conv,
+                                                "t0": spec.t0, "T": spec.t1, "bs": self.bs, "rows": cap,
+                                                "missing": sum(1 for x in cap if x < 0)})
                     if rel is not None:              # the rows the relation probe needs, to the host
                         sel = rel["pos"][(rel["pos"] >= t0) & (rel["pos"] < t0 + b - a)] - t0
                         rel["parts"].append(words.index_select(1, torch.as_tensor(sel, device=words.device)).cpu())
@@ -1042,6 +1059,13 @@ class _WorkerSide:
                 if not m.all():                      # the bit lengths of P's words against D's (diff: ordered)
                     d = dstat.record()
                     hrec["delta"] = {k: d[k] for k in ("hist", "sign_exp", "equal", "values")}
+                    if spec.capture and self.cstore is not None:   # D's own copy of the blocks that differ
+                        from .trace import capture_blocks, page_hashes as _ph
+                        J = [j for j in range(m.shape[1]) if not m[:, j].all()]
+                        sub = torch.cat([held[:, j * self.bs:(j + 1) * self.bs] for j in J], 1)
+                        rows = capture_blocks(self.cstore, sub, _ph(held, self.bs)[:, J], self.bs)
+                        self.cstore.record({"event": "held_differs", "key": spec.key, "t0": h_lo, "bs": self.bs,
+                                            "blocks": J, "rows": rows})
                 self.tlog.write(hrec)
             ok = True
         except _Skip:
@@ -1323,6 +1347,8 @@ class _WorkerSide:
             self.encode_q.put(None)
         if self.probe is not None:
             self.probe.close()
+        if self.cstore is not None:
+            self.cstore.close()
         if self.store_q is not None:
             self.store_q.put(None)
         if self.install_q is not None:

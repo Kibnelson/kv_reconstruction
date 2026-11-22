@@ -20,8 +20,8 @@ Several --prefill engines: each request goes to the one with the fewest requests
 A request may name its engines ("t_prefill": j, "t_decode": i; taken out before it is passed on): the benchmark
 driver's warm-up sends one request over every prefill-decode pair. "t_tag" (logged with the request's key) and
 "t_trace" (the prefill engine hashes the request's pages and relates them to earlier ones, kv_compare/pd/trace.py)
-and "t_pieces" (a traced prompt's pieces, [[kind, start, end]], passed to the prefill engine) are taken out the same
-way.
+"t_pieces" (a traced prompt's pieces, [[kind, start, end]], passed to the prefill engine) and "t_capture" (with
+t_trace: both engines store the request's raw pages, kv_compare/pd/trace.py PageStore) are taken out the same way.
 """
 from __future__ import annotations
 
@@ -84,6 +84,7 @@ class Proxy:
         pin_p, pin_d = body.pop("t_prefill", None), body.pop("t_decode", None)   # the bench's warm-up of each pair
         tag, trace = body.pop("t_tag", None), bool(body.pop("t_trace", False))     # the MTRAG driver's (pd_mtrag.py)
         pieces = body.pop("t_pieces", None)          # a traced prompt's pieces [[kind, start, end]]: the probe's groups
+        capture = bool(body.pop("t_capture", False)) and trace   # both engines store this request's raw pages
         key = uuid.uuid4().hex
         i = int(pin_d) % len(self.decodes) if pin_d is not None else self.pick(conv)
         durl, kvaddr = self.decodes[i]
@@ -119,7 +120,6 @@ class Proxy:
                 self.p_inflight[j] -= 1
             if ktp:
                 d_body["kv_transfer_params"] = ktp
-        self.inflight[i] += 1
         if cfg["mode"] == "pd":
             j = self.pick_prefill() if pin_p is None else int(pin_p) % len(self.prefills)
             rec["prefill"] = j
@@ -132,6 +132,9 @@ class Proxy:
             if trace and pieces:
                 p_body["kv_transfer_params"]["t_pieces"] = pieces
             d_body["kv_transfer_params"] = {"t_recv": True, "t_key": key}
+            if capture:
+                p_body["kv_transfer_params"]["t_capture"] = True
+                d_body["kv_transfer_params"]["t_capture"] = True
             # counted at the pick, not when the task first runs: requests that arrive together all picked the same
             # engine before any task had run (job 30210, 2p2d: 7 of 8 prompts on one prefill engine)
             self.p_inflight[j] += 1
@@ -146,7 +149,16 @@ class Proxy:
             # also when the task is cancelled before it ran (a failed decode request)
             p_task.add_done_callback(lambda _t, j=j: self._prefill_done(j))
 
-        resp = await self.session.post(durl + path, json=d_body, headers=headers)
+        self.inflight[i] += 1                        # from here on every path takes it back
+        try:
+            resp = await self.session.post(durl + path, json=d_body, headers=headers)
+        except Exception as exc:                     # the decode engine unreachable: not left counted in flight
+            self.inflight[i] -= 1
+            rec.update(error=f"decode engine: {exc!r}"[:300], t_out=time.time())
+            self.log(rec)
+            if p_task is not None:
+                p_task.cancel()
+            return JSONResponse(status_code=502, content={"error": rec["error"]})
         if resp.status != 200:
             txt = await resp.read()
             self.inflight[i] -= 1

@@ -16,7 +16,9 @@ proxy (scripts/run_pd_vllm.sh starts them). Stages (--stages, in order):
               point) with conversation routing; TTFT, TPOT, latency, and the tier's loads and stores
   mtrag       IBM's MTRAG conversations (scripts/pd_mtrag.py) per codec x prompt layout x routing, caches reset before
               each, the page trace on for one routing (kv_compare/pd/trace.py); then trace_report.md, the reuse
-              opportunity (scripts/pd_trace_report.py)
+              opportunity (scripts/pd_trace_report.py); with --mtrag-capture-convs, those conversations' raw pages
+              are stored too (the engines' capture_dir)
+  delta       the stored pages' offline analysis (scripts/pd_delta_analysis.py): delta_report.md
   report      results.json and summary.md
 
 Links: a number is a paced link in Gb/s; "native" leaves the transport unpaced (the machine's own path: the host
@@ -775,7 +777,8 @@ def stage_mtrag(a, res):
                        "--policy", policy, "--run", name, "--concurrency", str(a.mtrag_concurrency), "--max-tokens",
                        str(a.mtrag_max_tokens), "--max-len", str(a.mtrag_max_len), "--limit", str(a.mtrag_limit),
                        "--output", str(a.out / "runs" / (name + ".jsonl")),
-                       "--summary", str(a.out / "runs" / (name + ".json"))] + (["--trace"] if trace else [])
+                       "--summary", str(a.out / "runs" / (name + ".json"))] + (["--trace"] if trace else []) + \
+                      (["--capture-convs", str(a.mtrag_capture_convs)] if trace and a.mtrag_capture_convs else [])
                 try:
                     r = subprocess.run(cmd, capture_output=True, text=True, timeout=a.point_timeout)
                     rc, txt = r.returncode, r.stdout[-20000:] + "\n" + r.stderr[-20000:]
@@ -801,6 +804,33 @@ def stage_mtrag(a, res):
                         a.log_dir, "--markdown", str(a.out / "trace_report.md"), "--json",
                         str(a.out / "trace_report.json")], capture_output=True, text=True)
     log("trace report: " + (p.stdout[-2000:] + p.stderr[-3000:]).strip()[-3000:])
+
+
+def stage_delta(a, res):
+    """The raw pages the engines stored (stage mtrag with --mtrag-capture-convs) analysed offline, on the CPU:
+    delta_report.md / .json (scripts/pd_delta_analysis.py)."""
+    cap = Path(a.capture_dir) if a.capture_dir else None
+    if cap is None or not any(cap.glob("capture_P_*.jsonl")):
+        res["delta"] = {"error": f"no stored pages in {cap} (CAPTURE_GB with TRACE_PAGES and stage mtrag)"}
+        log(res["delta"]["error"])
+        return
+    quiet_files(cap, "blocks_*.bin")                 # the engines' writers done
+    t0 = time.time()
+    cmd = [sys.executable, "-I", str(ROOT / "scripts" / "pd_delta_analysis.py"), "--capture", str(cap), "--run",
+           str(a.out), "--model-dir", a.model, "--markdown", str(a.out / "delta_report.md"), "--json",
+           str(a.out / "delta_report.json")]
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=a.delta_timeout)
+        rc, txt = p.returncode, p.stdout[-20000:] + "\n" + p.stderr[-20000:]
+    except subprocess.TimeoutExpired as exc:
+        rc, txt = 124, f"stopped after {a.delta_timeout} s\n" + str(exc)[-2000:]
+    (a.out / "runs" / "delta.log").write_text(txt)
+    size = sum(f.stat().st_size for f in cap.glob("blocks_*.bin")) / 1e9
+    res["delta"] = {"exit": rc, "seconds": time.time() - t0, "capture_dir": str(cap), "capture_gb": size}
+    log(f"delta: exit {rc} in {time.time() - t0:.0f} s, {size:.1f} GB of stored pages in {cap}")
+    if rc != 0:
+        log(tail_of(txt))
+    save(a, res)
 
 
 def quiet_files(d, pattern, quiet_s=15.0, max_s=900.0):
@@ -1077,6 +1107,9 @@ def stage_report(a, res):
         tr = a.out / "trace_report.md"
         if tr.is_file():
             L += [tr.read_text().replace("# The reuse opportunity", "## The reuse opportunity"), ""]
+        dr = a.out / "delta_report.md"
+        if dr.is_file():
+            L += [dr.read_text().replace("# ", "## ", 1), ""]
     (a.out / "summary.md").write_text("\n".join(L) + "\n")
     log(f"report: {a.out / 'summary.md'}")
 
@@ -1114,6 +1147,10 @@ def main():
     ap.add_argument("--mtrag-max-tokens", type=int, default=128)
     ap.add_argument("--mtrag-max-len", type=int, default=0)
     ap.add_argument("--mtrag-limit", type=int, default=0, help="the first N conversations (0: all 110)")
+    ap.add_argument("--mtrag-capture-convs", type=int, default=0,
+                    help="in the traced runs, the first N conversations' raw pages are stored (stage delta)")
+    ap.add_argument("--capture-dir", default=None, help="where the engines store raw pages (their capture_dir)")
+    ap.add_argument("--delta-timeout", type=float, default=5400, help="stage delta's analysis, at most (s)")
     ap.add_argument("--env", default=None, help="JSON with model, gpus, vllm, torch for the report")
     ap.add_argument("--tier-codecs", default="raw,ours-hbh")
     ap.add_argument("--tier-clients", default="8,16")
@@ -1172,6 +1209,8 @@ def main():
                 stage_multiturn(a, res)
             elif stage == "mtrag":
                 stage_mtrag(a, res)
+            elif stage == "delta":
+                stage_delta(a, res)
             elif stage == "tier":
                 stage_tier(a, res)
             elif stage == "shapes":

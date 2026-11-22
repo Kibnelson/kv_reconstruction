@@ -115,7 +115,7 @@ async def build(tok, layout, turns, t, answers):
     return ids, pieces
 
 
-async def ask(session, a, ids, conv, tag, trace, pieces=None):
+async def ask(session, a, ids, conv, tag, trace, pieces=None, capture=False):
     """Stream one completion: (answer token ids or None, its text, TTFT s, latency s)."""
     body = {"model": a.model, "prompt": ids, "max_tokens": a.max_tokens, "temperature": 0, "stream": True,
             "return_token_ids": True, "conversation_id": conv, "t_tag": tag}
@@ -123,6 +123,8 @@ async def ask(session, a, ids, conv, tag, trace, pieces=None):
         body["t_trace"] = True
         if pieces:                                   # the prefill engine's relation probe groups by them
             body["t_pieces"] = [[k, s, e] for k, _r, s, e in pieces]
+        if capture:                                  # the engines store this request's raw pages
+            body["t_capture"] = True
     t0 = time.time()
     ttft, text, toks = None, [], []
     async with session.post(a.proxy.rstrip("/") + "/v1/completions", json=body) as r:
@@ -164,7 +166,9 @@ async def conversation(session, tok, a, k, conv, out, trace):
         if trace:
             rec["ids"] = ids
         try:
-            got, text, ttft, lat = await ask(session, a, ids, f"{run_of(a)}:{k}", rec["tag"], trace, pieces)
+            capture = trace and k < a.capture_convs
+            rec["capture"] = capture
+            got, text, ttft, lat = await ask(session, a, ids, f"{run_of(a)}:{k}", rec["tag"], trace, pieces, capture)
             src = "engine"
             if got is None:
                 got, src = await tok(text), "retokenized"
@@ -236,6 +240,8 @@ def main(argv=None):
     ap.add_argument("--limit", type=int, default=0, help="the first N conversations (0: all)")
     ap.add_argument("--request-timeout", type=float, default=600)
     ap.add_argument("--trace", action="store_true", help="the prefill engine hashes every page (and ids are kept)")
+    ap.add_argument("--capture-convs", type=int, default=0,
+                    help="with --trace: the first N conversations' raw pages are stored (the engines' capture_dir)")
     ap.add_argument("--output", required=True)
     ap.add_argument("--summary", required=True)
     a = ap.parse_args(argv)

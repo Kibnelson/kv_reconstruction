@@ -1414,6 +1414,28 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertIn("## MTRAG", (out / "summary.md").read_text())
         self.assertTrue((json.loads((out / "env.json").read_text()))["trace_pages"])
 
+    def test_capture_run_configures_both_engines_and_runs_the_delta_stage(self):
+        """MATRIX=capture's run: both engines get capture_dir (P its 16 GB, D its 2), the traced runs ask for the first
+        conversations' pages, and stage delta runs after mtrag (here no engine stores pages: it says so)."""
+        conv = [{"domain": "d", "messages": [{"speaker": "user", "text": "q0"}, {"speaker": "agent", "text": "a",
+                 "contexts": [{"document_id": "D1", "title": "", "text": "one"}]}]}]
+        mt = self.tmp / "mtrag.json"
+        mt.write_text(json.dumps(conv))
+        cap = self.tmp / "captures"
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="mtrag,delta,report", TRACE_PAGES="1",
+                             CAPTURE_GB="16", CAPTURE_DIR=str(cap), MTRAG_FILE=str(mt), MTRAG_LAYOUTS="docs_first",
+                             MTRAG_POLICIES="conversation", MTRAG_CAPTURE_CONVS="1")
+        self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
+        tkv = [e["cfg"] for e in eng if e["cfg"]["kv_connector"] == "TKVConnector"]
+        for c in tkv:
+            x = c["kv_connector_extra_config"]
+            self.assertEqual((x["capture_dir"], x["capture_gb"], x["capture_d_gb"]), (str(cap), 16, 2))
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        res = json.loads((out / "results.json").read_text())
+        self.assertIn("no stored pages", res["delta"]["error"])
+        log = (out / "runs" / "mtrag_raw_docs_first_conversation.log").read_text()
+        self.assertEqual(res["mtrag"]["mtrag_raw_docs_first_conversation"]["exit"], 0, log)
+
     def test_published_workloads(self):
         """SHAPES: the baselines' own workloads through the runner and the bench: their prompt files, the context the
         longest needs, B requests at once (vllm bench serve --max-concurrency), O tokens out, one point each."""
@@ -1579,6 +1601,13 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertEqual([x for x in r.stdout.split("\n") if x],
                          ["TRANSPORT=ring LINKS=100 CODECS=raw LAYOUT=1p3d STAGES=check,mtrag,report TRACE_PAGES=1 "
                           "MAXLEN=32768 RUN_TIMEOUT_S=10800"])
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1"))
+        cp = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual(len(cp), 1)
+        for want in ("CODECS=raw", "STAGES=check,mtrag,delta,report", "TRACE_PAGES=1", "CAPTURE_GB=16", "MTRAG_LIMIT=6",
+                     "MTRAG_CAPTURE_CONVS=6", "MTRAG_LAYOUTS=docs_first,history_first", "MTRAG_POLICIES=conversation"):
+            self.assertIn(want, cp[0].split())
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_bench as pb
         parsed = pb.parse_shapes(runs[0].split("SHAPES=")[1].split()[0])
@@ -1822,6 +1851,98 @@ class MtragDriverTests(unittest.TestCase):
         b = next(bb for bb in eng.bodies if bb["t_tag"] == r["tag"])
         s, e = next((s, e) for k, ref, s, e in r["pieces"] if k == "answer")
         self.assertEqual(b["prompt"][s:e], [ord(c) for c in "abc"])
+
+
+class DeltaAnalysisTests(unittest.TestCase):
+    def test_stored_pages_are_related_and_measured(self):
+        """Two captured prompts: the second holds the first's 80-token passage 16 positions later, after another
+        prefix. Its keys are the same vectors turned by RoPE to the new place; its values equal at layer 0 and a
+        rank-1 change at layers 1-2. The analysis relates those 80 tokens (no shared prefix), costs the values at
+        layer 0 nothing, the keys little once turned (and much unturned), finds the value change rank 1, and
+        measures D's held copy (one word apart) against P's."""
+        import numpy as np
+        import torch
+        from kv_compare.pd import trace as tr
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_delta_analysis as da
+        L, bs, H, hd = 3, 16, 2, 8
+        C, W = H * hd, 2 * H * hd
+        d = Path(tempfile.mkdtemp())
+        cap, run, mdir = d / "cap", d / "run", d / "model"
+        for x in (cap, run / "runs", mdir):
+            x.mkdir(parents=True)
+        (mdir / "config.json").write_text(json.dumps({"rope_theta": 10000.0, "head_dim": hd}))
+        inv, _hd = da.rope_inv_freq(str(mdir), hd)
+        rng = np.random.default_rng(4)
+
+        def rope(q, pos):                           # q [n, H, hd] float32, pos [n]
+            ang = (pos[:, None].astype(np.float64) * inv[None, :]).astype(np.float32)[:, None, :]
+            c, s_ = np.cos(ang), np.sin(ang)
+            x1, x2 = q[..., :hd // 2], q[..., hd // 2:]
+            return np.concatenate([x1 * c - x2 * s_, x2 * c + x1 * s_], -1).reshape(len(q), -1)
+
+        nA = 80
+        q = rng.standard_normal((L, nA, H, hd)).astype(np.float32)
+        v = rng.standard_normal((L, nA, C)).astype(np.float32)
+        u, w_ = rng.standard_normal(nA).astype(np.float32), rng.standard_normal(C).astype(np.float32)
+
+        def prompt(pre, start, tail):
+            T = pre + nA + tail
+            out = np.zeros((L, T, W), dtype=np.int16)
+            out[:, :pre] = da.to_bf16(rng.standard_normal((L, pre, W)).astype(np.float32))
+            out[:, pre + nA:] = da.to_bf16(rng.standard_normal((L, tail, W)).astype(np.float32))
+            for l in range(L):
+                out[l, pre:pre + nA, :C] = da.to_bf16(rope(q[l], np.arange(start, start + nA)))
+                vv = v[l] + (0.5 * np.outer(u, w_) if (start != 16 and l > 0) else 0)
+                out[l, pre:pre + nA, C:] = da.to_bf16(vv.astype(np.float32))
+            return out
+        w0, w1 = prompt(16, 16, 0), prompt(32, 32, 8)
+        st = tr.PageStore(str(cap), "P", 1.0, L, bs, W)
+        for key, w in (("K0", w0), ("K1", w1)):
+            t = torch.from_numpy(w)
+            rows = tr.capture_blocks(st, t, tr.page_hashes(t, bs), bs)
+            st.record({"event": "request", "key": key, "conv": "r:0", "t0": 0, "T": w.shape[1], "bs": bs,
+                       "rows": rows, "missing": 0})
+        st.close()
+        dst = tr.PageStore(str(cap), "D", 1.0, L, bs, W)     # D's copy of K1's first block: one word apart
+        blk = torch.from_numpy(w1[:, :16].copy())
+        blk[1, 3, 5] += 1
+        drows = tr.capture_blocks(dst, blk, tr.page_hashes(blk, bs), bs)
+        dst.record({"event": "held_differs", "key": "K1", "t0": 0, "bs": bs, "blocks": [0], "rows": drows})
+        dst.close()
+        X, A, Y, Z = (list(range(a, a + n)) for a, n in ((1000, 16), (2000, nA), (3000, 32), (4000, 8)))
+        name = "mtrag_raw_docs_first_conversation"
+        recs = [{"tag": f"{name}|0|{t}", "run": name, "layout": "docs_first", "policy": "conversation", "conv": 0,
+                 "turn": t, "prompt_tokens": len(ids), "ids": ids, "pieces": pcs, "trace": True, "capture": True}
+                for t, ids, pcs in ((0, X + A, [["system", None, 0, 16], ["doc", "D1", 16, 96]]),
+                                    (1, Y + A + Z, [["system", None, 0, 32], ["doc", "D1", 32, 112],
+                                                    ["user", 1, 112, 120]]))]
+        (run / "runs" / f"{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+        (run / "proxy.jsonl").write_text("".join(json.dumps({"key": f"K{t}", "tag": r["tag"], "t_in": t}) + "\n"
+                                                 for t, r in enumerate(recs)))
+        res = da.analyse(str(cap), str(run), str(mdir))
+        r = res["runs"][name]
+        self.assertEqual((r["requests"], r["tokens"], r["prefix_tokens"]), (2, 216, 0))
+        self.assertEqual((r["related"]["first"], r["related"]["latest"], r["by_kind"]), (80, 80, {"doc": 80}))
+        ll = r["lossless_first"]
+        self.assertEqual(ll["pairs"], 80)
+        v0, k1 = ll["V"][0], ll["K"][1]
+        self.assertEqual((v0["equal"], v0["xor"]), (1.0, 0.0))
+        self.assertLess(k1["diff"], 3.0)                     # turned: a rounding apart
+        self.assertGreater(k1["xor_unturned"], k1["diff"] + 4)
+        self.assertLess(k1["base"], k1["alone"] - 3)
+        ch = r["chunks"]
+        self.assertEqual(ch["chunks"], 1)
+        self.assertGreater(ch["V"][1]["rank_energy"]["1"], 0.95)   # the value change is rank 1
+        self.assertLess(ch["K"][1]["rel"], 0.02)
+        self.assertEqual(ch["V"][1]["overlap_with_layer2"] is not None, True)
+        h = res["held"]
+        self.assertEqual(h["blocks"], 1)
+        self.assertAlmostEqual(h["lossless"]["K"][1]["equal"] * C * 16 + h["lossless"]["V"][1]["equal"] * C * 16,
+                               2 * C * 16 - 1)
+        text = da.markdown(res)
+        self.assertIn("## mtrag_raw_docs_first_conversation", text)
+        self.assertIn("D's held copies against P's recomputation", text)
 
 
 class TraceReportTests(unittest.TestCase):

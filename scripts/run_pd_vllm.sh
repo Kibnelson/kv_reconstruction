@@ -256,6 +256,12 @@ SHARED_LINK=${SHARED_LINK:-0}
 # came again
 case "${TRACE_PAGES:-0}" in 1|true) TRACE_PAGES=true ;; *) TRACE_PAGES=false ;; esac
 export TRACE_PAGES
+# CAPTURE_GB>0 (with TRACE_PAGES=1; MATRIX=capture): the prefill engine stores the raw pages of the traced requests of
+# MTRAG's first MTRAG_CAPTURE_CONVS conversations (at most CAPTURE_GB), the decode engines their own copy of held
+# pages that differ, in CAPTURE_DIR (the campaign's kvpd-captures/<tag>: kept after cleanup); stage delta analyses
+# them (scripts/pd_delta_analysis.py)
+CAPTURE_GB=${CAPTURE_GB:-0}
+CAPTURE_DIR=${CAPTURE_DIR:-${KVPD_CAPTURE_DIR:-$KV_RUNS/captures/$STAMP}}
 # stage mtrag (scripts/pd_mtrag.py): MTRAG's conversations, fetched by scripts/pd_setup.sh
 MTRAG_FILE=${MTRAG_FILE:-$KV_RUNS/mtrag/conversations.json}
 if [ "$SHAPE_NEED" -gt "$MAXLEN" ]; then           # the longest workload's prompt and output
@@ -359,6 +365,7 @@ EXANS_INFO=$RUN/exans/exans_info.json
 COMMON="\"codecs_file\":\"$RUN/pd_codecs.pt\",\"codecs\":[$(json_list "$LOAD_CODECS")],\"splitzip_source\":\"$KV_HOME/sources/splitzip\",\"adacode_source\":\"$KV_HOME/sources/adacode\",\"exactkv_source\":\"$KV_HOME/sources/exactkv\",\"log_dir\":\"$LOGS\""
 [ -s "$EXANS_INFO" ] && COMMON="$COMMON,\"exans_info\":\"$EXANS_INFO\""
 COMMON="$COMMON,\"pipeline_tokens\":$PIPELINE_TOKENS,\"trace_pages\":$TRACE_PAGES"
+[ "$TRACE_PAGES" = true ] && [ "$CAPTURE_GB" != 0 ] && COMMON="$COMMON,\"capture_dir\":\"$CAPTURE_DIR\",\"capture_gb\":$CAPTURE_GB,\"capture_d_gb\":${CAPTURE_D_GB:-2}"
 [ "$TRACE_PAGES" = true ] && COMMON="$COMMON,\"model_dir\":\"$MP\",\"trace_store_gb\":${TRACE_STORE_GB:-16},\"trace_max_tokens\":${TRACE_MAX_TOKENS:-8192},\"trace_sample\":${TRACE_SAMPLE:-8}"
 P_EXTRA="\"async_encode\":$ASYNC_ENCODE"
 [ -n "$LINK_SHARED" ] && P_EXTRA="$P_EXTRA,\"link_shared\":\"$LINK_SHARED\""
@@ -470,7 +477,8 @@ PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
     --mtrag-layouts "${MTRAG_LAYOUTS:-docs_first,history_first,interleaved}" \
     --mtrag-policies "${MTRAG_POLICIES:-conversation,round_robin}" --mtrag-concurrency "${MTRAG_CONCURRENCY:-8}" \
     --mtrag-max-tokens "${MTRAG_MAX_TOKENS:-128}" --mtrag-max-len "$MAXLEN" --mtrag-limit "${MTRAG_LIMIT:-0}" \
-    2>&1 | tee "$OUT/bench.log"
+    --mtrag-capture-convs "$([ "$CAPTURE_GB" != 0 ] && echo "${MTRAG_CAPTURE_CONVS:-8}" || echo 0)" \
+    --capture-dir "$CAPTURE_DIR" 2>&1 | tee "$OUT/bench.log"
 STATUS=${PIPESTATUS[0]}
 set -e
 if [ "$STATUS" = 124 ]; then echo "STOP: the bench ran past RUN_TIMEOUT_S=$RUN_TIMEOUT_S s; packaged as _partial"; fi
@@ -489,7 +497,7 @@ if [ "$STATUS" != 0 ]; then NAME=${NAME}_partial; fi
 DEST=$RESULTS_ROOT/$NAME
 mkdir -p "$DEST/runs" "$DEST/connector"
 for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json \
-         trace_report.md trace_report.json; do
+         trace_report.md trace_report.json delta_report.md delta_report.json; do
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
 cp "$OUT"/runs/*.json "$OUT"/runs/*.log "$DEST/runs/" 2>/dev/null || true   # the logs: 60 KB at most each

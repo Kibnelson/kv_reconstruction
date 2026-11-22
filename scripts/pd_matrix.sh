@@ -34,6 +34,10 @@
 #               robin, every page hashed (TRACE_PAGES) and related to earlier KV of its text (how many bits a delta
 #               against it costs, per layer); trace_report.md says what was already where and how close
 #               (scripts/pd_trace_report.py, docs/pd_trace.md)
+#   capture     the raw pages themselves, for offline delta analysis: the trace's run on MTRAG's first 6
+#               conversations, docs first and history first, routing by conversation; P stores every block it sends,
+#               D its own copy of held blocks that differ (16 GB at most, kept in /tmp/$USER/kvpd-captures/<tag>);
+#               then scripts/pd_delta_analysis.py over them (delta_report.md; docs/pd_delta.md)
 #   xfer        where the transfer dominates, and where it does not (SplitZip's regime and its caveats): prompts of
 #               8K-64K tokens one at a time at 10-100 Gb/s per prefill GPU and GPU to GPU; three prefill GPUs behind
 #               one link of 10-100 Gb/s (3.3-33 per GPU) with many requests at once; exactkv apart, last
@@ -80,6 +84,8 @@ XFER=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,splitzip,adacode,exans
 QUICK="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=2048:1:128:4:sz1,16384:1:128:2:sz1,2048:16:128:1:sz16 RUN_TIMEOUT_S=5400"
 # trace: interleaved prompts reach about 17K tokens by a conversation's last turn
 TRACERUN="LAYOUT=1p3d STAGES=check,mtrag,report TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800"
+CAPRUN="LAYOUT=1p3d STAGES=check,mtrag,delta,report TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800 CAPTURE_GB=16
+        MTRAG_LIMIT=6 MTRAG_CAPTURE_CONVS=6 MTRAG_LAYOUTS=docs_first,history_first MTRAG_POLICIES=conversation"
 XLONG="8192:1:128:4:long,16384:1:128:4:long,32768:1:128:2:long,65536:1:128:2:long"
 XLRUN="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$XLONG P_MEM=0.68 D_MEM=0.66 RUN_TIMEOUT_S=16200"
 XSHARE="2048:24:128:2:share,8192:12:128:2:share,16384:6:128:2:share"
@@ -119,6 +125,7 @@ if [ -z "${RUNS:-}" ]; then
                       TRANSPORT=p2p LINKS=native CODECS=$OURSRE $WLRUN" ;;
         quick) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip $QUICK" ;;
         trace) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $TRACERUN" ;;
+        capture) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $CAPRUN" ;;
         xfer) RUNS="TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XLRUN;
                     TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XSRUN;
                     TRANSPORT=p2p LINKS=native CODECS=$XFER $XLRUN;
@@ -127,7 +134,7 @@ if [ -z "${RUNS:-}" ]; then
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$XKV $WLLONG" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace or xfer" \
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture or xfer" \
                 "(or set RUNS)"
            exit 1 ;;
     esac

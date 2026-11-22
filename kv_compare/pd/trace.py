@@ -467,3 +467,116 @@ class RelationProbe:
                 self.dirty.discard(g)
             else:
                 self.dirty.add(g)
+
+
+# ------------------------------------------------------------------------------------------------- page capture
+# capture_dir: the raw pages themselves, for offline analysis (scripts/pd_delta_analysis.py). P stores every 16-token
+# block of all layers it sends for a request carrying t_capture, once (by its pages' content hashes), and lists each
+# request's blocks; D stores its own copy of the held blocks whose bytes differ from what P sent again.
+#   blocks_<role>_<pid>.bin   rows of [layers, 16 tokens, W] int16 (BF16 words, keys then values), row r at r * row_bytes
+#   capture_<role>_<pid>.jsonl one record per request: its rows (P) or its differing held blocks and their rows (D)
+#   meta_<role>_<pid>.json    the row shape
+# Within capture_gb: past it, no new rows (the records say which blocks are missing, row -1).
+
+class PageStore:
+    def __init__(self, folder, role, budget_gb, L, bs, W, queue_gb=2.0):
+        import queue
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+        pid = os.getpid()
+        self.L, self.bs, self.W = int(L), int(bs), int(W)
+        self.row_bytes = self.L * self.bs * self.W * 2
+        self.budget_rows = int(float(budget_gb) * 2 ** 30) // self.row_bytes
+        self.path = os.path.join(folder, f"blocks_{role}_{pid}.bin")
+        self.index_path = os.path.join(folder, f"capture_{role}_{pid}.jsonl")
+        with open(os.path.join(folder, f"meta_{role}_{pid}.json"), "w") as f:
+            json.dump({"role": role, "pid": pid, "layers": self.L, "block_size": self.bs, "words": self.W,
+                       "dtype": "int16", "row_bytes": self.row_bytes, "shape": "[row, layer, token, word]",
+                       "blocks": os.path.basename(self.path), "index": os.path.basename(self.index_path)}, f)
+        self.fd = os.open(self.path, os.O_WRONLY | os.O_CREAT, 0o600)
+        self.rows, self.known, self.full = 0, {}, False
+        self.lock = threading.Lock()
+        self.room = threading.Condition()
+        self.pending, self.pending_budget = 0, int(float(queue_gb) * 2 ** 30)
+        self.q = queue.Queue()
+        self.errors = 0
+        self.t = threading.Thread(target=self._loop, daemon=True, name="tkv-capture")
+        self.t.start()
+
+    def assign(self, hashes, ntok):
+        """Rows of the blocks whose page hashes are `hashes` ([L, nb] uint64, numpy) and token counts `ntok`: (rows,
+        the block indices that are new and must be written). Row -1: the budget is spent."""
+        rows, new = [], []
+        with self.lock:
+            for j in range(hashes.shape[1]):
+                k = hashes[:, j].tobytes() + int(ntok[j]).to_bytes(2, "little")
+                r = self.known.get(k)
+                if r is None:
+                    if self.rows >= self.budget_rows:
+                        self.full = True
+                        rows.append(-1)
+                        continue
+                    r = self.known[k] = self.rows
+                    self.rows += 1
+                    new.append(j)
+                rows.append(r)
+        return rows, new
+
+    def put(self, rows, blocks):
+        """Write `blocks` ([n, L, bs, W] int16 on the host) at `rows`; waits while too much is queued."""
+        n = blocks.numel() * 2
+        with self.room:
+            while self.pending and self.pending + n > self.pending_budget:
+                self.room.wait(timeout=5)
+            self.pending += n
+        self.q.put((list(rows), blocks))
+
+    def record(self, rec):
+        with self.lock, open(self.index_path, "a") as f:
+            f.write(json.dumps(dict(rec, time=time.time())) + "\n")
+
+    def _loop(self):
+        while True:
+            item = self.q.get()
+            if item is None:
+                return
+            rows, blocks = item
+            try:
+                arr = blocks.contiguous().numpy()
+                for k, r in enumerate(rows):
+                    os.pwrite(self.fd, arr[k].tobytes(), r * self.row_bytes)
+            except Exception:
+                self.errors += 1
+            finally:
+                with self.room:
+                    self.pending -= blocks.numel() * 2
+                    self.room.notify_all()
+
+    def close(self):
+        self.q.put(None)
+        self.t.join(timeout=600)
+        try:
+            os.fsync(self.fd)
+            os.close(self.fd)
+        except OSError:
+            pass
+
+
+def block_slices(words, bs):
+    """[(start, end)] of the blocks of words [L, T, W] (the last one may be partial)."""
+    T = words.shape[1]
+    return [(s, min(s + bs, T)) for s in range(0, T, bs)]
+
+
+def capture_blocks(store, words, hashes, bs):
+    """Store the blocks of words [L, T, W] (on any device) not stored yet; their rows (one per block)."""
+    sl = block_slices(words, bs)
+    rows, new = store.assign(hashes, [e - s for s, e in sl])
+    if new:                                          # assembled on the host: no GPU memory beyond the words
+        L, _T, W = words.shape
+        host = words.cpu()
+        out = torch.zeros(len(new), L, bs, W, dtype=words.dtype)
+        for k, j in enumerate(new):
+            s, e = sl[j]
+            out[k, :, :e - s] = host[:, s:e]
+        store.put([rows[j] for j in new], out)
+    return rows

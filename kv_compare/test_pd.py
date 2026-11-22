@@ -331,11 +331,11 @@ class ConnectorFlowTests(unittest.TestCase):
         cls.Role, cls.Status = KVConnectorRole, RequestStatus
 
     def make(self, codecs=("raw",), timeout=600, async_install=False, pipeline=0, async_encode=False,
-             gather_budget=2 << 30, trace=False, p_more=None):
+             gather_budget=2 << 30, trace=False, p_more=None, d_more=None):
         log_dir = tempfile.mkdtemp()
         L, H, bs, hd = 3, 2, 16, 8
         d_extra = {"codecs": list(codecs), "listen": "127.0.0.1:0", "log_dir": log_dir, "recv_timeout_s": timeout,
-                   "async_install": async_install, "pipeline_tokens": pipeline, "trace_pages": trace}
+                   "async_install": async_install, "pipeline_tokens": pipeline, "trace_pages": trace, **(d_more or {})}
         p_extra = {"codecs": list(codecs), "log_dir": log_dir, "transport": "ring", "ring_bytes": 1 << 20,
                    "pipeline_tokens": pipeline, "async_encode": async_encode, "gather_budget": gather_budget,
                    "trace_pages": trace, **(p_more or {})}
@@ -511,7 +511,9 @@ class ConnectorFlowTests(unittest.TestCase):
         its prefix cache, logs per page whether its own bytes equal P's: equal in the first block, not at layer 1 of
         the second (one word changed); the new block is installed as usual and the held ones are left alone."""
         from kv_compare.pd import trace as tr
-        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(pipeline=16, trace=True, async_install=True)
+        cap = tempfile.mkdtemp()
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(pipeline=16, trace=True, async_install=True,
+                                                          p_more={"capture_dir": cap}, d_more={"capture_dir": cap})
         names = list(pc)
         for n in names:                               # D holds P's blocks 5 and 2 as its blocks 1 and 7
             dc[n][1].copy_(pc[n][5])
@@ -520,14 +522,14 @@ class ConnectorFlowTests(unittest.TestCase):
         held_before = {n: (dc[n][1].clone(), dc[n][7].clone()) for n in names}
         prompt = list(range(100, 140))
         dreq = SimpleNamespace(request_id="d-7", prompt_token_ids=prompt, num_computed_tokens=0,
-                               kv_transfer_params={"t_recv": True, "t_key": "K7"})
+                               kv_transfer_params={"t_recv": True, "t_key": "K7", "t_capture": True})
         n, _ = Ds.get_num_new_matched_tokens(dreq, 32)
         Ds.update_state_after_alloc(dreq, SimpleNamespace(get_block_ids=lambda: ([1, 7, 3],)), n)
         self.step(Ds, Dw)
         preq = SimpleNamespace(request_id="p-7", prompt_token_ids=prompt, num_computed_tokens=40, num_cached_tokens=16,
                                status=self.Status.FINISHED_LENGTH_CAPPED,
                                kv_transfer_params={"t_send": True, "t_key": "K7", "t_dest": dest, "t_codec": "raw",
-                                                   "t_trace": True})
+                                                   "t_trace": True, "t_capture": True})
         Ps.request_finished(preq, [5, 2, 9])
         self.step(Ps, Pw, finished={"p-7"})
         end = time.time() + 20
@@ -559,6 +561,24 @@ class ConnectorFlowTests(unittest.TestCase):
         self.assertEqual([dl["values"][kv][1] for kv in range(2)], [16 * 16] * 2)
         self.assertEqual(dl["equal"][0][1] + dl["equal"][1][1], 2 * 16 * 16 - 1)
         self.assertEqual([dl["equal"][kv][l] for kv in range(2) for l in (0, 2)], [16 * 16] * 4)
+        # capture: P stored its three blocks (the last one partial), D its own copy of the block that differs
+        Pw.w.cstore.close()
+        Dw.w.cstore.close()
+        import numpy as np
+        caps = {r: [json.loads(l) for f in Path(cap).glob(f"capture_{r}_*.jsonl") for l in f.read_text().splitlines()]
+                for r in ("P", "D")}
+        meta = json.loads(next(Path(cap).glob("meta_P_*.json")).read_text())
+        self.assertEqual((meta["layers"], meta["block_size"], meta["words"]), (3, 16, 32))
+        prec = caps["P"][0]
+        self.assertEqual((prec["key"], prec["T"], prec["rows"], prec["missing"]), ("K7", 40, [0, 1, 2], 0))
+        rows = np.fromfile(next(Path(cap).glob("blocks_P_*.bin")), dtype=np.int16).reshape(-1, 3, 16, 32)
+        self.assertTrue(np.array_equal(rows[0], words[:, 0:16].numpy()) and np.array_equal(rows[1], words[:, 16:32].numpy()))
+        self.assertTrue(np.array_equal(rows[2][:, :8], words[:, 32:40].numpy()) and not rows[2][:, 8:].any())
+        drec = caps["D"][0]
+        self.assertEqual((drec["event"], drec["key"], drec["t0"], drec["blocks"], drec["rows"]),
+                         ("held_differs", "K7", 16, [0], [0]))
+        drows = np.fromfile(next(Path(cap).glob("blocks_D_*.bin")), dtype=np.int16).reshape(-1, 3, 16, 32)
+        self.assertTrue(np.array_equal(drows[0], D.gather([1, 7, 3], 16, 32).numpy()))
         rel = [x for x in recs if x["event"] == "relations"]
         self.assertEqual([(x["key"], x["spans"], x["novel"], x["tokens"], x["sample"]) for x in rel],
                          [("K7", [], 25, 40, 8)])
@@ -610,6 +630,25 @@ class ConnectorFlowTests(unittest.TestCase):
             self.assertEqual(sum(d["hist"]["rot"][0][l]), 32 * C)    # keys turned by 16 positions
             self.assertLess(d["hist"]["rot"][0][l][0], 32 * C)
             self.assertEqual(sum(d["hist"]["rot"][1][l]), 0)
+
+    def test_the_page_store_keeps_each_block_once_within_its_budget(self):
+        import numpy as np
+        from kv_compare.pd import trace as tr
+        d = tempfile.mkdtemp()
+        st = tr.PageStore(d, "P", 3 * 2 * 16 * 4 * 2 / 2 ** 30, 2, 16, 4)     # room for three rows
+        g = torch.Generator().manual_seed(1)
+        w = torch.randint(-3000, 3000, (2, 40, 4), generator=g, dtype=torch.int32).to(torch.int16)
+        r1 = tr.capture_blocks(st, w, tr.page_hashes(w, 16), 16)
+        r2 = tr.capture_blocks(st, w[:, :32], tr.page_hashes(w[:, :32], 16), 16)   # its first two blocks again
+        v = w.clone()
+        v[0, 0, 0] += 1                                # a new first block: no room left
+        r3 = tr.capture_blocks(st, v[:, :16], tr.page_hashes(v[:, :16], 16), 16)
+        st.close()
+        self.assertEqual((r1, r2, r3, st.full), ([0, 1, 2], [0, 1], [-1], True))
+        rows = np.fromfile(st.path, dtype=np.int16).reshape(-1, 2, 16, 4)
+        self.assertEqual(rows.shape[0], 3)
+        self.assertTrue(np.array_equal(rows[1], w[:, 16:32].numpy()))
+        self.assertTrue(np.array_equal(rows[2][:, :8], w[:, 32:].numpy()) and not rows[2][:, 8:].any())
 
     def test_relation_measures_are_exact(self):
         from kv_compare.pd import trace as tr
@@ -1133,6 +1172,17 @@ class ProxyTests(unittest.TestCase):
         self.assertFalse(any("t_tag" in b or "t_trace" in b for b in (p, d)))
         tagged = [json.loads(l) for l in log.read_text().splitlines() if json.loads(l).get("tag")]
         self.assertEqual([(x["tag"], x["key"]) for x in tagged], [("docs_first|conversation|3|1", p["kv_transfer_params"]["t_key"])])
+        # capture (with the trace): both engines are told; the pieces go to the prefill engine; nothing else passed on
+        self.req(url, {"model": "m", "prompt": "y", "t_trace": True, "t_capture": True, "t_pieces": [["doc", 0, 4]]})
+        self.req(url, {"model": "m", "prompt": "x", "t_capture": True})        # without the trace: ignored
+        byp = {b["prompt"]: b for b in eng.seen["p"]}
+        byd = {b["prompt"]: b for b in eng.seen["d1"] + eng.seen["d2"]}
+        self.assertEqual((byp["y"]["kv_transfer_params"]["t_capture"], byp["y"]["kv_transfer_params"]["t_pieces"]),
+                         (True, [["doc", 0, 4]]))
+        self.assertTrue(byd["y"]["kv_transfer_params"]["t_capture"])
+        self.assertNotIn("t_capture", byp["x"]["kv_transfer_params"])
+        self.assertNotIn("t_capture", byd["x"]["kv_transfer_params"])
+        self.assertFalse(any(k in b for b in (byp["x"], byd["x"], byp["y"], byd["y"]) for k in ("t_capture", "t_pieces")))
 
     def test_failed_prefill_ends_the_decode_request(self):
         eng, url, log = self.start(prefill_status=500, decode_wait=20)

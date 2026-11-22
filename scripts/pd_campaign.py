@@ -39,7 +39,7 @@ import time
 
 SCHEMA = 1
 KIND = "kvpd_campaign"
-MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links", "workloads", "wlong", "wlours", "capacity", "quick", "trace", "xfer")
+MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links", "workloads", "wlong", "wlours", "capacity", "quick", "trace", "capture", "xfer")
 # Disk (GB) on the node's root file system, which /tmp is: the shared cache's parts when missing, then a job's peak.
 # Measured sizes go into disk_after.json; these only decide whether to start.
 NEED_GB = {"uv": 17.0, "python": 0.2, "hf": 6.6}   # measured on gpu-grad-01 (job 30170): 16.7, 0.1, 6.5
@@ -334,7 +334,12 @@ def find_uv(cache):
     return None
 
 
-def disk_plan(p, want_ibp):
+# a matrix's own files beyond a job's peak: capture keeps the raw pages it stores (kvpd-captures/<tag>, kept after
+# cleanup for offline analysis; scripts/pd_matrix.sh CAPTURE_GB)
+EXTRA_GB = {"capture": 18.0}
+
+
+def disk_plan(p, want_ibp, extra_gb=0.0):
     """What the run will add to the disk, and whether it fits with MARGIN_GB to spare; IBP is dropped first."""
     scale = float(os.environ.get("KVPD_NEED_SCALE", "1"))
     margin = float(os.environ.get("KVPD_MARGIN_GB", MARGIN_GB))
@@ -342,7 +347,7 @@ def disk_plan(p, want_ibp):
             "python": (p.cache / "python").is_dir() and any((p.cache / "python").iterdir()),
             "hf": (p.cache / "hf" / MODEL_DIR).is_dir()}
     missing = [k for k, ok in have.items() if not ok]
-    base = sum(NEED_GB[k] for k in missing) * scale
+    base = sum(NEED_GB[k] for k in missing) * scale + float(extra_gb)
     cuda13 = (p.cache / "cuda13" / "bin" / "nvcc").is_file()
     free = shutil.disk_usage(p.root).free / 1e9
 
@@ -455,7 +460,7 @@ def stage_run(p, a, job):
     ibp_opt = os.environ.get("KVPD_IBP", "auto")
     uses_ibp = any(re.search(r"(^|[,=])ibp(,|\s|$)", r) for r in m["runs"])
     want_ibp = ibp_opt == "1" or (ibp_opt == "auto" and uses_ibp)
-    plan = disk_plan(p, want_ibp)
+    plan = disk_plan(p, want_ibp, EXTRA_GB.get(a.matrix, 0.0))
     write_json(ev / "disk_plan.json", plan)
     if plan["ibp"] is None:
         rows = biggest(p.root)
@@ -491,6 +496,7 @@ def stage_run(p, a, job):
         "PYTHONFAULTHANDLER": "1",          # a native crash (nvCOMP's, ExANS's) prints where it happened
         "FLASHINFER_WORKSPACE_BASE": str(home / "cache"), "PD_CARD": "1", "RESULTS_ROOT": str(ev / "matrix"),
         "MATRIX": a.matrix, "RUNS": ";".join(m["runs"]),     # exactly the runs create recorded
+        "KVPD_CAPTURE_DIR": str(p.root / "kvpd-captures" / a.tag),   # MATRIX=capture's raw pages (kept)
     }
     if cuda12:
         env_vars["CUDA12_HOME"] = cuda12
