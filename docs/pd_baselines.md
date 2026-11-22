@@ -208,6 +208,7 @@ in ms:
 | T2 rank 256 | 9.3 | 265 | 34 | 12 | 17 | 361 | 110 |
 | T (hbh) | 8.5 | 311 | 33 | 11 | 66 | 400 | 101 |
 
+`scripts/pd_breakdown.py RUN_DIR... --markdown out.md` makes this table for every point of a published run.
 Prefill (about 169 ms) and the rest (about 29 ms: picking the request up, gathering, the first token) are the same
 for every codec. What that says about T, without a profile:
 - Its install is a fixed cost, not data: 62, 62, 66 and 76 ms at 512, 1K, 2K and 4K tokens, once per piece (8K twice,

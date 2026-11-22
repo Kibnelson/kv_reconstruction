@@ -1617,3 +1617,51 @@ class RunnerDryRunTests(unittest.TestCase):
         log = subprocess.run(["git", "-C", str(self.repo), "log", "--oneline", "-5"], capture_output=True,
                              text=True).stdout
         self.assertIn("PD matrix smoke: 3 runs (2 not finished)", log)   # the stand-ins log no transfers: run 1 fails its check
+
+
+class BreakdownTests(unittest.TestCase):
+    def test_a_point_breaks_down_from_its_logs(self):
+        """scripts/pd_breakdown.py: a request joined across the proxy's and both engines' records by its key, its
+        pieces counted once, matched to its point by time (the bench names the point's end in the node's local
+        time; the logs are UNIX time, here 5 h ahead); another codec's request in the same window is not counted."""
+        import datetime as dt
+        import gzip
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_breakdown as bd
+        d = Path(tempfile.mkdtemp())
+        (d / "runs").mkdir()
+        (d / "connector").mkdir()
+        (d / "env.json").write_text(json.dumps({"transport": "ring", "layout": "1p3d"}))
+        (d / "runs" / "shape_ours-hbh_10gbps_t8192_b1_o128.json").write_text(json.dumps(
+            {"date": "20261118-120010", "duration": 10.0, "median_ttft_ms": 900.0}))
+        t0 = dt.datetime(2026, 11, 18, 12, 0, 10, tzinfo=dt.timezone.utc).timestamp() + 5 * 3600 - 8
+
+        def gz(path, recs):
+            with gzip.open(path, "wt") as f:
+                f.write("".join(json.dumps(r) + "\n" for r in recs))
+        gz(d / "proxy.jsonl.gz", [{"key": "K", "codec": "ours-hbh", "t_in": t0, "t_first_byte": t0 + 0.9},
+                                  {"key": "J", "codec": "raw", "t_in": t0 + 1, "t_first_byte": t0 + 1.2}])
+        base = {"req_key": "K", "pieces": 2}
+        gz(d / "connector" / "tkv_P_1.jsonl.gz", [
+            {"event": "prefill_done", "key": "K", "time": t0 + 0.4},
+            dict(base, event="send", key="K", piece=0, tokens=4096, picked_at=t0 + 0.41, gather_ms=5.0, encode_ms=50.0,
+                 raw_bytes=4, coded_bytes=2, blob_bytes=2, queued=t0 + 0.47, send_begin=t0 + 0.47, send_end=t0 + 0.6),
+            dict(base, event="send", key="K#1", piece=1, tokens=4096, gather_ms=0.0, encode_ms=50.0, raw_bytes=4,
+                 coded_bytes=2, blob_bytes=2, queued=t0 + 0.52, send_begin=t0 + 0.6, send_end=t0 + 0.75),
+            {"event": "send", "key": "J", "tokens": 2048, "picked_at": t0 + 1.1, "queued": t0 + 1.1,
+             "send_begin": t0 + 1.1, "send_end": t0 + 1.15}])
+        gz(d / "connector" / "tkv_D_2.jsonl.gz", [
+            dict(base, event="install", key="K", piece=0, decode_install_ms=20.0, link_recv_end=t0 + 0.6,
+                 taken_at=t0 + 0.61, done_at=t0 + 0.63, exact=True),
+            dict(base, event="install", key="K#1", piece=1, decode_install_ms=20.0, link_recv_end=t0 + 0.75,
+                 taken_at=t0 + 0.76, done_at=t0 + 0.78, exact=True),
+            {"event": "install", "key": "J", "decode_install_ms": 3.0, "done_at": t0 + 1.17}])
+        rows = bd.analyse(d)
+        self.assertEqual(len(rows), 1)
+        r = rows[0]
+        got = {k: round(r[k], 3) for k in ("ttft", "prefill", "encode", "link", "install", "first_token", "tokens",
+                                           "pieces")}
+        self.assertEqual(got, {"ttft": 900.0, "prefill": 400.0, "encode": 100.0, "link": 280.0, "install": 40.0,
+                               "first_token": 120.0, "tokens": 8192, "pieces": 2})
+        self.assertEqual((r["codec"], r["gbps"], r["n"], r["bench_ttft"]), ("ours-hbh", "10", 1, 900.0))
+        self.assertIn("| shape t8192_b1_o128 | ours-hbh | 10 | 1 |", bd.markdown(rows))
