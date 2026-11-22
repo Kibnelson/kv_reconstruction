@@ -249,6 +249,15 @@ case "${ASYNC_ENCODE:-true}" in true|1) ASYNC_ENCODE=true ;; *) ASYNC_ENCODE=fal
 PIPELINE_TOKENS=${PIPELINE_TOKENS:-4096}
 # SHARED_LINK=1: every prefill engine sends over one paced link (a node's NIC behind several GPUs), not one each
 SHARED_LINK=${SHARED_LINK:-0}
+# TRACE_PAGES=1: the page trace (kv_compare/pd/trace.py): the prefill engines hash every page of a request sent with
+# t_trace (the MTRAG stage's traced runs) and measure how close its KV is to earlier KV of the same text (deltas per
+# layer, 1 token in TRACE_SAMPLE (8) chosen by content; the bases kept on the host within TRACE_STORE_GB, 16; at most
+# TRACE_MAX_TOKENS sampled related tokens a request, 8192), the decode engines compare the pages they held with what
+# came again
+case "${TRACE_PAGES:-0}" in 1|true) TRACE_PAGES=true ;; *) TRACE_PAGES=false ;; esac
+export TRACE_PAGES
+# stage mtrag (scripts/pd_mtrag.py): MTRAG's conversations, fetched by scripts/pd_setup.sh
+MTRAG_FILE=${MTRAG_FILE:-$KV_RUNS/mtrag/conversations.json}
 if [ "$SHAPE_NEED" -gt "$MAXLEN" ]; then           # the longest workload's prompt and output
     MAXLEN=$(( (SHAPE_NEED + 255) / 256 * 256 ))
     echo "   context $MAXLEN tokens for the workloads (SHAPES)"
@@ -349,7 +358,8 @@ json_list() { echo "$1" | tr ',' '\n' | { grep -v '^$' || true; } | sed 's/.*/"&
 EXANS_INFO=$RUN/exans/exans_info.json
 COMMON="\"codecs_file\":\"$RUN/pd_codecs.pt\",\"codecs\":[$(json_list "$LOAD_CODECS")],\"splitzip_source\":\"$KV_HOME/sources/splitzip\",\"adacode_source\":\"$KV_HOME/sources/adacode\",\"exactkv_source\":\"$KV_HOME/sources/exactkv\",\"log_dir\":\"$LOGS\""
 [ -s "$EXANS_INFO" ] && COMMON="$COMMON,\"exans_info\":\"$EXANS_INFO\""
-COMMON="$COMMON,\"pipeline_tokens\":$PIPELINE_TOKENS"
+COMMON="$COMMON,\"pipeline_tokens\":$PIPELINE_TOKENS,\"trace_pages\":$TRACE_PAGES"
+[ "$TRACE_PAGES" = true ] && COMMON="$COMMON,\"model_dir\":\"$MP\",\"trace_store_gb\":${TRACE_STORE_GB:-16},\"trace_max_tokens\":${TRACE_MAX_TOKENS:-8192},\"trace_sample\":${TRACE_SAMPLE:-8}"
 P_EXTRA="\"async_encode\":$ASYNC_ENCODE"
 [ -n "$LINK_SHARED" ] && P_EXTRA="$P_EXTRA,\"link_shared\":\"$LINK_SHARED\""
 P_URLS=() DECODE_ARGS=()
@@ -441,6 +451,7 @@ json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sy
            "piece_tokens": int(os.environ.get("TKV_PIECE_TOKENS", "4096")),
            "async_install": sys.argv[10] == "true", "async_encode": sys.argv[11] == "true",
            "pipeline_tokens": int(sys.argv[12]), "shared_link": sys.argv[13] == "1",
+           "trace_pages": os.environ.get("TRACE_PAGES") == "true",
            "encode_once": os.environ.get("TKV_ENCODE_ONCE", "1") != "0",
            "decode_graphs": os.environ.get("TKV_DECODE_GRAPHS", "1") != "0",
            "group_product": os.environ.get("TKV_GROUP_PRODUCT", "fused"), **extra},
@@ -455,7 +466,11 @@ PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
     --tier-codecs "$TIER_CODECS" --tier-clients "$TIER_CLIENTS" --tier-conversations "$TIER_CONVERSATIONS" \
     --tier-max-turns "$TIER_MAX_TURNS" --tier-prefix-max "$TIER_PREFIX_MAX" --tier-control "$TIERFILE" \
     --engine-logs "$OUT" --shapes "$SHAPES" --idle-timeout "${IDLE_TIMEOUT_S:-600}" \
-    --point-timeout "${POINT_TIMEOUT_S:-3600}" 2>&1 | tee "$OUT/bench.log"
+    --point-timeout "${POINT_TIMEOUT_S:-3600}" --mtrag-file "$MTRAG_FILE" --mtrag-codecs "${MTRAG_CODECS:-raw}" \
+    --mtrag-layouts "${MTRAG_LAYOUTS:-docs_first,history_first,interleaved}" \
+    --mtrag-policies "${MTRAG_POLICIES:-conversation,round_robin}" --mtrag-concurrency "${MTRAG_CONCURRENCY:-8}" \
+    --mtrag-max-tokens "${MTRAG_MAX_TOKENS:-128}" --mtrag-max-len "$MAXLEN" --mtrag-limit "${MTRAG_LIMIT:-0}" \
+    2>&1 | tee "$OUT/bench.log"
 STATUS=${PIPESTATUS[0]}
 set -e
 if [ "$STATUS" = 124 ]; then echo "STOP: the bench ran past RUN_TIMEOUT_S=$RUN_TIMEOUT_S s; packaged as _partial"; fi
@@ -473,10 +488,12 @@ if [ "${SMOKE:-0}" = 1 ]; then NAME=${NAME}_smoke; fi
 if [ "$STATUS" != 0 ]; then NAME=${NAME}_partial; fi
 DEST=$RESULTS_ROOT/$NAME
 mkdir -p "$DEST/runs" "$DEST/connector"
-for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json; do
+for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json \
+         trace_report.md trace_report.json; do
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
 cp "$OUT"/runs/*.json "$OUT"/runs/*.log "$DEST/runs/" 2>/dev/null || true   # the logs: 60 KB at most each
+for f in "$OUT"/runs/*.jsonl; do [ -f "$f" ] && gzip -c "$f" > "$DEST/runs/$(basename "$f").gz"; done   # MTRAG's
 for f in "$OUT"/engine_*.log; do      # whole when small (a failed start), else its start and its end
     if [ "$(stat -c %s "$f")" -lt 4000000 ]; then cp "$f" "$DEST/"
     else { head -n 300 "$f"; echo "[... $(wc -l < "$f") lines in all ...]"; tail -n 400 "$f"; } > "$DEST/$(basename "$f")"; fi

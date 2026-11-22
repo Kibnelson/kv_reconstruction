@@ -14,6 +14,9 @@ proxy (scripts/run_pd_vllm.sh starts them). Stages (--stages, in order):
               of clients, the tiers emptied (a new generation in --tier-control; vLLM's reset_prefix_cache with
               reset_external on every engine), then vLLM's multi-turn benchmark on fresh conversations (a seed per
               point) with conversation routing; TTFT, TPOT, latency, and the tier's loads and stores
+  mtrag       IBM's MTRAG conversations (scripts/pd_mtrag.py) per codec x prompt layout x routing, caches reset before
+              each, the page trace on for one routing (kv_compare/pd/trace.py); then trace_report.md, the reuse
+              opportunity (scripts/pd_trace_report.py)
   report      results.json and summary.md
 
 Links: a number is a paced link in Gb/s; "native" leaves the transport unpaced (the machine's own path: the host
@@ -454,6 +457,7 @@ def transfer_stats(recs):
         if r.get("set"):
             sets[r["set"]] = sets.get(r["set"], 0) + 1
     return {"sends": len(s), "send_errors": sum(1 for r in s if r.get("error")),
+            "blob_bytes_total": sum(int(r.get("blob_bytes") or 0) for r in s),
             "installs": len(d), "install_errors": sum(1 for r in d if r.get("error")), "timeouts": len(tmo),
             "bits": mean([r.get("bits") for r in s]), "gather_ms": mean([r.get("gather_ms") for r in s]),
             "encode_ms": mean([r.get("encode_ms") for r in s]),
@@ -742,6 +746,75 @@ def stage_multiturn(a, res):
     log(p.stdout[-3000:] + p.stderr[-2000:])
 
 
+def stage_mtrag(a, res):
+    """MTRAG's multi-turn RAG conversations (scripts/pd_mtrag.py) per codec, prompt layout and routing, caches reset
+    before each; the trace (kv_compare/pd/trace.py) on in the runs of a.mtrag_trace_policy. Then the opportunity
+    report (scripts/pd_trace_report.py) over all of them."""
+    if not a.mtrag_file or not Path(a.mtrag_file).is_file():
+        res["mtrag"] = {"error": f"no MTRAG conversations at {a.mtrag_file} (scripts/pd_setup.sh fetches them)"}
+        log(res["mtrag"]["error"])
+        return
+    out = res.setdefault("mtrag", {})
+    (a.out / "runs").mkdir(parents=True, exist_ok=True)
+    tok_url = get(a.proxy + "/t/status")["decodes"][0][0]
+    for codec in a.mtrag_codecs:
+        for layout in a.mtrag_layouts:
+            for policy in a.mtrag_policies:
+                name = f"mtrag_{codec}_{layout}_{policy}"
+                if name in out and not a.rerun:
+                    continue
+                ensure_alive(a, f"before {name}")
+                post(a.proxy + "/t/config", {"mode": "pd", "codec": codec, "policy": policy, "verify": False,
+                                             "reset_conversations": True})
+                settle(a, f"before {name}")
+                reset_caches(a)                   # every variant starts from empty prefix caches
+                trace = policy == a.mtrag_trace_policy
+                t0 = time.time()
+                cmd = [sys.executable, "-I", str(ROOT / "scripts" / "pd_mtrag.py"), "--conversations", a.mtrag_file,
+                       "--proxy", a.proxy, "--tokenize", tok_url, "--model", a.served_name, "--layout", layout,
+                       "--policy", policy, "--run", name, "--concurrency", str(a.mtrag_concurrency), "--max-tokens",
+                       str(a.mtrag_max_tokens), "--max-len", str(a.mtrag_max_len), "--limit", str(a.mtrag_limit),
+                       "--output", str(a.out / "runs" / (name + ".jsonl")),
+                       "--summary", str(a.out / "runs" / (name + ".json"))] + (["--trace"] if trace else [])
+                try:
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=a.point_timeout)
+                    rc, txt = r.returncode, r.stdout[-20000:] + "\n" + r.stderr[-20000:]
+                except subprocess.TimeoutExpired as exc:
+                    rc, txt = 124, f"stopped after {a.point_timeout} s\n" + str(exc)[-2000:]
+                (a.out / "runs" / (name + ".log")).write_text(txt)
+                ok, stop = after_point(a)
+                t1 = time.time()
+                st = transfer_stats(records(a.log_dir, t0, t1))
+                p = a.out / "runs" / (name + ".json")
+                summ = json.loads(p.read_text()) if p.is_file() else {}
+                out[name] = {"codec": codec, "layout": layout, "policy": policy, "trace": trace, "exit": rc, "t0": t0,
+                             "t1": t1, "summary": summ, "transfers": st}
+                log(f"{name}: exit {rc}, {summ.get('requests')} requests ({summ.get('errors')} failed), TTFT p50 "
+                    f"{fmt(summ.get('ttft_p50_ms'))} ms, {st['sends']} transfers")
+                if rc != 0:
+                    log(tail_of(txt))
+                save(a, res)
+                end_point(a, name, ok, stop)
+    post(a.proxy + "/t/config", {"policy": "round_robin"})
+    quiet_files(a.log_dir, "trace_*.jsonl")         # the prefill engines' relation probe writes its last totals
+    p = subprocess.run([sys.executable, "-I", str(ROOT / "scripts" / "pd_trace_report.py"), str(a.out), "--log-dir",
+                        a.log_dir, "--markdown", str(a.out / "trace_report.md"), "--json",
+                        str(a.out / "trace_report.json")], capture_output=True, text=True)
+    log("trace report: " + (p.stdout[-2000:] + p.stderr[-3000:]).strip()[-3000:])
+
+
+def quiet_files(d, pattern, quiet_s=15.0, max_s=900.0):
+    """Wait until no file matching `pattern` in folder d has changed for quiet_s seconds (at most max_s)."""
+    end = time.time() + max_s
+    while time.time() < end:
+        ts = [f.stat().st_mtime for f in Path(d).glob(pattern)] if d else []
+        if not ts or time.time() - max(ts) >= quiet_s:
+            return True
+        time.sleep(min(quiet_s, 5.0))
+    log(f"{pattern} still changing after {max_s:.0f} s: the trace report is read as it stands")
+    return False
+
+
 def tail_of(text, n=12):
     return "\n".join("   " + l for l in text.strip().splitlines()[-n:])
 
@@ -988,6 +1061,22 @@ def stage_report(a, res):
     if opp.is_file():
         o = json.loads(opp.read_text())
         L += ["## Reuse opportunities (multi-turn, before any base sending)", "", o.get("summary", ""), ""]
+    mt = {k: v for k, v in (res.get("mtrag") or {}).items() if isinstance(v, dict) and "summary" in v}
+    if mt:
+        L += ["## MTRAG (multi-turn RAG conversations)", "",
+              "| Codec | Layout | Routing | Traced | Requests (failed) | TTFT p50 (ms) | Prompt tokens mean / max | "
+              "Transfers | GB sent |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+        for v in mt.values():
+            sm, st = v["summary"], v["transfers"]
+            gb = (st.get("blob_bytes_total") or 0) / 1e9
+            L.append(f"| {v['codec']} | {v['layout']} | {v['policy']} | {'yes' if v['trace'] else '-'} | "
+                     f"{sm.get('requests')} ({sm.get('errors')}) | {fmt(sm.get('ttft_p50_ms'), 0)} | "
+                     f"{fmt(sm.get('prompt_tokens_mean'), 0)} / {sm.get('prompt_tokens_max')} | {st.get('sends')} | "
+                     f"{gb:.2f} |")
+        L.append("")
+        tr = a.out / "trace_report.md"
+        if tr.is_file():
+            L += [tr.read_text().replace("# The reuse opportunity", "## The reuse opportunity"), ""]
     (a.out / "summary.md").write_text("\n".join(L) + "\n")
     log(f"report: {a.out / 'summary.md'}")
 
@@ -1016,6 +1105,15 @@ def main():
     ap.add_argument("--mt-policy", default="conversation")
     ap.add_argument("--mt-conversations", type=int, default=24)
     ap.add_argument("--mt-clients", type=int, default=4)
+    ap.add_argument("--mtrag-file", default=None, help="MTRAG's conversations.json (stage mtrag)")
+    ap.add_argument("--mtrag-codecs", default="raw")
+    ap.add_argument("--mtrag-layouts", default="docs_first,history_first,interleaved")
+    ap.add_argument("--mtrag-policies", default="conversation,round_robin")
+    ap.add_argument("--mtrag-trace-policy", default="conversation", help="the routing whose runs hash every page")
+    ap.add_argument("--mtrag-concurrency", type=int, default=8)
+    ap.add_argument("--mtrag-max-tokens", type=int, default=128)
+    ap.add_argument("--mtrag-max-len", type=int, default=0)
+    ap.add_argument("--mtrag-limit", type=int, default=0, help="the first N conversations (0: all 110)")
     ap.add_argument("--env", default=None, help="JSON with model, gpus, vllm, torch for the report")
     ap.add_argument("--tier-codecs", default="raw,ours-hbh")
     ap.add_argument("--tier-clients", default="8,16")
@@ -1040,6 +1138,9 @@ def main():
     a.dataset = Path(a.dataset) if a.dataset else a.prompts / "prompts_mixed.jsonl"
     a.codecs = [c for c in a.codecs.split(",") if c]
     a.mt_codecs = [c for c in a.mt_codecs.split(",") if c]
+    a.mtrag_codecs = [c for c in a.mtrag_codecs.split(",") if c]
+    a.mtrag_layouts = [c for c in a.mtrag_layouts.split(",") if c]
+    a.mtrag_policies = [c for c in a.mtrag_policies.split(",") if c]
     a.links = [x if x == "native" else (float(x) if "." in x else int(x)) for x in a.links.split(",")]
     a.tier_codecs = [c for c in a.tier_codecs.split(",") if c]
     a.tier_clients = [int(c) for c in a.tier_clients.split(",") if c]
@@ -1069,6 +1170,8 @@ def main():
                 stage_sweep(a, res, colocated=True)
             elif stage == "multiturn":
                 stage_multiturn(a, res)
+            elif stage == "mtrag":
+                stage_mtrag(a, res)
             elif stage == "tier":
                 stage_tier(a, res)
             elif stage == "shapes":

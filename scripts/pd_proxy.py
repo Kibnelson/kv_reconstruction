@@ -18,7 +18,10 @@ Control (the benchmark driver):  POST /t/config {"codec": "ours-hbh", "verify": 
   do_remote_decode), then the decode engine with the kv_transfer_params the prefill returned (it pulls the KV).
 Several --prefill engines: each request goes to the one with the fewest requests in flight (each has its own link).
 A request may name its engines ("t_prefill": j, "t_decode": i; taken out before it is passed on): the benchmark
-driver's warm-up sends one request over every prefill-decode pair.
+driver's warm-up sends one request over every prefill-decode pair. "t_tag" (logged with the request's key) and
+"t_trace" (the prefill engine hashes the request's pages and relates them to earlier ones, kv_compare/pd/trace.py)
+and "t_pieces" (a traced prompt's pieces, [[kind, start, end]], passed to the prefill engine) are taken out the same
+way.
 """
 from __future__ import annotations
 
@@ -79,11 +82,15 @@ class Proxy:
         body = await raw.json()
         conv = body.pop("conversation_id", None)
         pin_p, pin_d = body.pop("t_prefill", None), body.pop("t_decode", None)   # the bench's warm-up of each pair
+        tag, trace = body.pop("t_tag", None), bool(body.pop("t_trace", False))     # the MTRAG driver's (pd_mtrag.py)
+        pieces = body.pop("t_pieces", None)          # a traced prompt's pieces [[kind, start, end]]: the probe's groups
         key = uuid.uuid4().hex
         i = int(pin_d) % len(self.decodes) if pin_d is not None else self.pick(conv)
         durl, kvaddr = self.decodes[i]
         cfg = dict(self.cfg)
         rec = {"key": key, "dest": i, "codec": cfg["codec"], "mode": cfg["mode"], "conv": conv, "t_in": time.time()}
+        if tag is not None:
+            rec["tag"] = tag
         headers = {"X-Request-Id": key}
         d_body = dict(body)
         p_task = None
@@ -121,7 +128,9 @@ class Proxy:
             if "max_completion_tokens" in p_body:
                 p_body["max_completion_tokens"] = 1
             p_body["kv_transfer_params"] = {"t_send": True, "t_key": key, "t_dest": kvaddr, "t_codec": cfg["codec"],
-                                            "t_verify": bool(cfg["verify"]), "t_conv": conv}
+                                            "t_verify": bool(cfg["verify"]), "t_conv": conv, "t_trace": trace}
+            if trace and pieces:
+                p_body["kv_transfer_params"]["t_pieces"] = pieces
             d_body["kv_transfer_params"] = {"t_recv": True, "t_key": key}
             # counted at the pick, not when the task first runs: requests that arrive together all picked the same
             # engine before any task had run (job 30210, 2p2d: 7 of 8 prompts on one prefill engine)

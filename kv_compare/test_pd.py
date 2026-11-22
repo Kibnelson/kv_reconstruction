@@ -331,13 +331,14 @@ class ConnectorFlowTests(unittest.TestCase):
         cls.Role, cls.Status = KVConnectorRole, RequestStatus
 
     def make(self, codecs=("raw",), timeout=600, async_install=False, pipeline=0, async_encode=False,
-             gather_budget=2 << 30):
+             gather_budget=2 << 30, trace=False, p_more=None):
         log_dir = tempfile.mkdtemp()
         L, H, bs, hd = 3, 2, 16, 8
         d_extra = {"codecs": list(codecs), "listen": "127.0.0.1:0", "log_dir": log_dir, "recv_timeout_s": timeout,
-                   "async_install": async_install, "pipeline_tokens": pipeline}
+                   "async_install": async_install, "pipeline_tokens": pipeline, "trace_pages": trace}
         p_extra = {"codecs": list(codecs), "log_dir": log_dir, "transport": "ring", "ring_bytes": 1 << 20,
-                   "pipeline_tokens": pipeline, "async_encode": async_encode, "gather_budget": gather_budget}
+                   "pipeline_tokens": pipeline, "async_encode": async_encode, "gather_budget": gather_budget,
+                   "trace_pages": trace, **(p_more or {})}
         Ps, Pw = (self.cn.TKVConnector(_vcfg(True, p_extra), r) for r in (self.Role.SCHEDULER, self.Role.WORKER))
         Ds, Dw = (self.cn.TKVConnector(_vcfg(False, dict(d_extra, ring_bytes=1 << 20)), r)
                   for r in (self.Role.SCHEDULER, self.Role.WORKER))
@@ -504,6 +505,201 @@ class ConnectorFlowTests(unittest.TestCase):
         recs = self.flow(pipeline=16, async_encode=True, gather_budget=0)         # piece by piece on the encoder
         self.assertFalse(any(x.get("gathered_in_step") for x in recs if x.get("event") == "send"))
         self.flow(pipeline=16, local_hit=16, async_install=True)
+
+    def test_a_trace_hashes_what_p_sends_and_compares_what_d_held(self):
+        """trace_pages: P logs every page's content hash of a traced request; D, which held the first two blocks in
+        its prefix cache, logs per page whether its own bytes equal P's: equal in the first block, not at layer 1 of
+        the second (one word changed); the new block is installed as usual and the held ones are left alone."""
+        from kv_compare.pd import trace as tr
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(pipeline=16, trace=True, async_install=True)
+        names = list(pc)
+        for n in names:                               # D holds P's blocks 5 and 2 as its blocks 1 and 7
+            dc[n][1].copy_(pc[n][5])
+            dc[n][7].copy_(pc[n][2])
+        dc[names[1]][7].view(-1)[3] += 1              # but layer 1 of the second differs by one word
+        held_before = {n: (dc[n][1].clone(), dc[n][7].clone()) for n in names}
+        prompt = list(range(100, 140))
+        dreq = SimpleNamespace(request_id="d-7", prompt_token_ids=prompt, num_computed_tokens=0,
+                               kv_transfer_params={"t_recv": True, "t_key": "K7"})
+        n, _ = Ds.get_num_new_matched_tokens(dreq, 32)
+        Ds.update_state_after_alloc(dreq, SimpleNamespace(get_block_ids=lambda: ([1, 7, 3],)), n)
+        self.step(Ds, Dw)
+        preq = SimpleNamespace(request_id="p-7", prompt_token_ids=prompt, num_computed_tokens=40, num_cached_tokens=16,
+                               status=self.Status.FINISHED_LENGTH_CAPPED,
+                               kv_transfer_params={"t_send": True, "t_key": "K7", "t_dest": dest, "t_codec": "raw",
+                                                   "t_trace": True})
+        Ps.request_finished(preq, [5, 2, 9])
+        self.step(Ps, Pw, finished={"p-7"})
+        end = time.time() + 20
+        while time.time() < end:
+            r = self.step(Ds, Dw)
+            if r.finished_recving:
+                break
+            time.sleep(0.02)
+        self.assertEqual((r.finished_recving, r.failed_recving), ({"d-7"}, set()))
+        from kv_compare.pd.paged import Paged
+        P = Paged([pc[n] for n in names], 16, 2, 8)
+        words = P.gather([5, 2, 9], 0, 40)
+        D = Paged([dc[n] for n in names], 16, 2, 8)
+        self.assertTrue(torch.equal(D.gather([1, 7, 3], 32, 40), words[:, 32:]))
+        for n in names:                               # what D held is left as it was
+            self.assertTrue(torch.equal(dc[n][1], held_before[n][0]) and torch.equal(dc[n][7], held_before[n][1]))
+        recs = [json.loads(l) for f in Path(log_dir).glob("trace_*.jsonl") for l in f.read_text().splitlines()]
+        pages = sorted((x for x in recs if x["event"] == "pages"), key=lambda x: x["piece"])
+        self.assertEqual([(x["key"], x["t0"], x["tokens"]) for x in pages], [("K7", 0, 16), ("K7", 16, 16), ("K7", 32, 8)])
+        for x in pages:
+            got = tr.unpack_u64(x["h"], (x["layers"], 1))
+            want = tr.page_hashes(words[:, x["t0"]:x["t0"] + x["tokens"]], 16)
+            self.assertTrue((got == want).all())
+        held = sorted((x for x in recs if x["event"] == "held"), key=lambda x: x["t0"])
+        self.assertEqual([(x["t0"], x["tokens"], x["equal_pages"], x["pages"]) for x in held], [(0, 16, 3, 3), (16, 16, 2, 3)])
+        self.assertEqual(tr.unpack_bits(held[1]["equal"], (3, 1))[:, 0].tolist(), [True, False, True])
+        self.assertNotIn("delta", held[0])           # every page the same: no histograms
+        dl = held[1]["delta"]                         # one word of layer 1's keys or values differs
+        self.assertEqual([dl["values"][kv][1] for kv in range(2)], [16 * 16] * 2)
+        self.assertEqual(dl["equal"][0][1] + dl["equal"][1][1], 2 * 16 * 16 - 1)
+        self.assertEqual([dl["equal"][kv][l] for kv in range(2) for l in (0, 2)], [16 * 16] * 4)
+        rel = [x for x in recs if x["event"] == "relations"]
+        self.assertEqual([(x["key"], x["spans"], x["novel"], x["tokens"], x["sample"]) for x in rel],
+                         [("K7", [], 25, 40, 8)])
+        self.assertLessEqual(rel[0]["stored"], 25)    # the sampled ones (1 in 8, by content)
+        log = [json.loads(l) for f in Path(log_dir).glob("tkv_Ps*.jsonl") for l in f.read_text().splitlines()]
+        self.assertEqual([x.get("cached") for x in log if x.get("event") == "prefill_done"], [16])
+
+    def test_the_relation_probe_measures_moved_text_against_its_first_occurrence(self):
+        """Two traced requests: the second holds the first's document after another 32-token prefix (its blocks are
+        the first's, so the words are the same). P relates the document's 32 tokens to their first occurrence (16
+        tokens earlier there), measures them against it (every XOR 0; the turned keys are not the same words), and
+        writes per group (layout from the conversation id / kind of piece) the totals."""
+        mdir = tempfile.mkdtemp()
+        Path(mdir, "config.json").write_text(json.dumps({"rope_theta": 10000.0}))
+        Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(pipeline=16, trace=True,
+                                                          p_more={"model_dir": mdir, "trace_sample": 1})
+        X, A, Y = list(range(1000, 1016)), list(range(2000, 2032)), list(range(3000, 3032))
+        reqs = [("p-1", "K1", X + A, [5, 2, 9], [["system", 0, 16], ["doc", 16, 48]]),
+                ("p-2", "K2", Y + A, [3, 4, 2, 9], [["system", 0, 32], ["doc", 32, 64]])]
+        for rid, key, prompt, blocks, pieces in reqs:
+            req = SimpleNamespace(request_id=rid, prompt_token_ids=prompt, num_computed_tokens=len(prompt),
+                                  num_cached_tokens=0, status=self.Status.FINISHED_LENGTH_CAPPED,
+                                  kv_transfer_params={"t_send": True, "t_key": key, "t_dest": dest, "t_codec": "raw",
+                                                      "t_trace": True, "t_conv": "docs_first:3", "t_pieces": pieces})
+            Ps.request_finished(req, blocks)
+            self.step(Ps, Pw, finished={rid})
+        Pw.w.probe.close()                            # its queue done, the totals written
+        recs = [json.loads(l) for f in Path(log_dir).glob("trace_P*.jsonl") for l in f.read_text().splitlines()]
+        self.assertEqual([x for x in recs if x["event"] == "relations_error"], [])
+        rel = {x["key"]: x for x in recs if x["event"] == "relations"}
+        self.assertEqual((rel["K1"]["spans"], rel["K1"]["novel"], rel["K1"]["stored"]), ([], 33, 33))  # 15..47
+        self.assertEqual(rel["K2"]["spans"], [[0, "doc", 32, 16, 32]])
+        self.assertEqual((rel["K2"]["by_kind"], rel["K2"]["novel"]), ({"doc": [32, 32]}, 32))
+        last = {}
+        for x in recs:
+            if x["event"] == "delta_stats":
+                last[x["group"]] = x
+        self.assertEqual(sorted(last), ["docs_first/all", "docs_first/doc"])
+        self.assertEqual((last["docs_first/all"]["requests"], last["docs_first/all"]["tokens"]), (2, 112))
+        d = last["docs_first/doc"]
+        self.assertEqual((d["related"], d["measured"], d["base_gone"]), (32, 32, 0))
+        C = 2 * 8
+        for l in range(3):
+            for kv in range(2):
+                self.assertEqual(d["hist"]["xor"][kv][l][0], 32 * C)
+                self.assertEqual(d["hist"]["diff"][kv][l][0], 32 * C)
+                self.assertEqual(d["equal"][kv][l], 32 * C)
+                self.assertEqual(sum(d["sign_exp"][kv][l]), 32 * C)
+            self.assertEqual(sum(d["hist"]["rot"][0][l]), 32 * C)    # keys turned by 16 positions
+            self.assertLess(d["hist"]["rot"][0][l][0], 32 * C)
+            self.assertEqual(sum(d["hist"]["rot"][1][l]), 0)
+
+    def test_relation_measures_are_exact(self):
+        from kv_compare.pd import trace as tr
+        v = torch.tensor([0, 1, 2, 3, 4, 7, 8, 65535, 65536, (1 << 23) - 1])
+        self.assertEqual(tr.bit_length(v).tolist(), [0, 1, 2, 2, 3, 3, 4, 16, 17, 23])
+        b = torch.tensor([1.0, -1.0, 0.0, -0.0, 2.0], dtype=torch.bfloat16).view(torch.int16)
+        o = tr.ordered(b).tolist()
+        self.assertEqual(o[2] - o[3], 1)              # +0 one above -0
+        self.assertTrue(o[1] < o[3] < o[2] < o[0] < o[4])
+        up = (b.to(torch.int32) + 1).to(torch.int16)  # one ULP away from zero for positive values
+        self.assertEqual((tr.ordered(up[[0, 4]]) - tr.ordered(b[[0, 4]])).tolist(), [1, 1])
+        st = tr.DeltaStats(2, torch.device("cpu"))
+        a = torch.tensor([[0x3F80, 0x3F81, -0x4080]], dtype=torch.int32).to(torch.int16)   # 1.0, next, -1.0
+        st.add(1, 0, a, a)
+        st.add(1, 1, a, torch.tensor([[0x3F80, 0x3F80, -0x4080 + 3]], dtype=torch.int32).to(torch.int16))
+        r = st.record("g")
+        self.assertEqual(r["hist"]["xor"][0][1][0], 3)
+        self.assertEqual(r["hist"]["xor"][1][1][:3], [1, 1, 1])     # 0; 1; 0b11 (2 bits) -> lengths 0, 1, 2
+        self.assertEqual(r["hist"]["diff"][1][1][:3], [1, 1, 1])    # 0; 1 ULP; 3 ULPs
+        self.assertEqual((r["equal"][1][1], r["values"][1][1], sum(r["sign_exp"][1][1])), (1, 3, 3))
+        self.assertEqual(sum(r["hist"]["xor"][0][0]), 0)            # layer 0 untouched
+
+    def test_turning_a_key_by_the_shift_predicts_it_at_its_new_place(self):
+        """A key is RoPE(position) of a vector: the one at position 7, turned by 33, is (to BF16 rounding) the one
+        at 40; unturned, it is far off. Llama-3's scaling keeps the fast frequencies and slows the slow ones."""
+        from kv_compare.pd import trace as tr
+        heads, hd = 2, 64
+        inv = tr.rope_inv_freq({"rope_theta": 500000.0}, hd)
+        g = torch.Generator().manual_seed(5)
+        q = torch.randn(10, heads, hd, generator=g)
+
+        def rope(x, p):
+            ang = (float(p) * inv).to(torch.float32)
+            c, s = torch.cos(ang), torch.sin(ang)
+            x1, x2 = x[..., :hd // 2], x[..., hd // 2:]
+            return torch.cat([x1 * c - x2 * s, x2 * c + x1 * s], -1).to(torch.bfloat16).view(torch.int16).reshape(10, -1)
+        base, want = rope(q, 7), rope(q, 40)
+        turned = tr.rotate(base, 33, inv, heads, hd)
+        near = (tr.ordered(turned) - tr.ordered(want)).abs()
+        far = (tr.ordered(base) - tr.ordered(want)).abs()
+        self.assertLessEqual(tr.bit_length(near).float().mean().item(), 1.5)
+        self.assertGreater(tr.bit_length(far).float().mean().item(), tr.bit_length(near).float().mean().item() + 4)
+        l3 = tr.rope_inv_freq({"rope_theta": 500000.0, "rope_scaling": {"rope_type": "llama3", "factor": 32.0,
+                               "low_freq_factor": 1.0, "high_freq_factor": 4.0,
+                               "original_max_position_embeddings": 8192}}, hd)
+        self.assertAlmostEqual(l3[0].item(), inv[0].item())
+        self.assertAlmostEqual(l3[-1].item(), inv[-1].item() / 32)
+        self.assertIsNone(tr.rope_inv_freq({"rope_scaling": {"rope_type": "yarn"}, "rope_theta": 1e4}, hd))
+        self.assertIsNone(tr.rope_inv_freq({}, hd))
+
+    def test_relation_index_finds_moved_text_and_leaves_out_shared_prefixes(self):
+        from kv_compare.pd import trace as tr
+        sys_, docA, q1 = list(range(1, 21)), list(range(100, 140)), list(range(200, 210))
+        ans, q2, docB, q3 = list(range(300, 310)), list(range(400, 410)), list(range(500, 530)), list(range(600, 610))
+        ix = tr.RelationIndex()
+        r0, sp0, nv0, h0 = ix.match("a", sys_ + docA + q1)
+        self.assertEqual((r0, sp0, nv0.tolist()), (0, [], list(range(15, 70))))
+        r1, sp1, nv1, _h = ix.match("b", sys_ + docA + q1 + ans + q2)  # the same prefix, then new: no relation
+        self.assertEqual((r1, sp1, nv1.tolist()), (1, [], list(range(70, 90))))
+        r2, sp2, nv2, h2 = ix.match("c", sys_ + docB + docA + q3)      # the document 30 tokens later
+        self.assertEqual(sp2, [(0, 50, 20, 40)])
+        s0, s2 = set(tr.sampled(h0, 4).tolist()), set(tr.sampled(h2, 4).tolist())
+        inside = range(65, 90)                        # windows wholly in the document: the same choice there
+        self.assertEqual({i for i in inside if i in s2}, {i for i in inside if i - 30 in s0})
+        self.assertTrue(0 < len(s2) < len(h2))
+        self.assertEqual(tr.sampled(h2, 1).tolist(), list(range(15, 100)))
+        self.assertEqual(nv2.tolist(), list(range(20, 65)) + list(range(90, 100)))
+        pieces = [("system", 0, 20), ("doc", 20, 50), ("doc", 50, 90), ("user", 90, 100)]
+        self.assertEqual(tr.split_spans(sp2, pieces), [("doc", 0, 50, 20, 40)])
+        self.assertEqual(tr.split_spans([(0, 45, 15, 50)], pieces), [("doc", 0, 45, 15, 5), ("doc", 0, 50, 20, 40),
+                                                                    ("question", 0, 90, 60, 5)])
+        self.assertEqual(tr.split_spans(sp2, None), [("all", 0, 50, 20, 40)])
+
+    def test_page_hashes_are_exact_integers_equal_only_for_equal_pages(self):
+        from kv_compare.pd import trace as tr
+        g = torch.Generator().manual_seed(3)
+        w = torch.randint(-32768, 32768, (3, 40, 64), generator=g, dtype=torch.int32).to(torch.int16)
+        h = tr.page_hashes(w, 16)
+        self.assertEqual(h.shape, (3, 3))             # 16 + 16 + 8 tokens
+        self.assertTrue((h == tr.page_hashes(w.clone(), 16)).all())
+        v = w.clone()
+        v[2, 39, 5] += 1                              # one word of the partial block of layer 2
+        d = tr.page_hashes(v, 16) != h
+        self.assertEqual(d.tolist(), [[False] * 3, [False] * 3, [False, False, True]])
+        ext = torch.full((1, 16, 2048), -32768, dtype=torch.int16)   # the largest sums: still exact (no overflow)
+        e1, e2 = tr.page_hashes(ext, 16), tr.page_hashes(ext.clone(), 16)
+        self.assertEqual(e1.tolist(), e2.tolist())
+        x = tr.unpack_bits(tr.pack_bits(d), d.shape)
+        self.assertEqual(x.tolist(), d.tolist())
+        self.assertTrue((tr.unpack_u64(tr.pack_u64(h), h.shape) == h).all())
 
     def test_a_failed_piece_fails_the_request_once_the_others_are_done(self):
         """The second piece's encode fails: the sender tells the receiver and sends no more; the decode engine
@@ -929,6 +1125,14 @@ class ProxyTests(unittest.TestCase):
         dests = [json.loads(l)["dest"] for l in log.read_text().splitlines() if json.loads(l).get("conv") == "c7"]
         self.assertEqual(len(set(dests)), 1)
         self.assertNotIn("conversation_id", eng.seen["p"][-1])
+        # the MTRAG driver's tag (logged with the key) and trace flag (to the prefill engine only), not passed on
+        self.req(url, {"model": "m", "prompt": "z", "t_tag": "docs_first|conversation|3|1", "t_trace": True})
+        p, d = eng.seen["p"][-1], (eng.seen["d1"] + eng.seen["d2"])[-1]
+        self.assertTrue(p["kv_transfer_params"]["t_trace"])
+        self.assertNotIn("t_trace", d["kv_transfer_params"])
+        self.assertFalse(any("t_tag" in b or "t_trace" in b for b in (p, d)))
+        tagged = [json.loads(l) for l in log.read_text().splitlines() if json.loads(l).get("tag")]
+        self.assertEqual([(x["tag"], x["key"]) for x in tagged], [("docs_first|conversation|3|1", p["kv_transfer_params"]["t_key"])])
 
     def test_failed_prefill_ends_the_decode_request(self):
         eng, url, log = self.start(prefill_status=500, decode_wait=20)

@@ -1300,6 +1300,8 @@ class H(BaseHTTPRequestHandler):
         self.reply({"ok": True, "data": [{"id": "llama"}]})
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
+        if self.path == "/tokenize":
+            return self.reply({"tokens": [ord(c) for c in body.get("prompt", "")]})
         out = {"choices": [{"text": " same"}], "success": True}
         if (body.get("kv_transfer_params") or {}).get("do_remote_decode"):
             out["kv_transfer_params"] = {"remote_engine_id": str(port)}
@@ -1386,6 +1388,31 @@ class RunnerDryRunTests(unittest.TestCase):
                            text=True, timeout=600)
         engines = [json.loads(l) for l in log.read_text().splitlines()] if log.is_file() else []
         return r, engines
+
+    def test_mtrag_stage_runs_every_layout_and_routing_and_packages_the_trace(self):
+        """STAGES=mtrag: the MTRAG driver per layout x routing through the proxy, its records packaged (gzip), the
+        engines configured with trace_pages, the opportunity report beside the summary."""
+        conv = [{"domain": "d", "messages": [{"speaker": "user", "text": "q0"}, {"speaker": "agent", "text": "a",
+                 "contexts": [{"document_id": "D1", "title": "", "text": "one"}]}, {"speaker": "user", "text": "q1"},
+                 {"speaker": "agent", "text": "b"}]}]
+        mt = self.tmp / "mtrag.json"
+        mt.write_text(json.dumps(conv))
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="mtrag,report", TRACE_PAGES="1",
+                             MTRAG_FILE=str(mt), MTRAG_LAYOUTS="docs_first,interleaved", MTRAG_POLICIES="conversation,round_robin")
+        self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
+        self.assertTrue(all(e["cfg"]["kv_connector_extra_config"]["trace_pages"] for e in eng if e["cfg"]["kv_connector"] == "TKVConnector"))
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        res = json.loads((out / "results.json").read_text())
+        names = sorted(res["mtrag"])
+        self.assertEqual(names, sorted(f"mtrag_raw_{l}_{p}" for l in ("docs_first", "interleaved")
+                                       for p in ("conversation", "round_robin")))
+        v = res["mtrag"]["mtrag_raw_interleaved_conversation"]
+        self.assertEqual((v["trace"], v["summary"]["requests"], v["summary"]["errors"]), (True, 2, 0))
+        self.assertFalse(res["mtrag"]["mtrag_raw_interleaved_round_robin"]["trace"])
+        self.assertTrue((out / "runs" / "mtrag_raw_interleaved_conversation.jsonl.gz").is_file())
+        self.assertTrue((out / "trace_report.md").is_file())
+        self.assertIn("## MTRAG", (out / "summary.md").read_text())
+        self.assertTrue((json.loads((out / "env.json").read_text()))["trace_pages"])
 
     def test_published_workloads(self):
         """SHAPES: the baselines' own workloads through the runner and the bench: their prompt files, the context the
@@ -1547,6 +1574,11 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertEqual(qk, ["TRANSPORT=ring LINKS=10,100 CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip LAYOUT=1p3d "
                               "STAGES=check,shapes,report SHAPES=2048:1:128:4:sz1,16384:1:128:2:sz1,2048:16:128:1:sz16 "
                               "RUN_TIMEOUT_S=5400"])
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="trace", PRINT_RUNS="1"))
+        self.assertEqual([x for x in r.stdout.split("\n") if x],
+                         ["TRANSPORT=ring LINKS=100 CODECS=raw LAYOUT=1p3d STAGES=check,mtrag,report TRACE_PAGES=1 "
+                          "MAXLEN=32768 RUN_TIMEOUT_S=10800"])
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_bench as pb
         parsed = pb.parse_shapes(runs[0].split("SHAPES=")[1].split()[0])
@@ -1665,3 +1697,258 @@ class BreakdownTests(unittest.TestCase):
                                "first_token": 120.0, "tokens": 8192, "pieces": 2})
         self.assertEqual((r["codec"], r["gbps"], r["n"], r["bench_ttft"]), ("ours-hbh", "10", 1, 900.0))
         self.assertIn("| shape t8192_b1_o128 | ours-hbh | 10 | 1 |", bd.markdown(rows))
+
+
+class _FakeEngine:
+    """One fake engine (aiohttp): /tokenize gives a token per character (+1 in front with special tokens);
+    /v1/completions streams a 3-token answer with its token ids. Records every completion body."""
+
+    def __init__(self, token_ids=True):
+        import asyncio
+        import threading
+        from aiohttp import web
+        self.bodies, self.port, self.token_ids = [], None, token_ids
+        self.loop = asyncio.new_event_loop()
+        ready = threading.Event()
+
+        async def tokenize(request):
+            b = await request.json()
+            toks = ([1] if b.get("add_special_tokens") else []) + [ord(c) for c in b["prompt"]]
+            return web.json_response({"tokens": toks, "count": len(toks)})
+
+        async def complete(request):
+            b = await request.json()
+            self.bodies.append(b)
+            n = len(self.bodies)
+            resp = web.StreamResponse(headers={"content-type": "text/event-stream"})
+            await resp.prepare(request)
+            for i, ch in enumerate("abc"):
+                c = {"text": ch}
+                if self.token_ids:
+                    c["token_ids"] = [1000 * n + i]
+                await resp.write(f"data: {json.dumps({'choices': [c]})}\n\n".encode())
+            await resp.write(b"data: [DONE]\n\n")
+            return resp
+
+        def run():
+            asyncio.set_event_loop(self.loop)
+
+            async def start():
+                app = web.Application()
+                app.router.add_post("/tokenize", tokenize)
+                app.router.add_post("/v1/completions", complete)
+                runner = web.AppRunner(app)
+                await runner.setup()
+                site = web.TCPSite(runner, "127.0.0.1", 0)
+                await site.start()
+                self.port = site._server.sockets[0].getsockname()[1]
+                ready.set()
+            self.loop.run_until_complete(start())
+            self.loop.run_forever()
+        threading.Thread(target=run, daemon=True).start()
+        ready.wait(10)
+
+
+class MtragDriverTests(unittest.TestCase):
+    CONVS = [{"domain": "d", "messages": [
+        {"speaker": "user", "text": "q0"}, {"speaker": "agent", "text": "x", "contexts": [
+            {"document_id": "D1", "title": "t", "text": "one"}, {"document_id": "D2", "title": "", "text": "two"}]},
+        {"speaker": "user", "text": "q1"}, {"speaker": "agent", "text": "x", "contexts": []},
+        {"speaker": "user", "text": "q2"}, {"speaker": "agent", "text": "x", "contexts": [
+            {"document_id": "D1", "title": "t", "text": "one"}]}]},
+        {"domain": "e", "messages": [{"speaker": "user", "text": "r0"}, {"speaker": "agent", "text": "y"}]}]
+
+    def run_driver(self, layout, trace=False, token_ids=True, run=None):
+        eng = _FakeEngine(token_ids=token_ids)
+        d = Path(tempfile.mkdtemp())
+        (d / "c.json").write_text(json.dumps(self.CONVS))
+        url = f"http://127.0.0.1:{eng.port}"
+        cmd = [sys.executable, "-I", str(ROOT / "scripts" / "pd_mtrag.py"), "--conversations", str(d / "c.json"),
+               "--proxy", url, "--tokenize", url, "--model", "m", "--layout", layout, "--policy", "conversation",
+               "--concurrency", "2", "--max-tokens", "3", "--output", str(d / "r.jsonl"), "--summary", str(d / "s.json")]
+        cmd += ["--run", run] if run else []
+        r = subprocess.run(cmd + (["--trace"] if trace else []), capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        recs = [json.loads(l) for l in (d / "r.jsonl").read_text().splitlines()]
+        return eng, recs, json.loads((d / "s.json").read_text())
+
+    def test_layouts_place_passages_history_and_answers(self):
+        """docs_first puts a turn's passages before the history, history_first after it; interleaved extends the
+        previous prompt (append only); a passage has the same tokens wherever it goes; the history holds the
+        engine's own answer ids; requests carry the conversation and a tag under the run's name, and the trace flag
+        and the prompt's pieces only with --trace."""
+        tok = lambda s: [ord(c) for c in s]
+        doc1 = tok("Document: t\none\n\n")
+        for layout in ("docs_first", "history_first", "interleaved"):
+            run = f"mtrag_raw_{layout}_conversation" if layout == "interleaved" else None
+            eng, recs, summ = self.run_driver(layout, trace=(layout == "interleaved"), run=run)
+            run = run or f"{layout}_conversation"
+            self.assertEqual(summ["run"], run)
+            self.assertEqual((summ["requests"], summ["errors"], summ["answer_ids_from"]["engine"]), (4, 0, 4))
+            a = [r for r in recs if r["conv"] == 0]
+            self.assertEqual([r["turn"] for r in a], [0, 1, 2])
+            kinds = lambda r: [(k, ref) for k, ref, s, e in r["pieces"]]
+            if layout == "docs_first":
+                self.assertEqual(kinds(a[2])[:2], [("system", None), ("doc", "D1")])
+                self.assertEqual(kinds(a[2])[2:4], [("user", 0), ("assistant", 0)])
+            elif layout == "history_first":
+                self.assertEqual(kinds(a[2])[1:3], [("user", 0), ("assistant", 0)])
+                self.assertEqual(kinds(a[2])[-3], ("doc", "D1"))
+            by_body = {b["t_tag"]: b for b in eng.bodies}
+            for r in a:
+                b = by_body[r["tag"]]
+                self.assertEqual((b["conversation_id"], r["run"]), (f"{run}:0", run))
+                self.assertTrue(r["tag"].startswith(run + "|0|"))
+                self.assertEqual(b.get("t_trace", False), layout == "interleaved")
+                self.assertEqual(b.get("t_pieces"), [[k, s, e] for k, _r, s, e in r["pieces"]] if b.get("t_trace") else None)
+                for k, ref, s, e in r["pieces"]:
+                    if k == "doc" and ref == "D1":
+                        self.assertEqual(b["prompt"][s:e], doc1)
+                    if k == "answer":                 # the engine's ids of that turn's answer
+                        first = next(x for x in a if x["turn"] == ref)
+                        n = [bb["t_tag"] for bb in eng.bodies].index(first["tag"]) + 1
+                        self.assertEqual(b["prompt"][s:e], [1000 * n, 1000 * n + 1, 1000 * n + 2])
+            if layout == "interleaved":
+                for x, y in zip(a, a[1:]):
+                    self.assertEqual(y["ids"][:len(x["ids"])], x["ids"])
+                self.assertEqual(a[0]["ids"], by_body[a[0]["tag"]]["prompt"])
+            else:
+                self.assertNotIn("ids", a[0])
+
+    def test_answer_text_is_tokenized_again_without_engine_ids(self):
+        eng, recs, summ = self.run_driver("docs_first", token_ids=False)
+        self.assertEqual(summ["answer_ids_from"], {"engine": 0, "retokenized": 4})
+        r = next(x for x in recs if x["conv"] == 0 and x["turn"] == 1)
+        b = next(bb for bb in eng.bodies if bb["t_tag"] == r["tag"])
+        s, e = next((s, e) for k, ref, s, e in r["pieces"] if k == "answer")
+        self.assertEqual(b["prompt"][s:e], [ord(c) for c in "abc"])
+
+
+class TraceReportTests(unittest.TestCase):
+    def test_related_kv_is_costed_against_its_first_occurrence(self):
+        """P's relation records: turn 1 holds turn 0's document 16 tokens later (16 related tokens, moved, within
+        the conversation). Its totals (the last snapshot counts): keys equal to their base (0 bits; turned: 2),
+        values 1 bit by diff; alone 7 and 8 bits: 0.5 against 7.5 bits per value. D's recomputed page: its delta."""
+        import numpy as np
+        from kv_compare.pd import trace as tr
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_trace_report as rep
+        d = Path(tempfile.mkdtemp())
+        (d / "runs").mkdir()
+        (d / "connector").mkdir()
+        (d / "env.json").write_text(json.dumps({"kv_bytes_per_token": 2048}))
+        run = "mtrag_raw_docs_first_conversation"
+        recs = [{"tag": f"{run}|0|{t}", "run": run, "layout": "docs_first", "policy": "conversation", "conv": 0,
+                 "turn": t, "prompt_tokens": n, "pieces": [["doc", "D1", 0, n]]} for t, n in ((0, 48), (1, 64))]
+        (d / "runs" / f"{run}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+        (d / "proxy.jsonl").write_text("".join(json.dumps({"key": f"K{t}", "tag": r["tag"], "dest": 0, "t_in": t})
+                                               + "\n" for t, r in enumerate(recs)))
+        z = lambda: [[[0] * 18], [[0] * 18]]
+        se = lambda: [[[0] * 512], [[0] * 512]]
+
+        def stats(scale):
+            h = {"xor": z(), "diff": z(), "rot": z()}
+            h["xor"][0][0][0] = h["diff"][0][0][0] = 100 * scale     # keys: all equal
+            h["rot"][0][0][2] = 100 * scale                           # turned: 2-bit differences
+            h["xor"][1][0][0] = h["xor"][1][0][3] = 50 * scale        # values: half 0, half 3 bits
+            h["diff"][1][0][1] = 100 * scale                          # 1 ULP each
+            sx = se()
+            sx[0][0][5] = 100 * scale
+            sx[1][0][5] = sx[1][0][6] = 50 * scale
+            return {"event": "delta_stats", "group": f"{run}/doc", "requests": 2, "layers": 1, "hist": h,
+                    "sign_exp": sx, "equal": [[100 * scale], [50 * scale]], "values": [[100 * scale], [100 * scale]]}
+        held = {"hist": {"xor": z(), "diff": z(), "rot": z()}, "sign_exp": se(), "equal": [[6], [10]], "values": [[10], [10]]}
+        held["hist"]["xor"][0][0][1] = 4
+        held["hist"]["xor"][0][0][0] = 6
+        held["hist"]["xor"][1][0][0] = 10
+        held["sign_exp"][0][0][3] = held["sign_exp"][1][0][3] = 10
+        (d / "connector" / "trace_P_1_0.jsonl").write_text("".join(json.dumps(r) + "\n" for r in (
+            {"event": "relations", "r": 0, "key": "K0", "group": run, "tokens": 48, "novel": 33, "spans": [], "by_kind": {}},
+            stats(1),
+            {"event": "relations", "r": 1, "key": "K1", "group": run, "tokens": 64, "novel": 32,
+             "spans": [[0, "doc", 32, 16, 16]], "by_kind": {"doc": [16, 16]}},
+            stats(2))))
+        (d / "connector" / "trace_D_2_0.jsonl").write_text(json.dumps(
+            {"event": "held", "key": "K1", "piece": 0, "t0": 0, "tokens": 32, "bs": 16, "layers": 1,
+             "equal": tr.pack_bits(np.array([[True, False]])), "equal_pages": 1, "pages": 2, "delta": held}) + "\n")
+        res = rep.analyse(*rep.load(d))
+        r = res["docs_first / conversation"]["relations"]
+        self.assertEqual((r["tokens"], r["related"], r["measured"], r["novel"]), (112, 16, 16, 65))
+        self.assertEqual((r["by_kind"], r["moved"], r["same_place"]), ({"doc": 16}, 16, 0))
+        self.assertEqual((r["within_conversation"], r["across_conversations"], r["median_shift"]), (16, 0, 16))
+        dl = r["delta"]
+        self.assertEqual(dl["values"], 400)
+        self.assertAlmostEqual(dl["bits"]["K"]["xor"], 0.0)
+        self.assertAlmostEqual(dl["bits"]["K"]["rot"], 2.0)
+        self.assertAlmostEqual(dl["bits"]["K"]["alone"], 7.0)
+        self.assertAlmostEqual(dl["bits"]["V"]["xor"], 2.0)
+        self.assertAlmostEqual(dl["bits"]["V"]["diff"], 1.0)
+        self.assertAlmostEqual(dl["bits"]["V"]["alone"], 8.0)
+        self.assertAlmostEqual(dl["best_bits"], 0.5)
+        self.assertAlmostEqual(dl["saving"], 1 - 0.5 / 7.5)
+        self.assertAlmostEqual(dl["equal_share"], 300 / 400)
+        self.assertAlmostEqual(r["gb"]["related_as_deltas"], 16 * 2048 * 0.5 / 16 / 1e9)
+        hr = r["held_recomputed"]
+        self.assertEqual((hr["pages"], hr["pages_differing"]), (2, 1))
+        self.assertAlmostEqual(hr["delta"]["bits"]["K"]["xor"], rep.entropy([6, 4]))
+        text = rep.markdown(res)
+        self.assertIn("## How close related KV is", text)
+        self.assertIn("| docs_first / conversation | 112 | 16 (14.3%) | 16 / 0 / 0 / 0 | 0 / 16 | 16 / 0 | 16 |", text)
+        self.assertIn("0.50 vs 7.50 (93.3%)", text)
+
+    def test_pages_are_sorted_by_what_already_existed(self):
+        """Two turns of one conversation, traced. Turn 1: block 0 shares turn 0's prefix (1); block 1 is the same
+        passage after another prefix: the same bytes at layer 0 (2), the same text at layer 1 (3); its answer and
+        question are new (4). D held two blocks: the first equal to what P sent again, the second not at layer 1."""
+        import numpy as np
+        from kv_compare.pd import trace as tr
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_trace_report as rep
+        d = Path(tempfile.mkdtemp())
+        (d / "runs").mkdir()
+        (d / "connector").mkdir()
+        (d / "env.json").write_text(json.dumps({"kv_bytes_per_token": 2048}))
+        sysb, doc, user0 = list(range(1, 17)), list(range(100, 116)), list(range(200, 216))
+        ans, user1 = list(range(300, 316)), list(range(400, 416))
+        r0 = {"tag": "docs_first|conversation|0|0", "layout": "docs_first", "policy": "conversation", "conv": 0,
+              "turn": 0, "prompt_tokens": 48, "ids": sysb + doc + user0,
+              "pieces": [["system", None, 0, 16], ["doc", "D1", 16, 32], ["user", 0, 32, 48]]}
+        r1 = {"tag": "docs_first|conversation|0|1", "layout": "docs_first", "policy": "conversation", "conv": 0,
+              "turn": 1, "prompt_tokens": 64, "ids": sysb + doc + ans + user1,
+              "pieces": [["system", None, 0, 16], ["doc", "D1", 16, 32], ["answer", 0, 32, 48], ["user", 1, 48, 64]]}
+        (d / "runs" / "mtrag_raw_docs_first_conversation.jsonl").write_text("".join(json.dumps(r) + "\n" for r in (r0, r1)))
+        (d / "proxy.jsonl").write_text("".join(json.dumps(r) + "\n" for r in (
+            {"key": "K0", "tag": r0["tag"], "dest": 0, "t_in": 1.0}, {"key": "K1", "tag": r1["tag"], "dest": 0, "t_in": 2.0})))
+        (d / "connector" / "tkv_Ps_1.jsonl").write_text("".join(json.dumps(r) + "\n" for r in (
+            {"event": "prefill_done", "key": "K0", "tokens": 48, "t0": 0, "blocks": ["a", "b", "c"], "cached": 0},
+            {"event": "prefill_done", "key": "K1", "tokens": 64, "t0": 0, "blocks": ["a", "x", "y", "z"], "cached": 16})))
+        (d / "connector" / "tkv_Ds_2.jsonl").write_text("".join(json.dumps(r) + "\n" for r in (
+            {"event": "match", "key": "K0", "local_hit": 0}, {"event": "match", "key": "K1", "local_hit": 32})))
+        h0 = np.array([[1, 2, 3], [11, 12, 13]], dtype=np.uint64)
+        h1 = np.array([[1, 2, 5, 6], [11, 99, 7, 8]], dtype=np.uint64)
+        eq = np.array([[True, True], [True, False]])
+        (d / "connector" / "trace_P_1_0.jsonl").write_text("".join(json.dumps(r) + "\n" for r in (
+            {"event": "pages", "key": "K0", "piece": 0, "t0": 0, "tokens": 48, "bs": 16, "layers": 2, "h": tr.pack_u64(h0)},
+            {"event": "pages", "key": "K1", "piece": 0, "t0": 0, "tokens": 64, "bs": 16, "layers": 2, "h": tr.pack_u64(h1)})))
+        (d / "connector" / "trace_D_2_0.jsonl").write_text(json.dumps(
+            {"event": "held", "key": "K1", "piece": 0, "t0": 0, "tokens": 32, "bs": 16, "layers": 2,
+             "equal": tr.pack_bits(eq)}) + "\n")
+        res = rep.analyse(*rep.load(d))
+        v = res["docs_first / conversation"]
+        self.assertEqual(v["moved_again"]["tokens_sent"], 112)
+        self.assertEqual(v["moved_again"]["tokens_d_held"], 32)
+        self.assertEqual(v["recomputed"], {"tokens": 96, "answer_tokens": 16, "answer_tokens_recomputed": 16})
+        self.assertEqual(v["same_bytes"]["other"]["share"], 1.0)
+        self.assertEqual(v["same_bytes"]["doc"]["share"], 0.0)
+        self.assertEqual(v["same_bytes_by_layer"], [1.0, 0.5])
+        self.assertEqual(v["affinity"], {"later_turns": 1, "same_d": 1, "share": 1.0})
+        k = {n: x["pages"] for n, x in v["pages"]["kinds"].items()}
+        self.assertEqual(k, {"1 prefix": 2, "2 same bytes": 1, "3 same text": 1, "4 new": 10})
+        self.assertEqual(v["pages"]["same_bytes_by_layer"], [1, 0])
+        self.assertEqual(v["pages"]["same_text_by_piece"], {"doc": 1})
+        pb = 2048 * 16 // 2 / 1e9
+        self.assertAlmostEqual(v["store_gb"]["by_prefix"], 12 * pb)
+        self.assertAlmostEqual(v["store_gb"]["by_content"], 11 * pb)
+        self.assertAlmostEqual(v["store_gb"]["by_content_without_layer0"], 6 * pb)
+        text = rep.markdown(res)
+        self.assertIn("| docs_first / conversation | 2 |", text)

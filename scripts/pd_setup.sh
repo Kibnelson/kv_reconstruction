@@ -89,6 +89,34 @@ for s in splitzip adacode exactkv; do
     [ -d "$KV_HOME/sources/$s" ] || echo "NOTE: no $KV_HOME/sources/$s (scripts/a5000_setup.sh clones it); $s is left out"
 done
 
+# IBM's MTRAG (github.com/IBM/mt-rag-benchmark, Apache-2.0): 110 human multi-turn RAG conversations, for stage mtrag
+# (scripts/pd_mtrag.py). One file at a pinned commit, checked by its SHA-256; data only (read with python -I).
+echo "== MTRAG conversations (stage mtrag)"
+MTRAG_COMMIT=e0970de1b1207c2a9506adf238e6e1a22037e38a
+MTRAG_SHA=1a30baf5e025b4915e87556c64de37d7fe96e98f9f4ea9f3cf9322199e538f89
+MTRAG_DIR=$KV_RUNS/mtrag
+if [ -s "$MTRAG_DIR/conversations.json" ] && echo "$MTRAG_SHA  $MTRAG_DIR/conversations.json" | sha256sum -c --quiet - 2>/dev/null; then
+    echo "MTRAG: $MTRAG_DIR/conversations.json (as fetched before)"
+else
+    mkdir -p "$MTRAG_DIR" "$KV_HOME/tmp"
+    MT_TMP=$(mktemp -d "$KV_HOME/tmp/mtrag.XXXXXX")
+    if curl -fsSL --retry 3 -o "$MT_TMP/c.json" \
+            "https://raw.githubusercontent.com/IBM/mt-rag-benchmark/$MTRAG_COMMIT/mtrag-human/conversations/conversations.json" ||
+       { git -C "$MT_TMP" init -q && git -C "$MT_TMP" remote add origin https://github.com/IBM/mt-rag-benchmark.git &&
+         git -C "$MT_TMP" fetch -q --depth 1 --filter=blob:none origin "$MTRAG_COMMIT" &&
+         git -C "$MT_TMP" show "$MTRAG_COMMIT:mtrag-human/conversations/conversations.json" > "$MT_TMP/c.json"; }; then
+        if echo "$MTRAG_SHA  $MT_TMP/c.json" | sha256sum -c --quiet -; then
+            mv "$MT_TMP/c.json" "$MTRAG_DIR/conversations.json"
+            echo "MTRAG: $MTRAG_DIR/conversations.json (commit ${MTRAG_COMMIT:0:12}, SHA-256 checked)"
+        else
+            echo "NOTE: MTRAG's conversations.json does not match its SHA-256; stage mtrag is left out"
+        fi
+    else
+        echo "NOTE: MTRAG could not be fetched; stage mtrag is left out"
+    fi
+    rm -rf -- "$MT_TMP"
+fi
+
 if [ "${LMCACHE:-1}" = 1 ]; then
     echo "== LMCache environment $KV_HOME/venv_lmcache (the CPU-tier reference)"
     venv_create "$KV_HOME/venv_lmcache"

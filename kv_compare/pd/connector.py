@@ -85,6 +85,8 @@ class SendSpec:
     steps: list | None = None                        # [(start, n, M)] of the prefill steps (T2's layer 0)
     prompt: list | None = None                       # token ids from position 0 (T2's layer 0)
     chunks: list | None = None                       # tier store: [(chunk index, hash)]
+    trace: bool = False                              # trace_pages: hash every page sent (kv_compare.pd.trace)
+    kinds: list | None = None                        # trace: the driver's pieces [(kind, start, end)]
 
 
 @dataclass
@@ -146,6 +148,14 @@ class TKVConnector(KVConnectorBase_V1):
         super().__init__(vllm_config=vllm_config, role=role, kv_cache_config=kv_cache_config)
         self.cfg = dict(self._kv_transfer_config.kv_connector_extra_config or {})
         self.block_size = int(vllm_config.cache_config.block_size)
+        if self.cfg.get("trace_pages") and not self.cfg.get("_rope"):
+            try:                                     # the trace's turned keys: the model's RoPE parameters
+                hf = vllm_config.model_config.hf_config
+                rope = {k: getattr(hf, k, None) for k in ("rope_theta", "rope_scaling", "rope_parameters")}
+                if any(isinstance(v, (int, float, dict)) for v in rope.values()):
+                    self.cfg["_rope"] = rope
+            except Exception:
+                pass
         self.producer = bool(self._kv_transfer_config.is_kv_producer)
         side = "P" if self.producer else "D"
         if role == KVConnectorRole.SCHEDULER:
@@ -367,16 +377,20 @@ class _SchedulerSide:
         t0 = int(p.get("t_start", 0))
         codec = p.get("t_codec", "raw")
         t2 = codec.startswith("t2-")
+        trace = bool(self.cfg.get("trace_pages")) and bool(p.get("t_trace"))
         spec = SendSpec(req_id=rid, key=p["t_key"], dest=p["t_dest"], codec=codec,
                         block_ids=list(block_ids), t0=t0, t1=T, conv=p.get("t_conv"), finished_at=time.time(),
                         verify=bool(p.get("t_verify", self.cfg.get("verify", False))),
-                        steps=steps if t2 else None, prompt=prompt if t2 else None)
+                        steps=steps if t2 else None, prompt=prompt if (t2 or trace) else None, trace=trace,
+                        kinds=[tuple(x) for x in p.get("t_pieces") or ()] if trace else None)
         self.to_send[rid] = spec
         self.sending.add(rid)
-        self.log.write({"event": "prefill_done", "key": spec.key, "conv": spec.conv, "dest": spec.dest,
-                        "codec": spec.codec, "tokens": T, "t0": t0, "time": spec.finished_at,
-                        "steps": [list(x) for x in (steps or [])][:16],
-                        "blocks": block_hashes(prompt[:T], self.bs)})
+        rec = {"event": "prefill_done", "key": spec.key, "conv": spec.conv, "dest": spec.dest,
+               "codec": spec.codec, "tokens": T, "t0": t0, "time": spec.finished_at,
+               "steps": [list(x) for x in (steps or [])][:16], "blocks": block_hashes(prompt[:T], self.bs)}
+        if self.cfg.get("trace_pages"):              # how much of the prompt P found in its own prefix cache
+            rec["cached"] = getattr(request, "num_cached_tokens", None)
+        self.log.write(rec)
         return True, {"t_key": spec.key, "t_tokens": T}
 
     # tier (colocated engines)
@@ -487,6 +501,14 @@ class _WorkerSide:
         self.gather_budget = int(cfg.get("gather_budget", 2 << 30))
         self.slock = threading.Lock()                # sent_ready (the encoder thread adds to it)
         self.req_state: dict[str, dict] = {}         # decode: per request, its pieces dispatched / installed / ok
+        # trace_pages (kv_compare.pd.trace): P hashes every page of a traced request; D compares the pages it already
+        # held with the ones P sent again
+        self.tlog = self.rindex = self.probe = self.rns = None
+        self.trace_max_tokens = int(cfg.get("trace_max_tokens", 8192))   # sampled span tokens measured per request
+        self.trace_sample = int(cfg.get("trace_sample", 8))  # 1 in this many tokens measured (by content)
+        if cfg.get("trace_pages") and cfg.get("log_dir"):
+            from .trace import TraceLog
+            self.tlog = TraceLog(cfg["log_dir"], "P" if producer else "D")
         self.timeout = float(cfg.get("recv_timeout_s", 600))
         self.gpu_budget = int(cfg.get("gpu_send_budget", 2 << 30))
         self.gpu_queued = 0
@@ -534,6 +556,12 @@ class _WorkerSide:
             raise ValueError(f"{len(caches)} attention layers, the codec constants have {self.meta['L']}")
         self.paged = Paged(caches, self.bs, heads, hd)
         self.device = device
+        if self.tlog is not None and self.producer:  # trace: how close a request's KV is to earlier KV of its text
+            from .trace import RelationIndex, RelationProbe
+            self.rindex = RelationIndex()
+            self.probe = RelationProbe(self.tlog, device, heads, hd, rope=self.cfg.get("_rope") or self.cfg.get("model_dir"),
+                                       store_gb=float(self.cfg.get("trace_store_gb", 16)),
+                                       queue_gb=float(self.cfg.get("trace_queue_gb", 4)))
         warm = self._warm_up_apart()
         self.log.write({"event": "ready", "role": "P" if self.producer else "D", "codecs": sorted(self.codecs),
                         "codec_errors": errors, "layers": len(caches), "view": list(caches[0].shape),
@@ -701,6 +729,38 @@ class _WorkerSide:
                 logger.warning("TKVConnector: encoder: %r", exc)
                 self._sent(spec.req_id)
 
+    def _relate(self, spec, n):
+        """trace: the request's tokens matched to the earlier traced requests' (RelationIndex), and the positions
+        whose words the probe needs, of the sampled ones (trace_sample): its span tokens (up to trace_max_tokens) and
+        its novel ones (the bases of later requests). None if it fails (logged) or the probe is behind."""
+        import numpy as np
+        from .trace import sampled, split_spans
+        t = time.perf_counter()
+        try:
+            layout = str(spec.conv).split(":")[0] if spec.conv else "none"
+            if layout != self.rns:                   # a new run (the driver's name, before ":"): relate within it
+                from .trace import RelationIndex
+                self.rindex, self.rns = RelationIndex(), layout
+            r, spans, novel, hs = self.rindex.match(spec.key, spec.prompt[:spec.t1])
+            spans = split_spans(spans, spec.kinds)
+            samp = sampled(hs, self.trace_sample)
+            n_novel = len(novel)
+            novel = np.intersect1d(novel, samp)
+            take = np.intersect1d(np.concatenate([np.arange(i0, i0 + m) for _k, _s, i0, _j, m in spans])
+                                  if spans else np.zeros(0, np.int64), samp)[:self.trace_max_tokens]
+            pos = np.union1d(take, novel).astype(np.int64)
+            pos = pos[(pos >= spec.t0) & (pos < spec.t1)]
+            need = len(pos) * len(self.paged.caches) * 2 * self.paged.heads * self.paged.hd * 2
+            if not self.probe.room(need):            # the probe is behind: this request is related, not measured
+                self.tlog.write({"event": "relations_skipped", "key": spec.key, "bytes": need})
+                pos, novel = np.zeros(0, np.int64), np.zeros(0, np.int64)
+            return {"r": r, "spans": spans, "novel": novel[(novel >= spec.t0) & (novel < spec.t1)], "pos": pos,
+                    "layout": layout, "parts": [], "ms": 1e3 * (time.perf_counter() - t),
+                    "info": {"novel": n_novel, "sample": self.trace_sample}}
+        except Exception as exc:
+            self.tlog.write({"event": "relations_error", "key": spec.key, "error": repr(exc)[:300]})
+            return None
+
     def _send_now(self, spec: SendSpec, put_at=None, on_stream=False, gathered=None):
         """Gather, code and hand to the link each piece of the request (piece_bounds), in order. gathered: (the
         pieces' words, copied out already, and the time that took)."""
@@ -717,6 +777,7 @@ class _WorkerSide:
         n = len(bounds)
         picked = time.time()
         ctx = None
+        rel = self._relate(spec, n) if spec.trace and self.probe is not None else None
         for i, (a, b) in enumerate(bounds):
             key, t0 = piece_key(spec.key, i), spec.t0 + a
             rec = {"event": "send", "key": key, "req": spec.req_id, "codec": spec.codec, "dest": spec.dest,
@@ -742,6 +803,19 @@ class _WorkerSide:
                     rec["gather_ms"] = 1e3 * (time.perf_counter() - t)
                     if i == n - 1:
                         self._sent(spec.req_id)      # every piece is copied out: vLLM may free the blocks
+                if spec.trace and self.tlog is not None:
+                    from .trace import pack_u64, page_hashes
+                    t = time.perf_counter()
+                    h = page_hashes(words, self.bs)
+                    self.tlog.write({"event": "pages", "key": spec.key, "piece": i, "t0": t0, "tokens": b - a,
+                                     "bs": self.bs, "layers": int(h.shape[0]), "h": pack_u64(h)})
+                    if rel is not None:              # the rows the relation probe needs, to the host
+                        sel = rel["pos"][(rel["pos"] >= t0) & (rel["pos"] < t0 + b - a)] - t0
+                        rel["parts"].append(words.index_select(1, torch.as_tensor(sel, device=words.device)).cpu())
+                        if i == n - 1 and len(rel["parts"]) == n:
+                            self.probe.submit(rel["r"], spec.key, rel["layout"], spec.t1, rel["spans"], rel["pos"],
+                                              torch.cat(rel["parts"], 1), rel["novel"], rel["info"])
+                    rec["trace_ms"] = 1e3 * (time.perf_counter() - t) + (rel["ms"] if rel is not None and i == 0 else 0)
                 lossy = getattr(codec, "lossy", False)    # AQUA-KV: a speed reference; its own error, no checksum
                 check = word_checksum(words) if spec.verify and not lossy else None
                 t = time.perf_counter()
@@ -895,18 +969,26 @@ class _WorkerSide:
         try:
             st0, sT = int(hm.get("t0", 0)), int(hm.get("T", 0))
             lo, hi = max(spec.t0, st0), min(spec.t1, st0 + sT)    # the part this engine does not have yet
+            h_lo, h_hi = st0, min(st0 + sT, spec.t0)  # what it sent that this engine held (its prefix cache)
+            compare = self.tlog is not None and h_hi > h_lo
             if hm.get("pieces"):
                 rec["tokens"] = max(0, hi - lo)
-                if lo >= hi:                         # a piece of the prefix this engine has cached
+                if lo >= hi and not compare:         # a piece of the prefix this engine has cached
                     rec.update(skipped=True, decode_install_ms=0.0, exact=None)
                     raise _Skip()
             elif lo != spec.t0 or hi != spec.t1:
                 raise ValueError(f"transfer holds tokens {st0}..{st0 + sT}, request needs {spec.t0}..{spec.t1}")
+            held = self.paged.gather(spec.block_ids, h_lo, h_hi) if compare else None
+            eq = [None] * (len(self.paged.caches) if compare else 0)
+            dstat = None
+            if compare:                              # how close P's recomputed words are to D's own, where they differ
+                from .trace import DeltaStats
+                dstat = DeltaStats(len(self.paged.caches), self.device)
             parts, meta = unbundle(header, blob if blob.device == self.device else blob.to(self.device))
             codec = self.codecs[meta["codec"]]
             rec["codec"] = meta["codec"]
             a, b = lo - st0, hi - st0
-            blk, off = self.paged.slots(spec.block_ids, lo, hi)
+            blk, off = self.paged.slots(spec.block_ids, lo, hi) if hi > lo else (None, None)
             want = meta.get("checksum")
             if self.device.type != "cuda":
                 sync = lambda *x: None
@@ -923,7 +1005,15 @@ class _WorkerSide:
                 def sink(l, w):
                     if ck is not None:
                         ck.add(w)
-                    self.paged.scatter_layer(l, w[a:b], blk, off)
+                    if held is not None:             # D's own bytes against P's, page by page
+                        from .trace import equal_pages
+                        p_w = w[h_lo - st0:h_hi - st0]
+                        eq[l] = equal_pages(held[l:l + 1], p_w.unsqueeze(0), self.bs)[0]
+                        C = self.paged.heads * self.paged.hd
+                        dstat.add(l, 0, p_w[:, :C], held[l, :, :C])
+                        dstat.add(l, 1, p_w[:, C:], held[l, :, C:])
+                    if b > a:
+                        self.paged.scatter_layer(l, w[a:b], blk, off)
                 with torch.inference_mode():
                     if ctx is not None:
                         codec.decode(parts, meta, sink, ctx=ctx)
@@ -942,6 +1032,17 @@ class _WorkerSide:
             rec["exact"] = None if want is None else (ck.value() == want)
             if rec["exact"] is False:
                 raise ValueError("checksum mismatch: the installed KV differs from the sender's")
+            if held is not None and all(x is not None for x in eq):
+                import numpy as np
+                from .trace import pack_bits
+                m = np.stack(eq)
+                hrec = {"event": "held", "key": spec.key, "piece": int(hm.get("piece", 0)), "t0": h_lo,
+                        "tokens": h_hi - h_lo, "bs": self.bs, "layers": int(m.shape[0]),
+                        "equal": pack_bits(m), "equal_pages": int(m.sum()), "pages": int(m.size)}
+                if not m.all():                      # the bit lengths of P's words against D's (diff: ordered)
+                    d = dstat.record()
+                    hrec["delta"] = {k: d[k] for k in ("hist", "sign_exp", "equal", "values")}
+                self.tlog.write(hrec)
             ok = True
         except _Skip:
             ok = True
@@ -1220,6 +1321,8 @@ class _WorkerSide:
     def close(self):
         if self.encode_q is not None:
             self.encode_q.put(None)
+        if self.probe is not None:
+            self.probe.close()
         if self.store_q is not None:
             self.store_q.put(None)
         if self.install_q is not None:
