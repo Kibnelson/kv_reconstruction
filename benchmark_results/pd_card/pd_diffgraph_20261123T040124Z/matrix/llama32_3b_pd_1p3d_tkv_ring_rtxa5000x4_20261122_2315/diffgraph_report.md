@@ -1,0 +1,55 @@
+# KV Diff Graph against EvidenceStore, on the kept capture
+
+Pages of 16 tokens x 28 layers (1,835,008 B raw). Ours (t2-*): layer 0 recomputed from the token ids (taken as exact offline; T2 checks it per request in the engine); per page, T pads a page to 32 tokens (its programs' size), and that padding is in the sizes; the rest with T2 or as a delta coded by T's value-slice coder against the base (keys turned by RoPE). Every representation decoded and compared byte for byte. Theirs: zlib level 1 (scripts/pd_page_compare.py).
+
+## mtrag_raw_docs_first_conversation
+
+47 requests; 3,614 complete blocks, of them 347 identical to a stored one (references) and 3,267 distinct pages (5,995.0 MB raw).
+
+| Representation (distinct pages) | MB | Saving vs raw | Decoded exactly |
+| --- | ---: | ---: | --- |
+| Raw | 5,995.0 | - | - |
+| Theirs: best independent (zlib, exponent / sign-fraction streams) | 4,326.4 | 27.8% | - |
+| Theirs: graph (position, text) | 4,220.6 | 29.6% | - |
+| Theirs: graph + keys turned | 4,153.4 | 30.7% | - |
+| Ours: t2-hbh per request | 4,258.8 | 35.8% | 47 of 47 |
+| Ours: t2-hbh per segment | 3,950.6 | 34.1% | 47 of 47 |
+| Ours: t2-rank256 per request | 4,642.0 | 30.0% | 47 of 47 |
+| Ours: t2-rank256 per segment | 4,297.4 | 28.3% | 47 of 47 |
+
+T2 per page did not run: RuntimeError('self.size(0) needs to be greater than 16, but got 16')
+
+## mtrag_raw_history_first_conversation
+
+47 requests; 3,650 complete blocks, of them 1,372 identical to a stored one (references) and 2,278 distinct pages (4,180.1 MB raw).
+
+| Representation (distinct pages) | MB | Saving vs raw | Decoded exactly |
+| --- | ---: | ---: | --- |
+| Raw | 4,180.1 | - | - |
+| Theirs: best independent (zlib, exponent / sign-fraction streams) | 3,018.9 | 27.8% | - |
+| Theirs: graph (position, text) | 2,943.9 | 29.6% | - |
+| Theirs: graph + keys turned | 2,897.5 | 30.7% | - |
+| Ours: t2-hbh per request | 4,318.5 | 35.5% | 47 of 47 |
+| Ours: t2-hbh per segment | 2,966.4 | 29.0% | 41 of 41 |
+| Ours: t2-rank256 per request | 4,705.1 | 29.8% | 47 of 47 |
+| Ours: t2-rank256 per segment | 3,209.2 | 23.2% | 41 of 41 |
+
+T2 per page did not run: RuntimeError('self.size(0) needs to be greater than 16, but got 16')
+
+## Times (CUDA-synchronised, one RTX A5000)
+
+| Step | n | mean ms | p50 ms |
+| --- | ---: | ---: | ---: |
+| delta decode (base warm) | 6,471 | 7.04 | 7.71 |
+| delta encode | 6,471 | 2.85 | 2.81 |
+| raw page host to GPU | 400 | 0.08 | 0.08 |
+| t2-hbh per page encode | 2 | 0.76 | 0.76 |
+| t2-hbh per request decode | 94 | 45.37 | 25.01 |
+| t2-hbh per request encode | 94 | 24.60 | 19.84 |
+| t2-hbh per segment decode | 88 | 25.83 | 23.88 |
+| t2-hbh per segment encode | 88 | 16.83 | 17.31 |
+| t2-rank256 per request decode | 94 | 9.54 | 5.38 |
+| t2-rank256 per request encode | 94 | 15.53 | 16.45 |
+| t2-rank256 per segment decode | 88 | 4.94 | 4.74 |
+| t2-rank256 per segment encode | 88 | 13.68 | 14.65 |
+
