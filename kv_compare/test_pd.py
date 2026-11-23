@@ -362,9 +362,22 @@ class ConnectorFlowTests(unittest.TestCase):
         return r
 
     def flow(self, local_hit=0, codec="raw", lossy=False, async_install=False, pipeline=0, async_encode=False,
-             gather_budget=2 << 30):
+             gather_budget=2 << 30, pieced=False):
         Ps, Pw, Ds, Dw, pc, dc, dest, log_dir = self.make(async_install=async_install, pipeline=pipeline,
                                                           async_encode=async_encode, gather_budget=gather_budget)
+        if pieced:                                    # raw words in T's and T2's own pieces and meta
+            from kv_compare.pd import codecs as cdm
+
+            class Pieced(cdm.Raw):
+                def encode(self, words, pos0=0):
+                    return cdm._encode_pieces(lambda w, p: cdm.Raw.encode(self, w, p), words, pos0, self.name)
+
+                def decode(self, parts, meta, sink):
+                    w = next(iter(parts.values()))
+                    return cdm._decode_pieces(lambda a, m, k: cdm.Raw.decode(self, a, m, k), parts, meta, sink,
+                                              int(w.shape[0]), int(w.shape[-1]), w.device)
+            Pw.w.codecs[codec] = Pieced()
+            Dw.w.codecs[codec] = Pieced()
         if lossy:                                     # a lossy stand-in for AQUA-KV: every word's lowest bit flipped
             from kv_compare.pd.codecs import Raw
 
@@ -505,6 +518,21 @@ class ConnectorFlowTests(unittest.TestCase):
         recs = self.flow(pipeline=16, async_encode=True, gather_budget=0)         # piece by piece on the encoder
         self.assertFalse(any(x.get("gathered_in_step") for x in recs if x.get("event") == "send"))
         self.flow(pipeline=16, local_hit=16, async_install=True)
+
+    def test_a_codec_with_pieces_of_its_own_installs_a_request_sent_in_pieces(self):
+        """Job 30563: every T and T2 install of a request over 4,096 tokens failed ("not enough values to unpack"):
+        the connector's piece count, written into the codec's meta as "pieces", stood for T's own list of pieces.
+        The transfer's count is now "t_pieces"; a codec in one piece of its own, and in several, installs exactly."""
+        from kv_compare.pd import codecs as cdm
+        self.flow(pipeline=16, pieced=True)
+        self.flow(pipeline=16, pieced=True, async_install=True, local_hit=16)
+        one = cdm._pieces
+        cdm._pieces = lambda T: [(a, min(a + 8, T)) for a in range(0, T, 8)] if T > 8 else [(0, T)]
+        try:
+            recs = self.flow(pipeline=16, pieced=True)
+        finally:
+            cdm._pieces = one
+        self.assertEqual(sorted(x["pieces"] for x in recs if x.get("event") == "install"), [3, 3, 3])
 
     def test_a_trace_hashes_what_p_sends_and_compares_what_d_held(self):
         """trace_pages: P logs every page's content hash of a traced request; D, which held the first two blocks in

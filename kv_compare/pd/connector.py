@@ -236,9 +236,11 @@ class _Skip(Exception):
 
 
 def _pieces_of(header):
-    """How many pieces the transfer this header starts has (1: the request in one transfer)."""
+    """How many pieces the transfer this header starts has (1: the request in one transfer). The transfer's own
+    count is "t_pieces": "pieces" in the meta is the codec's (T's and T2's list of their own pieces; job 30563: the
+    count written over it made every T and T2 install of a request over 4,096 tokens fail)."""
     m = (header or {}).get("meta") or {}
-    return max(1, int(m.get("pieces") or 1))
+    return max(1, int(m.get("t_pieces") or 1))
 
 
 def piece_key(key, i):
@@ -840,7 +842,7 @@ class _WorkerSide:
                     ctx = self._ctx(codec, spec.prompt, spec.steps)
                 parts, meta = _retry_once(lambda w=words, c=ctx, p=t0: (codec.encode(w, pos0=p, ctx=c) if c is not None
                                                                        else codec.encode(w, pos0=p)), self.device, rec)
-                extra = {"piece": i, "pieces": n} if n > 1 else {}
+                extra = {"t_piece": i, "t_pieces": n} if n > 1 else {}     # not the codec's "pieces"
                 header, blob = bundle(parts, dict(meta, checksum=check, key=key, t0=t0, sent_at=time.time(), **extra))
                 for k in ("set", "layer0", "layer0_check", "rel_err"):
                     if k in meta:
@@ -977,8 +979,8 @@ class _WorkerSide:
         hm = header.get("meta") or {}
         rec = {"event": "install", "key": trec.get("key", spec.key), "req": spec.req_id, "tokens": spec.t1 - spec.t0,
                "admitted_at": spec.admitted_at, "taken_at": time.time(), **{f"link_{k}": v for k, v in trec.items()}}
-        if hm.get("pieces"):
-            rec.update(piece=int(hm.get("piece", 0)), pieces=int(hm["pieces"]), req_key=spec.key)
+        if hm.get("t_pieces"):
+            rec.update(piece=int(hm.get("t_piece", 0)), pieces=int(hm["t_pieces"]), req_key=spec.key)
         if queued_ms is not None:
             rec["install_queued_ms"] = queued_ms
             rec["async"] = True
@@ -988,7 +990,7 @@ class _WorkerSide:
             lo, hi = max(spec.t0, st0), min(spec.t1, st0 + sT)    # the part this engine does not have yet
             h_lo, h_hi = st0, min(st0 + sT, spec.t0)  # what it sent that this engine held (its prefix cache)
             compare = self.tlog is not None and h_hi > h_lo
-            if hm.get("pieces"):
+            if hm.get("t_pieces"):
                 rec["tokens"] = max(0, hi - lo)
                 if lo >= hi and not compare:         # a piece of the prefix this engine has cached
                     rec.update(skipped=True, decode_install_ms=0.0, exact=None)
@@ -1053,7 +1055,7 @@ class _WorkerSide:
                 import numpy as np
                 from .trace import pack_bits
                 m = np.stack(eq)
-                hrec = {"event": "held", "key": spec.key, "piece": int(hm.get("piece", 0)), "t0": h_lo,
+                hrec = {"event": "held", "key": spec.key, "piece": int(hm.get("t_piece", 0)), "t0": h_lo,
                         "tokens": h_hi - h_lo, "bs": self.bs, "layers": int(m.shape[0]),
                         "equal": pack_bits(m), "equal_pages": int(m.sum()), "pages": int(m.size)}
                 if not m.all():                      # the bit lengths of P's words against D's (diff: ordered)
