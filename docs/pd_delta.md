@@ -149,3 +149,39 @@ To delete the kept pages when done, inside `/tmp/$USER` only:
 srun -p all -A oana2026 -q research12h -N 1 -w gpu-grad-01 -c 1 --mem=1G -t 00:10:00 bash -c '
 r=$(realpath -m /tmp/$USER/kvpd-captures/<tag>); case "$r" in /tmp/$USER/kvpd-captures/?*) rm -rf --one-file-system -- "$r" && echo "removed $r";; esac'
 ```
+
+## Our KV Diff Graph against EvidenceStore's (`MATRIX=diffgraph`)
+
+No vLLM engines run. The job sets up as usual, which also builds the codec constants. It then runs
+`scripts/pd_diffgraph.py` on one GPU over the newest capture in `/tmp/$USER/kvpd-captures`. Set `DIFF_CAPTURE` and
+`DIFF_RUN` to choose another capture and run.
+
+The pages are the capture's distinct complete 16-token blocks. Every representation is decoded and compared byte for
+byte with the capture.
+
+**Ours** (the t2 codecs). Layer 0 is recomputed from the token ids, as T2 does in the PD path; offline, the recompute
+is taken as exact (T2 checks it on every request in the engine). The other layers are coded in one of these units:
+
+| Unit | What is coded together |
+| --- | --- |
+| T2 per request | the whole prompt (the transfer's unit) |
+| T2 per segment | each run of a request's contiguous new pages |
+| T2 per page | each 16-token page alone; T's programs take 32 tokens, so a page is padded to 32 and the padding counts in its size |
+| Delta per page | layers 1–27 coded by T's value-slice coder against the base page (values as they are, keys turned by RoPE) |
+
+The delta's spread is set per layer, K/V and channel. It is scaled by how long the text has agreed with the base's,
+fitted on the even conversations and also reported on the odd ones alone.
+
+The graph keeps, per page, the smaller of T2-per-page and the delta. It is depth one, with bases counted once, like
+theirs.
+
+**Theirs:** `scripts/pd_page_compare.py` (zlib level 1) on the same pages.
+
+**Times** (CUDA-synchronised):
+
+- T2 encode and decode, per request, segment and page;
+- delta encode, and decode with the base warm;
+- a cold rebuild: the base page decoded with T2, then the delta;
+- a raw page copied from pinned host memory.
+
+The report is `diffgraph_report.md`, with `page_compare.md` beside it, in the published run.

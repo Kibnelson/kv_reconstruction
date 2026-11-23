@@ -1414,6 +1414,23 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertIn("## MTRAG", (out / "summary.md").read_text())
         self.assertTrue((json.loads((out / "env.json").read_text()))["trace_pages"])
 
+    def test_diffgraph_runs_offline_without_engines(self):
+        """STAGES=diffgraph: no engine starts; without a kept capture it says so, and the run is still packaged (its
+        results say the stage's exit); MATRIX=diffgraph lists that one run."""
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw,t2-hbh", STAGES="diffgraph",
+                             KVPD_ROOT=str(self.tmp / "noroot"))
+        self.assertEqual(eng, [])
+        self.assertIn("STOP: no kept capture", r.stdout + r.stderr)
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        res = json.loads((out / "results.json").read_text())
+        self.assertEqual(res["diffgraph"]["exit"], 1)
+        self.assertTrue((out / "bench.log").is_file())
+        m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="diffgraph", PRINT_RUNS="1"))
+        self.assertEqual([x for x in m.stdout.split("\n") if x],
+                         ["TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=diffgraph "
+                          "RUN_TIMEOUT_S=10800"])
+
     def test_capture_run_configures_both_engines_and_runs_the_delta_stage(self):
         """MATRIX=capture's run: both engines get capture_dir (P its 16 GB, D its 2), the traced runs ask for the first
         conversations' pages, and stage delta runs after mtrag (here no engine stores pages: it says so)."""

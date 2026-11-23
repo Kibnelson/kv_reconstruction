@@ -873,6 +873,94 @@ class ConnectorFlowTests(unittest.TestCase):
         self.assertFalse(Ps.has_pending_push_work())
 
 
+DIFFGRAPH_CHECK = r"""
+import os, sys, json, tempfile
+os.environ["TRITON_INTERPRET"] = "1"
+os.environ["DELTA_WORKERS"] = "1"
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(sys.argv[1], "scripts"))
+from pathlib import Path
+import numpy as np
+import torch
+from transformers import LlamaConfig, LlamaForCausalLM
+from kv_compare.capture import capture_ids, model_meta
+from kv_compare.predict import Study
+from kv_compare import fused, layerwise
+from kv_compare.grouped import prepare_groups
+from kv_compare.pd import codecs, export, trace as tr
+import pd_diffgraph as dg
+torch.manual_seed(0)
+cfg = LlamaConfig(vocab_size=97, hidden_size=128, intermediate_size=192, num_hidden_layers=3, num_attention_heads=4,
+                  num_key_value_heads=2, head_dim=32, max_position_embeddings=2048, rope_theta=500000.0)
+model = LlamaForCausalLM(cfg).to(torch.bfloat16).eval()
+names = [f"train{i}" for i in range(4)] + ["tables", "test"]
+root = Path(tempfile.mkdtemp()) / "c"
+reports = []
+for i, n in enumerate(names):
+    ids = [int(v) for v in np.random.default_rng(i).integers(0, 97, size=96)]
+    reports.append(capture_ids(model, ids, root, n, torch.device("cpu"), queries=n.startswith("train")))
+(root / "meta.json").write_text(json.dumps(dict(model_meta(model, "tiny", None), tokens=96, captures=reports)))
+study = Study(root, "cpu", names[:4], "tables", ["test"], log=lambda m: None)
+consts = fused.prepare(study, log=lambda m: None)
+rc = layerwise.prepare_rank(study, consts, 64, lambda m: None)
+groups = prepare_groups(study, consts, [2, 4], lambda m: None)
+b = export.make_bundle(study, consts, rc, groups, 512)
+bpath = Path(tempfile.mkdtemp()) / "b.pt"
+torch.save(b, bpath)
+codecs.PAD = 64
+
+
+def kv_words(ids):
+    with torch.no_grad():
+        pkv = model(torch.tensor([ids]), use_cache=True).past_key_values
+    layers = []
+    for l in range(3):
+        k, v = (pkv[l] if isinstance(pkv, (list, tuple)) else (pkv.layers[l].keys, pkv.layers[l].values))
+        k = k[0].transpose(0, 1).reshape(len(ids), -1)      # [T, heads*hd]
+        v = v[0].transpose(0, 1).reshape(len(ids), -1)
+        layers.append(torch.cat([k, v], 1).contiguous().view(torch.int16))
+    return torch.stack(layers)                              # [L, T, W]
+
+
+d = Path(tempfile.mkdtemp())
+cap, run, mdir, out = d / "cap", d / "run", d / "model", d / "out"
+for x in (cap, run / "runs", mdir, out):
+    x.mkdir(parents=True)
+(mdir / "config.json").write_text(json.dumps({"rope_theta": 500000.0, "head_dim": 32}))
+A = [int(v) for v in np.random.default_rng(10).integers(0, 97, size=48)]
+B = [int(v) for v in np.random.default_rng(11).integers(0, 97, size=16)]
+prompts = [A, B + A]                                         # turn 1: turn 0's text 16 tokens later
+st = tr.PageStore(str(cap), "P", 1.0, 3, 16, 128)
+recs, prox = [], []
+nm = "mtrag_raw_docs_first_conversation"
+for t, ids in enumerate(prompts):
+    w = kv_words(ids)
+    rows = tr.capture_blocks(st, w, tr.page_hashes(w, 16), 16)
+    st.record({"event": "request", "key": f"K{t}", "conv": "r:0", "t0": 0, "T": len(ids), "bs": 16, "rows": rows,
+               "missing": 0})
+    recs.append({"tag": f"{nm}|0|{t}", "run": nm, "layout": "docs_first", "policy": "conversation", "conv": 0,
+                 "turn": t, "prompt_tokens": len(ids), "ids": ids, "pieces": [["doc", "D", 0, len(ids)]]})
+    prox.append({"key": f"K{t}", "tag": recs[-1]["tag"], "t_in": t})
+st.close()
+(run / "runs" / f"{nm}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+(run / "proxy.jsonl").write_text("".join(json.dumps(r) + "\n" for r in prox))
+res = dg.analyse(str(cap), str(run), str(bpath), str(mdir), str(out), names=("ours-kv",), device="cpu",
+                 log=lambda m: None)
+r = res["runs"][nm]
+assert r["pages"] == 3 + 4, r["pages"]
+for unit in ("per_request", "per_segment", "per_page"):
+    x = r[f"ours-kv_{unit}"]
+    cnt = x.get("requests") or x.get("segments") or x.get("pages")
+    assert x["exact"] == cnt and x["bytes"] > 0, (unit, x)
+assert r["delta"]["coded"] >= 3 and r["delta"]["exact"] == r["delta"]["coded"], r["delta"]
+assert r["graph_ours-kv"]["independent"] == r["ours-kv_per_page"]["bytes"]
+assert "mtrag_raw_docs_first_conversation" in res["theirs"]["runs"]
+text = dg.markdown(res)
+assert "KV Diff Graph against EvidenceStore" in text and "rebuild cold" in text, text[:2000]
+print("ok diffgraph", json.dumps({k: r[k] for k in ("ours-kv_per_request", "ours-kv_per_page", "delta")}))
+"""
+
+
 OURS_WIRE_CHECK = r"""
 import os, sys, json, tempfile
 os.environ["TRITON_INTERPRET"] = "1"
@@ -1037,6 +1125,18 @@ print("ok ours wire")
 
 
 class OursWireTests(unittest.TestCase):
+    def test_the_diff_graph_evaluator_codes_and_checks_every_page_interpreted(self):
+        """scripts/pd_diffgraph.py end to end on a tiny model's real KV (two turns, the first's text moved by 16
+        tokens): T per request, per segment and per page, deltas by the slice coder from the base, every page
+        decoded and equal, their zlib graph beside it."""
+        import importlib.util
+        if importlib.util.find_spec("triton") is None or importlib.util.find_spec("transformers") is None:
+            self.skipTest("Triton and transformers are required")
+        r = subprocess.run([sys.executable, "-c", DIFFGRAPH_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=7200)
+        self.assertEqual(r.returncode, 0, r.stderr[-4000:])
+        self.assertIn("ok diffgraph", r.stdout)
+
     def test_our_modes_round_trip_through_the_wire_interpreted(self):
         """Every mode of T (dense, keys then values, head groups, reduced rank): encode, only the used segment tails
         on the wire, decode layer by layer; padded token counts and a non-zero start position included."""

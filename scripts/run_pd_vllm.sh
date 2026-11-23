@@ -164,6 +164,7 @@ print("   GPUs " + ", ".join(f"{d}={v['nvidia_smi']}" + ("" if v["torch"] else "
                             for d, v in got.items()))
 EOF
 
+
 REVPY=None; [ -n "$REVISION" ] && REVPY="'$REVISION'"
 MP=${MODEL_PATH:-$("$VPY" -c "
 from huggingface_hub import snapshot_download
@@ -173,6 +174,44 @@ echo "   model folder $MP"
 # ---------------------------------------------------------------------------------------------- what to run
 # a run that hangs (a transfer that never arrives) ends here instead of taking the allocation: seconds for the bench
 RUN_TIMEOUT_S=${RUN_TIMEOUT_S:-$([ "${SMOKE:-0}" = 1 ] && echo 1200 || echo 10800)}
+
+# STAGES=diffgraph (MATRIX=diffgraph): no engines. Our KV Diff Graph against EvidenceStore's (scripts/pd_diffgraph.py)
+# on one GPU, over a capture kept by MATRIX=capture (DIFF_CAPTURE, default the newest in kvpd-captures) and its run's
+# records (DIFF_RUN, default its campaign's packaged run), with the codec constants setup just built
+OFFLINE_DONE=0
+if [ "${STAGES:-}" = diffgraph ]; then
+    CAPROOT=${KVPD_ROOT:-/tmp/$USER}/kvpd-captures
+    DIFF_CAPTURE=${DIFF_CAPTURE:-$(ls -dt "$CAPROOT"/*/ 2>/dev/null | head -n 1 || true)}
+    DIFF_CAPTURE=${DIFF_CAPTURE%/}
+    DIFF_CAPTURE=${DIFF_CAPTURE:-}
+    CTAG=$(basename "${DIFF_CAPTURE:-none}")
+    DIFF_RUN=${DIFF_RUN:-$(ls -d "${KVPD_ROOT:-/tmp/$USER}/kvpd-evidence/$CTAG/repo/benchmark_results/pd_card/$CTAG/matrix/"llama32_3b_* 2>/dev/null | head -n 1 || true)}
+    echo "== diffgraph: capture ${DIFF_CAPTURE:-none}; its run ${DIFF_RUN:-none}"
+    set +e
+    if [ -n "$DIFF_CAPTURE" ] && [ -d "$DIFF_CAPTURE" ] && [ -n "$DIFF_RUN" ] && [ -d "$DIFF_RUN" ]; then
+        CUDA_VISIBLE_DEVICES=${DEVS[0]} PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
+            "$VPY" -u scripts/pd_diffgraph.py --capture "$DIFF_CAPTURE" --run "$DIFF_RUN" \
+            --codecs-file "$RUN/pd_codecs.pt" --model-dir "$MP" --out "$OUT" \
+            --codecs "${DIFF_CODECS:-t2-hbh,t2-rank256}" --page-sample "${DIFF_PAGE_SAMPLE:-0}" 2>&1 | tee "$OUT/bench.log"
+        STATUS=${PIPESTATUS[0]}
+    else
+        echo "STOP: no kept capture in $CAPROOT (MATRIX=capture keeps one) or no records of its run" | tee "$OUT/bench.log"
+        STATUS=1
+    fi
+    set -e
+    "$VPY" - "$OUT" "$MODEL_ID" "$LAYOUT" "$TRANSPORT" "$STATUS" "${DIFF_CAPTURE:-}" "${DIFF_RUN:-}" <<'EOF'
+import json, sys
+out, model, layout, transport, status, cap, run = sys.argv[1:8]
+env = {"model": model, "layout": layout, "transport": transport, "connector": "none (offline)", "stage": "diffgraph",
+       "capture": cap, "capture_run": run}
+json.dump(env, open(f"{out}/env.json", "w"))
+json.dump({"diffgraph": {"exit": int(status), "capture": cap, "capture_run": run}, "env": env},
+          open(f"{out}/results.json", "w"))
+EOF
+    [ -f "$OUT/diffgraph_report.md" ] && cp "$OUT/diffgraph_report.md" "$OUT/summary.md"
+    OFFLINE_DONE=1
+fi
+if [ "$OFFLINE_DONE" != 1 ]; then              # the engines' run: everything down to their cleanup
 if [ "${SMOKE:-0}" = 1 ]; then
     CODECS=${CODECS:-raw,splitzip,ours-hbh,t2-hbh}
     LINKS=${LINKS:-$([ "$TRANSPORT" = p2p ] && echo native || echo 10)}
@@ -489,6 +528,7 @@ else
 fi
 cleanup
 trap - EXIT
+fi                                             # the engines' run
 
 GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n 1p | tr 'A-Z' 'a-z' | sed 's/nvidia//' | tr -cd 'a-z0-9')
 NAME=${TAG}_pd_${RUN_TAG}_${GPU_TAG}x$([ "${SHARE_GPU:-0}" = 1 ] && echo 1shared || echo "$NENG")_${STAMP}
@@ -497,7 +537,8 @@ if [ "$STATUS" != 0 ]; then NAME=${NAME}_partial; fi
 DEST=$RESULTS_ROOT/$NAME
 mkdir -p "$DEST/runs" "$DEST/connector"
 for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json \
-         trace_report.md trace_report.json delta_report.md delta_report.json; do
+         trace_report.md trace_report.json delta_report.md delta_report.json diffgraph_report.md \
+         diffgraph_report.json page_compare.md; do
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
 cp "$OUT"/runs/*.json "$OUT"/runs/*.log "$DEST/runs/" 2>/dev/null || true   # the logs: 60 KB at most each
