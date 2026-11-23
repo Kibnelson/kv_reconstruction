@@ -29,9 +29,23 @@ triton, tl = gc.triton, gc.tl
 GROUP_PRODUCT = os.environ.get("TKV_GROUP_PRODUCT", "fused")
 
 
+def _int_mm_rows(x, A):
+    """torch._int_mm for any number of rows: cuBLAS's int8 product takes more than 16 (a 16-token page coded alone
+    has 16: job 30576), so fewer are padded with zero rows to 32 and cut off again (the same integers)."""
+    n = x.shape[0]
+    if n > 16:
+        return torch._int_mm(x, A.t())
+    xp = torch.zeros(32, x.shape[1], dtype=x.dtype, device=x.device)
+    xp[:n] = x
+    return torch._int_mm(xp, A.t())[:n]
+
+
 def int_mm(x, A, out=None):
     """Exact x [n, K] int8 times A [N, K] int8 transposed -> int32 [n, N] (cuBLAS on the GPU)."""
     if x.is_cuda:
+        if x.shape[0] <= 16:
+            y = _int_mm_rows(x, A)
+            return y if out is None else out.copy_(y)
         if out is not None:
             try:
                 return torch._int_mm(x, A.t(), out=out)

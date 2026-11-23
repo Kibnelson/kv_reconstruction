@@ -544,6 +544,7 @@ done
 cp "$OUT"/runs/*.json "$OUT"/runs/*.log "$DEST/runs/" 2>/dev/null || true   # the logs: 60 KB at most each
 for f in "$OUT"/runs/*.jsonl; do [ -f "$f" ] && gzip -c "$f" > "$DEST/runs/$(basename "$f").gz"; done   # MTRAG's
 for f in "$OUT"/engine_*.log; do      # whole when small (a failed start), else its start and its end
+    [ -f "$f" ] || continue           # none in an offline run (STAGES=diffgraph: job 30576 stopped here)
     if [ "$(stat -c %s "$f")" -lt 4000000 ]; then cp "$f" "$DEST/"
     else { head -n 300 "$f"; echo "[... $(wc -l < "$f") lines in all ...]"; tail -n 400 "$f"; } > "$DEST/$(basename "$f")"; fi
 done

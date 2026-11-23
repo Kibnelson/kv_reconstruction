@@ -1421,7 +1421,11 @@ class RunnerDryRunTests(unittest.TestCase):
                              KVPD_ROOT=str(self.tmp / "noroot"))
         self.assertEqual(eng, [])
         self.assertIn("STOP: no kept capture", r.stdout + r.stderr)
+        # job 30576: packaging stopped at the engine logs, of which an offline run has none
+        self.assertNotIn("PD RUN STOPPED", r.stdout + r.stderr, r.stderr[-2000:])
+        self.assertIn("committed locally", r.stdout, r.stdout[-2000:])
         out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        self.assertEqual(list(out.glob("engine_*")), [])
         res = json.loads((out / "results.json").read_text())
         self.assertEqual(res["diffgraph"]["exit"], 1)
         self.assertTrue((out / "bench.log").is_file())
@@ -1870,6 +1874,26 @@ class MtragDriverTests(unittest.TestCase):
         self.assertEqual(b["prompt"][s:e], [ord(c) for c in "abc"])
 
 
+def _in_process(test, da):
+    """pd_delta_analysis.pmap forks its workers. In this process numpy and torch have started their threads already
+    (BLAS, OpenMP), and a worker forked then can wait for ever on a lock no thread of its holds (this suite stalled
+    so). The scripts set one thread before numpy loads, so their runs fork safely (PmapForkTests); here the work runs
+    in this process."""
+    old = da.WORKERS
+    da.WORKERS = 1
+    test.addCleanup(setattr, da, "WORKERS", old)
+
+
+class PmapForkTests(unittest.TestCase):
+    def test_workers_fork_in_a_fresh_interpreter_as_the_scripts_run(self):
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); import pd_delta_analysis as da; import numpy as np; "
+                "da.WORKERS = 2; print(da.pmap(abs, [-1, -2, 3]), float(np.ones((64, 64)).dot(np.ones(64)).sum()))")
+        r = subprocess.run([sys.executable, "-I", "-c", code, str(ROOT / "scripts")], capture_output=True, text=True,
+                           timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        self.assertEqual(r.stdout.split(), ["[1,", "2,", "3]", "4096.0"])
+
+
 class DeltaAnalysisTests(unittest.TestCase):
     def test_stored_pages_are_related_and_measured(self):
         """Two captured prompts: the second holds the first's 80-token passage 16 positions later, after another
@@ -1882,6 +1906,7 @@ class DeltaAnalysisTests(unittest.TestCase):
         from kv_compare.pd import trace as tr
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_delta_analysis as da
+        _in_process(self, da)
         L, bs, H, hd = 3, 16, 2, 8
         C, W = H * hd, 2 * H * hd
         d = Path(tempfile.mkdtemp())
@@ -1975,6 +2000,7 @@ class PageCompareTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_delta_analysis as da
         import pd_page_compare as pg
+        _in_process(self, da)
         L, bs, H, hd = 3, 16, 2, 8
         C, W = H * hd, 2 * H * hd
         d = Path(tempfile.mkdtemp())

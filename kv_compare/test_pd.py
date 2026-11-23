@@ -981,10 +981,14 @@ for unit in ("per_request", "per_segment", "per_page"):
     cnt = x.get("requests") or x.get("segments") or x.get("pages")
     assert x["exact"] == cnt and x["bytes"] > 0, (unit, x)
 assert r["delta"]["coded"] >= 3 and r["delta"]["exact"] == r["delta"]["coded"], r["delta"]
+assert 1 <= r["delta"]["pages"] <= r["delta"]["coded"] and 0 < r["delta"]["bytes"], r["delta"]
+assert r["delta"]["raw_bytes"] == r["delta"]["pages"] * res["meta"]["page_bytes"], r["delta"]
 assert r["graph_ours-kv"]["independent"] == r["ours-kv_per_page"]["bytes"]
 assert "mtrag_raw_docs_first_conversation" in res["theirs"]["runs"]
 text = dg.markdown(res)
 assert "KV Diff Graph against EvidenceStore" in text and "rebuild cold" in text, text[:2000]
+assert "| Representation | MB | Bits |" in text and "delta against the base alone" in text, text[:3000]
+assert "repeats included" in text, text[:3000]
 print("ok diffgraph", json.dumps({k: r[k] for k in ("ours-kv_per_request", "ours-kv_per_page", "delta")}))
 """
 
@@ -1404,6 +1408,30 @@ class OpportunityTests(unittest.TestCase):
         self.assertEqual((per["b"]["gpu"], per["b"]["dram"], per["b"]["new"]), (32, 32, 32))   # held 4 blocks before
         self.assertEqual((per["c"]["elsewhere"], per["c"]["new"]), (96, 16))                    # D1 held 6 of them
         self.assertEqual(o["tokens"]["tokens"], 272)
+
+
+class IntProductTests(unittest.TestCase):
+    def test_the_int8_product_takes_a_page_of_16_rows(self):
+        """Job 30576: T2 per page stopped at cuBLAS's int8 product ("self.size(0) needs to be greater than 16"). Here
+        torch._int_mm refuses 16 rows or fewer as cuBLAS does; the product pads them and gives the same integers."""
+        import torch
+        from unittest import mock
+        from kv_compare import layerwise as lw
+        real = torch._int_mm
+
+        def cublas_like(x, b):
+            if x.shape[0] <= 16:
+                raise RuntimeError(f"self.size(0) needs to be greater than 16, but got {x.shape[0]}")
+            return real(x, b)
+        g = torch.Generator().manual_seed(0)
+        A = torch.randint(-128, 128, (24, 64), generator=g, dtype=torch.int8)
+        with mock.patch.object(torch, "_int_mm", cublas_like):
+            for n in (1, 15, 16, 17, 40):
+                x = torch.randint(-128, 128, (n, 64), generator=g, dtype=torch.int8)
+                want = (x.long() @ A.long().t()).to(torch.int32)
+                self.assertTrue(torch.equal(lw._int_mm_rows(x, A), want), n)
+            with self.assertRaises(RuntimeError):     # the stand-in is cuBLAS's rule
+                torch._int_mm(x[:16], A.t())
 
 
 if __name__ == "__main__":

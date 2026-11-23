@@ -281,18 +281,19 @@ def analyse(cap, run_dir, codecs_file, model_dir, out_dir, names=("t2-hbh", "t2-
         old_pad = cdm.PAD
         cdm.PAD = PAGE_PAD
         try:
-            for mode, codec in built.items():
-                sizes, ok = {}, 0
-                for i in page_ix:
-                    p = pages[i]
-                    n, exact, _ = t2_code(codec, fetch(p["loc"]), p["block"] * bs, timer, f"{mode} per page")
-                    sizes[i] = n
-                    ok += exact
-                per_page[mode] = sizes
-                res[f"{mode}_per_page"] = {"bytes": sum(sizes.values()), "exact": ok, "pages": len(sizes)}
-        except Exception as exc:
-            res["per_page_error"] = repr(exc)[:300]
-            log(f"   T2 per page failed: {exc!r}")
+            for mode, codec in built.items():          # each mode on its own: one failing leaves the other
+                try:
+                    sizes, ok = {}, 0
+                    for i in page_ix:
+                        p = pages[i]
+                        n, exact, _ = t2_code(codec, fetch(p["loc"]), p["block"] * bs, timer, f"{mode} per page")
+                        sizes[i] = n
+                        ok += exact
+                    per_page[mode] = sizes
+                    res[f"{mode}_per_page"] = {"bytes": sum(sizes.values()), "exact": ok, "pages": len(sizes)}
+                except Exception as exc:
+                    res.setdefault("per_page_error", f"{mode}: {exc!r}"[:300])
+                    log(f"   {mode} per page failed: {exc!r}")
         finally:
             cdm.PAD = old_pad
         # raw page from host memory (pinned)
@@ -333,7 +334,13 @@ def analyse(cap, run_dir, codecs_file, model_dir, out_dir, names=("t2-hbh", "t2-
             n, exact = delta_code(coder, T, mu, s, timer, "delta")
             dsize[(i, rule)] = n + pg.DESC * len(b["pages"])
             dok += exact
-        res["delta"] = {"coded": len(dsize), "exact": dok}
+        best = {}                                   # per page, its smaller delta (by text or by position)
+        for (i, _rule), n in dsize.items():
+            best[i] = min(best.get(i, n), n)
+        res["delta"] = {"coded": len(dsize), "exact": dok, "pages": len(best), "bytes": int(sum(best.values())),
+                        "raw_bytes": len(best) * out["meta"]["page_bytes"],
+                        "heldout_bytes": int(sum(n for i, n in best.items() if pages[i]["conv"] not in train)),
+                        "heldout_pages": sum(1 for i in best if pages[i]["conv"] not in train)}
         # cold rebuild: the base decoded first (its page with T2, then the delta) for a sample
         mode0 = next(iter(built), None)
         if mode0 and mode0 in per_page:
@@ -407,15 +414,21 @@ def markdown(res):
               f"{r['requests']} requests; {r['references']['blocks']:,} complete blocks, of them "
               f"{r['references']['reference_blocks']:,} identical to a stored one (references) and "
               f"{r['pages']:,} distinct pages ({mb(raw)} MB raw).", "",
-              "| Representation (distinct pages) | MB | Saving vs raw | Decoded exactly |",
-              "| --- | ---: | ---: | --- |", f"| Raw | {mb(raw)} | - | - |"]
+              "Every row covers the distinct pages, except T2 per request: it codes each request's whole prompt, the "
+              "pages identical to stored ones included (no page is shared between requests), against that prompt's "
+              "own raw size. Bits: per value (16 raw).", "",
+              "| Representation | MB | Bits | Saving vs raw | Decoded exactly |",
+              "| --- | ---: | ---: | ---: | --- |", f"| Raw | {mb(raw)} | 16.00 | - | - |"]
+        bits = lambda b, base: f"{16 * b / base:.2f}"
         if th:
+            ind = th['independent']['split']
             L.append(f"| Theirs: best independent (zlib, exponent / sign-fraction streams) | "
-                     f"{mb(th['independent']['split'])} | {pc(1 - th['independent']['split'] / th['raw_bytes'])} | - |")
+                     f"{mb(ind)} | {bits(ind, th['raw_bytes'])} | {pc(1 - ind / th['raw_bytes'])} | - |")
             for k, lab in (("graph_theirs", "Theirs: graph (position, text)"),
                            ("graph_turned", "Theirs: graph + keys turned")):
                 g = th[k]
-                L.append(f"| {lab} | {mb(g['graph'])} | {pc(1 - g['graph'] / th['raw_bytes'])} | - |")
+                L.append(f"| {lab} | {mb(g['graph'])} | {bits(g['graph'], th['raw_bytes'])} | "
+                         f"{pc(1 - g['graph'] / th['raw_bytes'])} | - |")
         for mode in m["modes"]:
             for unit in ("per_request", "per_segment", "per_page"):
                 x = r.get(f"{mode}_{unit}")
@@ -423,17 +436,30 @@ def markdown(res):
                     continue
                 cnt = x.get("requests") or x.get("segments") or x.get("pages")
                 base = raw if unit != "per_request" else x["tokens"] / 16 * m["page_bytes"]
-                L.append(f"| Ours: {mode} {unit.replace('_', ' ')} | {mb(x['bytes'])} | {pc(1 - x['bytes'] / base)} | "
+                lab = (f"{mode} per request (whole prompts: {x['tokens'] / 16:,.0f} blocks, repeats included)"
+                       if unit == "per_request" else f"{mode} {unit.replace('_', ' ')}")
+                L.append(f"| Ours: {lab} | {mb(x['bytes'])} | {bits(x['bytes'], base)} | {pc(1 - x['bytes'] / base)} | "
                          f"{x['exact']} of {cnt} |")
             g = r.get(f"graph_{mode}")
             if g:
                 L.append(f"| Ours: graph ({mode} page or delta): {g['deltas']} deltas on {g['bases']} bases | "
-                         f"{mb(g['graph'])} | {pc(1 - g['graph'] / raw)} (beyond {mode} per page: "
-                         f"{pc(g['saving_beyond_independent'])}) | deltas {r['delta']['exact']} of {r['delta']['coded']} |")
+                         f"{mb(g['graph'])} | {bits(g['graph'], raw)} | {pc(1 - g['graph'] / raw)} (beyond {mode} "
+                         f"per page: {pc(g['saving_beyond_independent'])}) | deltas {r['delta']['exact']} of "
+                         f"{r['delta']['coded']} |")
                 h = r.get(f"graph_{mode}_heldout")
                 if h:
                     L.append(f"| Ours: the same, odd conversations only (spread fitted on the even ones) | "
-                             f"{mb(h['graph'])} | beyond {mode} per page: {pc(h['saving_beyond_independent'])} | - |")
+                             f"{mb(h['graph'])} | - | beyond {mode} per page: {pc(h['saving_beyond_independent'])} | - |")
+        dl = r.get("delta") or {}
+        if dl.get("pages"):
+            L.append(f"| Ours: delta against the base alone, on the {dl['pages']:,} pages that have one (layer 0 "
+                     f"recomputed) | {mb(dl['bytes'])} | {bits(dl['bytes'], dl['raw_bytes'])} | "
+                     f"{pc(1 - dl['bytes'] / dl['raw_bytes'])} | {dl['exact']} of {dl['coded']} |")
+            if dl.get("heldout_pages"):
+                hb = dl["heldout_pages"] * m["page_bytes"]
+                L.append(f"| Ours: the same, odd conversations only ({dl['heldout_pages']:,} pages) | "
+                         f"{mb(dl['heldout_bytes'])} | {bits(dl['heldout_bytes'], hb)} | "
+                         f"{pc(1 - dl['heldout_bytes'] / hb)} | - |")
         if r.get("per_page_error"):
             L.append(f"\nT2 per page did not run: {r['per_page_error']}")
         L.append("")

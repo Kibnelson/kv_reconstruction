@@ -185,3 +185,31 @@ theirs.
 - a raw page copied from pinned host memory.
 
 The report is `diffgraph_report.md`, with `page_compare.md` beside it, in the published run.
+
+### First run (job 30576)
+
+Bits per value (16 raw), on the distinct pages. T2 per request is the exception: it covers each request's whole prompt,
+the repeated pages included.
+
+| Representation | docs_first | history_first |
+| --- | ---: | ---: |
+| Theirs: best independent (zlib) | 11.55 | 11.56 |
+| Theirs: graph + keys turned | 11.09 | 11.09 |
+| T2-hbh per request (repeats included) | 10.27 | 10.32 |
+| T2-hbh per segment | 10.54 | 11.35 |
+| T2-rank256 per segment | 11.47 | 12.28 |
+
+- **Per segment against theirs.** T2-hbh with no deltas is 4.9% under their graph in docs_first and 2.4% over it in
+  history_first. history_first's new pages come in shorter runs.
+- **Out of domain.** On MTRAG, T2-hbh costs 10.3 bits. On the quick run's prompts it costs 8.2–8.9, but those prompts
+  come from the datasets T's constants were fitted on (WikiText-2, HumanEval, GSM8K, MMLU, PTB).
+- **Times per page.** A delta decodes in 7.0 ms, against about 0.4 ms per page for T2 per segment and 0.08 ms for a
+  raw page from host memory. The delta decoder takes one call per page, so its launches dominate.
+
+What did not run, fixed since:
+
+| Problem | Fix |
+| --- | --- |
+| T2 per page stopped: cuBLAS's int8 product takes more than 16 rows, and a page has 16. | `layerwise.int_mm` pads 16 rows or fewer to 32. |
+| No graph without T2 per page, and the deltas' sizes were not reported. | The delta total is reported on its own, held-out conversations too. Each mode's per page runs on its own. |
+| The runner stopped while packaging engine logs that an offline run does not have. | The loop skips them. |
