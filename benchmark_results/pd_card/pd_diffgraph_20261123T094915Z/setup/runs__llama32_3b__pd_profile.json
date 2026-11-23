@@ -1,0 +1,3757 @@
+{
+ "rows": [
+  {
+   "codec": "ours-hbh",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 4.839560016989708,
+    "issue_ms": 4.7516487538814545,
+    "gpu_ms": 4.146579000000002,
+    "launches": 222,
+    "kinds": {
+     "copies and fills": [
+      56,
+      0.5706979999999996
+     ],
+     "our features": [
+      82,
+      0.6588219999999996
+     ],
+     "products (int8 GEMM)": [
+      55,
+      1.6980690000000032
+     ],
+     "our encoder": [
+      28,
+      1.124780999999998
+     ],
+     "packing": [
+      1,
+      0.09420899999999983
+     ]
+    },
+    "top": [
+     {
+      "ms": 1.6980690000000032,
+      "count": 55,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_128x64_128x3_tn_align16>"
+     },
+     {
+      "ms": 1.124780999999998,
+      "count": 28,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 0.4800059999999998,
+      "count": 28,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<in"
+     },
+     {
+      "ms": 0.30473999999999896,
+      "count": 28,
+      "name": "_lfeat_kernel"
+     },
+     {
+      "ms": 0.2935399999999991,
+      "count": 27,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 0.09420899999999983,
+      "count": 1,
+      "name": "_tail_copy"
+     }
+    ]
+   },
+   "bits": 8.099931989397321,
+   "decode": {
+    "wall_ms": 23.77784624695778,
+    "issue_ms": 0.6229691207408905,
+    "gpu_ms": 21.317490000000003,
+    "launches": 945,
+    "kinds": {
+     "copies and fills": [
+      50,
+      0.2809970000000028
+     ],
+     "our decoder": [
+      448,
+      16.92942899999999
+     ],
+     "other": [
+      420,
+      3.273421999999991
+     ],
+     "products (int8 GEMM)": [
+      27,
+      0.8336419999999966
+     ]
+    },
+    "top": [
+     {
+      "ms": 16.92942899999999,
+      "count": 448,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 3.273421999999991,
+      "count": 420,
+      "name": "_gacc_kernel"
+     },
+     {
+      "ms": 0.8336419999999966,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_128x64_128x3_tn_align16>"
+     },
+     {
+      "ms": 0.2456680000000028,
+      "count": 32,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.007488000000000283,
+      "count": 3,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.006463999999999942,
+      "count": 1,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 6.8871621042490005,
+    "issue_ms": 6.79549016058445
+   },
+   "decode_eager": {
+    "wall_ms": 22.194301709532738,
+    "issue_ms": 21.623894572257996
+   },
+   "decode_before": {
+    "wall_ms": 30.51484376192093,
+    "issue_ms": 30.472232028841972
+   }
+  },
+  {
+   "codec": "t2-hbh",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 9.554039686918259,
+    "issue_ms": 9.469037875533104,
+    "gpu_ms": 8.471680999999993,
+    "launches": 484,
+    "kinds": {
+     "copies and fills": [
+      308,
+      4.589038999999998
+     ],
+     "products (int8 GEMM)": [
+      65,
+      2.001588999999996
+     ],
+     "our features": [
+      82,
+      0.6603010000000026
+     ],
+     "our encoder": [
+      28,
+      1.1276309999999996
+     ],
+     "packing": [
+      1,
+      0.09312099999999919
+     ]
+    },
+    "top": [
+     {
+      "ms": 2.001588999999996,
+      "count": 65,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_128x64_128x3_tn_align16>"
+     },
+     {
+      "ms": 1.1467669999999979,
+      "count": 72,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 1.1276309999999996,
+      "count": 28,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 0.5588540000000007,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.4786910000000062,
+      "count": 28,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<in"
+     },
+     {
+      "ms": 0.3289300000000012,
+      "count": 26,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<fl"
+     }
+    ]
+   },
+   "bits": 8.099931989397321,
+   "decode": {
+    "wall_ms": 21.66743390262127,
+    "issue_ms": 1.0820254683494568,
+    "gpu_ms": 21.320305,
+    "launches": 945,
+    "kinds": {
+     "copies and fills": [
+      50,
+      0.2831670000000045
+     ],
+     "our decoder": [
+      448,
+      16.93103599999998
+     ],
+     "other": [
+      420,
+      3.2731350000000226
+     ],
+     "products (int8 GEMM)": [
+      27,
+      0.8329670000000018
+     ]
+    },
+    "top": [
+     {
+      "ms": 16.93103599999998,
+      "count": 448,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 3.2731350000000226,
+      "count": 420,
+      "name": "_gacc_kernel"
+     },
+     {
+      "ms": 0.8329670000000018,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_128x64_128x3_tn_align16>"
+     },
+     {
+      "ms": 0.24816000000000576,
+      "count": 32,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.007519000000000234,
+      "count": 3,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.00640099999999984,
+      "count": 1,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 11.91222295165062,
+    "issue_ms": 11.82309165596962
+   },
+   "decode_eager": {
+    "wall_ms": 26.63421630859375,
+    "issue_ms": 26.596834883093834
+   },
+   "decode_before": {
+    "wall_ms": 40.44724814593792,
+    "issue_ms": 40.404679253697395
+   }
+  },
+  {
+   "codec": "t2-rank256",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 9.125413373112679,
+    "issue_ms": 9.030262008309364,
+    "gpu_ms": 8.078654999999994,
+    "launches": 454,
+    "kinds": {
+     "copies and fills": [
+      280,
+      4.109902999999989
+     ],
+     "products (int8 GEMM)": [
+      64,
+      1.2541620000000058
+     ],
+     "our features": [
+      81,
+      0.8050959999999986
+     ],
+     "our encoder": [
+      28,
+      1.8070599999999974
+     ],
+     "packing": [
+      1,
+      0.10243399999999929
+     ]
+    },
+    "top": [
+     {
+      "ms": 1.8070599999999974,
+      "count": 28,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 1.144910999999996,
+      "count": 72,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 0.6859280000000052,
+      "count": 27,
+      "name": "_igemm_rq_kernel"
+     },
+     {
+      "ms": 0.5682340000000002,
+      "count": 37,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_128x64_128x3_tn_align16>"
+     },
+     {
+      "ms": 0.5582770000000005,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.4543099999999977,
+      "count": 27,
+      "name": "_lsurp_kernel"
+     }
+    ]
+   },
+   "bits": 9.315870012555804,
+   "decode": {
+    "wall_ms": 3.7525445222854614,
+    "issue_ms": 2.9058605432510376,
+    "gpu_ms": 3.385416000000001,
+    "launches": 131,
+    "kinds": {
+     "copies and fills": [
+      49,
+      0.17388800000000268
+     ],
+     "our decoder": [
+      28,
+      2.2310359999999987
+     ],
+     "products (int8 GEMM)": [
+      54,
+      0.9804919999999987
+     ]
+    },
+    "top": [
+     {
+      "ms": 2.2310359999999987,
+      "count": 28,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 0.6848400000000016,
+      "count": 27,
+      "name": "_igemm_rq_kernel"
+     },
+     {
+      "ms": 0.29565199999999736,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_128x64_128x3_tn_align16>"
+     },
+     {
+      "ms": 0.13452800000000162,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.011136000000000422,
+      "count": 3,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.006112000000000079,
+      "count": 3,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 10.544072836637497,
+    "issue_ms": 10.447731241583824
+   },
+   "decode_eager": {
+    "wall_ms": 3.7420708686113358,
+    "issue_ms": 2.8817113488912582
+   },
+   "decode_before": {
+    "wall_ms": 3.7400033324956894,
+    "issue_ms": 2.8749704360961914
+   }
+  },
+  {
+   "codec": "raw",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 0.006848946213722229,
+    "issue_ms": 0.0008605420589447021,
+    "gpu_ms": 0.0,
+    "launches": 0,
+    "kinds": {},
+    "top": []
+   },
+   "bits": 16.0,
+   "decode": {
+    "wall_ms": 0.2259332686662674,
+    "issue_ms": 0.2150610089302063,
+    "gpu_ms": 0.18966399999999972,
+    "launches": 28,
+    "kinds": {
+     "copies and fills": [
+      28,
+      0.18966399999999972
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.18966399999999972,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "splitzip",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 3.0577536672353745,
+    "issue_ms": 3.039054572582245,
+    "gpu_ms": 0.7397199999999985,
+    "launches": 196,
+    "kinds": {
+     "other": [
+      56,
+      0.4811559999999976
+     ],
+     "copies and fills": [
+      140,
+      0.2585640000000007
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.2869459999999992,
+      "count": 28,
+      "name": "_write_escapes_chunk"
+     },
+     {
+      "ms": 0.19420999999999822,
+      "count": 28,
+      "name": "_enc_4bit_quad64_count2_chunks"
+     },
+     {
+      "ms": 0.07177399999999717,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::CUDAFunctor_add<long>, "
+     },
+     {
+      "ms": 0.06400400000000196,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.06256100000000059,
+      "count": 28,
+      "name": "void at_cuda_detail::cub::detail::scan::DeviceScanKernel<at_cuda_detail::cub::de"
+     },
+     {
+      "ms": 0.03260799999999925,
+      "count": 28,
+      "name": "Memcpy DtoH (Device -> Pinned)"
+     }
+    ]
+   },
+   "bits": 12.041053771972656,
+   "decode": {
+    "wall_ms": 1.1426471173763275,
+    "issue_ms": 1.1277571320533752,
+    "gpu_ms": 0.2870389999999981,
+    "launches": 84,
+    "kinds": {
+     "other": [
+      56,
+      0.21666899999999883
+     ],
+     "copies and fills": [
+      28,
+      0.07036999999999913
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.16124599999999925,
+      "count": 28,
+      "name": "_dec_4bit_quad64"
+     },
+     {
+      "ms": 0.07036999999999913,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.05542299999999955,
+      "count": 28,
+      "name": "_fix_escapes_local_linear"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "adacode",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 14.19820822775364,
+    "issue_ms": 14.176487922668457,
+    "gpu_ms": 2.2084490000000314,
+    "launches": 952,
+    "kinds": {
+     "copies and fills": [
+      784,
+      1.8615580000000334
+     ],
+     "other": [
+      112,
+      0.29118000000000244
+     ],
+     "packing": [
+      56,
+      0.05571099999999522
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.37625599999999704,
+      "count": 56,
+      "name": "void at_cuda_detail::cub::detail::select::DeviceSelectSweepKernel<at_cuda_detail"
+     },
+     {
+      "ms": 0.28793900000000766,
+      "count": 56,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 0.22224500000000125,
+      "count": 56,
+      "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<a"
+     },
+     {
+      "ms": 0.19824100000000391,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::compare_scalar_ker"
+     },
+     {
+      "ms": 0.1477810000000032,
+      "count": 56,
+      "name": "get_exp_mask_count_fused_kernel"
+     },
+     {
+      "ms": 0.14339899999999944,
+      "count": 56,
+      "name": "compress3bit_vector"
+     }
+    ]
+   },
+   "bits": 11.385751451764788,
+   "decode": {
+    "wall_ms": 2.493835985660553,
+    "issue_ms": 2.47972272336483,
+    "gpu_ms": 0.44364799999999815,
+    "launches": 112,
+    "kinds": {
+     "other": [
+      56,
+      0.2793289999999981
+     ],
+     "copies and fills": [
+      56,
+      0.16431899999999988
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.2793289999999981,
+      "count": 56,
+      "name": "uncompress3bit_vector_merge"
+     },
+     {
+      "ms": 0.0898209999999999,
+      "count": 28,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::nativ"
+     },
+     {
+      "ms": 0.07449800000000005,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "exactkv",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 11.808531358838081,
+    "issue_ms": 11.78027130663395,
+    "gpu_ms": 1.722558999999997,
+    "launches": 896,
+    "kinds": {
+     "copies and fills": [
+      840,
+      1.1720880000000047
+     ],
+     "exactkv": [
+      56,
+      0.5504709999999936
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.5504709999999936,
+      "count": 56,
+      "name": "_encode_pages_kernel"
+     },
+     {
+      "ms": 0.3099560000000009,
+      "count": 56,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 0.2301229999999984,
+      "count": 224,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.1882960000000049,
+      "count": 168,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<unsign"
+     },
+     {
+      "ms": 0.12953499999999638,
+      "count": 112,
+      "name": "Memcpy DtoH (Device -> Pinned)"
+     },
+     {
+      "ms": 0.0705959999999998,
+      "count": 56,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "bits": 12.584821428571429,
+   "decode": {
+    "wall_ms": 2.5399085134267807,
+    "issue_ms": 2.519048750400543,
+    "gpu_ms": 1.4820570000000002,
+    "launches": 152,
+    "kinds": {
+     "copies and fills": [
+      96,
+      0.22572900000000046
+     ],
+     "exactkv": [
+      56,
+      1.2563279999999988
+     ]
+    },
+    "top": [
+     {
+      "ms": 1.2563279999999988,
+      "count": 56,
+      "name": "_dec_only_kernel"
+     },
+     {
+      "ms": 0.09315400000000058,
+      "count": 31,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::nativ"
+     },
+     {
+      "ms": 0.07238300000000003,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.008769000000000233,
+      "count": 3,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<bool, at::native::fu"
+     },
+     {
+      "ms": 0.008255999999999972,
+      "count": 6,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::AUnaryFunctor<long"
+     },
+     {
+      "ms": 0.0078069999999999026,
+      "count": 5,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<lo"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "exans",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 13.388335704803467,
+    "issue_ms": 13.257043436169624,
+    "gpu_ms": 12.703910000000008,
+    "launches": 83,
+    "kinds": {
+     "copies and fills": [
+      73,
+      1.8244610000000043
+     ],
+     "other": [
+      10,
+      10.879449
+     ]
+    },
+    "top": [
+     {
+      "ms": 9.290733,
+      "count": 1,
+      "name": "(anonymous namespace)::residual_histogram(unsigned short const*, unsigned char c"
+     },
+     {
+      "ms": 1.277547,
+      "count": 1,
+      "name": "(anonymous namespace)::gather_segments(unsigned long const*, unsigned int const*"
+     },
+     {
+      "ms": 0.9087440000000006,
+      "count": 1,
+      "name": "(anonymous namespace)::pack_records(unsigned char*, unsigned int, unsigned char "
+     },
+     {
+      "ms": 0.29433800000000154,
+      "count": 1,
+      "name": "(anonymous namespace)::fit_group_direction_phases(unsigned short const*, unsigne"
+     },
+     {
+      "ms": 0.1995520000000052,
+      "count": 59,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.18163299999999982,
+      "count": 1,
+      "name": "(anonymous namespace)::split_bf16_position_phase(unsigned short const*, unsigned"
+     }
+    ]
+   },
+   "bits": 11.013909476143974,
+   "decode": {
+    "wall_ms": 3.67642380297184,
+    "issue_ms": 3.6606043577194214,
+    "gpu_ms": 3.126999,
+    "launches": 155,
+    "kinds": {
+     "copies and fills": [
+      152,
+      1.8906060000000007
+     ],
+     "other": [
+      3,
+      1.2363930000000003
+     ]
+    },
+    "top": [
+     {
+      "ms": 1.2738649999999998,
+      "count": 1,
+      "name": "(anonymous namespace)::scatter_segments(unsigned char const*, unsigned long cons"
+     },
+     {
+      "ms": 0.9773190000000002,
+      "count": 1,
+      "name": "(anonymous namespace)::unpack_records(unsigned char const*, unsigned int, unsign"
+     },
+     {
+      "ms": 0.45536099999999985,
+      "count": 87,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.17680200000000013,
+      "count": 1,
+      "name": "(anonymous namespace)::merge_bf16_position_phase(unsigned char const*, unsigned "
+     },
+     {
+      "ms": 0.08227199999999993,
+      "count": 1,
+      "name": "void ans_gpu_lib::detail::decompress_kernel<(ans_gpu_lib::detail::DecodeMode)0, "
+     },
+     {
+      "ms": 0.08175999999999999,
+      "count": 1,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<unsign"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "aquakv-2",
+   "tokens": 512,
+   "encode": {
+    "wall_ms": 39.699116721749306,
+    "issue_ms": 39.652226492762566,
+    "gpu_ms": 36.73022399999999,
+    "launches": 3286,
+    "kinds": {
+     "copies and fills": [
+      3058,
+      24.416849999999823
+     ],
+     "products (int8 GEMM)": [
+      228,
+      12.313373999999977
+     ]
+    },
+    "top": [
+     {
+      "ms": 7.609074999999977,
+      "count": 112,
+      "name": "ampere_sgemm_128x128_nn"
+     },
+     {
+      "ms": 6.9101229999999925,
+      "count": 62,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::A"
+     },
+     {
+      "ms": 6.712267000000004,
+      "count": 562,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 3.7886389999999666,
+      "count": 616,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 2.0093290000000037,
+      "count": 54,
+      "name": "ampere_sgemm_32x128_tn"
+     },
+     {
+      "ms": 1.930992999999996,
+      "count": 54,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_128x128_32x4"
+     }
+    ]
+   },
+   "bits": 2.2112513950892856,
+   "decode": {
+    "wall_ms": 15.8713199198246,
+    "issue_ms": 15.83787240087986,
+    "gpu_ms": 10.751165999999955,
+    "launches": 1397,
+    "kinds": {
+     "copies and fills": [
+      1287,
+      5.067145999999973
+     ],
+     "products (int8 GEMM)": [
+      110,
+      5.684019999999993
+     ]
+    },
+    "top": [
+     {
+      "ms": 3.7713009999999936,
+      "count": 56,
+      "name": "ampere_sgemm_128x128_nn"
+     },
+     {
+      "ms": 1.9127190000000014,
+      "count": 54,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_128x128_32x4"
+     },
+     {
+      "ms": 1.3422169999999982,
+      "count": 308,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.6771899999999955,
+      "count": 168,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 0.5691229999999985,
+      "count": 56,
+      "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<a"
+     },
+     {
+      "ms": 0.5088369999999841,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<fl"
+     }
+    ]
+   },
+   "exact": null
+  },
+  {
+   "codec": "ours-hbh",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 14.598643407225609,
+    "issue_ms": 14.22729529440403,
+    "gpu_ms": 13.604156000000001,
+    "launches": 222,
+    "kinds": {
+     "copies and fills": [
+      56,
+      2.3558949999999963
+     ],
+     "our features": [
+      82,
+      2.256173999999999
+     ],
+     "products (int8 GEMM)": [
+      55,
+      5.610325000000007
+     ],
+     "our encoder": [
+      28,
+      3.0055659999999995
+     ],
+     "packing": [
+      1,
+      0.37619600000000175
+     ]
+    },
+    "top": [
+     {
+      "ms": 5.610325000000007,
+      "count": 55,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 3.0055659999999995,
+      "count": 28,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 2.1161819999999962,
+      "count": 28,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<in"
+     },
+     {
+      "ms": 1.1867289999999961,
+      "count": 27,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 0.9887759999999999,
+      "count": 28,
+      "name": "_lfeat_kernel"
+     },
+     {
+      "ms": 0.37619600000000175,
+      "count": 1,
+      "name": "_tail_copy"
+     }
+    ]
+   },
+   "bits": 8.050223214285714,
+   "decode": {
+    "wall_ms": 26.73242799937725,
+    "issue_ms": 1.1267438530921936,
+    "gpu_ms": 26.544455999999983,
+    "launches": 945,
+    "kinds": {
+     "copies and fills": [
+      50,
+      1.0954689999999971
+     ],
+     "our decoder": [
+      448,
+      18.451756999999997
+     ],
+     "other": [
+      420,
+      4.374798999999998
+     ],
+     "products (int8 GEMM)": [
+      27,
+      2.6224309999999975
+     ]
+    },
+    "top": [
+     {
+      "ms": 18.451756999999997,
+      "count": 448,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 4.374798999999998,
+      "count": 420,
+      "name": "_gacc_kernel"
+     },
+     {
+      "ms": 2.6224309999999975,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 1.0396919999999967,
+      "count": 32,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.02483199999999988,
+      "count": 1,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.007840000000000145,
+      "count": 3,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 22.60558120906353,
+    "issue_ms": 22.234683856368065
+   },
+   "decode_eager": {
+    "wall_ms": 27.2067841142416,
+    "issue_ms": 26.484737172722816
+   },
+   "decode_before": {
+    "wall_ms": 40.11913388967514,
+    "issue_ms": 40.07686488330364
+   }
+  },
+  {
+   "codec": "t2-hbh",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 23.958448320627213,
+    "issue_ms": 23.59125390648842,
+    "gpu_ms": 22.692546000000025,
+    "launches": 484,
+    "kinds": {
+     "copies and fills": [
+      308,
+      10.83848000000002
+     ],
+     "products (int8 GEMM)": [
+      65,
+      6.2029130000000015
+     ],
+     "our features": [
+      82,
+      2.259153999999999
+     ],
+     "our encoder": [
+      28,
+      3.016411000000013
+     ],
+     "packing": [
+      1,
+      0.37558799999999976
+     ]
+    },
+    "top": [
+     {
+      "ms": 5.619483000000001,
+      "count": 55,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 3.016411000000013,
+      "count": 28,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 2.2601530000000016,
+      "count": 72,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 2.1143569999999996,
+      "count": 28,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<in"
+     },
+     {
+      "ms": 1.2120749999999962,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 1.1879469999999945,
+      "count": 27,
+      "name": "_lsurp_kernel"
+     }
+    ]
+   },
+   "bits": 8.050223214285714,
+   "decode": {
+    "wall_ms": 26.731539517641068,
+    "issue_ms": 1.1275261640548706,
+    "gpu_ms": 26.582868000000033,
+    "launches": 945,
+    "kinds": {
+     "copies and fills": [
+      50,
+      1.0947650000000004
+     ],
+     "our decoder": [
+      448,
+      18.47427600000001
+     ],
+     "other": [
+      420,
+      4.387205999999989
+     ],
+     "products (int8 GEMM)": [
+      27,
+      2.626620999999996
+     ]
+    },
+    "top": [
+     {
+      "ms": 18.47427600000001,
+      "count": 448,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 4.387205999999989,
+      "count": 420,
+      "name": "_gacc_kernel"
+     },
+     {
+      "ms": 2.626620999999996,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 1.0386340000000005,
+      "count": 32,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.02483199999999988,
+      "count": 1,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.007904999999999973,
+      "count": 3,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 31.929634511470795,
+    "issue_ms": 31.563546508550644
+   },
+   "decode_eager": {
+    "wall_ms": 27.29402855038643,
+    "issue_ms": 26.57937817275524
+   },
+   "decode_before": {
+    "wall_ms": 40.45217111706734,
+    "issue_ms": 40.40366783738136
+   }
+  },
+  {
+   "codec": "t2-rank256",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 17.642855644226074,
+    "issue_ms": 17.196692526340485,
+    "gpu_ms": 17.231714,
+    "launches": 454,
+    "kinds": {
+     "copies and fills": [
+      280,
+      8.825608999999998
+     ],
+     "products (int8 GEMM)": [
+      64,
+      2.403382999999992
+     ],
+     "our features": [
+      81,
+      2.2331389999999907
+     ],
+     "our encoder": [
+      28,
+      3.3185059999999975
+     ],
+     "packing": [
+      1,
+      0.4510770000000011
+     ]
+    },
+    "top": [
+     {
+      "ms": 3.3185059999999975,
+      "count": 28,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 2.285916999999998,
+      "count": 72,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 1.224463999999996,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 1.1793699999999991,
+      "count": 27,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 0.9945069999999958,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 0.9779309999999949,
+      "count": 27,
+      "name": "_lfeat_kernel"
+     }
+    ]
+   },
+   "bits": 9.260718209402901,
+   "decode": {
+    "wall_ms": 6.349632516503334,
+    "issue_ms": 2.9461532831192017,
+    "gpu_ms": 5.838867999999998,
+    "launches": 131,
+    "kinds": {
+     "copies and fills": [
+      49,
+      0.805866
+     ],
+     "our decoder": [
+      28,
+      3.3158329999999983
+     ],
+     "products (int8 GEMM)": [
+      54,
+      1.7171689999999986
+     ]
+    },
+    "top": [
+     {
+      "ms": 3.3158329999999983,
+      "count": 28,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 0.9761369999999998,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 0.7410319999999987,
+      "count": 27,
+      "name": "_igemm_rq_kernel"
+     },
+     {
+      "ms": 0.7101850000000001,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.050559999999999945,
+      "count": 3,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.012225000000000022,
+      "count": 1,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<signed"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 19.56915482878685,
+    "issue_ms": 19.12612095475197
+   },
+   "decode_eager": {
+    "wall_ms": 6.341012194752693,
+    "issue_ms": 2.9599741101264954
+   },
+   "decode_before": {
+    "wall_ms": 6.337160244584084,
+    "issue_ms": 2.924911677837372
+   }
+  },
+  {
+   "codec": "raw",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 0.007212162017822266,
+    "issue_ms": 0.0009406358003616333,
+    "gpu_ms": 0.0,
+    "launches": 0,
+    "kinds": {},
+    "top": []
+   },
+   "bits": 16.0,
+   "decode": {
+    "wall_ms": 0.7604826241731644,
+    "issue_ms": 0.21352246403694153,
+    "gpu_ms": 0.7321870000000006,
+    "launches": 28,
+    "kinds": {
+     "copies and fills": [
+      28,
+      0.7321870000000006
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.7321870000000006,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "splitzip",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 3.088155761361122,
+    "issue_ms": 3.067104145884514,
+    "gpu_ms": 1.900587999999999,
+    "launches": 196,
+    "kinds": {
+     "other": [
+      56,
+      1.6018000000000012
+     ],
+     "copies and fills": [
+      140,
+      0.2987879999999974
+     ]
+    },
+    "top": [
+     {
+      "ms": 1.0358800000000006,
+      "count": 28,
+      "name": "_write_escapes_chunk"
+     },
+     {
+      "ms": 0.5659200000000013,
+      "count": 28,
+      "name": "_enc_4bit_quad64_count2_chunks"
+     },
+     {
+      "ms": 0.09091199999999901,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.07187299999999903,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::CUDAFunctor_add<long>, "
+     },
+     {
+      "ms": 0.06726300000000016,
+      "count": 28,
+      "name": "void at_cuda_detail::cub::detail::scan::DeviceScanKernel<at_cuda_detail::cub::de"
+     },
+     {
+      "ms": 0.035967999999999285,
+      "count": 28,
+      "name": "void at_cuda_detail::cub::detail::scan::DeviceScanInitKernel<at_cuda_detail::cub"
+     }
+    ]
+   },
+   "bits": 12.042319774627686,
+   "decode": {
+    "wall_ms": 1.5011206269264221,
+    "issue_ms": 1.1128764599561691,
+    "gpu_ms": 1.4418630000000008,
+    "launches": 84,
+    "kinds": {
+     "other": [
+      56,
+      0.721348
+     ],
+     "copies and fills": [
+      28,
+      0.720515
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.720515,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.642658,
+      "count": 28,
+      "name": "_dec_4bit_quad64"
+     },
+     {
+      "ms": 0.07868999999999997,
+      "count": 28,
+      "name": "_fix_escapes_local_linear"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "adacode",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 14.841755852103233,
+    "issue_ms": 14.81599546968937,
+    "gpu_ms": 4.849835999999984,
+    "launches": 952,
+    "kinds": {
+     "copies and fills": [
+      784,
+      3.896318999999985
+     ],
+     "other": [
+      112,
+      0.896777999999993
+     ],
+     "packing": [
+      56,
+      0.05673900000000209
+     ]
+    },
+    "top": [
+     {
+      "ms": 1.053216999999995,
+      "count": 56,
+      "name": "void at_cuda_detail::cub::detail::select::DeviceSelectSweepKernel<at_cuda_detail"
+     },
+     {
+      "ms": 0.8261529999999975,
+      "count": 56,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 0.5226909999999969,
+      "count": 56,
+      "name": "compress3bit_vector"
+     },
+     {
+      "ms": 0.4098549999999976,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::compare_scalar_ker"
+     },
+     {
+      "ms": 0.3740869999999964,
+      "count": 56,
+      "name": "get_exp_mask_count_fused_kernel"
+     },
+     {
+      "ms": 0.35065999999999126,
+      "count": 56,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<bool"
+     }
+    ]
+   },
+   "bits": 11.374289172036308,
+   "decode": {
+    "wall_ms": 2.477874979376793,
+    "issue_ms": 2.434592694044113,
+    "gpu_ms": 2.1914089999999975,
+    "launches": 112,
+    "kinds": {
+     "other": [
+      56,
+      0.7298589999999988
+     ],
+     "copies and fills": [
+      56,
+      1.4615500000000001
+     ]
+    },
+    "top": [
+     {
+      "ms": 0.7539600000000013,
+      "count": 28,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::nativ"
+     },
+     {
+      "ms": 0.7298589999999988,
+      "count": 56,
+      "name": "uncompress3bit_vector_merge"
+     },
+     {
+      "ms": 0.7075899999999987,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "exactkv",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 13.055849820375443,
+    "issue_ms": 13.026410713791847,
+    "gpu_ms": 3.7878099999999923,
+    "launches": 896,
+    "kinds": {
+     "copies and fills": [
+      840,
+      1.8641709999999945
+     ],
+     "exactkv": [
+      56,
+      1.9236389999999977
+     ]
+    },
+    "top": [
+     {
+      "ms": 1.9236389999999977,
+      "count": 56,
+      "name": "_encode_pages_kernel"
+     },
+     {
+      "ms": 0.8669550000000024,
+      "count": 56,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 0.32147099999999323,
+      "count": 168,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<unsign"
+     },
+     {
+      "ms": 0.2279690000000116,
+      "count": 224,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.12924799999998815,
+      "count": 112,
+      "name": "Memcpy DtoH (Device -> Pinned)"
+     },
+     {
+      "ms": 0.06963199999999732,
+      "count": 56,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "bits": 12.579677036830358,
+   "decode": {
+    "wall_ms": 6.959529593586922,
+    "issue_ms": 2.5418493896722794,
+    "gpu_ms": 6.296742,
+    "launches": 152,
+    "kinds": {
+     "copies and fills": [
+      96,
+      1.5591460000000017
+     ],
+     "exactkv": [
+      56,
+      4.737596
+     ]
+    },
+    "top": [
+     {
+      "ms": 4.737596,
+      "count": 56,
+      "name": "_dec_only_kernel"
+     },
+     {
+      "ms": 0.7736040000000016,
+      "count": 31,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::nativ"
+     },
+     {
+      "ms": 0.7147579999999997,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.01254399999999987,
+      "count": 3,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<bool, at::native::fu"
+     },
+     {
+      "ms": 0.009344999999999801,
+      "count": 6,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::AUnaryFunctor<long"
+     },
+     {
+      "ms": 0.009153000000000248,
+      "count": 5,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<lo"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "exans",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 47.13120684027672,
+    "issue_ms": 46.62317968904972,
+    "gpu_ms": 44.84701699999994,
+    "launches": 261,
+    "kinds": {
+     "copies and fills": [
+      251,
+      3.625282999999929
+     ],
+     "other": [
+      10,
+      41.221734
+     ]
+    },
+    "top": [
+     {
+      "ms": 37.515454000000005,
+      "count": 1,
+      "name": "(anonymous namespace)::residual_histogram(unsigned short const*, unsigned char c"
+     },
+     {
+      "ms": 1.471504,
+      "count": 1,
+      "name": "(anonymous namespace)::gather_segments(unsigned long const*, unsigned int const*"
+     },
+     {
+      "ms": 1.1922370000000009,
+      "count": 1,
+      "name": "(anonymous namespace)::fit_group_direction_phases(unsigned short const*, unsigne"
+     },
+     {
+      "ms": 1.048971000000005,
+      "count": 1,
+      "name": "(anonymous namespace)::pack_records(unsigned char*, unsigned int, unsigned char "
+     },
+     {
+      "ms": 0.7986929999999371,
+      "count": 236,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.7682319999999964,
+      "count": 1,
+      "name": "(anonymous namespace)::split_bf16_position_phase(unsigned short const*, unsigned"
+     }
+    ]
+   },
+   "bits": 10.88146904536656,
+   "decode": {
+    "wall_ms": 7.7665019780397415,
+    "issue_ms": 7.235907018184662,
+    "gpu_ms": 6.0123540000000055,
+    "launches": 509,
+    "kinds": {
+     "copies and fills": [
+      506,
+      3.898112000000005
+     ],
+     "other": [
+      3,
+      2.114241999999999
+     ]
+    },
+    "top": [
+     {
+      "ms": 1.7814380000000054,
+      "count": 264,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 1.4705609999999998,
+      "count": 1,
+      "name": "(anonymous namespace)::scatter_segments(unsigned char const*, unsigned long cons"
+     },
+     {
+      "ms": 1.0925129999999998,
+      "count": 1,
+      "name": "(anonymous namespace)::unpack_records(unsigned char const*, unsigned int, unsign"
+     },
+     {
+      "ms": 0.7048969999999999,
+      "count": 1,
+      "name": "(anonymous namespace)::merge_bf16_position_phase(unsigned char const*, unsigned "
+     },
+     {
+      "ms": 0.330433,
+      "count": 1,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<unsign"
+     },
+     {
+      "ms": 0.31683199999999945,
+      "count": 1,
+      "name": "void ans_gpu_lib::detail::decompress_kernel<(ans_gpu_lib::detail::DecodeMode)0, "
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "aquakv-2",
+   "tokens": 2048,
+   "encode": {
+    "wall_ms": 143.87659169733524,
+    "issue_ms": 143.79827119410038,
+    "gpu_ms": 142.80954900000012,
+    "launches": 3294,
+    "kinds": {
+     "copies and fills": [
+      3042,
+      103.8008310000001
+     ],
+     "products (int8 GEMM)": [
+      252,
+      39.00871800000015
+     ]
+    },
+    "top": [
+     {
+      "ms": 28.986522999999938,
+      "count": 86,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::A"
+     },
+     {
+      "ms": 28.056449999999828,
+      "count": 586,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 23.685316000000125,
+      "count": 112,
+      "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(cutlass_80_si"
+     },
+     {
+      "ms": 15.007181999999958,
+      "count": 616,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 8.472673000000055,
+      "count": 54,
+      "name": "ampere_sgemm_32x128_tn"
+     },
+     {
+      "ms": 6.260194000000182,
+      "count": 252,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<fl"
+     }
+    ]
+   },
+   "bits": 2.12982177734375,
+   "decode": {
+    "wall_ms": 41.27442091703415,
+    "issue_ms": 15.397224575281143,
+    "gpu_ms": 39.45623199999999,
+    "launches": 1341,
+    "kinds": {
+     "copies and fills": [
+      1231,
+      24.771945999999947
+     ],
+     "products (int8 GEMM)": [
+      110,
+      14.684286
+     ]
+    },
+    "top": [
+     {
+      "ms": 11.19733499999999,
+      "count": 56,
+      "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(cutlass_80_si"
+     },
+     {
+      "ms": 5.521176999999971,
+      "count": 308,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 3.252611999999966,
+      "count": 168,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 3.08140200000003,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<fl"
+     },
+     {
+      "ms": 2.3128249999999815,
+      "count": 54,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_alignedK_contig<at::"
+     },
+     {
+      "ms": 2.260857000000018,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_256x128_32x3"
+     }
+    ]
+   },
+   "exact": null
+  },
+  {
+   "codec": "ours-hbh",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 60.29464863240719,
+    "issue_ms": 59.551406651735306,
+    "gpu_ms": 57.76964799999996,
+    "launches": 446,
+    "kinds": {
+     "copies and fills": [
+      114,
+      12.11297199999999
+     ],
+     "our features": [
+      164,
+      8.413791999999955
+     ],
+     "products (int8 GEMM)": [
+      110,
+      22.941154000000004
+     ],
+     "our encoder": [
+      56,
+      12.788688999999998
+     ],
+     "packing": [
+      2,
+      1.5130410000000047
+     ]
+    },
+    "top": [
+     {
+      "ms": 22.941154000000004,
+      "count": 110,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 12.788688999999998,
+      "count": 56,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 8.350784000000004,
+      "count": 56,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<in"
+     },
+     {
+      "ms": 4.418671999999967,
+      "count": 54,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 3.8182530000000083,
+      "count": 56,
+      "name": "_lfeat_kernel"
+     },
+     {
+      "ms": 2.8905600000000007,
+      "count": 2,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     }
+    ]
+   },
+   "bits": 8.009789875575475,
+   "decode": {
+    "wall_ms": 73.17550480365753,
+    "issue_ms": 36.513401195406914,
+    "gpu_ms": 73.40487499999998,
+    "launches": 1918,
+    "kinds": {
+     "copies and fills": [
+      128,
+      7.193727999999975
+     ],
+     "our decoder": [
+      896,
+      40.81082300000006
+     ],
+     "other": [
+      840,
+      14.394960000000008
+     ],
+     "products (int8 GEMM)": [
+      54,
+      11.005363999999961
+     ]
+    },
+    "top": [
+     {
+      "ms": 40.81082300000006,
+      "count": 896,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 14.394960000000008,
+      "count": 840,
+      "name": "_gacc_kernel"
+     },
+     {
+      "ms": 11.005363999999961,
+      "count": 54,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 7.023422999999978,
+      "count": 92,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.09712000000000126,
+      "count": 2,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.017791999999995936,
+      "count": 6,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 91.65514446794987,
+    "issue_ms": 90.91982431709766
+   },
+   "decode_eager": {
+    "wall_ms": 73.52129742503166,
+    "issue_ms": 61.91316992044449
+   },
+   "decode_before": {
+    "wall_ms": 96.92548029124737,
+    "issue_ms": 87.03707531094551
+   }
+  },
+  {
+   "codec": "t2-hbh",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 79.35185171663761,
+    "issue_ms": 78.61523143947124,
+    "gpu_ms": 76.60272400000015,
+    "launches": 970,
+    "kinds": {
+     "copies and fills": [
+      618,
+      29.23017199999999
+     ],
+     "products (int8 GEMM)": [
+      130,
+      24.417135000000037
+     ],
+     "our features": [
+      164,
+      8.509628999999963
+     ],
+     "our encoder": [
+      56,
+      12.924874999999991
+     ],
+     "packing": [
+      2,
+      1.520912999999993
+     ]
+    },
+    "top": [
+     {
+      "ms": 23.151965000000036,
+      "count": 110,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 12.924874999999991,
+      "count": 56,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 8.349949000000016,
+      "count": 56,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<in"
+     },
+     {
+      "ms": 4.5561660000000215,
+      "count": 144,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 4.418990999999997,
+      "count": 54,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 3.9104429999999772,
+      "count": 56,
+      "name": "_lfeat_kernel"
+     }
+    ]
+   },
+   "bits": 8.009789875575475,
+   "decode": {
+    "wall_ms": 73.19394685328007,
+    "issue_ms": 36.53302416205406,
+    "gpu_ms": 72.04664000000017,
+    "launches": 1918,
+    "kinds": {
+     "copies and fills": [
+      128,
+      7.1741970000000315
+     ],
+     "our decoder": [
+      896,
+      39.81167300000006
+     ],
+     "other": [
+      840,
+      14.246286000000076
+     ],
+     "products (int8 GEMM)": [
+      54,
+      10.814484000000009
+     ]
+    },
+    "top": [
+     {
+      "ms": 39.81167300000006,
+      "count": 896,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 14.246286000000076,
+      "count": 840,
+      "name": "_gacc_kernel"
+     },
+     {
+      "ms": 10.814484000000009,
+      "count": 54,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 7.010517000000046,
+      "count": 92,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.0969289999999969,
+      "count": 2,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.016639000000006263,
+      "count": 6,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 110.39987578988075,
+    "issue_ms": 109.67378504574299
+   },
+   "decode_eager": {
+    "wall_ms": 73.57640191912651,
+    "issue_ms": 61.979422345757484
+   },
+   "decode_before": {
+    "wall_ms": 96.94093093276024,
+    "issue_ms": 87.04266510903835
+   }
+  },
+  {
+   "codec": "t2-rank256",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 52.577923983335495,
+    "issue_ms": 51.67517252266407,
+    "gpu_ms": 51.578433999999994,
+    "launches": 910,
+    "kinds": {
+     "copies and fills": [
+      562,
+      20.959087999999944
+     ],
+     "products (int8 GEMM)": [
+      128,
+      7.057809000000041
+     ],
+     "our features": [
+      162,
+      8.414807000000007
+     ],
+     "our encoder": [
+      56,
+      13.28779600000001
+     ],
+     "packing": [
+      2,
+      1.8589340000000047
+     ]
+    },
+    "top": [
+     {
+      "ms": 13.28779600000001,
+      "count": 56,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 4.564810999999992,
+      "count": 144,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 4.433744000000008,
+      "count": 54,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 4.045391000000032,
+      "count": 54,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 3.7995899999999923,
+      "count": 54,
+      "name": "_lfeat_kernel"
+     },
+     {
+      "ms": 2.9145920000000025,
+      "count": 2,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     }
+    ]
+   },
+   "bits": 9.219076974051339,
+   "decode": {
+    "wall_ms": 25.784127414226532,
+    "issue_ms": 14.590632170438766,
+    "gpu_ms": 24.115966000000007,
+    "launches": 290,
+    "kinds": {
+     "copies and fills": [
+      126,
+      5.940345000000004
+     ],
+     "our decoder": [
+      56,
+      12.695082000000005
+     ],
+     "products (int8 GEMM)": [
+      108,
+      5.480539
+     ]
+    },
+    "top": [
+     {
+      "ms": 12.695082000000005,
+      "count": 56,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 5.632373000000004,
+      "count": 84,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 3.8841680000000007,
+      "count": 54,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 1.5963709999999964,
+      "count": 54,
+      "name": "_igemm_rq_kernel"
+     },
+     {
+      "ms": 0.19574500000000125,
+      "count": 6,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.047360999999999764,
+      "count": 2,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<signed"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 58.679353445768356,
+    "issue_ms": 57.78150074183941
+   },
+   "decode_eager": {
+    "wall_ms": 25.86272545158863,
+    "issue_ms": 14.65822383761406
+   },
+   "decode_before": {
+    "wall_ms": 25.948068127036095,
+    "issue_ms": 14.712013304233551
+   }
+  },
+  {
+   "codec": "raw",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 0.00724010169506073,
+    "issue_ms": 0.0007729977369308472,
+    "gpu_ms": 0.0,
+    "launches": 0,
+    "kinds": {},
+    "top": []
+   },
+   "bits": 16.0,
+   "decode": {
+    "wall_ms": 2.8333626687526703,
+    "issue_ms": 0.22257119417190552,
+    "gpu_ms": 2.7988409999999972,
+    "launches": 28,
+    "kinds": {
+     "copies and fills": [
+      28,
+      2.7988409999999972
+     ]
+    },
+    "top": [
+     {
+      "ms": 2.7988409999999972,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "splitzip",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 7.704323157668114,
+    "issue_ms": 7.632900029420853,
+    "gpu_ms": 7.008419000000011,
+    "launches": 196,
+    "kinds": {
+     "other": [
+      56,
+      6.666881999999997
+     ],
+     "copies and fills": [
+      140,
+      0.341537000000008
+     ]
+    },
+    "top": [
+     {
+      "ms": 4.224135999999998,
+      "count": 28,
+      "name": "_write_escapes_chunk"
+     },
+     {
+      "ms": 2.4427459999999974,
+      "count": 28,
+      "name": "_enc_4bit_quad64_count2_chunks"
+     },
+     {
+      "ms": 0.10934400000000025,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.07993600000000049,
+      "count": 28,
+      "name": "void at_cuda_detail::cub::detail::scan::DeviceScanKernel<at_cuda_detail::cub::de"
+     },
+     {
+      "ms": 0.07987100000000248,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::CUDAFunctor_add<long>, "
+     },
+     {
+      "ms": 0.03875200000000257,
+      "count": 28,
+      "name": "void at_cuda_detail::cub::detail::scan::DeviceScanInitKernel<at_cuda_detail::cub"
+     }
+    ]
+   },
+   "bits": 12.049286961555481,
+   "decode": {
+    "wall_ms": 5.453599616885185,
+    "issue_ms": 1.1591892689466476,
+    "gpu_ms": 5.372112999999998,
+    "launches": 84,
+    "kinds": {
+     "other": [
+      56,
+      2.603319999999999
+     ],
+     "copies and fills": [
+      28,
+      2.7687929999999987
+     ]
+    },
+    "top": [
+     {
+      "ms": 2.7687929999999987,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 2.4429319999999994,
+      "count": 28,
+      "name": "_dec_4bit_quad64"
+     },
+     {
+      "ms": 0.16038799999999995,
+      "count": 28,
+      "name": "_fix_escapes_local_linear"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "adacode",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 22.40152657032013,
+    "issue_ms": 22.370396181941032,
+    "gpu_ms": 20.475101999999943,
+    "launches": 952,
+    "kinds": {
+     "copies and fills": [
+      784,
+      15.751823
+     ],
+     "other": [
+      112,
+      4.643951999999998
+     ],
+     "packing": [
+      56,
+      0.0793270000000014
+     ]
+    },
+    "top": [
+     {
+      "ms": 4.052905000000003,
+      "count": 56,
+      "name": "void at_cuda_detail::cub::detail::select::DeviceSelectSweepKernel<at_cuda_detail"
+     },
+     {
+      "ms": 3.091103999999993,
+      "count": 56,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 2.977542000000002,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::compare_scalar_ker"
+     },
+     {
+      "ms": 2.445912000000006,
+      "count": 56,
+      "name": "compress3bit_vector"
+     },
+     {
+      "ms": 2.209045999999996,
+      "count": 56,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<bool"
+     },
+     {
+      "ms": 2.198039999999993,
+      "count": 56,
+      "name": "get_exp_mask_count_fused_kernel"
+     }
+    ]
+   },
+   "bits": 11.37075240271432,
+   "decode": {
+    "wall_ms": 8.29031877219677,
+    "issue_ms": 2.463776618242264,
+    "gpu_ms": 8.193875000000002,
+    "launches": 112,
+    "kinds": {
+     "other": [
+      56,
+      2.5364720000000007
+     ],
+     "copies and fills": [
+      56,
+      5.657403
+     ]
+    },
+    "top": [
+     {
+      "ms": 2.852637999999998,
+      "count": 28,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::nativ"
+     },
+     {
+      "ms": 2.804765000000002,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 2.5364720000000007,
+      "count": 56,
+      "name": "uncompress3bit_vector_merge"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "exactkv",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 18.32091622054577,
+    "issue_ms": 18.285216763615608,
+    "gpu_ms": 11.899448999999953,
+    "launches": 896,
+    "kinds": {
+     "copies and fills": [
+      840,
+      4.921053000000012
+     ],
+     "exactkv": [
+      56,
+      6.9783959999999965
+     ]
+    },
+    "top": [
+     {
+      "ms": 6.9783959999999965,
+      "count": 56,
+      "name": "_encode_pages_kernel"
+     },
+     {
+      "ms": 3.0375870000000043,
+      "count": 56,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 1.1906010000000091,
+      "count": 168,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<unsign"
+     },
+     {
+      "ms": 0.2307250000000048,
+      "count": 224,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.1298910000000143,
+      "count": 112,
+      "name": "Memcpy DtoH (Device -> Pinned)"
+     },
+     {
+      "ms": 0.07347099999999532,
+      "count": 56,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "bits": 12.575496128627233,
+   "decode": {
+    "wall_ms": 25.037406012415886,
+    "issue_ms": 2.678830176591873,
+    "gpu_ms": 24.324356,
+    "launches": 152,
+    "kinds": {
+     "copies and fills": [
+      96,
+      5.796191000000007
+     ],
+     "exactkv": [
+      56,
+      18.528165000000005
+     ]
+    },
+    "top": [
+     {
+      "ms": 18.528165000000005,
+      "count": 56,
+      "name": "_dec_only_kernel"
+     },
+     {
+      "ms": 2.8600269999999997,
+      "count": 31,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::nativ"
+     },
+     {
+      "ms": 2.800033000000008,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.027807999999999992,
+      "count": 3,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<bool, at::native::fu"
+     },
+     {
+      "ms": 0.02217699999999991,
+      "count": 5,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<lo"
+     },
+     {
+      "ms": 0.017152999999999908,
+      "count": 6,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::AUnaryFunctor<long"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "exans",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 188.7674666941166,
+    "issue_ms": 186.8365779519081,
+    "gpu_ms": 179.62955499999987,
+    "launches": 1041,
+    "kinds": {
+     "copies and fills": [
+      1001,
+      14.518983999999485
+     ],
+     "other": [
+      40,
+      165.1105710000001
+     ]
+    },
+    "top": [
+     {
+      "ms": 150.36019900000002,
+      "count": 4,
+      "name": "(anonymous namespace)::residual_histogram(unsigned short const*, unsigned char c"
+     },
+     {
+      "ms": 5.880830999999994,
+      "count": 4,
+      "name": "(anonymous namespace)::gather_segments(unsigned long const*, unsigned int const*"
+     },
+     {
+      "ms": 4.795188000000031,
+      "count": 4,
+      "name": "(anonymous namespace)::fit_group_direction_phases(unsigned short const*, unsigne"
+     },
+     {
+      "ms": 4.130094999999994,
+      "count": 4,
+      "name": "(anonymous namespace)::pack_records(unsigned char*, unsigned int, unsigned char "
+     },
+     {
+      "ms": 3.20133099999952,
+      "count": 941,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 3.0945320000000063,
+      "count": 4,
+      "name": "(anonymous namespace)::split_bf16_position_phase(unsigned short const*, unsigned"
+     }
+    ]
+   },
+   "bits": 10.905555759157453,
+   "decode": {
+    "wall_ms": 30.789539217948914,
+    "issue_ms": 28.198162093758583,
+    "gpu_ms": 23.813345000000165,
+    "launches": 1949,
+    "kinds": {
+     "copies and fills": [
+      1937,
+      15.426790000000226
+     ],
+     "other": [
+      12,
+      8.386555000000001
+     ]
+    },
+    "top": [
+     {
+      "ms": 6.968622000000049,
+      "count": 969,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 5.869437999999997,
+      "count": 4,
+      "name": "(anonymous namespace)::scatter_segments(unsigned char const*, unsigned long cons"
+     },
+     {
+      "ms": 4.318254,
+      "count": 4,
+      "name": "(anonymous namespace)::unpack_records(unsigned char const*, unsigned int, unsign"
+     },
+     {
+      "ms": 2.816702,
+      "count": 4,
+      "name": "(anonymous namespace)::merge_bf16_position_phase(unsigned char const*, unsigned "
+     },
+     {
+      "ms": 1.3220310000000015,
+      "count": 4,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<unsign"
+     },
+     {
+      "ms": 1.258187000000041,
+      "count": 948,
+      "name": "Memcpy DtoH (Device -> Pageable)"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "aquakv-2",
+   "tokens": 8192,
+   "encode": {
+    "wall_ms": 565.5676666647196,
+    "issue_ms": 565.2903448790312,
+    "gpu_ms": 567.3606970000036,
+    "launches": 4746,
+    "kinds": {
+     "copies and fills": [
+      4074,
+      406.92685100000176
+     ],
+     "products (int8 GEMM)": [
+      672,
+      160.43384600000059
+     ]
+    },
+    "top": [
+     {
+      "ms": 120.65224199999955,
+      "count": 344,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::A"
+     },
+     {
+      "ms": 109.0707220000008,
+      "count": 844,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 96.88346599999998,
+      "count": 112,
+      "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(cutlass_80_si"
+     },
+     {
+      "ms": 57.30334500000061,
+      "count": 616,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 35.68356700000017,
+      "count": 216,
+      "name": "ampere_sgemm_32x128_tn"
+     },
+     {
+      "ms": 25.23811100000026,
+      "count": 252,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<fl"
+     }
+    ]
+   },
+   "bits": 2.109464372907366,
+   "decode": {
+    "wall_ms": 162.56946697831154,
+    "issue_ms": 39.13981094956398,
+    "gpu_ms": 161.1433820000004,
+    "launches": 1341,
+    "kinds": {
+     "copies and fills": [
+      1231,
+      98.2897080000005
+     ],
+     "products (int8 GEMM)": [
+      110,
+      62.853673999999934
+     ]
+    },
+    "top": [
+     {
+      "ms": 48.14604899999992,
+      "count": 56,
+      "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(cutlass_80_si"
+     },
+     {
+      "ms": 21.368152000000013,
+      "count": 308,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 12.562898000000045,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<fl"
+     },
+     {
+      "ms": 11.812430000000058,
+      "count": 168,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 9.546378000000042,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_256x128_32x3"
+     },
+     {
+      "ms": 9.047722000000045,
+      "count": 54,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_alignedK_contig<at::"
+     }
+    ]
+   },
+   "exact": null
+  },
+  {
+   "codec": "ours-hbh",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 122.38435074687004,
+    "issue_ms": 121.01929076015949,
+    "gpu_ms": 120.64474800000016,
+    "launches": 892,
+    "kinds": {
+     "copies and fills": [
+      228,
+      24.36369400000001
+     ],
+     "our features": [
+      328,
+      17.226207999999872
+     ],
+     "products (int8 GEMM)": [
+      220,
+      47.82536800000022
+     ],
+     "our encoder": [
+      112,
+      26.966678
+     ],
+     "packing": [
+      4,
+      4.262799999999992
+     ]
+    },
+    "top": [
+     {
+      "ms": 47.82536800000022,
+      "count": 220,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 26.966678,
+      "count": 112,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 16.703736000000053,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<in"
+     },
+     {
+      "ms": 8.858656999999958,
+      "count": 108,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 7.997660999999975,
+      "count": 112,
+      "name": "_lfeat_kernel"
+     },
+     {
+      "ms": 5.907938999999992,
+      "count": 4,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     }
+    ]
+   },
+   "bits": 10.862199238368444,
+   "decode": {
+    "wall_ms": 153.86322885751724,
+    "issue_ms": 136.3839954137802,
+    "gpu_ms": 151.82354200000006,
+    "launches": 3806,
+    "kinds": {
+     "copies and fills": [
+      226,
+      13.047954000000027
+     ],
+     "our decoder": [
+      1792,
+      88.037076
+     ],
+     "other": [
+      1680,
+      28.95823000000013
+     ],
+     "products (int8 GEMM)": [
+      108,
+      21.780282000000028
+     ]
+    },
+    "top": [
+     {
+      "ms": 88.037076,
+      "count": 1792,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 28.95823000000013,
+      "count": 1680,
+      "name": "_gacc_kernel"
+     },
+     {
+      "ms": 21.780282000000028,
+      "count": 108,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 12.570093000000002,
+      "count": 148,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.2931879999999867,
+      "count": 8,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.04764799999998649,
+      "count": 2,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<signed"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 186.38466484844685,
+    "issue_ms": 185.03733724355698
+   },
+   "decode_eager": {
+    "wall_ms": 153.97761203348637,
+    "issue_ms": 136.33227534592152
+   },
+   "decode_before": {
+    "wall_ms": 201.19202695786953,
+    "issue_ms": 184.98393148183823
+   }
+  },
+  {
+   "codec": "t2-hbh",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 159.11193564534187,
+    "issue_ms": 157.7589251101017,
+    "gpu_ms": 157.0373659999998,
+    "launches": 1940,
+    "kinds": {
+     "copies and fills": [
+      1236,
+      58.75659200000017
+     ],
+     "products (int8 GEMM)": [
+      260,
+      50.1050479999998
+     ],
+     "our features": [
+      328,
+      17.30570400000008
+     ],
+     "our encoder": [
+      112,
+      26.60456400000001
+     ],
+     "packing": [
+      4,
+      4.265458000000006
+     ]
+    },
+    "top": [
+     {
+      "ms": 47.40162899999986,
+      "count": 220,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 26.60456400000001,
+      "count": 112,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 16.724316999999996,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<in"
+     },
+     {
+      "ms": 9.137229000000147,
+      "count": 288,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 8.846470999999955,
+      "count": 108,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 8.092577000000077,
+      "count": 112,
+      "name": "_lfeat_kernel"
+     }
+    ]
+   },
+   "bits": 10.862199238368444,
+   "decode": {
+    "wall_ms": 154.22901697456837,
+    "issue_ms": 136.229133233428,
+    "gpu_ms": 151.62388600000077,
+    "launches": 3806,
+    "kinds": {
+     "copies and fills": [
+      226,
+      13.040373999999915
+     ],
+     "our decoder": [
+      1792,
+      87.75662100000004
+     ],
+     "other": [
+      1680,
+      28.95706700000018
+     ],
+     "products (int8 GEMM)": [
+      108,
+      21.869824000000076
+     ]
+    },
+    "top": [
+     {
+      "ms": 87.75662100000004,
+      "count": 1792,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 28.95706700000018,
+      "count": 1680,
+      "name": "_gacc_kernel"
+     },
+     {
+      "ms": 21.869824000000076,
+      "count": 108,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 12.56500599999992,
+      "count": 148,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.2922900000000302,
+      "count": 8,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.04812800000001152,
+      "count": 2,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<signed"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 223.55265356600285,
+    "issue_ms": 222.20040671527386
+   },
+   "decode_eager": {
+    "wall_ms": 154.4369775801897,
+    "issue_ms": 136.43980585038662
+   },
+   "decode_before": {
+    "wall_ms": 201.4546226710081,
+    "issue_ms": 185.25564670562744
+   }
+  },
+  {
+   "codec": "t2-rank256",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 105.94440065324306,
+    "issue_ms": 104.78242486715317,
+    "gpu_ms": 104.18447499999972,
+    "launches": 1820,
+    "kinds": {
+     "copies and fills": [
+      1124,
+      41.974740000000004
+     ],
+     "products (int8 GEMM)": [
+      256,
+      14.222532999999975
+     ],
+     "our features": [
+      324,
+      16.907037000000077
+     ],
+     "our encoder": [
+      112,
+      26.866100999999954
+     ],
+     "packing": [
+      4,
+      4.214063999999995
+     ]
+    },
+    "top": [
+     {
+      "ms": 26.866100999999954,
+      "count": 112,
+      "name": "_lenc_kernel"
+     },
+     {
+      "ms": 9.151117000000028,
+      "count": 288,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 8.878534000000093,
+      "count": 108,
+      "name": "_lsurp_kernel"
+     },
+     {
+      "ms": 8.140221999999982,
+      "count": 108,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 7.665397000000025,
+      "count": 108,
+      "name": "_lfeat_kernel"
+     },
+     {
+      "ms": 5.867747000000004,
+      "count": 4,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     }
+    ]
+   },
+   "bits": 10.388965742928642,
+   "decode": {
+    "wall_ms": 54.74459566175938,
+    "issue_ms": 39.15582783520222,
+    "gpu_ms": 51.85613700000003,
+    "launches": 552,
+    "kinds": {
+     "copies and fills": [
+      224,
+      11.800380999999994
+     ],
+     "our decoder": [
+      112,
+      28.916440999999995
+     ],
+     "products (int8 GEMM)": [
+      216,
+      11.13931500000003
+     ]
+    },
+    "top": [
+     {
+      "ms": 28.916440999999995,
+      "count": 112,
+      "name": "_ldec_kernel"
+     },
+     {
+      "ms": 11.185117999999978,
+      "count": 140,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 7.828951000000003,
+      "count": 108,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_i16832gemm_s8_256x128_64x3_tn_align16>"
+     },
+     {
+      "ms": 3.310364000000029,
+      "count": 108,
+      "name": "_igemm_rq_kernel"
+     },
+     {
+      "ms": 0.39174700000000623,
+      "count": 12,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.09488199999999505,
+      "count": 4,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<signed"
+     }
+    ]
+   },
+   "exact": true,
+   "encode_twice": {
+    "wall_ms": 118.07996779680252,
+    "issue_ms": 116.91983230412006
+   },
+   "decode_eager": {
+    "wall_ms": 54.856088012456894,
+    "issue_ms": 39.245862513780594
+   },
+   "decode_before": {
+    "wall_ms": 54.84333820641041,
+    "issue_ms": 39.25185278058052
+   }
+  },
+  {
+   "codec": "raw",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 0.007661059498786926,
+    "issue_ms": 0.0008195638656616211,
+    "gpu_ms": 0.0,
+    "launches": 0,
+    "kinds": {},
+    "top": []
+   },
+   "bits": 16.0,
+   "decode": {
+    "wall_ms": 5.59520348906517,
+    "issue_ms": 0.24011172354221344,
+    "gpu_ms": 5.559228999999997,
+    "launches": 28,
+    "kinds": {
+     "copies and fills": [
+      28,
+      5.559228999999997
+     ]
+    },
+    "top": [
+     {
+      "ms": 5.559228999999997,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "splitzip",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 14.68578353524208,
+    "issue_ms": 14.463318511843681,
+    "gpu_ms": 13.572163,
+    "launches": 196,
+    "kinds": {
+     "other": [
+      56,
+      13.210467999999999
+     ],
+     "copies and fills": [
+      140,
+      0.3616950000000071
+     ]
+    },
+    "top": [
+     {
+      "ms": 8.273392000000001,
+      "count": 28,
+      "name": "_write_escapes_chunk"
+     },
+     {
+      "ms": 4.937075999999998,
+      "count": 28,
+      "name": "_enc_4bit_quad64_count2_chunks"
+     },
+     {
+      "ms": 0.11097800000000052,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 0.09568199999999945,
+      "count": 28,
+      "name": "void at_cuda_detail::cub::detail::scan::DeviceScanKernel<at_cuda_detail::cub::de"
+     },
+     {
+      "ms": 0.08303800000000225,
+      "count": 28,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::CUDAFunctor_add<long>, "
+     },
+     {
+      "ms": 0.03858900000000472,
+      "count": 28,
+      "name": "void at_cuda_detail::cub::detail::scan::DeviceScanInitKernel<at_cuda_detail::cub"
+     }
+    ]
+   },
+   "bits": 12.049286961555481,
+   "decode": {
+    "wall_ms": 10.695196688175201,
+    "issue_ms": 1.1704452335834503,
+    "gpu_ms": 10.605260000000012,
+    "launches": 84,
+    "kinds": {
+     "other": [
+      56,
+      5.101622000000004
+     ],
+     "copies and fills": [
+      28,
+      5.503638000000001
+     ]
+    },
+    "top": [
+     {
+      "ms": 5.503638000000001,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 4.843763000000003,
+      "count": 28,
+      "name": "_dec_4bit_quad64"
+     },
+     {
+      "ms": 0.257859000000001,
+      "count": 28,
+      "name": "_fix_escapes_local_linear"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "adacode",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 40.61352089047432,
+    "issue_ms": 40.50183854997158,
+    "gpu_ms": 39.14049500000001,
+    "launches": 952,
+    "kinds": {
+     "copies and fills": [
+      784,
+      29.989544000000038
+     ],
+     "other": [
+      112,
+      9.063781000000011
+     ],
+     "packing": [
+      56,
+      0.08716999999999833
+     ]
+    },
+    "top": [
+     {
+      "ms": 8.028540999999978,
+      "count": 56,
+      "name": "void at_cuda_detail::cub::detail::select::DeviceSelectSweepKernel<at_cuda_detail"
+     },
+     {
+      "ms": 6.02205300000001,
+      "count": 56,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 5.762623000000022,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::compare_scalar_ker"
+     },
+     {
+      "ms": 4.803190000000014,
+      "count": 56,
+      "name": "compress3bit_vector"
+     },
+     {
+      "ms": 4.286672000000002,
+      "count": 56,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::BinaryFunctor<bool"
+     },
+     {
+      "ms": 4.260591000000001,
+      "count": 56,
+      "name": "get_exp_mask_count_fused_kernel"
+     }
+    ]
+   },
+   "bits": 11.37075240271432,
+   "decode": {
+    "wall_ms": 16.230395063757896,
+    "issue_ms": 2.5434475392103195,
+    "gpu_ms": 16.107621999999996,
+    "launches": 112,
+    "kinds": {
+     "other": [
+      56,
+      4.9329769999999975
+     ],
+     "copies and fills": [
+      56,
+      11.174645000000005
+     ]
+    },
+    "top": [
+     {
+      "ms": 5.619064000000002,
+      "count": 28,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::nativ"
+     },
+     {
+      "ms": 5.555580999999999,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 4.9329769999999975,
+      "count": 56,
+      "name": "uncompress3bit_vector_merge"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "exactkv",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 26.199402287602425,
+    "issue_ms": 26.155980303883553,
+    "gpu_ms": 22.612770000000047,
+    "launches": 896,
+    "kinds": {
+     "copies and fills": [
+      840,
+      8.877903999999994
+     ],
+     "exactkv": [
+      56,
+      13.734865999999998
+     ]
+    },
+    "top": [
+     {
+      "ms": 13.734865999999998,
+      "count": 56,
+      "name": "_encode_pages_kernel"
+     },
+     {
+      "ms": 5.940801000000007,
+      "count": 56,
+      "name": "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 2.222300000000023,
+      "count": 168,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<unsign"
+     },
+     {
+      "ms": 0.24618599999999224,
+      "count": 224,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, "
+     },
+     {
+      "ms": 0.13126799999999855,
+      "count": 112,
+      "name": "Memcpy DtoH (Device -> Pinned)"
+     },
+     {
+      "ms": 0.0740189999999951,
+      "count": 56,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<c10::B"
+     }
+    ]
+   },
+   "bits": 12.575496128627233,
+   "decode": {
+    "wall_ms": 49.153685569763184,
+    "issue_ms": 2.8933919966220856,
+    "gpu_ms": 48.371242999999986,
+    "launches": 152,
+    "kinds": {
+     "copies and fills": [
+      96,
+      11.411032999999993
+     ],
+     "exactkv": [
+      56,
+      36.96021
+     ]
+    },
+    "top": [
+     {
+      "ms": 36.96021,
+      "count": 56,
+      "name": "_dec_only_kernel"
+     },
+     {
+      "ms": 5.6257249999999965,
+      "count": 31,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_vectorized<at::nativ"
+     },
+     {
+      "ms": 5.553691000000001,
+      "count": 28,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 0.06550499999999988,
+      "count": 5,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<lo"
+     },
+     {
+      "ms": 0.041407999999999674,
+      "count": 6,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::AUnaryFunctor<long"
+     },
+     {
+      "ms": 0.0334720000000002,
+      "count": 5,
+      "name": "void at::native::vectorized_elementwise_kernel<2, at::native::BUnaryFunctor<long"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "exans",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 377.5874562561512,
+    "issue_ms": 373.81281331181526,
+    "gpu_ms": 359.34039400000023,
+    "launches": 2080,
+    "kinds": {
+     "copies and fills": [
+      2000,
+      29.084675000000832
+     ],
+     "other": [
+      80,
+      330.25571900000017
+     ]
+    },
+    "top": [
+     {
+      "ms": 300.719249,
+      "count": 8,
+      "name": "(anonymous namespace)::residual_histogram(unsigned short const*, unsigned char c"
+     },
+     {
+      "ms": 11.81421799999998,
+      "count": 8,
+      "name": "(anonymous namespace)::gather_segments(unsigned long const*, unsigned int const*"
+     },
+     {
+      "ms": 9.607791000000113,
+      "count": 8,
+      "name": "(anonymous namespace)::fit_group_direction_phases(unsigned short const*, unsigne"
+     },
+     {
+      "ms": 8.264284000000051,
+      "count": 8,
+      "name": "(anonymous namespace)::pack_records(unsigned char*, unsigned int, unsigned char "
+     },
+     {
+      "ms": 6.396307000000937,
+      "count": 1881,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 6.211015999999989,
+      "count": 8,
+      "name": "(anonymous namespace)::split_bf16_position_phase(unsigned short const*, unsigned"
+     }
+    ]
+   },
+   "bits": 10.902515121868678,
+   "decode": {
+    "wall_ms": 61.63620762526989,
+    "issue_ms": 56.30816891789436,
+    "gpu_ms": 47.64167799999979,
+    "launches": 3869,
+    "kinds": {
+     "copies and fills": [
+      3845,
+      30.86820900000001
+     ],
+     "other": [
+      24,
+      16.77346900000001
+     ]
+    },
+    "top": [
+     {
+      "ms": 13.904809999999989,
+      "count": 1909,
+      "name": "Memcpy DtoD (Device -> Device)"
+     },
+     {
+      "ms": 11.792548,
+      "count": 8,
+      "name": "(anonymous namespace)::scatter_segments(unsigned char const*, unsigned long cons"
+     },
+     {
+      "ms": 8.632129000000008,
+      "count": 8,
+      "name": "(anonymous namespace)::unpack_records(unsigned char const*, unsigned int, unsign"
+     },
+     {
+      "ms": 5.632481000000009,
+      "count": 8,
+      "name": "(anonymous namespace)::merge_bf16_position_phase(unsigned char const*, unsigned "
+     },
+     {
+      "ms": 2.6425290000000037,
+      "count": 8,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<unsign"
+     },
+     {
+      "ms": 2.515553999999847,
+      "count": 1896,
+      "name": "Memcpy DtoH (Device -> Pageable)"
+     }
+    ]
+   },
+   "exact": true
+  },
+  {
+   "codec": "aquakv-2",
+   "tokens": 16384,
+   "encode": {
+    "wall_ms": 1123.897971585393,
+    "issue_ms": 1123.741839081049,
+    "gpu_ms": 1127.028411000002,
+    "launches": 6682,
+    "kinds": {
+     "copies and fills": [
+      5450,
+      806.8118840000003
+     ],
+     "products (int8 GEMM)": [
+      1232,
+      320.21652700000186
+     ]
+    },
+    "top": [
+     {
+      "ms": 241.41912099999993,
+      "count": 688,
+      "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::A"
+     },
+     {
+      "ms": 216.5596309999985,
+      "count": 1188,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 192.56854100000035,
+      "count": 112,
+      "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(cutlass_80_si"
+     },
+     {
+      "ms": 112.77549200000014,
+      "count": 616,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 70.99474200000049,
+      "count": 432,
+      "name": "ampere_sgemm_32x128_tn"
+     },
+     {
+      "ms": 50.193098999998895,
+      "count": 252,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<fl"
+     }
+    ]
+   },
+   "bits": 2.1060714721679688,
+   "decode": {
+    "wall_ms": 321.6296620666981,
+    "issue_ms": 77.03100144863129,
+    "gpu_ms": 321.1331630000004,
+    "launches": 1341,
+    "kinds": {
+     "copies and fills": [
+      1231,
+      193.76614000000043
+     ],
+     "products (int8 GEMM)": [
+      110,
+      127.3670229999999
+     ]
+    },
+    "top": [
+     {
+      "ms": 96.87729099999999,
+      "count": 56,
+      "name": "void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(cutlass_80_si"
+     },
+     {
+      "ms": 41.95534400000041,
+      "count": 308,
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda"
+     },
+     {
+      "ms": 24.87929399999991,
+      "count": 112,
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<fl"
+     },
+     {
+      "ms": 23.119789000000143,
+      "count": 168,
+      "name": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<a"
+     },
+     {
+      "ms": 20.049129,
+      "count": 27,
+      "name": "void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_128x128_32x4"
+     },
+     {
+      "ms": 18.27406799999988,
+      "count": 54,
+      "name": "void at::native::(anonymous namespace)::CatArrayBatchedCopy_alignedK_contig<at::"
+     }
+    ]
+   },
+   "exact": null
+  }
+ ],
+ "codec_errors": {},
+ "meta": {
+  "model": "unsloth/Llama-3.2-3B",
+  "revision": "d4446454d87d51aa42e1fb174f25acc5f8762331",
+  "train_set": "wikitext",
+  "calibration": [
+   "wtrain0",
+   "wtrain1",
+   "wtrain2",
+   "wtrain3",
+   "wtrain4",
+   "wtrain5"
+  ],
+  "splitzip_book_from": "wtrain0",
+  "rope_layout": "half",
+  "L": 28,
+  "W": 2048,
+  "C": 1024,
+  "hd": 128,
+  "rank": 256,
+  "groups": [
+   2,
+   4,
+   16
+  ],
+  "max_positions": 32768,
+  "aqua_bits": [
+   2,
+   3
+  ],
+  "t2_sets": [
+   "wikitext",
+   "code",
+   "math",
+   "exam",
+   "news"
+  ]
+ },
+ "torch": "2.13.0+cu130",
+ "decode_chunks": 1,
+ "piece_tokens": 4096,
+ "encode_once": true,
+ "decode_graphs": true,
+ "graph_events": [
+  {
+   "codec": "ours-hbh",
+   "tokens": 512,
+   "layer0": "coded",
+   "ok": true,
+   "record_ms": 53.638240322470665,
+   "graphs": 28
+  },
+  {
+   "codec": "t2-hbh/wikitext",
+   "tokens": 512,
+   "layer0": "coded",
+   "ok": true,
+   "record_ms": 54.56332489848137,
+   "graphs": 28
+  },
+  {
+   "codec": "ours-hbh",
+   "tokens": 2048,
+   "layer0": "coded",
+   "ok": true,
+   "record_ms": 72.3019428551197,
+   "graphs": 28
+  },
+  {
+   "codec": "t2-hbh/wikitext",
+   "tokens": 2048,
+   "layer0": "coded",
+   "ok": true,
+   "record_ms": 73.79976473748684,
+   "graphs": 28
+  },
+  {
+   "codec": "ours-hbh",
+   "tokens": 4096,
+   "layer0": "coded",
+   "ok": true,
+   "record_ms": 104.78340648114681,
+   "graphs": 28
+  },
+  {
+   "codec": "t2-hbh/wikitext",
+   "tokens": 4096,
+   "layer0": "coded",
+   "ok": true,
+   "record_ms": 104.03296537697315,
+   "graphs": 28
+  }
+ ]
+}
