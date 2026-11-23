@@ -1945,6 +1945,99 @@ class DeltaAnalysisTests(unittest.TestCase):
         self.assertIn("D's held copies against P's recomputation", text)
 
 
+class PageCompareTests(unittest.TestCase):
+    def test_their_measures_on_a_known_capture(self):
+        """Three turns of one conversation. Turn 1 repeats turn 0's passage at the same place with a few words one
+        ULP off (aligned near-copies: cheap deltas, high bytes all equal, layer 0 identical). Turn 2 holds it 16
+        tokens later (moved: found by its text, keys turned by RoPE). Layer-0 values depend on the token only, so
+        moved layer-0 V rows match at another slot and layer-0 K rows do not; the first block of turn 1 is turn 0's
+        (a reference, not a page)."""
+        import numpy as np
+        import torch
+        from kv_compare.pd import trace as tr
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_delta_analysis as da
+        import pd_page_compare as pg
+        L, bs, H, hd = 3, 16, 2, 8
+        C, W = H * hd, 2 * H * hd
+        d = Path(tempfile.mkdtemp())
+        cap, run, mdir = d / "cap", d / "run", d / "model"
+        for x in (cap, run / "runs", mdir):
+            x.mkdir(parents=True)
+        (mdir / "config.json").write_text(json.dumps({"rope_theta": 10000.0, "head_dim": hd}))
+        inv, _ = da.rope_inv_freq(str(mdir), hd)
+        rng = np.random.default_rng(7)
+        vocab = 6000
+        k0 = rng.standard_normal((vocab, H, hd)).astype(np.float32)   # layer 0: a function of the token
+        v0 = rng.standard_normal((vocab, C)).astype(np.float32)
+
+        def rope(q, pos):
+            ang = (pos[:, None].astype(np.float64) * inv[None, :]).astype(np.float32)[:, None, :]
+            c, s_ = np.cos(ang), np.sin(ang)
+            x1, x2 = q[..., :hd // 2], q[..., hd // 2:]
+            return np.concatenate([x1 * c - x2 * s_, x2 * c + x1 * s_], -1).reshape(len(q), -1)
+
+        deep = {}
+
+        def words_of(ids, near=None):
+            T = len(ids)
+            w = np.zeros((L, T, W), dtype=np.int16)
+            pos = np.arange(T)
+            w[0, :, :C] = da.to_bf16(rope(k0[ids], pos))
+            w[0, :, C:] = da.to_bf16(v0[ids])
+            for l in range(1, L):
+                w[l] = da.to_bf16(rng.standard_normal((T, W)).astype(np.float32))
+            if near is not None:                     # the given tokens: the earlier words, a few one ULP off
+                src, lo, hi = near
+                w[1:, lo:hi] = src[1:, lo:hi]
+                flip = rng.random(w[1:, lo:hi].shape) < 0.05
+                w[1:, lo:hi] = np.where(flip, w[1:, lo:hi] + 1, w[1:, lo:hi])
+            return w
+        X, A, Y = list(range(100, 116)), list(range(2000, 2032)), list(range(3000, 3032))
+        ids0, ids1, ids2 = X + A, X + A, Y + A
+        w0 = words_of(ids0)
+        w1 = words_of(ids1, near=(w0, 16, 48))
+        w1[:, :16] = w0[:, :16]                       # the first block exactly turn 0's
+        w2 = words_of(ids2)
+        st = tr.PageStore(str(cap), "P", 1.0, L, bs, W)
+        for key, w in (("K0", w0), ("K1", w1), ("K2", w2)):
+            t = torch.from_numpy(w)
+            rows = tr.capture_blocks(st, t, tr.page_hashes(t, bs), bs)
+            st.record({"event": "request", "key": key, "conv": "r:0", "t0": 0, "T": w.shape[1], "bs": bs,
+                       "rows": rows, "missing": 0})
+        st.close()
+        name = "mtrag_raw_docs_first_conversation"
+        recs = [{"tag": f"{name}|0|{t}", "run": name, "layout": "docs_first", "policy": "conversation", "conv": 0,
+                 "turn": t, "prompt_tokens": len(ids), "ids": ids, "pieces": [["doc", "D", 0, len(ids)]]}
+                for t, ids in enumerate((ids0, ids1, ids2))]
+        (run / "runs" / f"{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+        (run / "proxy.jsonl").write_text("".join(json.dumps({"key": f"K{t}", "tag": r["tag"], "t_in": t}) + "\n"
+                                                 for t, r in enumerate(recs)))
+        res = pg.analyse(str(cap), str(run), str(mdir))
+        r = res["runs"][name]
+        self.assertEqual(r["pages"], 3 + 2 + 4)             # turn 1's first block is a reference
+        self.assertEqual(r["with_base"], {"position": 2 + 3, "text": 2 + 2, "turned": 2})   # turned: moved only
+        g = r["graph_by_rule"]["position"]
+        self.assertGreaterEqual(g["deltas"], 2)              # the aligned near-copies
+        self.assertGreater(g["saving_beyond_independent"], 0)
+        bm = r["byte_match"]
+        self.assertEqual((bm["aligned K L0"]["high"], bm["aligned V L0"]["low"]), (1.0, 1.0))  # layer 0 the same
+        self.assertGreater(bm["aligned V L1+"]["high"], 0.9)                # a few words one ULP off
+        self.assertLess(bm["position K L0"]["high"], 1.0)                   # other text at the place too
+        self.assertLess(bm["text K L0"]["low"], bm["turned K L0"]["low"])   # moved keys: turned, closer
+        rows = r["rows"]
+        self.assertEqual(rows["L0 V"]["any_slot"], 32 + 32)  # turn 1's A (same slot) and turn 2's A (moved)
+        self.assertEqual(rows["L0 K"]["any_slot"], 32)        # only at the same slot: keys carry the position
+        self.assertEqual(rows["L0 K"]["same_slot"], 32)
+        for kv in ("K", "V"):                                 # deeper: only the near-copy's untouched rows, in place
+            self.assertEqual(rows[f"L1+ {kv}"]["any_slot"], rows[f"L1+ {kv}"]["same_slot"])
+            self.assertGreater(rows[f"L1+ {kv}"]["same_slot"], 0)
+        self.assertIsNotNone(r["previous_layer"]["change"])
+        text = pg.markdown(res)
+        self.assertIn("## mtrag_raw_docs_first_conversation", text)
+        self.assertIn("their best", text)
+
+
 class TraceReportTests(unittest.TestCase):
     def test_related_kv_is_costed_against_its_first_occurrence(self):
         """P's relation records: turn 1 holds turn 0's document 16 tokens later (16 related tokens, moved, within
