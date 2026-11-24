@@ -1435,6 +1435,25 @@ class RunnerDryRunTests(unittest.TestCase):
                          ["TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=diffgraph "
                           "RUN_TIMEOUT_S=10800"])
 
+    def test_tree_runs_offline_without_engines(self):
+        """STAGES=tree: as diffgraph, no engine starts, the missing capture is said, the run packaged with the stage's
+        exit under its own name; MATRIX=tree lists that one run."""
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw,t2-hbh", STAGES="tree",
+                             KVPD_ROOT=str(self.tmp / "noroot"))
+        self.assertEqual(eng, [])
+        self.assertIn("== tree: capture none", r.stdout)
+        self.assertIn("STOP: no kept capture", r.stdout + r.stderr)
+        self.assertNotIn("PD RUN STOPPED", r.stdout + r.stderr, r.stderr[-2000:])
+        self.assertIn("committed locally", r.stdout, r.stdout[-2000:])
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        res = json.loads((out / "results.json").read_text())
+        self.assertEqual((res["tree"]["exit"], res["env"]["stage"]), (1, "tree"))
+        m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="tree", PRINT_RUNS="1"))
+        self.assertEqual([x for x in m.stdout.split("\n") if x],
+                         ["TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=tree "
+                          "RUN_TIMEOUT_S=10800"])
+
     def test_capture_run_configures_both_engines_and_runs_the_delta_stage(self):
         """MATRIX=capture's run: both engines get capture_dir (P its 16 GB, D its 2), the traced runs ask for the first
         conversations' pages, and stage delta runs after mtrag (here no engine stores pages: it says so)."""
@@ -1892,6 +1911,175 @@ class PmapForkTests(unittest.TestCase):
                            timeout=120)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
         self.assertEqual(r.stdout.split(), ["[1,", "2,", "3]", "4096.0"])
+
+
+class TreeTests(unittest.TestCase):
+    """scripts/pd_tree.py: the conversations' block tree kept by a rule (docs/pd_delta.md, idea 1)."""
+    BS = 16
+
+    @staticmethod
+    def _tree():
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_tree
+        return pd_tree
+
+    def scenario(self):
+        """Two conversations sharing the system block S (history first). Conversation 0: turn 0 S D0 D0' Q0; turn 1
+        S Q0 A0 D1 D1' Q1 (its history moved Q0: a new page); turn 2 S Q0 A0 Q1 A1 D2 D2' Q2 (reuses S Q0 A0).
+        Conversation 1: turn 0 S E0 R0. Rows stand for bytes: the same token prefix, the same row."""
+        bs = self.BS
+        tok = lambda name: [hash(name) % 50000 + i for i in range(bs)]
+        S, Q0, A0, Q1, A1, Q2, R0 = (tok(x) for x in ("S", "Q0", "A0", "Q1", "A1", "Q2", "R0"))
+        D0, D1, D2, E0 = (tok(x) + tok(x + "'") for x in ("D0", "D1", "D2", "E0"))
+        E0 = E0[:bs]
+
+        def pieces(parts):
+            out, at = [], 0
+            for kind, n in parts:
+                out.append([kind, None, at, at + n * bs])
+                at += n * bs
+            return out
+        convs = [
+            (0, 0, S + D0 + Q0, pieces([("system", 1), ("doc", 2), ("user", 1)])),
+            (1, 0, S + E0 + R0, pieces([("system", 1), ("doc", 1), ("user", 1)])),
+            (0, 1, S + Q0 + A0 + D1 + Q1, pieces([("system", 1), ("user", 1), ("answer", 1), ("doc", 2),
+                                                  ("user", 1)])),
+            (0, 2, S + Q0 + A0 + Q1 + A1 + D2 + Q2, pieces([("system", 1), ("user", 1), ("answer", 1), ("user", 1),
+                                                            ("answer", 1), ("doc", 2), ("user", 1)])),
+        ]
+        return convs
+
+    def reqs_of(self, convs, row_of=None):
+        pt = self._tree()
+        bs = self.BS
+        rows_by_prefix, reqs, req = {}, [], {}
+        for n, (c, t, ids, pcs) in enumerate(convs):
+            keys = pt.token_keys(ids, len(ids) // bs, bs)
+            rows = [rows_by_prefix.setdefault(k, len(rows_by_prefix)) for k in keys]
+            if row_of:
+                rows = row_of(n, rows)
+            reqs.append((n, {"conv": c, "turn": t, "ids": ids, "pieces": pcs}, f"K{n}"))
+            req[f"K{n}"] = (1, rows, len(ids))
+        return reqs, req
+
+    def test_each_rule_reuses_and_keeps_what_it_should(self):
+        pt = self._tree()
+        reqs, req = self.reqs_of(self.scenario())
+        c, peaks, pages_of = pt.replay(reqs, req, self.BS)
+        self.assertEqual(sum(len(p) for p in pages_of), 4 + 3 + 6 + 8)
+        self.assertEqual(len({p for ps in pages_of for p in ps}), 4 + 2 + 5 + 5)
+        hits = {r: c[r]["hits"] for r in pt.RULES}
+        self.assertEqual(hits, {"everything": 5, "newest_path": 5, "newest_no_docs": 5, "hindsight": 5, "none": 0})
+        peak = {r: c[r]["peak_pages"] for r in pt.RULES}
+        # everything: all 16; newest path: conversation 0's 8 and conversation 1's S E0 R0 (S shared): 10; without
+        # documents: S Q0 A0 Q1 A1 Q2 and R0: 7; hindsight: S Q0 A0 (still to be reused): 3
+        self.assertEqual(peak, {"everything": 16, "newest_path": 10, "newest_no_docs": 7, "hindsight": 3, "none": 0})
+        self.assertEqual(c["none"]["computed_again"], 5)       # each repeat computed again
+        self.assertEqual(c["newest_path"]["computed_again"], 0)
+        self.assertEqual(c["everything"]["computed_tokens"], c["everything"]["tokens"] - 5 * self.BS)
+        runs = pt.kept_runs(peaks["hindsight"], pages_of, self.BS)
+        self.assertEqual([(pos0, len(ps)) for pos0, ps in runs], [(0, 1), (16, 2)])   # S of turn 0; Q0 A0 of turn 1
+
+    def test_a_kept_page_after_a_missing_one_is_not_a_hit(self):
+        """A prefix cache reuses blocks from the first on: without documents, U0 is kept but follows F0, dropped."""
+        pt = self._tree()
+        bs = self.BS
+        S, F0, U0, V1 = ([i * 100 + j for j in range(bs)] for i in range(1, 5))
+        pc = lambda *k: [[kind, None, i * bs, (i + 1) * bs] for i, kind in enumerate(k)]
+        reqs, req = self.reqs_of([(0, 0, S + F0 + U0, pc("system", "doc", "user")),
+                                  (0, 1, S + F0 + U0 + V1, pc("system", "doc", "user", "user"))])
+        c, _, _ = pt.replay(reqs, req, bs)
+        self.assertEqual((c["newest_no_docs"]["hits"], c["newest_no_docs"]["hits_anywhere"]), (1, 2))
+        self.assertEqual(c["newest_no_docs"]["computed_again"], 1)          # F0
+        self.assertEqual(c["newest_path"]["hits"], 3)
+
+    def test_identity_counts_recomputes_by_their_bytes(self):
+        pt = self._tree()
+
+        def turn2_s_differs(n, rows):        # turn 2's S under the same token prefix: other bytes
+            return [999] + rows[1:] if n == 3 else rows
+        reqs, req = self.reqs_of(self.scenario(), turn2_s_differs)
+        idn = pt.identity(reqs, req, self.BS)
+        self.assertEqual(idn, {"same_prefix_same_bytes": 4, "same_prefix_other_bytes": 1,
+                               "other_prefix_same_bytes": 0})
+
+    def test_the_stage_on_a_capture_with_a_stand_in_codec(self):
+        """The whole stage on a capture of the scenario (words a function of the token prefix, so the capture's rows
+        follow it), raw words standing in for T2: hits and peaks as the replay's, every kept run decoded exactly, 16
+        bits; the padding probe's accounting (raw words: no padding bytes of its own); the run's prefill rate; D's
+        held check; the report."""
+        import numpy as np
+        import torch
+        from unittest import mock
+        from kv_compare.pd import trace as tr
+        from kv_compare.pd import codecs as cdm
+        pt = self._tree()
+        import pd_delta_analysis as da
+        _in_process(self, da)
+        bs, L, W = self.BS, 2, 8
+        d = Path(tempfile.mkdtemp())
+        cap, run, mdir, out = d / "cap", d / "run", d / "model", d / "out"
+        for x in (cap, run / "runs", run / "connector", mdir):
+            x.mkdir(parents=True)
+        (mdir / "config.json").write_text(json.dumps({"rope_theta": 10000.0, "head_dim": 4}))
+        convs = self.scenario()
+        convs[3] = convs[3][:2] + (convs[3][2] + list(range(7000, 7000 + 15 * bs)),
+                                   convs[3][3] + [["user", None, 8 * bs, 23 * bs]])   # 23 blocks: the probe's case
+        st = tr.PageStore(str(cap), "P", 1.0, L, bs, W)
+        name = "mtrag_raw_history_first_conversation"
+        recs, proxy, sends = [], [], []
+        for n, (c, t, ids, pcs) in enumerate(convs):
+            w = np.zeros((L, len(ids), W), dtype=np.int16)
+            for b, key in enumerate(pt.token_keys(ids, len(ids) // bs, bs)):
+                g = np.random.default_rng(int.from_bytes(key[:8], "little"))
+                w[:, b * bs:(b + 1) * bs] = g.integers(-3000, 3000, (L, bs, W))
+            tw = torch.from_numpy(w)
+            rows = tr.capture_blocks(st, tw, tr.page_hashes(tw, bs), bs)
+            st.record({"event": "request", "key": f"K{n}", "conv": f"{c}", "t0": 0, "T": len(ids), "bs": bs,
+                       "rows": rows, "missing": 0})
+            recs.append({"tag": f"{name}|{c}|{t}", "run": name, "layout": "history_first", "policy": "conversation",
+                         "conv": c, "turn": t, "prompt_tokens": len(ids), "ids": ids, "pieces": pcs})
+            proxy.append({"key": f"K{n}", "tag": recs[-1]["tag"], "t_in": 100.0 + n})
+            sends.append({"event": "send", "key": f"K{n}", "t0": 0, "tokens": len(ids),
+                          "finished_at": 100.0 + n + 0.002 * len(ids)})          # 2 ms per token
+        st.close()
+        (run / "runs" / f"{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+        (run / "proxy.jsonl").write_text("".join(json.dumps(r) + "\n" for r in proxy))
+        (run / "connector" / "tkv_Pw_1.jsonl").write_text("".join(json.dumps(r) + "\n" for r in sends))
+        (run / "trace_report.json").write_text(json.dumps(
+            {"history_first / conversation": {"relations": {"held_recomputed": {"pages": 56, "pages_differing": 0}}}}))
+        stand_in = cdm.Raw()
+        with mock.patch.object(cdm, "build", lambda *a, **k: ({"t2-hbh": stand_in}, {}, {})):
+            res = pt.analyse(str(cap), str(run), None, str(mdir), str(out), names=("t2-hbh",), device="cpu",
+                             log=lambda *a: None)
+        m = res["meta"]
+        self.assertAlmostEqual(m["prefill_ms_per_token"], 2.0, places=6)
+        self.assertEqual(m["held_check"], {"history_first / conversation": {"layer_pages": 56, "differing": 0}})
+        r = res["runs"][name]
+        self.assertEqual(r["identity"], {"same_prefix_same_bytes": 5, "same_prefix_other_bytes": 0,
+                                         "other_prefix_same_bytes": 0})
+        ru = r["rules"]
+        self.assertEqual({k: ru[k]["hits"] for k in ru},
+                         {"everything": 5, "newest_path": 5, "newest_no_docs": 5, "hindsight": 5, "none": 0})
+        self.assertEqual((ru["everything"]["peak_pages"], ru["hindsight"]["peak_pages"]), (16 + 15, 3))
+        for k in ("everything", "newest_path", "newest_no_docs", "hindsight"):
+            x = ru[k]
+            self.assertEqual(x["t2-hbh_exact"], x["peak_runs"], k)
+            self.assertEqual(x["peak_raw_bytes"], x["peak_pages"] * m["page_bytes"])
+            self.assertEqual(x["t2-hbh_bytes"], x["peak_raw_bytes"], k)     # raw words: 16 bits
+        pr = r["probe"]["t2-hbh"]
+        # the requests of 256 tokens or more: turn 2 of conversation 0 (23 blocks = 368 tokens: 256 + a tail of 112)
+        self.assertEqual((pr["requests"], pr["tokens"], pr["head_tokens"]), (1, 368, 256))
+        self.assertEqual((pr["pad_tokens_now"], pr["pad_tokens_split"]), (512 - 368, 128 - 112))
+        tok = L * W * 2                                  # raw words: zeros cost nothing extra, copies are coded
+        self.assertEqual((pr["now"], pr["head_only"], pr["split_zeros"], pr["split_copies"], pr["copies_256"]),
+                         (368 * tok, 256 * tok, 368 * tok, (256 + 128) * tok, 512 * tok))
+        self.assertEqual(pr["exact"], 1)
+        text = pt.markdown(res)
+        self.assertIn("| Newest path per conversation | 5 of", text)
+        self.assertIn("Recompute is exact", text)
+        self.assertIn("16.00", text)
+        self.assertIn("2.000 ms per token", text)
 
 
 class DeltaAnalysisTests(unittest.TestCase):

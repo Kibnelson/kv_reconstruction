@@ -201,8 +201,12 @@ the repeated pages included.
 
 - **Per segment against theirs.** T2-hbh with no deltas is 4.9% under their graph in docs_first and 2.4% over it in
   history_first. history_first's new pages come in shorter runs.
-- **Out of domain.** On MTRAG, T2-hbh costs 10.3 bits. On the quick run's prompts it costs 8.2–8.9, but those prompts
-  come from the datasets T's constants were fitted on (WikiText-2, HumanEval, GSM8K, MMLU, PTB).
+- **Padding, not the domain (job 30583).** On MTRAG, T2-hbh costs 10.3 bits; on the quick run's prompts 8.2–8.9. This
+  note first put that down to the domain (T's constants were fitted on the quick prompts' datasets). Job 30583's T2 per
+  page then cost 28.4 bits for 16 real tokens padded to 32 with zeros: zero tokens cost about 20 bits per value each.
+  T pads every unit with zeros up to a multiple of 256, about 128 tokens on average on MTRAG; taken out, every MTRAG
+  row comes to about 8.2–8.5 bits. The quick prompts (2,048 and 16,384 tokens) need no padding. `MATRIX=tree`
+  measures it directly.
 - **Times per page.** A delta decodes in 7.0 ms, against about 0.4 ms per page for T2 per segment and 0.08 ms for a
   raw page from host memory. The delta decoder takes one call per page, so its launches dominate.
 
@@ -213,3 +217,62 @@ What did not run, fixed since:
 | T2 per page stopped: cuBLAS's int8 product takes more than 16 rows, and a page has 16. | `layerwise.int_mm` pads 16 rows or fewer to 32. |
 | No graph without T2 per page, and the deltas' sizes were not reported. | The delta total is reported on its own, held-out conversations too. Each mode's per page runs on its own. |
 | The runner stopped while packaging engine logs that an offline run does not have. | The loop skips them. |
+
+### Second run (job 30583)
+
+Bits per value, on the distinct pages (T2 per request: whole prompts, repeats included):
+
+| Representation | docs_first | history_first |
+| --- | ---: | ---: |
+| Theirs: graph + keys turned | 11.09 | 11.09 |
+| T2-hbh per segment | 10.54 | 11.35 |
+| T2-hbh per page (16 tokens padded to 32) | 28.42 | 28.41 |
+| Our graph (T2 per page or delta) | 19.49 | 19.54 |
+| Delta, on the pages with a base (held-out conversations) | 9.20 (9.36) | 9.42 (10.09) |
+
+Decoding per page: T2-rank256 per segment 0.08 ms, as a raw page from host memory; one page per call 3–20 ms (kernel
+launches). A delta 7.0 ms with its base decoded, 22.6 ms cold.
+
+## The conversations' block tree (`MATRIX=tree`)
+
+No vLLM engines, like diffgraph: `scripts/pd_tree.py` on one GPU over the newest kept capture (`DIFF_CAPTURE`,
+`DIFF_RUN` choose another). Exact reuse can only come from a shared prefix: attention is causal, so a change anywhere
+changes every later page at layers 1–27. Most pages are never reused, and recompute is exact. The capture's run shows
+both:
+
+- D compared 1,459 held blocks (40,852 pages of one layer) with P's recompute: none differed.
+- P, with no prefix cache, recomputed every block an earlier request had; the capture keys blocks by their bytes, so a
+  page seen again came out byte-identical.
+
+So a store can keep only what later turns will reuse and recompute the rest.
+
+The requests are replayed in arrival order, a page identified by its bytes. Rules:
+
+| Rule | Keeps |
+| --- | --- |
+| everything | every distinct page (EvidenceStore's setting) |
+| newest path | per conversation, the latest request's pages |
+| newest path, no docs | the same without document pages (history first: the documents are never a later prefix) |
+| hindsight | each page from its first use to its last (knows the future: the least store for the same hits) |
+| none | nothing |
+
+Per rule:
+
+- **hits:** blocks reused from the request's first block on, as a prefix cache can;
+- **prefill left:** in tokens, and in seconds at the run's own prefill rate;
+- **the store at its peak:** pages, raw GB, and coded with T2-hbh and T2-rank256. Each run of contiguous kept pages of
+  the request that wrote them is coded together, decoded and checked byte for byte, with encode and decode times per
+  page.
+
+It also counts blocks that repeat a token prefix with the same bytes and with other bytes (a recompute that differed),
+and blocks with an earlier block's bytes under another token prefix in the records.
+
+**Padding probe (for the next step).** For the first 24 requests of 256 tokens or more per layout, T2's size:
+
+- as now: zeros up to a multiple of 256;
+- with no padding: the multiple of 256 below;
+- with the tail under 256 coded apart, padded to 32 with zeros;
+- with the tail coded apart, padded to 32 with copies of its last token;
+- the whole prompt padded to 256 with copies.
+
+The report is `tree_report.md` (`tree_report.json`), in the published run.

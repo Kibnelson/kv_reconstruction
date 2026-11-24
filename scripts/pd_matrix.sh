@@ -41,6 +41,10 @@
 #   diffgraph   no engines: our KV Diff Graph against EvidenceStore's on the newest kept capture (one GPU, after
 #               setup's codec constants): T2 per request / segment / page, deltas by T's coder from the base, their
 #               zlib graph, every page decoded and checked, rebuild times (scripts/pd_diffgraph.py)
+#   tree        no engines: the conversations' block tree on the newest kept capture, kept by a rule (everything, the
+#               newest path per conversation, with or without its documents, hindsight, nothing) and the rest
+#               recomputed: hits, prefill left, the store at its peak raw and coded with T2 and checked; T2's padding
+#               against none and a tail coded apart (scripts/pd_tree.py)
 #   xfer        where the transfer dominates, and where it does not (SplitZip's regime and its caveats): prompts of
 #               8K-64K tokens one at a time at 10-100 Gb/s per prefill GPU and GPU to GPU; three prefill GPUs behind
 #               one link of 10-100 Gb/s (3.3-33 per GPU) with many requests at once; exactkv apart, last
@@ -130,6 +134,7 @@ if [ -z "${RUNS:-}" ]; then
         trace) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $TRACERUN" ;;
         capture) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $CAPTURERUN" ;;
         diffgraph) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=diffgraph RUN_TIMEOUT_S=10800" ;;
+        tree) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=tree RUN_TIMEOUT_S=10800" ;;
         xfer) RUNS="TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XLRUN;
                     TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XSRUN;
                     TRANSPORT=p2p LINKS=native CODECS=$XFER $XLRUN;
@@ -138,7 +143,7 @@ if [ -z "${RUNS:-}" ]; then
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$XKV $WLLONG" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph or xfer" \
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree or xfer" \
                 "(or set RUNS)"
            exit 1 ;;
     esac

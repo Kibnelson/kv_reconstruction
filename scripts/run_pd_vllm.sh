@@ -175,40 +175,49 @@ echo "   model folder $MP"
 # a run that hangs (a transfer that never arrives) ends here instead of taking the allocation: seconds for the bench
 RUN_TIMEOUT_S=${RUN_TIMEOUT_S:-$([ "${SMOKE:-0}" = 1 ] && echo 1200 || echo 10800)}
 
-# STAGES=diffgraph (MATRIX=diffgraph): no engines. Our KV Diff Graph against EvidenceStore's (scripts/pd_diffgraph.py)
-# on one GPU, over a capture kept by MATRIX=capture (DIFF_CAPTURE, default the newest in kvpd-captures) and its run's
-# records (DIFF_RUN, default its campaign's packaged run), with the codec constants setup just built
+# STAGES=diffgraph or tree (MATRIX=diffgraph, tree): no engines, one GPU, over a capture kept by MATRIX=capture
+# (DIFF_CAPTURE, default the newest in kvpd-captures) and its run's records (DIFF_RUN, default its campaign's packaged
+# run), with the codec constants setup just built. diffgraph: our KV Diff Graph against EvidenceStore's
+# (scripts/pd_diffgraph.py); tree: the conversations' block tree kept by a rule, the rest recomputed
+# (scripts/pd_tree.py)
 OFFLINE_DONE=0
-if [ "${STAGES:-}" = diffgraph ]; then
+if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ]; then
+    OFF=$STAGES
     CAPROOT=${KVPD_ROOT:-/tmp/$USER}/kvpd-captures
     DIFF_CAPTURE=${DIFF_CAPTURE:-$(ls -dt "$CAPROOT"/*/ 2>/dev/null | head -n 1 || true)}
     DIFF_CAPTURE=${DIFF_CAPTURE%/}
     DIFF_CAPTURE=${DIFF_CAPTURE:-}
     CTAG=$(basename "${DIFF_CAPTURE:-none}")
     DIFF_RUN=${DIFF_RUN:-$(ls -d "${KVPD_ROOT:-/tmp/$USER}/kvpd-evidence/$CTAG/repo/benchmark_results/pd_card/$CTAG/matrix/"llama32_3b_* 2>/dev/null | head -n 1 || true)}
-    echo "== diffgraph: capture ${DIFF_CAPTURE:-none}; its run ${DIFF_RUN:-none}"
+    echo "== $OFF: capture ${DIFF_CAPTURE:-none}; its run ${DIFF_RUN:-none}"
     set +e
     if [ -n "$DIFF_CAPTURE" ] && [ -d "$DIFF_CAPTURE" ] && [ -n "$DIFF_RUN" ] && [ -d "$DIFF_RUN" ]; then
+        OFF_PY=scripts/pd_diffgraph.py
+        OFF_ARGS=(--page-sample "${DIFF_PAGE_SAMPLE:-0}")
+        if [ "$OFF" = tree ]; then
+            OFF_PY=scripts/pd_tree.py
+            OFF_ARGS=(--probe "${TREE_PROBE:-24}")
+        fi
         CUDA_VISIBLE_DEVICES=${DEVS[0]} PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
-            "$VPY" -u scripts/pd_diffgraph.py --capture "$DIFF_CAPTURE" --run "$DIFF_RUN" \
+            "$VPY" -u "$OFF_PY" --capture "$DIFF_CAPTURE" --run "$DIFF_RUN" \
             --codecs-file "$RUN/pd_codecs.pt" --model-dir "$MP" --out "$OUT" \
-            --codecs "${DIFF_CODECS:-t2-hbh,t2-rank256}" --page-sample "${DIFF_PAGE_SAMPLE:-0}" 2>&1 | tee "$OUT/bench.log"
+            --codecs "${DIFF_CODECS:-t2-hbh,t2-rank256}" "${OFF_ARGS[@]}" 2>&1 | tee "$OUT/bench.log"
         STATUS=${PIPESTATUS[0]}
     else
         echo "STOP: no kept capture in $CAPROOT (MATRIX=capture keeps one) or no records of its run" | tee "$OUT/bench.log"
         STATUS=1
     fi
     set -e
-    "$VPY" - "$OUT" "$MODEL_ID" "$LAYOUT" "$TRANSPORT" "$STATUS" "${DIFF_CAPTURE:-}" "${DIFF_RUN:-}" <<'EOF'
+    "$VPY" - "$OUT" "$MODEL_ID" "$LAYOUT" "$TRANSPORT" "$STATUS" "${DIFF_CAPTURE:-}" "${DIFF_RUN:-}" "$OFF" <<'EOF'
 import json, sys
-out, model, layout, transport, status, cap, run = sys.argv[1:8]
-env = {"model": model, "layout": layout, "transport": transport, "connector": "none (offline)", "stage": "diffgraph",
+out, model, layout, transport, status, cap, run, stage = sys.argv[1:9]
+env = {"model": model, "layout": layout, "transport": transport, "connector": "none (offline)", "stage": stage,
        "capture": cap, "capture_run": run}
 json.dump(env, open(f"{out}/env.json", "w"))
-json.dump({"diffgraph": {"exit": int(status), "capture": cap, "capture_run": run}, "env": env},
+json.dump({stage: {"exit": int(status), "capture": cap, "capture_run": run}, "env": env},
           open(f"{out}/results.json", "w"))
 EOF
-    [ -f "$OUT/diffgraph_report.md" ] && cp "$OUT/diffgraph_report.md" "$OUT/summary.md"
+    [ -f "$OUT/${OFF}_report.md" ] && cp "$OUT/${OFF}_report.md" "$OUT/summary.md"
     OFFLINE_DONE=1
 fi
 if [ "$OFFLINE_DONE" != 1 ]; then              # the engines' run: everything down to their cleanup
@@ -538,7 +547,7 @@ DEST=$RESULTS_ROOT/$NAME
 mkdir -p "$DEST/runs" "$DEST/connector"
 for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json \
          trace_report.md trace_report.json delta_report.md delta_report.json diffgraph_report.md \
-         diffgraph_report.json page_compare.md; do
+         diffgraph_report.json page_compare.md tree_report.md tree_report.json; do
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
 cp "$OUT"/runs/*.json "$OUT"/runs/*.log "$DEST/runs/" 2>/dev/null || true   # the logs: 60 KB at most each
