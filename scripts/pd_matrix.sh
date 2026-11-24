@@ -95,8 +95,14 @@ XFER=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,splitzip,adacode,exans
 QUICK="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=2048:1:128:4:sz1,16384:1:128:2:sz1,2048:16:128:1:sz16 RUN_TIMEOUT_S=5400"
 # trace: interleaved prompts reach about 17K tokens by a conversation's last turn
 TRACERUN="LAYOUT=1p3d STAGES=check,mtrag,report TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800"
-CAPTURERUN="LAYOUT=1p3d STAGES=check,mtrag,delta,report TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800 CAPTURE_GB=16
-        MTRAG_LIMIT=6 MTRAG_CAPTURE_CONVS=6 MTRAG_LAYOUTS=docs_first,history_first MTRAG_POLICIES=conversation"
+# capture: MTRAG's first KVPD_CAPTURE_CONVS conversations (6; 2 to 110). P's store: 16 GB for 6 (job 30555 used 10.3),
+# else 2 GB a conversation (pd_campaign.py's disk plan reserves the same, and D's 2 GB). After the engines, stages
+# tree and region analyse this run's capture with this job's codec constants (run_pd_vllm.sh)
+CAPN=${KVPD_CAPTURE_CONVS:-6}
+CAPGB=16
+case "$CAPN" in ''|*[!0-9]*) ;; *) [ "$CAPN" != 6 ] && CAPGB=$(( 2 * CAPN )) ;; esac
+CAPTURERUN="LAYOUT=1p3d STAGES=check,mtrag,delta,report,tree,region TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800 CAPTURE_GB=$CAPGB
+        MTRAG_LIMIT=$CAPN MTRAG_CAPTURE_CONVS=$CAPN MTRAG_LAYOUTS=docs_first,history_first MTRAG_POLICIES=conversation"
 XLONG="8192:1:128:4:long,16384:1:128:4:long,32768:1:128:2:long,65536:1:128:2:long"
 XLRUN="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$XLONG P_MEM=0.68 D_MEM=0.66 RUN_TIMEOUT_S=16200"
 XSHARE="2048:24:128:2:share,8192:12:128:2:share,16384:6:128:2:share"
@@ -136,7 +142,14 @@ if [ -z "${RUNS:-}" ]; then
                       TRANSPORT=p2p LINKS=native CODECS=$OURSRE $WLRUN" ;;
         quick) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=raw,ours-hbh,t2-hbh,t2-rank256,splitzip $QUICK" ;;
         trace) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $TRACERUN" ;;
-        capture) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $CAPTURERUN" ;;
+        capture)
+            case "$CAPN" in ''|*[!0-9]*) echo "STOP: KVPD_CAPTURE_CONVS=$CAPN: a whole number of conversations, 2 to 110" >&2
+                exit 2 ;; esac
+            if [ "$CAPN" -lt 2 ] || [ "$CAPN" -gt 110 ]; then
+                echo "STOP: KVPD_CAPTURE_CONVS=$CAPN: 2 to 110 conversations (the region test fits on the even ones)" >&2
+                exit 2
+            fi
+            RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $CAPTURERUN" ;;
         diffgraph) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=diffgraph RUN_TIMEOUT_S=10800" ;;
         tree) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=tree RUN_TIMEOUT_S=10800" ;;
         region) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=region RUN_TIMEOUT_S=10800" ;;

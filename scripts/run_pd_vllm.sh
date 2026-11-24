@@ -516,11 +516,12 @@ json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sy
           open(sys.argv[1], "w"))
 EOF
 set +e
+BENCH_STAGES=$(printf '%s' "${STAGES:-}" | tr ',' '\n' | grep -vx -e tree -e region | paste -sd, - || true)
 PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
     "$CPY" -u scripts/pd_bench.py --proxy "$PROXY" --model "$MP" --out "$OUT" --prompts "$PROMPTS" \
     --texts "$KV_RUNS/dataset_texts" --log-dir "$LOGS" --link-control "$LINKFILE" --codecs "$CODECS" --links "$LINKS" \
     --rates "$RATES" --num-prompts "$NUM_PROMPTS" --output-len "$OUTPUT_LEN" --ttft-slo-ms "${TTFT_SLO_MS:-2000}" \
-    --stages "$STAGES" --vllm-source "$KV_HOME/sources/vllm" --env "$OUT/env.json" \
+    --stages "$BENCH_STAGES" --vllm-source "$KV_HOME/sources/vllm" --env "$OUT/env.json" \
     --tier-codecs "$TIER_CODECS" --tier-clients "$TIER_CLIENTS" --tier-conversations "$TIER_CONVERSATIONS" \
     --tier-max-turns "$TIER_MAX_TURNS" --tier-prefix-max "$TIER_PREFIX_MAX" --tier-control "$TIERFILE" \
     --engine-logs "$OUT" --shapes "$SHAPES" --idle-timeout "${IDLE_TIMEOUT_S:-600}" \
@@ -540,6 +541,27 @@ else
 fi
 cleanup
 trap - EXIT
+# after the engines (STAGES with tree or region: MATRIX=capture): the offline stages on this run's own capture and
+# records, on one GPU, with this job's codec constants: one setup and one cache for the capture and its analyses
+for OFF2 in tree region; do
+    case ",${STAGES:-}," in *",$OFF2,"*) ;; *) continue ;; esac
+    if [ "$CAPTURE_GB" = 0 ] || ! ls "$CAPTURE_DIR"/capture_P_*.jsonl >/dev/null 2>&1; then
+        echo "== $OFF2: no capture in this run ($CAPTURE_DIR)" | tee -a "$OUT/bench.log"
+        continue
+    fi
+    echo "== $OFF2: this run's capture $CAPTURE_DIR" | tee -a "$OUT/bench.log"
+    OFF2_ARGS=(--probe "${TREE_PROBE:-24}")
+    [ "$OFF2" = region ] && OFF2_ARGS=(--batch "${REGION_BATCH:-64}")
+    set +e
+    CUDA_VISIBLE_DEVICES=${DEVS[0]} PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "${OFFLINE_TIMEOUT_S:-5400}" \
+        "$VPY" -u "scripts/pd_$OFF2.py" --capture "$CAPTURE_DIR" --run "$OUT" --codecs-file "$RUN/pd_codecs.pt" \
+        --model-dir "$MP" --out "$OUT" --codecs "${DIFF_CODECS:-t2-hbh,t2-rank256}" "${OFF2_ARGS[@]}" \
+        > "$OUT/runs/$OFF2.log" 2>&1
+    RC=$?
+    set -e
+    echo "== $OFF2: exit $RC (runs/$OFF2.log)" | tee -a "$OUT/bench.log"
+    if [ -f "$OUT/${OFF2}_report.md" ]; then { echo; cat "$OUT/${OFF2}_report.md"; } >> "$OUT/summary.md"; fi
+done
 fi                                             # the engines' run
 
 GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n 1p | tr 'A-Z' 'a-z' | sed 's/nvidia//' | tr -cd 'a-z0-9')

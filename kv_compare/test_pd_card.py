@@ -284,7 +284,7 @@ class CardTests(unittest.TestCase):
 class DiskPlanTests(unittest.TestCase):
     """What the run stage decides from the free space: everything, everything but IBP's toolkit, or stop."""
 
-    def plan(self, free_gb, want_ibp, have=()):
+    def plan(self, free_gb, want_ibp, have=(), extra=0.0):
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_campaign as c
         tmp = Path(tempfile.mkdtemp())
@@ -298,7 +298,7 @@ class DiskPlanTests(unittest.TestCase):
         orig = shutil.disk_usage
         shutil.disk_usage = lambda path: type("U", (), {"free": free_gb * 1e9, "total": 200e9})()
         try:
-            return c.disk_plan(p, want_ibp)
+            return c.disk_plan(p, want_ibp, extra)
         finally:
             shutil.disk_usage = orig
 
@@ -310,6 +310,27 @@ class DiskPlanTests(unittest.TestCase):
         self.assertIn("IBP left out", p["note"])
         self.assertIsNone(self.plan(40, False)["ibp"])
         self.assertFalse(self.plan(28, False, have=("uv", "python", "hf"))["ibp"] is None)
+
+    def test_a_capture_counts_after_setup_drops_its_own(self):
+        """MATRIX=capture's stores fill after setup has deleted its captures (6.6 GB): the job's peak is the larger
+        of setup's (14) and the matrix's own files (7.4) plus the stores, not both added."""
+        import os
+        from unittest import mock
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_campaign as c
+        with mock.patch.dict(os.environ, {"KVPD_CAPTURE_CONVS": "4"}):
+            four = c.extra_gb("capture")
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("KVPD_CAPTURE_CONVS", None)
+            six = c.extra_gb("capture")
+        self.assertEqual((four, six, c.extra_gb("tree")), (8.0 + 2.0, 16.0 + 2.0, 0.0))
+        # nothing cached (23.8 GB) + max(14, 7.4 + 10) = 41.2 GB, and 10 kept free
+        p = self.plan(51.3, False, extra=four)
+        self.assertEqual((p["need_gb"], p["setup_gb"], p["matrix_gb"]), (41.2, 14.0, 17.4))
+        self.assertFalse(p["ibp"] is None)
+        self.assertIsNone(self.plan(51.1, False, extra=four)["ibp"])
+        # six conversations: 23.8 + 7.4 + 18 = 49.2 (before: 23.8 + 18 + 14 = 55.8)
+        self.assertEqual(self.plan(60, False, extra=six)["need_gb"], 49.2)
 
 
 @unittest.skipIf(shutil.which("uv") is None, "uv needed")

@@ -1478,10 +1478,13 @@ class RunnerDryRunTests(unittest.TestCase):
         mt = self.tmp / "mtrag.json"
         mt.write_text(json.dumps(conv))
         cap = self.tmp / "captures"
-        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="mtrag,delta,report", TRACE_PAGES="1",
-                             CAPTURE_GB="16", CAPTURE_DIR=str(cap), MTRAG_FILE=str(mt), MTRAG_LAYOUTS="docs_first",
-                             MTRAG_POLICIES="conversation", MTRAG_CAPTURE_CONVS="1")
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="mtrag,delta,report,tree,region",
+                             TRACE_PAGES="1", CAPTURE_GB="16", CAPTURE_DIR=str(cap), MTRAG_FILE=str(mt),
+                             MTRAG_LAYOUTS="docs_first", MTRAG_POLICIES="conversation", MTRAG_CAPTURE_CONVS="1")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
+        # tree and region run after the engines, not in the bench; here there is no capture to analyse
+        for st in ("tree", "region"):
+            self.assertIn(f"== {st}: no capture in this run", r.stdout)
         tkv = [e["cfg"] for e in eng if e["cfg"]["kv_connector"] == "TKVConnector"]
         for c in tkv:
             x = c["kv_connector_extra_config"]
@@ -1491,6 +1494,31 @@ class RunnerDryRunTests(unittest.TestCase):
         self.assertIn("no stored pages", res["delta"]["error"])
         log = (out / "runs" / "mtrag_raw_docs_first_conversation.log").read_text()
         self.assertEqual(res["mtrag"]["mtrag_raw_docs_first_conversation"]["exit"], 0, log)
+        self.assertNotIn("tree", res)
+        self.assertNotIn("region", res)
+
+    def test_a_capture_run_analyses_its_capture_after_the_engines(self):
+        """With pages in the run's capture, stages tree and region run after the engines on it, with the run's records
+        and codec constants, their logs packaged and the run finished whatever they say (here a capture without its
+        rows: each stops at once)."""
+        conv = [{"domain": "d", "messages": [{"speaker": "user", "text": "q0"}, {"speaker": "agent", "text": "a",
+                 "contexts": [{"document_id": "D1", "title": "", "text": "one"}]}]}]
+        mt = self.tmp / "mtrag.json"
+        mt.write_text(json.dumps(conv))
+        cap = self.tmp / "captures"
+        cap.mkdir()
+        (cap / "capture_P_1.jsonl").write_text("")
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="mtrag,report,tree,region",
+                             TRACE_PAGES="1", CAPTURE_GB="16", CAPTURE_DIR=str(cap), MTRAG_FILE=str(mt),
+                             MTRAG_LAYOUTS="docs_first", MTRAG_POLICIES="conversation", MTRAG_CAPTURE_CONVS="1")
+        self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        bench = (out / "bench.log").read_text()
+        for st in ("tree", "region"):
+            self.assertIn(f"== {st}: this run's capture {cap}", r.stdout)
+            self.assertRegex(bench, rf"== {st}: exit [1-9]")
+            self.assertIn("STOP", (out / "runs" / f"{st}.log").read_text())
+        self.assertNotIn("tree", json.loads((out / "results.json").read_text()))
 
     def test_published_workloads(self):
         """SHAPES: the baselines' own workloads through the runner and the bench: their prompt files, the context the
@@ -1661,9 +1689,22 @@ class RunnerDryRunTests(unittest.TestCase):
                            env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1"))
         cp = [x for x in r.stdout.split("\n") if x]
         self.assertEqual(len(cp), 1)
-        for want in ("CODECS=raw", "STAGES=check,mtrag,delta,report", "TRACE_PAGES=1", "CAPTURE_GB=16", "MTRAG_LIMIT=6",
+        for want in ("CODECS=raw", "STAGES=check,mtrag,delta,report,tree,region", "TRACE_PAGES=1", "CAPTURE_GB=16",
+                     "MTRAG_LIMIT=6",
                      "MTRAG_CAPTURE_CONVS=6", "MTRAG_LAYOUTS=docs_first,history_first", "MTRAG_POLICIES=conversation"):
             self.assertIn(want, cp[0].split())
+        # KVPD_CAPTURE_CONVS: fewer conversations, P's store 2 GB each; out of range or not a number: stop
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1", KVPD_CAPTURE_CONVS="4"))
+        c4 = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual(len(c4), 1)
+        for want in ("CAPTURE_GB=8", "MTRAG_LIMIT=4", "MTRAG_CAPTURE_CONVS=4"):
+            self.assertIn(want, c4[0].split())
+        for bad in ("1", "111", "four"):
+            r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                               env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1", KVPD_CAPTURE_CONVS=bad))
+            self.assertEqual(r.returncode, 2, bad)
+            self.assertIn("STOP: KVPD_CAPTURE_CONVS", r.stderr)
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_bench as pb
         parsed = pb.parse_shapes(runs[0].split("SHAPES=")[1].split()[0])

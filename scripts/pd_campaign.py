@@ -48,6 +48,10 @@ CUDA13_INSTALL_GB = 11.0   # its download and the installer's unpacking, while i
 JOB_PEAK_GB = 14.0         # captures without queries (6.6 GB), one T2 set's windows (3.5 GB), the environments' own
                            # files and caches (5 GB at cleanup, job 30176)
 MARGIN_GB = 10.0           # left free: /tmp is the node's system disk, shared with everyone
+SETUP_DROPPED_GB = 6.6     # setup's captures, deleted before the matrix runs (DROP_CAPTURES=1): the job's peak is
+                           # setup's, or the matrix's own files plus what the matrix adds, not both
+CAPTURE_GB_PER_CONV = 2.0  # MATRIX=capture: P's store a conversation (job 30555: 10.3 GB for 6), as pd_matrix.sh sets
+CAPTURE_D_GB = 2.0         # and D's
 MODEL_DIR = "hub/models--unsloth--Llama-3.2-3B"
 CUDA12_CANDIDATES = ("/usr/local/pkgs/cuda/cuda-12.6", "/usr/local/pkgs/cuda/12.6", "/usr/local/cuda-12.6",
                      "/usr/local/pkgs/cuda/latest", "/usr/local/cuda-12", "/usr/local/cuda-12.3", "/usr/local/cuda")
@@ -336,7 +340,14 @@ def find_uv(cache):
 
 # a matrix's own files beyond a job's peak: capture keeps the raw pages it stores (kvpd-captures/<tag>, kept after
 # cleanup for offline analysis; scripts/pd_matrix.sh CAPTURE_GB)
-EXTRA_GB = {"capture": 18.0}
+def extra_gb(matrix):
+    """What a matrix adds to the disk after setup, and keeps (GB): MATRIX=capture's stores, P's as pd_matrix.sh sets
+    it (16 GB for the default 6 conversations, else 2 GB each: KVPD_CAPTURE_CONVS) and D's."""
+    if matrix != "capture":
+        return 0.0
+    n = os.environ.get("KVPD_CAPTURE_CONVS", "6")
+    p_gb = 16.0 if not n.isdigit() or int(n) == 6 else CAPTURE_GB_PER_CONV * int(n)
+    return p_gb + CAPTURE_D_GB
 
 
 def disk_plan(p, want_ibp, extra_gb=0.0):
@@ -347,17 +358,20 @@ def disk_plan(p, want_ibp, extra_gb=0.0):
             "python": (p.cache / "python").is_dir() and any((p.cache / "python").iterdir()),
             "hf": (p.cache / "hf" / MODEL_DIR).is_dir()}
     missing = [k for k, ok in have.items() if not ok]
-    base = sum(NEED_GB[k] for k in missing) * scale + float(extra_gb)
+    base = sum(NEED_GB[k] for k in missing) * scale
     cuda13 = (p.cache / "cuda13" / "bin" / "nvcc").is_file()
     free = shutil.disk_usage(p.root).free / 1e9
+    setup = JOB_PEAK_GB * scale                                       # setup's peak, its captures included
+    runs = (JOB_PEAK_GB - SETUP_DROPPED_GB) * scale + float(extra_gb)  # the matrix: setup's captures gone, its own added
 
     def need(ibp):
         if ibp and not cuda13:
-            return base + (CUDA13_GB + max(CUDA13_INSTALL_GB, JOB_PEAK_GB)) * scale
-        return base + JOB_PEAK_GB * scale
+            return base + CUDA13_GB * scale + max(CUDA13_INSTALL_GB * scale, setup, runs)
+        return base + max(setup, runs)
 
     plan = {"free_gb": round(free, 1), "margin_gb": margin, "missing": missing, "cuda13_cached": cuda13,
-            "ibp_wanted": want_ibp, "need_gb": round(need(want_ibp), 1)}
+            "ibp_wanted": want_ibp, "need_gb": round(need(want_ibp), 1), "setup_gb": round(setup, 1),
+            "matrix_gb": round(runs, 1), "extra_gb": round(float(extra_gb), 1)}
     if free - need(want_ibp) >= margin:
         plan["ibp"] = want_ibp
     elif want_ibp and free - need(False) >= margin:
@@ -460,7 +474,7 @@ def stage_run(p, a, job):
     ibp_opt = os.environ.get("KVPD_IBP", "auto")
     uses_ibp = any(re.search(r"(^|[,=])ibp(,|\s|$)", r) for r in m["runs"])
     want_ibp = ibp_opt == "1" or (ibp_opt == "auto" and uses_ibp)
-    plan = disk_plan(p, want_ibp, EXTRA_GB.get(a.matrix, 0.0))
+    plan = disk_plan(p, want_ibp, extra_gb(a.matrix))
     write_json(ev / "disk_plan.json", plan)
     if plan["ibp"] is None:
         rows = biggest(p.root)

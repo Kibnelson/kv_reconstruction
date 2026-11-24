@@ -16,11 +16,11 @@ the pages themselves, so this run stores them and analyses them offline.
 | Setting | Value |
 | --- | --- |
 | Engines | 1p3d, raw codec, ring at 100 Gbit/s |
-| Conversations | MTRAG's first 6 (about 1.2 GB of distinct pages each per layout, so ~14 GB in all) |
+| Conversations | MTRAG's first 6 (`KVPD_CAPTURE_CONVS`, 2 to 110); job 30555's 6 took 10.3 GB |
 | Layouts | docs_first and history_first |
 | Routing | by conversation, traced |
-| Stages | `check,mtrag,delta,report` |
-| P's budget | 16 GB |
+| Stages | `check,mtrag,delta,report`, then `tree` and `region` after the engines, on this run's capture |
+| P's budget | 16 GB for 6 conversations, else 2 GB a conversation |
 | D's budget | 2 GB |
 
 - **P** stores every 16-token block it sends, all 28 layers, as raw BF16 words. Each block is stored once, keyed by its
@@ -28,7 +28,9 @@ the pages themselves, so this run stores them and analyses them offline.
 - **D** stores its own copy of any held block whose bytes differ from what P recomputed.
 - **Where:** everything goes to `/tmp/$USER/kvpd-captures/<tag>/` on the node. It is kept after cleanup, so the
   analysis can be rerun without rerunning vLLM. It is deleted only by hand.
-- **Disk:** the campaign's disk plan adds 18 GB for it.
+- **Disk:** the campaign's disk plan reserves P's budget and D's 2 GB. They fill after setup has deleted its own
+  captures (6.6 GB), so the job's peak is the larger of setup's (14 GB) and the matrix's own files (7.4 GB) plus the
+  stores.
 
 The store's files:
 
@@ -73,6 +75,11 @@ Per layout:
 
 The run's `delta_report.md` and `delta_report.json` are packaged with the run and embedded in its summary.
 
+After the engines stop, the runner runs `scripts/pd_tree.py` and `scripts/pd_region.py` on the run's own capture and
+records, on one GPU, with the job's codec constants (below). Their reports are packaged and appended to the summary,
+and their logs are in `runs/`. One campaign thus needs one setup and one cache. Run on their own (`MATRIX=tree`,
+`MATRIX=region`), they need the cache and the kept capture on the disk, plus a setup's 14 GB.
+
 ## Reading it
 
 | Result | What it means |
@@ -83,8 +90,9 @@ The run's `delta_report.md` and `delta_report.json` are packaged with the run an
 
 ## Run it (login host, in tmux)
 
-The node's `/tmp` needs about 32 GB free beyond the cache: the 18 GB store, the job's 14 GB peak, and the 10 GB kept
-free. The start block is the trace's, with the branch and matrix changed:
+The node's `/tmp` needs, beyond the cache (23.8 GB more if it is gone), the 10 GB kept free and 25.4 GB for 6
+conversations (7.4 GB plus the 18 GB of stores), or 17.4 GB for 4 (`export KVPD_CAPTURE_CONVS=4`). The start block is
+the trace's, with the branch and matrix changed:
 
 ```bash
 module load slurm
