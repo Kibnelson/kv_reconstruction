@@ -175,13 +175,14 @@ echo "   model folder $MP"
 # a run that hangs (a transfer that never arrives) ends here instead of taking the allocation: seconds for the bench
 RUN_TIMEOUT_S=${RUN_TIMEOUT_S:-$([ "${SMOKE:-0}" = 1 ] && echo 1200 || echo 10800)}
 
-# STAGES=diffgraph or tree (MATRIX=diffgraph, tree): no engines, one GPU, over a capture kept by MATRIX=capture
+# STAGES=diffgraph, tree, region or diffedge (MATRIX=<the same>): no engines, one GPU, over a capture kept by MATRIX=capture
 # (DIFF_CAPTURE, default the newest in kvpd-captures) and its run's records (DIFF_RUN, default its campaign's packaged
 # run), with the codec constants setup just built. diffgraph: our KV Diff Graph against EvidenceStore's
 # (scripts/pd_diffgraph.py); tree: the conversations' block tree kept by a rule, the rest recomputed
-# (scripts/pd_tree.py); region: T plus the base against T alone on pages with an earlier copy (scripts/pd_region.py)
+# (scripts/pd_tree.py); region: T plus the base against T alone on pages with an earlier copy (scripts/pd_region.py);
+# diffedge: plain diff edges, every page against its earlier versions or D's copy, no codec (scripts/pd_diffedge.py)
 OFFLINE_DONE=0
-if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ] || [ "${STAGES:-}" = region ]; then
+if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ] || [ "${STAGES:-}" = region ] || [ "${STAGES:-}" = diffedge ]; then
     OFF=$STAGES
     CAPROOT=${KVPD_ROOT:-/tmp/$USER}/kvpd-captures
     DIFF_CAPTURE=${DIFF_CAPTURE:-$(ls -dt "$CAPROOT"/*/ 2>/dev/null | head -n 1 || true)}
@@ -200,6 +201,9 @@ if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ] || [ "${STAGES:-}" 
         elif [ "$OFF" = region ]; then
             OFF_PY=scripts/pd_region.py
             OFF_ARGS=(--batch "${REGION_BATCH:-64}")
+        elif [ "$OFF" = diffedge ]; then
+            OFF_PY=scripts/pd_diffedge.py
+            OFF_ARGS=(--batch "${DIFFEDGE_BATCH:-32}")
         fi
         CUDA_VISIBLE_DEVICES=${DEVS[0]} PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
             "$VPY" -u "$OFF_PY" --capture "$DIFF_CAPTURE" --run "$DIFF_RUN" \
@@ -516,7 +520,7 @@ json.dump({"model": sys.argv[2], "prefills": int(sys.argv[3]), "decodes": int(sy
           open(sys.argv[1], "w"))
 EOF
 set +e
-BENCH_STAGES=$(printf '%s' "${STAGES:-}" | tr ',' '\n' | grep -vx -e tree -e region | paste -sd, - || true)
+BENCH_STAGES=$(printf '%s' "${STAGES:-}" | tr ',' '\n' | grep -vx -e tree -e region -e diffedge | paste -sd, - || true)
 PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
     "$CPY" -u scripts/pd_bench.py --proxy "$PROXY" --model "$MP" --out "$OUT" --prompts "$PROMPTS" \
     --texts "$KV_RUNS/dataset_texts" --log-dir "$LOGS" --link-control "$LINKFILE" --codecs "$CODECS" --links "$LINKS" \
@@ -541,9 +545,9 @@ else
 fi
 cleanup
 trap - EXIT
-# after the engines (STAGES with tree or region: MATRIX=capture): the offline stages on this run's own capture and
-# records, on one GPU, with this job's codec constants: one setup and one cache for the capture and its analyses
-for OFF2 in tree region; do
+# after the engines (STAGES with tree, region or diffedge: MATRIX=capture): the offline stages on this run's own capture
+# and records, on one GPU, with this job's codec constants: one setup and one cache for the capture and its analyses
+for OFF2 in tree region diffedge; do
     case ",${STAGES:-}," in *",$OFF2,"*) ;; *) continue ;; esac
     if [ "$CAPTURE_GB" = 0 ] || ! ls "$CAPTURE_DIR"/capture_P_*.jsonl >/dev/null 2>&1; then
         echo "== $OFF2: no capture in this run ($CAPTURE_DIR)" | tee -a "$OUT/bench.log"
@@ -552,6 +556,7 @@ for OFF2 in tree region; do
     echo "== $OFF2: this run's capture $CAPTURE_DIR" | tee -a "$OUT/bench.log"
     OFF2_ARGS=(--probe "${TREE_PROBE:-24}")
     [ "$OFF2" = region ] && OFF2_ARGS=(--batch "${REGION_BATCH:-64}")
+    [ "$OFF2" = diffedge ] && OFF2_ARGS=(--batch "${DIFFEDGE_BATCH:-32}")
     set +e
     CUDA_VISIBLE_DEVICES=${DEVS[0]} PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "${OFFLINE_TIMEOUT_S:-5400}" \
         "$VPY" -u "scripts/pd_$OFF2.py" --capture "$CAPTURE_DIR" --run "$OUT" --codecs-file "$RUN/pd_codecs.pt" \
@@ -573,7 +578,7 @@ mkdir -p "$DEST/runs" "$DEST/connector"
 for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json \
          trace_report.md trace_report.json delta_report.md delta_report.json diffgraph_report.md \
          diffgraph_report.json page_compare.md tree_report.md tree_report.json region_report.md \
-         region_report.json; do
+         region_report.json diffedge_report.md diffedge_report.json diffedge_pages.json diffedge_sample.npz; do
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
 cp "$OUT"/runs/*.json "$OUT"/runs/*.log "$DEST/runs/" 2>/dev/null || true   # the logs: 60 KB at most each

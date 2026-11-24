@@ -95,14 +95,22 @@ XFER=raw,ours-hbh,ours-rank256,t2-hbh,t2-rank256,splitzip,adacode,exans
 QUICK="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=2048:1:128:4:sz1,16384:1:128:2:sz1,2048:16:128:1:sz16 RUN_TIMEOUT_S=5400"
 # trace: interleaved prompts reach about 17K tokens by a conversation's last turn
 TRACERUN="LAYOUT=1p3d STAGES=check,mtrag,report TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800"
-# capture: MTRAG's first KVPD_CAPTURE_CONVS conversations (6; 2 to 110). P's store: 16 GB for 6 (job 30555 used 10.3),
-# else 2 GB a conversation (pd_campaign.py's disk plan reserves the same, and D's 2 GB). After the engines, stages
-# tree and region analyse this run's capture with this job's codec constants (run_pd_vllm.sh)
+# capture: MTRAG's first KVPD_CAPTURE_CONVS conversations (6; 2 to 110) in the layouts KVPD_CAPTURE_LAYOUTS
+# (docs_first,history_first; or interleaved: each turn's prompt holds every earlier turn's documents, question and
+# answer, then its own). P's store: 16 GB for 6 (job 30555 used 10.3), else 2 GB a conversation; each D engine's
+# KVPD_CAPTURE_D_GB (2; its copies of held blocks that differ: interleaved needs more). pd_campaign.py's disk plan
+# reserves the same. After the engines, the stages KVPD_CAPTURE_AFTER (tree,region,diffedge; or none) analyse this
+# run's capture with this job's codec constants (run_pd_vllm.sh)
 CAPN=${KVPD_CAPTURE_CONVS:-6}
 CAPGB=16
 case "$CAPN" in ''|*[!0-9]*) ;; *) [ "$CAPN" != 6 ] && CAPGB=$(( 2 * CAPN )) ;; esac
-CAPTURERUN="LAYOUT=1p3d STAGES=check,mtrag,delta,report,tree,region TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800 CAPTURE_GB=$CAPGB
-        MTRAG_LIMIT=$CAPN MTRAG_CAPTURE_CONVS=$CAPN MTRAG_LAYOUTS=docs_first,history_first MTRAG_POLICIES=conversation"
+CAPL=${KVPD_CAPTURE_LAYOUTS:-docs_first,history_first}
+CAPD=${KVPD_CAPTURE_D_GB:-2}
+CAPA=${KVPD_CAPTURE_AFTER:-tree,region,diffedge}
+CAPSTAGES=check,mtrag,delta,report
+[ "$CAPA" = none ] || CAPSTAGES=$CAPSTAGES,$CAPA
+CAPTURERUN="LAYOUT=1p3d STAGES=$CAPSTAGES TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800 CAPTURE_GB=$CAPGB
+        CAPTURE_D_GB=$CAPD MTRAG_LIMIT=$CAPN MTRAG_CAPTURE_CONVS=$CAPN MTRAG_LAYOUTS=$CAPL MTRAG_POLICIES=conversation"
 XLONG="8192:1:128:4:long,16384:1:128:4:long,32768:1:128:2:long,65536:1:128:2:long"
 XLRUN="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$XLONG P_MEM=0.68 D_MEM=0.66 RUN_TIMEOUT_S=16200"
 XSHARE="2048:24:128:2:share,8192:12:128:2:share,16384:6:128:2:share"
@@ -149,10 +157,26 @@ if [ -z "${RUNS:-}" ]; then
                 echo "STOP: KVPD_CAPTURE_CONVS=$CAPN: 2 to 110 conversations (the region test fits on the even ones)" >&2
                 exit 2
             fi
+            for x in $(echo "$CAPL" | tr ',' ' '); do
+                case "$x" in docs_first|history_first|interleaved) ;;
+                    *) echo "STOP: KVPD_CAPTURE_LAYOUTS=$CAPL: docs_first, history_first or interleaved, by commas" >&2
+                       exit 2 ;; esac
+            done
+            [ -n "$(echo "$CAPL" | tr -d ', ')" ] || { echo "STOP: KVPD_CAPTURE_LAYOUTS is empty" >&2; exit 2; }
+            [[ "$CAPD" =~ ^[0-9]+([.][0-9]+)?$ ]] && awk -v x="$CAPD" 'BEGIN { exit !(x >= 0.5 && x <= 16) }' || {
+                echo "STOP: KVPD_CAPTURE_D_GB=$CAPD: GB for each D engine's store, 0.5 to 16" >&2; exit 2; }
+            if [ "$CAPA" != none ]; then
+                for x in $(echo "$CAPA" | tr ',' ' '); do
+                    case "$x" in tree|region|diffedge) ;;
+                        *) echo "STOP: KVPD_CAPTURE_AFTER=$CAPA: tree, region or diffedge, by commas (or none)" >&2
+                           exit 2 ;; esac
+                done
+            fi
             RUNS="TRANSPORT=ring LINKS=100 CODECS=raw $CAPTURERUN" ;;
         diffgraph) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=diffgraph RUN_TIMEOUT_S=10800" ;;
         tree) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=tree RUN_TIMEOUT_S=10800" ;;
         region) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=region RUN_TIMEOUT_S=10800" ;;
+        diffedge) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw LAYOUT=1p3d STAGES=diffedge RUN_TIMEOUT_S=10800" ;;
         xfer) RUNS="TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XLRUN;
                     TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XSRUN;
                     TRANSPORT=p2p LINKS=native CODECS=$XFER $XLRUN;
@@ -161,7 +185,7 @@ if [ -z "${RUNS:-}" ]; then
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$XKV $WLLONG" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree, region or xfer" \
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree, region, diffedge or xfer" \
                 "(or set RUNS)"
            exit 1 ;;
     esac

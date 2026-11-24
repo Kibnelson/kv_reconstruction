@@ -39,7 +39,7 @@ import time
 
 SCHEMA = 1
 KIND = "kvpd_campaign"
-MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links", "workloads", "wlong", "wlours", "capacity", "quick", "trace", "capture", "diffgraph", "tree", "region", "xfer")
+MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links", "workloads", "wlong", "wlours", "capacity", "quick", "trace", "capture", "diffgraph", "tree", "region", "diffedge", "xfer")
 # Disk (GB) on the node's root file system, which /tmp is: the shared cache's parts when missing, then a job's peak.
 # Measured sizes go into disk_after.json; these only decide whether to start.
 NEED_GB = {"uv": 17.0, "python": 0.2, "hf": 6.6}   # measured on gpu-grad-01 (job 30170): 16.7, 0.1, 6.5
@@ -51,7 +51,8 @@ MARGIN_GB = 10.0           # left free: /tmp is the node's system disk, shared w
 SETUP_DROPPED_GB = 6.6     # setup's captures, deleted before the matrix runs (DROP_CAPTURES=1): the job's peak is
                            # setup's, or the matrix's own files plus what the matrix adds, not both
 CAPTURE_GB_PER_CONV = 2.0  # MATRIX=capture: P's store a conversation (job 30555: 10.3 GB for 6), as pd_matrix.sh sets
-CAPTURE_D_GB = 2.0         # and D's
+CAPTURE_D_GB = 2.0         # and each D engine's (KVPD_CAPTURE_D_GB): its copies of held blocks that differ
+CAPTURE_D_ENGINES = 3      # MATRIX=capture runs 1p3d
 MODEL_DIR = "hub/models--unsloth--Llama-3.2-3B"
 CUDA12_CANDIDATES = ("/usr/local/pkgs/cuda/cuda-12.6", "/usr/local/pkgs/cuda/12.6", "/usr/local/cuda-12.6",
                      "/usr/local/pkgs/cuda/latest", "/usr/local/cuda-12", "/usr/local/cuda-12.3", "/usr/local/cuda")
@@ -341,13 +342,18 @@ def find_uv(cache):
 # a matrix's own files beyond a job's peak: capture keeps the raw pages it stores (kvpd-captures/<tag>, kept after
 # cleanup for offline analysis; scripts/pd_matrix.sh CAPTURE_GB)
 def extra_gb(matrix):
-    """What a matrix adds to the disk after setup, and keeps (GB): MATRIX=capture's stores, P's as pd_matrix.sh sets
-    it (16 GB for the default 6 conversations, else 2 GB each: KVPD_CAPTURE_CONVS) and D's."""
+    """What a matrix adds to the disk after setup, and keeps (GB): MATRIX=capture's stores as pd_matrix.sh sets them:
+    P's (16 GB for the default 6 conversations, else 2 GB each: KVPD_CAPTURE_CONVS) and each of the 3 D engines'
+    (KVPD_CAPTURE_D_GB, 2)."""
     if matrix != "capture":
         return 0.0
     n = os.environ.get("KVPD_CAPTURE_CONVS", "6")
     p_gb = 16.0 if not n.isdigit() or int(n) == 6 else CAPTURE_GB_PER_CONV * int(n)
-    return p_gb + CAPTURE_D_GB
+    try:
+        d_gb = float(os.environ.get("KVPD_CAPTURE_D_GB") or CAPTURE_D_GB)
+    except ValueError:                             # pd_matrix.sh stops on it
+        d_gb = CAPTURE_D_GB
+    return p_gb + CAPTURE_D_ENGINES * d_gb
 
 
 def disk_plan(p, want_ibp, extra_gb=0.0):

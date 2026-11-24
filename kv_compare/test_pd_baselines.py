@@ -1470,37 +1470,54 @@ class RunnerDryRunTests(unittest.TestCase):
                          ["TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=region "
                           "RUN_TIMEOUT_S=10800"])
 
+    def test_diffedge_runs_offline_without_engines(self):
+        """STAGES=diffedge: as diffgraph, tree and region; MATRIX=diffedge lists that one run (no codec)."""
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="diffedge",
+                             KVPD_ROOT=str(self.tmp / "noroot"))
+        self.assertEqual(eng, [])
+        self.assertIn("== diffedge: capture none", r.stdout)
+        self.assertNotIn("PD RUN STOPPED", r.stdout + r.stderr, r.stderr[-2000:])
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        res = json.loads((out / "results.json").read_text())
+        self.assertEqual((res["diffedge"]["exit"], res["env"]["stage"]), (1, "diffedge"))
+        m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="diffedge", PRINT_RUNS="1"))
+        self.assertEqual([x for x in m.stdout.split("\n") if x],
+                         ["TRANSPORT=ring LINKS=100 CODECS=raw LAYOUT=1p3d STAGES=diffedge RUN_TIMEOUT_S=10800"])
+
     def test_capture_run_configures_both_engines_and_runs_the_delta_stage(self):
-        """MATRIX=capture's run: both engines get capture_dir (P its 16 GB, D its 2), the traced runs ask for the first
-        conversations' pages, and stage delta runs after mtrag (here no engine stores pages: it says so)."""
+        """MATRIX=capture's run: both engines get capture_dir (P its 16 GB, each D its CAPTURE_D_GB), the traced runs
+        ask for the first conversations' pages, and stage delta runs after mtrag (here no engine stores pages: it says
+        so)."""
         conv = [{"domain": "d", "messages": [{"speaker": "user", "text": "q0"}, {"speaker": "agent", "text": "a",
                  "contexts": [{"document_id": "D1", "title": "", "text": "one"}]}]}]
         mt = self.tmp / "mtrag.json"
         mt.write_text(json.dumps(conv))
         cap = self.tmp / "captures"
-        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="mtrag,delta,report,tree,region",
-                             TRACE_PAGES="1", CAPTURE_GB="16", CAPTURE_DIR=str(cap), MTRAG_FILE=str(mt),
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw",
+                             STAGES="mtrag,delta,report,tree,region,diffedge", TRACE_PAGES="1", CAPTURE_GB="16",
+                             CAPTURE_D_GB="3", CAPTURE_DIR=str(cap), MTRAG_FILE=str(mt),
                              MTRAG_LAYOUTS="docs_first", MTRAG_POLICIES="conversation", MTRAG_CAPTURE_CONVS="1")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
-        # tree and region run after the engines, not in the bench; here there is no capture to analyse
-        for st in ("tree", "region"):
+        # tree, region and diffedge run after the engines, not in the bench; here there is no capture to analyse
+        for st in ("tree", "region", "diffedge"):
             self.assertIn(f"== {st}: no capture in this run", r.stdout)
         tkv = [e["cfg"] for e in eng if e["cfg"]["kv_connector"] == "TKVConnector"]
         for c in tkv:
             x = c["kv_connector_extra_config"]
-            self.assertEqual((x["capture_dir"], x["capture_gb"], x["capture_d_gb"]), (str(cap), 16, 2))
+            self.assertEqual((x["capture_dir"], x["capture_gb"], x["capture_d_gb"]), (str(cap), 16, 3))
         out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
         res = json.loads((out / "results.json").read_text())
         self.assertIn("no stored pages", res["delta"]["error"])
         log = (out / "runs" / "mtrag_raw_docs_first_conversation.log").read_text()
         self.assertEqual(res["mtrag"]["mtrag_raw_docs_first_conversation"]["exit"], 0, log)
-        self.assertNotIn("tree", res)
-        self.assertNotIn("region", res)
+        for st in ("tree", "region", "diffedge"):
+            self.assertNotIn(st, res)
 
     def test_a_capture_run_analyses_its_capture_after_the_engines(self):
-        """With pages in the run's capture, stages tree and region run after the engines on it, with the run's records
-        and codec constants, their logs packaged and the run finished whatever they say (here a capture without its
-        rows: each stops at once)."""
+        """With pages in the run's capture, stages tree, region and diffedge run after the engines on it, with the run's
+        records and codec constants, their logs packaged and the run finished whatever they say (here a capture
+        without its rows: each stops at once)."""
         conv = [{"domain": "d", "messages": [{"speaker": "user", "text": "q0"}, {"speaker": "agent", "text": "a",
                  "contexts": [{"document_id": "D1", "title": "", "text": "one"}]}]}]
         mt = self.tmp / "mtrag.json"
@@ -1508,13 +1525,14 @@ class RunnerDryRunTests(unittest.TestCase):
         cap = self.tmp / "captures"
         cap.mkdir()
         (cap / "capture_P_1.jsonl").write_text("")
-        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="mtrag,report,tree,region",
-                             TRACE_PAGES="1", CAPTURE_GB="16", CAPTURE_DIR=str(cap), MTRAG_FILE=str(mt),
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw",
+                             STAGES="mtrag,report,tree,region,diffedge", TRACE_PAGES="1", CAPTURE_GB="16",
+                             CAPTURE_DIR=str(cap), MTRAG_FILE=str(mt),
                              MTRAG_LAYOUTS="docs_first", MTRAG_POLICIES="conversation", MTRAG_CAPTURE_CONVS="1")
         self.assertIn("committed locally", r.stdout, r.stdout[-3000:] + r.stderr[-3000:])
         out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
         bench = (out / "bench.log").read_text()
-        for st in ("tree", "region"):
+        for st in ("tree", "region", "diffedge"):
             self.assertIn(f"== {st}: this run's capture {cap}", r.stdout)
             self.assertRegex(bench, rf"== {st}: exit [1-9]")
             self.assertIn("STOP", (out / "runs" / f"{st}.log").read_text())
@@ -1689,10 +1707,29 @@ class RunnerDryRunTests(unittest.TestCase):
                            env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1"))
         cp = [x for x in r.stdout.split("\n") if x]
         self.assertEqual(len(cp), 1)
-        for want in ("CODECS=raw", "STAGES=check,mtrag,delta,report,tree,region", "TRACE_PAGES=1", "CAPTURE_GB=16",
-                     "MTRAG_LIMIT=6",
+        for want in ("CODECS=raw", "STAGES=check,mtrag,delta,report,tree,region,diffedge", "TRACE_PAGES=1",
+                     "CAPTURE_GB=16", "CAPTURE_D_GB=2", "MTRAG_LIMIT=6",
                      "MTRAG_CAPTURE_CONVS=6", "MTRAG_LAYOUTS=docs_first,history_first", "MTRAG_POLICIES=conversation"):
             self.assertIn(want, cp[0].split())
+        # the layouts, each D engine's store and the stages after the engines: settable, checked
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1", KVPD_CAPTURE_CONVS="4",
+                                    KVPD_CAPTURE_LAYOUTS="interleaved", KVPD_CAPTURE_D_GB="3",
+                                    KVPD_CAPTURE_AFTER="tree,diffedge"))
+        ci = [x for x in r.stdout.split("\n") if x]
+        self.assertEqual(len(ci), 1, r.stderr)
+        for want in ("STAGES=check,mtrag,delta,report,tree,diffedge", "CAPTURE_GB=8", "CAPTURE_D_GB=3",
+                     "MTRAG_LAYOUTS=interleaved"):
+            self.assertIn(want, ci[0].split())
+        r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1", KVPD_CAPTURE_AFTER="none"))
+        self.assertIn("STAGES=check,mtrag,delta,report", r.stdout.split())
+        for k, bad in (("KVPD_CAPTURE_LAYOUTS", "interleave"), ("KVPD_CAPTURE_LAYOUTS", ","), ("KVPD_CAPTURE_D_GB", "0"),
+                       ("KVPD_CAPTURE_D_GB", "two"), ("KVPD_CAPTURE_D_GB", "17"), ("KVPD_CAPTURE_AFTER", "sweep")):
+            r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                               env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1", **{k: bad}))
+            self.assertEqual(r.returncode, 2, (k, bad))
+            self.assertIn(f"STOP: {k}", r.stderr)
         # KVPD_CAPTURE_CONVS: fewer conversations, P's store 2 GB each; out of range or not a number: stop
         r = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                            env=dict(os.environ, MATRIX="capture", PRINT_RUNS="1", KVPD_CAPTURE_CONVS="4"))
@@ -2260,6 +2297,179 @@ class RegionTests(unittest.TestCase):
                            timeout=3600)
         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-3000:])
         self.assertIn("ok region", r.stdout)
+
+
+DIFFEDGE_CHECK = r"""
+import os, sys, json, tempfile
+os.environ["TRITON_INTERPRET"] = "1"
+os.environ["DELTA_WORKERS"] = "1"
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(sys.argv[1], "scripts"))
+from pathlib import Path
+import numpy as np
+import torch
+from kv_compare.pd import trace as tr
+import pd_delta_analysis as da
+import pd_diffedge as de
+L, bs, H, hd = 3, 16, 4, 8
+C, W = H * hd, 2 * H * hd
+d = Path(tempfile.mkdtemp())
+cap, run, mdir, out = d / "cap", d / "run", d / "model", d / "out"
+for x in (cap, run / "runs", run / "connector", mdir, out):
+    x.mkdir(parents=True)
+(mdir / "config.json").write_text(json.dumps({"rope_theta": 10000.0, "head_dim": hd}))
+inv, _hd = da.rope_inv_freq(str(mdir), hd)
+rng = np.random.default_rng(5)
+
+
+def rope(q, pos):                                  # q [n, H, hd], pos [n] -> [n, C]
+    ang = (pos[:, None].astype(np.float64) * np.asarray(inv)[None, :]).astype(np.float32)[:, None, :]
+    c, s_ = np.cos(ang), np.sin(ang)
+    x1, x2 = q[..., :hd // 2], q[..., hd // 2:]
+    return np.concatenate([x1 * c - x2 * s_, x2 * c + x1 * s_], -1).reshape(len(q), -1)
+
+
+rand = lambda n: da.to_bf16(rng.standard_normal((L, n, W)).astype(np.float32))
+toks = lambda n: [int(v) for v in rng.integers(1000, 9000, size=n)]
+st = tr.PageStore(str(cap), "P", 1.0, L, bs, W)
+dst = tr.PageStore(str(cap), "D", 1.0, L, bs, W)
+nm = "mtrag_raw_interleaved_conversation"
+recs, prox, held = [], [], []
+for c in range(4):
+    S, X = toks(bs), toks(2 * bs)                   # a system block, and a passage of two blocks seen every turn
+    wS = rand(bs)
+    q = rng.standard_normal((L, 2 * bs, H, hd)).astype(np.float32)
+    v = rng.standard_normal((L, 2 * bs, C)).astype(np.float32)
+    dq = 0.3 * rng.standard_normal((L, 2 * bs, H, hd)).astype(np.float32)   # the passage drifts turn by turn
+    dv = 0.3 * rng.standard_normal((L, 2 * bs, C)).astype(np.float32)
+    for t in range(3):
+        pre = toks(bs * (t + 1))
+        Z = toks(bs)
+        ids = S + pre + X + Z
+        p0 = bs * (t + 2)                           # the passage's place: 16 later each turn
+        w = np.concatenate([wS, rand(len(pre)), np.zeros((L, 2 * bs, W), np.int16), rand(bs)], 1)
+        for l in range(L):
+            w[l, p0:p0 + 2 * bs, :C] = da.to_bf16(rope(q[l] + t * dq[l], np.arange(p0, p0 + 2 * bs)))
+            w[l, p0:p0 + 2 * bs, C:] = da.to_bf16(v[l] + t * dv[l])
+        tw = torch.from_numpy(np.ascontiguousarray(w))
+        rows = tr.capture_blocks(st, tw, tr.page_hashes(tw, bs), bs)
+        key = f"K{c}{t}"
+        st.record({"event": "request", "key": key, "conv": f"{c}", "t0": 0, "T": len(ids), "bs": bs, "rows": rows,
+                   "missing": 0})
+        zb = len(ids) // bs - 1                     # the last block (an answer D held)
+        if t == 1:                                  # D's copy differs a little: a twin
+            blk = tw[:, zb * bs:].clone()
+            blk[:, :, :C] += 1
+            drows = tr.capture_blocks(dst, blk, tr.page_hashes(blk, bs), bs)
+            dst.record({"event": "held_differs", "key": key, "t0": zb * bs, "bs": bs, "blocks": [0], "rows": drows})
+        if t == 2:                                  # D's copy is the same: free
+            held.append({"event": "held", "key": key, "t0": zb * bs, "tokens": bs, "bs": bs, "layers": L,
+                         "equal": tr.pack_bits(np.ones((L, 1), bool)), "pages": L})
+        recs.append({"tag": f"{nm}|{c}|{t}", "run": nm, "layout": "interleaved", "policy": "conversation", "conv": c,
+                     "turn": t, "prompt_tokens": len(ids), "ids": ids,
+                     "pieces": [["system", None, 0, bs], ["doc", "D", p0, p0 + 2 * bs], ["answer", 0, zb * bs, len(ids)]]})
+        prox.append({"key": key, "tag": recs[-1]["tag"], "t_in": 10 * c + t})
+st.close()
+dst.close()
+(run / "runs" / f"{nm}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+(run / "proxy.jsonl").write_text("".join(json.dumps(r) + "\n" for r in prox))
+(run / "connector" / "trace_D_1_0.jsonl").write_text("".join(json.dumps(r) + "\n" for r in held))
+res = de.analyse(str(cap), str(run), str(mdir), str(out), device="cpu", batch=64, stream_values=16, log=lambda m: None)
+r = res["runs"][nm]
+assert (r["blocks"], r["references"], r["distinct"]) == (72, 8, 64), (r["blocks"], r["references"], r["distinct"])
+assert r["kinds"] == {"new": 40, "moved": 16, "twin": 4, "twin_equal": 4}, r["kinds"]
+assert r["versions"] == {1: 8, 2: 8}, r["versions"]
+assert all(r["exact"][v] == r["calls"][v] > 0 for v in r["calls"]), (r["exact"], r["calls"])
+assert set(r["calls"]) == set(de.EDGES) | {"twin"}, r["calls"]
+h = r["tables"]["heldout"]
+assert (h["moved_pages"], h["twin_pages"], h["moved_by_versions"]) == (8, 2, [4, 4, 0]), h
+assert h["moved_by_bucket"][:2] == [4, 4], h["moved_by_bucket"]
+e = h["edges"]
+two = {v: e[v]["versions"][1] for v in de.EDGES}
+one = {v: e[v]["versions"][0] for v in de.EDGES}
+# the drift goes on: with two versions, the second order (and the edges holding it) predict the page; the latest alone
+# is a drift away
+assert two["second_order"] < two["latest"] - 4 and two["composite"] < two["latest"] - 1, two
+assert two["multi_ref"] < two["latest"] - 4, two
+assert abs(one["second_order"] - one["latest"]) < 0.5, one    # one version: no drift to go on
+assert e["best"]["all"] <= min(e[v]["all"] for v in de.EDGES) + 1e-9, e["best"]
+w = r["weights"]["second_order"]
+for kv in "KV":                                    # l about 1 where the page has two versions (buckets 0 and 1)
+    assert all(0.85 < w[kv][len(de.BUCKETS) + q][1] < 1.15 for q in (0, 1)), w
+assert e["twin"]["all"] < 6, e["twin"]             # keys one step apart, values equal: cheap
+ch = r["chains"]
+assert ch["latest"]["depth"] == {1: 8, 2: 8} and ch["first"]["depth"] == {1: 16}, ch
+assert ch["latest"]["decode_pages_max"] == 2 and ch["latest"]["decode_pages_mean"] == 1.5, ch
+g = r["graph"]["all"]
+pb = res["meta"]["page_bytes"]
+assert g["raw_distinct"] == 64 * pb and g["new_raw"] == 40 * pb and g["pages"]["twin_equal"] == 4, g
+assert g["graph"] < g["raw_distinct"] - 4 * pb, g  # equal twins free, the rest smaller
+rows = json.loads((out / "diffedge_pages.json").read_text())["rows"]
+assert len(rows) == 20 and all(len(x["bytes"]["latest" if x["edge"] == "moved" else "twin"]) == 2 for x in rows)
+z = np.load(out / "diffedge_sample.npz")
+assert z["moved_target"].shape == (16, 2, bs, 2 * hd) and z["twin_target"].shape == (4, 2, bs, 2 * hd), \
+    (z["moved_target"].shape, z["twin_target"].shape)
+assert z["moved_shift"].shape == (16, 3) and z["moved_agree"].shape == (16, 3, bs)
+m0 = json.loads(str(z["moved_meta"]))
+assert len(m0) == 16 and all(x["versions"] in (1, 2) for x in m0)
+k = [i for i, x in enumerate(m0) if x["versions"] == 2][0]
+assert list(z["moved_shift"][k]) == [16, 32, 32], z["moved_shift"][k]
+text = de.markdown(res)
+for s in ("The plain graph", "Second order: latest + l (latest - previous)", "by earlier versions", "Chains and stars",
+          "Decoded exactly", "(ALL)"):
+    assert s in text, (s, text)
+import pd_diffedge_explore as ex                    # the sample read back: the drift found again in numpy
+xr = ex.analyse(ex.load(out / "diffedge_sample.npz"))
+assert xr["layers"] == [0, 1] and xr["pages"]["two_versions"] == 8, xr["pages"]
+assert all(0.95 < x["second_order_l"] < 1.05 and x["second_order_left"] < 0.01 for x in xr["by_layer"]), xr["by_layer"]
+assert all(abs(t["equal_words"] - 0.5) < 1e-9 for t in xr["twins"]), xr["twins"]
+assert "Cross-layer" in ex.markdown(xr)
+print("ok diffedge", json.dumps({"two": two, "one": one, "twin": e["twin"]["all"], "graph": g["graph"] / g["raw_distinct"]}))
+"""
+
+
+class DiffEdgeTests(unittest.TestCase):
+    """scripts/pd_diffedge.py: plain diff edges, every page against its earlier versions or D's copy, no codec."""
+
+    def test_the_fit_recovers_known_weights_and_falls_back_without_samples(self):
+        import torch
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_diffedge as de
+        g = torch.Generator().manual_seed(1)
+        L, n, C, nc = 2, 6000, 4, 3
+        a = torch.randn(L, n, 2, C, generator=g, dtype=torch.float64)
+        b = torch.randn(L, n, 2, C, generator=g, dtype=torch.float64)
+        cls = torch.randint(0, 2, (n,), generator=g)              # class 2 has no samples
+        y = 0.7 * a + 0.4 * b + 0.25 + 1e-3 * torch.randn(a.shape, generator=g, dtype=torch.float64)
+        for mode in ("bucket", "channel", "channel_bucket"):
+            q = de.LSQ(mode, 3, L, C, nc, torch.device("cpu"))
+            q.add([a, b, None], y, cls)
+            w = q.solve()
+            got = w[..., :2, :] if mode == "bucket" else (w if mode == "channel" else w[..., :2, :])
+            for k, want in enumerate((0.7, 0.4, 0.25)):
+                self.assertTrue(torch.allclose(got[..., k], torch.full_like(got[..., k], want), atol=0.01), (mode, k))
+            if mode != "channel":                                 # no samples: the plain first feature
+                empty = w[:, :, 2] if mode == "bucket" else w[:, :, :, 2]
+                self.assertTrue(torch.equal(empty, torch.tensor([1.0, 0.0, 0.0], dtype=torch.float64).expand_as(empty)))
+        # the prediction applies the weights per class
+        X = {"latest": a.reshape(L, n, 2 * C).float(), "drift": b.reshape(L, n, 2 * C).float()}
+        q = de.LSQ("bucket", 2, L, C, nc, torch.device("cpu"))
+        q.add([a, b], 0.7 * a + 0.4 * b, cls)
+        mu = de.predict("second_order", q.solve(), X, cls, C)
+        self.assertLess(float((mu - (0.7 * X["latest"] + 0.4 * X["drift"])).abs().max()), 0.02)   # pulled a little
+
+    def test_the_stage_on_a_stand_in_capture(self):
+        """Four conversations of three turns: a passage seen every turn after another prefix, drifting by the same
+        step each turn (keys turned by RoPE), an answer D held with other bytes, one with the same. Every kind
+        found; the second order (and the edges holding it) codes the third turn's copy far under the latest alone;
+        chains of depth 2; every page decoded exactly; the per-page rows and the sample written."""
+        import importlib.util
+        if importlib.util.find_spec("triton") is None:
+            self.skipTest("Triton is required")
+        r = subprocess.run([sys.executable, "-c", DIFFEDGE_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=3600)
+        self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-3000:])
+        self.assertIn("ok diffedge", r.stdout)
 
 
 class DeltaAnalysisTests(unittest.TestCase):

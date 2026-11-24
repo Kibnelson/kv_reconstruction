@@ -17,20 +17,25 @@ the pages themselves, so this run stores them and analyses them offline.
 | --- | --- |
 | Engines | 1p3d, raw codec, ring at 100 Gbit/s |
 | Conversations | MTRAG's first 6 (`KVPD_CAPTURE_CONVS`, 2 to 110); job 30555's 6 took 10.3 GB |
-| Layouts | docs_first and history_first |
+| Layouts | docs_first and history_first (`KVPD_CAPTURE_LAYOUTS`; or `interleaved`) |
 | Routing | by conversation, traced |
-| Stages | `check,mtrag,delta,report`, then `tree` and `region` after the engines, on this run's capture |
+| Stages | `check,mtrag,delta,report`, then `tree`, `region` and `diffedge` after the engines, on this run's capture (`KVPD_CAPTURE_AFTER`, or `none`) |
 | P's budget | 16 GB for 6 conversations, else 2 GB a conversation |
-| D's budget | 2 GB |
+| D's budget | 2 GB for each of the 3 D engines (`KVPD_CAPTURE_D_GB`, 0.5 to 16) |
 
 - **P** stores every 16-token block it sends, all 28 layers, as raw BF16 words. Each block is stored once, keyed by its
   pages' content hashes, and each request lists its blocks.
 - **D** stores its own copy of any held block whose bytes differ from what P recomputed.
 - **Where:** everything goes to `/tmp/$USER/kvpd-captures/<tag>/` on the node. It is kept after cleanup, so the
   analysis can be rerun without rerunning vLLM. It is deleted only by hand.
-- **Disk:** the campaign's disk plan reserves P's budget and D's 2 GB. They fill after setup has deleted its own
-  captures (6.6 GB), so the job's peak is the larger of setup's (14 GB) and the matrix's own files (7.4 GB) plus the
-  stores.
+- **Disk:** the campaign's disk plan reserves P's budget and each D engine's (3 × 2 GB). They fill after setup has
+  deleted its own captures (6.6 GB), so the job's peak is the larger of setup's (14 GB) and the matrix's own files
+  (7.4 GB) plus the stores.
+- **interleaved:** each turn's prompt holds every earlier turn's documents, question and answer, then its own
+  documents, question and the answer cue (`Instructions ¶ A ¶ B ¶ Q1 + A1 ¶ B ¶ C ¶ Q2 + cue`). D held the earlier
+  answers it decoded, and P computes them again in the next turn: 22% of those held pages differed in the trace
+  (job 30541). D's store keeps only those (an answer is at most 8 blocks a turn), so 2 GB a D engine is plenty for a
+  few conversations; the report counts any D had no room for.
 
 The store's files:
 
@@ -90,9 +95,9 @@ and their logs are in `runs/`. One campaign thus needs one setup and one cache. 
 
 ## Run it (login host, in tmux)
 
-The node's `/tmp` needs, beyond the cache (23.8 GB more if it is gone), the 10 GB kept free and 25.4 GB for 6
-conversations (7.4 GB plus the 18 GB of stores), or 17.4 GB for 4 (`export KVPD_CAPTURE_CONVS=4`). The start block is
-the trace's, with the branch and matrix changed:
+The node's `/tmp` needs, beyond the cache (23.8 GB more if it is gone), the 10 GB kept free and 29.4 GB for 6
+conversations (7.4 GB plus the 22 GB of stores), or 21.4 GB for 4 (`export KVPD_CAPTURE_CONVS=4`), plus 3 GB for each
+GB more a D engine gets. The start block is the trace's, with the branch and matrix changed:
 
 ```bash
 module load slurm
@@ -323,3 +328,77 @@ padding). A wrong prediction would show as a much larger size.
 | The blend about equal to T's own | Regions without deltas: T2 runs per conversation, batched decoding, the tree's keeping rule |
 
 The report is `region_report.md` (`region_report.json`).
+
+## Plain diff edges (`diffedge`)
+
+KV is kept as a radix tree: a block is reused only after the same prefix. A diff edge graph adds edges for the rest:
+a page stored as a diff against another page that holds the same tokens, rebuilt when it is needed. Agentic and
+multi-turn workloads keep long append-only histories, so the same text comes back (documents retrieved again, a tool's
+output quoted again) and the answers D decoded are computed again by P in the next turn. `scripts/pd_diffedge.py`
+measures plain edges first, with no codec's prediction, on a capture, after the engines (`STAGES=...,diffedge`) or on
+a kept one (`MATRIX=diffedge`).
+
+**Pages:** every distinct page P stored (a block whose bytes P stored before is a reference, free):
+
+| Kind | What it is | Stored as |
+| --- | --- | --- |
+| Twin, equal | D held the same tokens after the same prefix, with the same bytes (D's trace) | free: D's page |
+| Twin | the same, other bytes (D's decode, or a prefill in another batch) | a diff against D's copy |
+| Moved | the same 16 tokens earlier in the conversation, after another prefix | a diff against its earlier versions |
+| New | none of these | raw |
+
+**Edges of a moved page:** keys are turned by RoPE to the page's place first. Weights are fitted by least squares per
+layer, K or V, and class (agreement bucket, and one version or more), or per channel:
+
+| Edge | Prediction |
+| --- | --- |
+| first | its first version (a star: every copy against the first) |
+| latest | its latest version (a chain: each copy against the one before) |
+| latest_affine | the latest with a scale and an offset per layer, K or V, and channel |
+| second_order | latest + λ (latest − previous): the drift between versions goes on (a diff of a diff) |
+| multi_ref | a·latest + b·previous + c·first |
+| composite | a·latest + b·(latest − previous) + c·first + d, per layer, K or V, channel and class |
+
+A token's agreement is how many tokens up to it the page's text has agreed with the version's, backwards from the
+page start and then within the page. Buckets: 0–15, 16–63, 64–255, 256–1023, 1024+.
+
+**Coding:** every value is coded with the value-slice coder (exact mode) against the edge's prediction and a fitted
+spread, then decoded and checked. The spread is a scale per layer, K or V, and channel, times a factor and a
+multiplier per class (the multiplier chosen by the coder's ideal size on training pages). Weights and spreads are fitted
+on the even conversations; tables give the odd ones (held out) and the training ones apart. Each page is coded alone,
+per layer group (0–4, 5–13, 14–27) and K or V, so sizes break down any way. Batches of 32 pages are also coded whole,
+to time rebuilding.
+
+**Report (`diffedge_report.md`):**
+
+- bits per value of each edge by agreement bucket, by number of earlier versions (a diff of a diff needs two), by what
+  the page holds, and by layer group and K or V; the best edge per page (its number goes in the page's header) and a
+  cheap rule (one edge per bucket, chosen on the training pages);
+- the plain graph against raw distinct pages: references and equal twins free, twins and moved pages at their best
+  edge or raw, new pages raw;
+- chains: each moved page's depth against its latest version (or its first), the pages to decode to rebuild it, and
+  decoding time per page against recomputing (P's prefill in the run).
+
+**For analysis elsewhere:**
+
+| File | Contents |
+| --- | --- |
+| `diffedge_pages.json` | one row per coded page: conversation, turn, kind, versions, shifts, agreement, part, and bytes per edge and slice |
+| `diffedge_sample.npz` | 96 moved pages with their latest, previous and first versions, and 64 twins with D's copy: layers 0, 1, 3, 4, 12, 13, 26 and 27, head 0's keys and values, BF16 words as int16, with shifts, agreements, RoPE frequencies and each page's row; ~30 MB |
+
+Read the sample with numpy (`np.load(path)`; `moved_meta` and `twin_meta` are JSON). Layer pairs (0, 1), (3, 4),
+(12, 13) and (26, 27) let a residual be predicted from the layer below. `scripts/pd_diffedge_explore.py SAMPLE.npz`
+(numpy, any machine) tries further composite steps on the residual (target − turned latest version), fitted on half
+the sample's conversations and measured on the rest: the second order's λ, the residual at a layer from the one
+below (a linear map), at a token from the token before, its top 1, 4 and 16 directions (a low-rank delta), and its
+size by agreement bucket; and the twins' equal words.
+
+**Run it on a new interleaved capture** (4 conversations): the block above, with these before it. With the cache in
+place, 4 conversations need 21.4 GB beyond the 10 kept free (P's 8 GB, 3 × 2 GB for D, 7.4 GB of the job's own):
+
+```bash
+export KVPD_CAPTURE_CONVS=4 KVPD_CAPTURE_LAYOUTS=interleaved KVPD_CAPTURE_AFTER=tree,diffedge
+```
+
+**Then:** the edges and buckets where the plain diff pays are where the codecs (T's prediction, the blend) are tried
+on edges next.

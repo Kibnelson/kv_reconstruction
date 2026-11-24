@@ -313,24 +313,32 @@ class DiskPlanTests(unittest.TestCase):
 
     def test_a_capture_counts_after_setup_drops_its_own(self):
         """MATRIX=capture's stores fill after setup has deleted its captures (6.6 GB): the job's peak is the larger
-        of setup's (14) and the matrix's own files (7.4) plus the stores, not both added."""
+        of setup's (14) and the matrix's own files (7.4) plus the stores (P's, and each of the 3 D engines'), not
+        both added."""
         import os
         from unittest import mock
         sys.path.insert(0, str(ROOT / "scripts"))
         import pd_campaign as c
         with mock.patch.dict(os.environ, {"KVPD_CAPTURE_CONVS": "4"}):
+            os.environ.pop("KVPD_CAPTURE_D_GB", None)
             four = c.extra_gb("capture")
+        with mock.patch.dict(os.environ, {"KVPD_CAPTURE_CONVS": "4", "KVPD_CAPTURE_D_GB": "3"}):
+            four_d3 = c.extra_gb("capture")
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("KVPD_CAPTURE_CONVS", None)
+            os.environ.pop("KVPD_CAPTURE_D_GB", None)
             six = c.extra_gb("capture")
-        self.assertEqual((four, six, c.extra_gb("tree")), (8.0 + 2.0, 16.0 + 2.0, 0.0))
-        # nothing cached (23.8 GB) + max(14, 7.4 + 10) = 41.2 GB, and 10 kept free
-        p = self.plan(51.3, False, extra=four)
-        self.assertEqual((p["need_gb"], p["setup_gb"], p["matrix_gb"]), (41.2, 14.0, 17.4))
+        self.assertEqual((four, four_d3, six, c.extra_gb("tree"), c.extra_gb("diffedge")),
+                         (8.0 + 3 * 2.0, 8.0 + 3 * 3.0, 16.0 + 3 * 2.0, 0.0, 0.0))
+        # nothing cached (23.8 GB) + max(14, 7.4 + 14) = 45.2 GB, and 10 kept free
+        p = self.plan(55.3, False, extra=four)
+        self.assertEqual((p["need_gb"], p["setup_gb"], p["matrix_gb"]), (45.2, 14.0, 21.4))
         self.assertFalse(p["ibp"] is None)
-        self.assertIsNone(self.plan(51.1, False, extra=four)["ibp"])
-        # six conversations: 23.8 + 7.4 + 18 = 49.2 (before: 23.8 + 18 + 14 = 55.8)
-        self.assertEqual(self.plan(60, False, extra=six)["need_gb"], 49.2)
+        self.assertIsNone(self.plan(55.1, False, extra=four)["ibp"])
+        # six conversations: 23.8 + 7.4 + 22 = 53.2 (before: 23.8 + 18 + 14 = 55.8)
+        self.assertEqual(self.plan(64, False, extra=six)["need_gb"], 53.2)
+        # the cache kept: 7.4 + 17 = 24.4 for four interleaved conversations with 3 GB a D engine
+        self.assertEqual(self.plan(40, False, extra=four_d3, have=("uv", "python", "hf"))["need_gb"], 24.4)
 
 
 @unittest.skipIf(shutil.which("uv") is None, "uv needed")
