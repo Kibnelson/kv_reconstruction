@@ -359,6 +359,19 @@ layer, K or V, and class (agreement bucket, and one version or more), or per cha
 | multi_ref | a·latest + b·previous + c·first |
 | composite | a·latest + b·(latest − previous) + c·first + d, per layer, K or V, channel and class |
 
+**T's edges** (with the codec constants, `DIFFEDGE_CODEC`, t2-hbh; `none` leaves them out), on the same moved pages,
+layers 1–27 with T's coder in its uniform mode and layer 0 as the latest edge codes it:
+
+| Edge | Prediction |
+| --- | --- |
+| t | T alone, its own prediction and spread: T2 as it codes now |
+| t_fit | T alone, the spread fitted like the blend's: the blend's control |
+| t_blend | T + w (latest − T), w per layer, K or V, and class (least squares): CacheBlend's reuse of the moved copy, made exact |
+
+This is scripts/pd_region.py's blend, beside the plain edges: plain, T alone and T with the earlier copy, page by
+page. T's prediction comes from the page's own lower layers, which a decoder has only in order, so its rebuild time
+is T's own (not timed here).
+
 A token's agreement is how many tokens up to it the page's text has agreed with the version's, backwards from the
 page start and then within the page. Buckets: 0–15, 16–63, 64–255, 256–1023, 1024+.
 
@@ -366,8 +379,8 @@ page start and then within the page. Buckets: 0–15, 16–63, 64–255, 256–1
 spread, then decoded and checked. The spread is a scale per layer, K or V, and channel, times a factor and a
 multiplier per class (the multiplier chosen by the coder's ideal size on training pages). Weights and spreads are fitted
 on the even conversations; tables give the odd ones (held out) and the training ones apart. Each page is coded alone,
-per layer group (0–4, 5–13, 14–27) and K or V, so sizes break down any way. Batches of 32 pages are also coded whole,
-to time rebuilding.
+per layer group (0, 1–4, 5–13, 14–27) and K or V, so sizes break down any way. Batches of 32 pages are also coded whole,
+to time rebuilding, and their size shows what coding a page at a time costs in streams. Layer 0 is a slice of its own (T2 recomputes it).
 
 **Report (`diffedge_report.md`):**
 
@@ -375,7 +388,7 @@ to time rebuilding.
   the page holds, and by layer group and K or V; the best edge per page (its number goes in the page's header) and a
   cheap rule (one edge per bucket, chosen on the training pages);
 - the plain graph against raw distinct pages: references and equal twins free, twins and moved pages at their best
-  edge or raw, new pages raw;
+  edge or raw, new pages raw; and the graph with T's edges too;
 - chains: each moved page's depth against its latest version (or its first), the pages to decode to rebuild it, and
   decoding time per page against recomputing (P's prefill in the run).
 
@@ -400,5 +413,6 @@ place, 4 conversations need 21.4 GB beyond the 10 kept free (P's 8 GB, 3 × 2 GB
 export KVPD_CAPTURE_CONVS=4 KVPD_CAPTURE_LAYOUTS=interleaved KVPD_CAPTURE_AFTER=tree,diffedge
 ```
 
-**Then:** the edges and buckets where the plain diff pays are where the codecs (T's prediction, the blend) are tried
-on edges next.
+**On a kept capture** (`MATRIX=diffedge`: no engines, one GPU, the newest capture in `kvpd-captures` and its
+campaign's packaged run): the same stage, for example with T's edges on a capture whose stage ran without them.
+It needs 14 GB beyond the 10 kept free.

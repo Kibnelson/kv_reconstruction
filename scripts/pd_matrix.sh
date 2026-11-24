@@ -176,7 +176,7 @@ if [ -z "${RUNS:-}" ]; then
         diffgraph) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=diffgraph RUN_TIMEOUT_S=10800" ;;
         tree) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=tree RUN_TIMEOUT_S=10800" ;;
         region) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=region RUN_TIMEOUT_S=10800" ;;
-        diffedge) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw LAYOUT=1p3d STAGES=diffedge RUN_TIMEOUT_S=10800" ;;
+        diffedge) RUNS="TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=diffedge RUN_TIMEOUT_S=10800" ;;
         xfer) RUNS="TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XLRUN;
                     TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XSRUN;
                     TRANSPORT=p2p LINKS=native CODECS=$XFER $XLRUN;

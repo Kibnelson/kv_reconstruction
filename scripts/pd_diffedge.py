@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Plain diff edges: every distinct page of a capture coded against earlier versions of it, no codec.
+"""Plain diff edges: every distinct page of a capture coded against earlier versions of it; then T and the blend.
 
-  python3 scripts/pd_diffedge.py --capture CAPTURE_DIR --run RUN_DIR --model-dir MODEL --out OUT_DIR
+  python3 scripts/pd_diffedge.py --capture CAPTURE_DIR --run RUN_DIR --model-dir MODEL --out OUT_DIR \
+      [--codecs-file pd_codecs.pt --t-codec t2-hbh]
 
 After the engines of a capture run (MATRIX=capture, STAGES=...,diffedge), or on a kept capture (MATRIX=diffedge), on
 one GPU, over the run's own capture and records. "Plain": no codec's prediction (T's is not used). A page is coded
@@ -22,6 +23,11 @@ Edges of a moved page (weights per layer, K/V and agreement bucket, or per chann
   second_order   latest + l (latest - previous): the drift between versions goes on (a diff of a diff)
   multi_ref      a latest + b previous + c first
   composite      per layer, K/V, channel and agreement bucket: a latest + b (latest - previous) + c first + d
+With the codec constants (--codecs-file), moved pages also get T's edges, layers 1.. with T's value-slice coder in its
+uniform mode (layer 0 as the latest edge codes it), as scripts/pd_region.py:
+  t              T alone, its own prediction and spread: T as it codes now
+  t_fit          T alone, the spread fitted as the blend's (the blend's control)
+  t_blend        T + w (latest - T), w per layer, K/V and class (least squares): CacheBlend's reuse, made exact
 The agreement of a token: how many tokens up to it the target's text has agreed with the version's (backwards from
 the page's start, then the page itself): deep inside a long repeated run the version's context is nearly the same.
 Weights and spreads (scale per layer, K/V and channel, a factor per agreement bucket, a multiplier per edge and bucket
@@ -53,12 +59,13 @@ sys.path.insert(0, os.path.dirname(HERE))
 import pd_delta_analysis as da  # noqa: E402
 import pd_diffgraph as dg  # noqa: E402
 import pd_page_compare as pg  # noqa: E402
+import pd_region as rg  # noqa: E402
 
 np = da.np
 LN2 = math.log(2.0)
 BUCKETS = (0, 16, 64, 256, 1024)            # tokens of agreement: 0-15, 16-63, 64-255, 256-1023, 1024+
 BLABEL = ("0-15", "16-63", "64-255", "256-1023", "1024+")
-GROUPS = ((0, 4), (5, 13), (14, 27))          # layer groups, inclusive
+GROUPS = ((0, 0), (1, 4), (5, 13), (14, 27))  # layer groups, inclusive; layer 0 alone (T2 recomputes it)
 EDGES = ("first", "latest", "latest_affine", "second_order", "multi_ref", "composite")
 FEATS = {"first": ("first",), "latest": ("latest",), "latest_affine": ("latest", 1),
          "second_order": ("latest", "drift"), "multi_ref": ("latest", "previous", "first"),
@@ -67,7 +74,10 @@ MODE = {"latest_affine": "channel", "second_order": "bucket", "multi_ref": "buck
 LABEL = {"first": "Its first version (star)", "latest": "Its latest version (chain)",
          "latest_affine": "Latest, scale + offset per channel", "second_order": "Second order: latest + l (latest - previous)",
          "multi_ref": "a latest + b previous + c first", "composite": "Composite: a latest + b drift + c first + d, per channel",
-         "twin": "Twin: P's page against D's copy", "best": "Best edge per page (or raw)"}
+         "twin": "Twin: P's page against D's copy", "best": "Best edge per page (or raw)",
+         "best_plain": "Best plain edge per page (or raw)", "t": "T alone, its own spread (as now)",
+         "t_fit": "T alone, fitted spread", "t_blend": "Blend: T + w (latest - T)"}
+T_EDGES = ("t", "t_fit", "t_blend")
 MULTS = (0.35, 0.5, 0.7, 1.0, 1.4, 2.0)      # spread multipliers tried per edge and bucket
 BATCH = 32
 MIN_FIT = 16                                  # samples a weight group needs (else the plain latest)
@@ -312,7 +322,7 @@ def code(coder, w, mu, s, timer=None, tag=""):
 
 
 def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream_values=None, sample=True,
-            log=print):
+            log=print, codecs_file=None, t_codec="t2-hbh", predictor=None):
     import torch
     from kv_compare import gpu_coder as gc
     dev = torch.device(device)
@@ -327,8 +337,23 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
     pw = da.Words(stores["P"])
     dw = da.Words(stores["D"]) if stores["D"] else None
     fetch = lambda words, loc: torch.from_numpy(words.get(loc).transpose(1, 0, 2).copy()).to(dev)   # [L, n, W]
-    coder = gc.SliceCoder(dev, **({"values_per_stream": stream_values} if stream_values else {}))
+    sv = {"values_per_stream": stream_values} if stream_values else {}
+    coder = gc.SliceCoder(dev, **sv)
     timer = dg.Timer()
+    # T's edges: its constant sets (T2 picks one per request: here one per run, the smallest on training pages)
+    t_sets, t_info = None, {}
+    if t_codec and t_codec != "none" and (codecs_file or predictor is not None):
+        from kv_compare.pd import codecs as cdm
+        built, errors, _meta = cdm.build(codecs_file, dev, [t_codec], log=log)
+        codec = built.get(t_codec)
+        if codec is None:
+            t_info["error"] = str(errors.get(t_codec, errors))[:300]
+            log(f"T's edges left out: {t_info['error']}")
+        else:
+            t_sets = getattr(codec, "sets", None) or {t_codec: codec}
+            t_info["codec"] = t_codec
+    make_t = predictor or rg.TPredictor
+    coder_u = gc.SliceCoder(dev, mode="uniform", **sv) if t_sets else None
     req = {}
     for s in stores["P"]:
         for r in s.records:
@@ -343,7 +368,7 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
     out = {"meta": {"layers": L, "block_size": bs, "page_bytes": page_bytes, "buckets": list(BLABEL),
                     "slices": [x[0] for x in SL], "edges": list(EDGES), "twin_pairs": len(tw_all),
                     "twins_without_room": tw_missing, "held_equal_pages": len(eq_all), "coder": coder.mode,
-                    "values_per_stream": coder.V}, "runs": {}}
+                    "values_per_stream": coder.V, "t": t_info}, "runs": {}}
     rows_out, smp = [], {"moved": [], "twin": []}
     pages_for = collections.Counter()               # timer tag -> pages its calls covered
     for name, run in runs.items():
@@ -379,7 +404,10 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
             p = pages[i]
             return np.asarray(dg.agreement(reqs[p["r"]][1]["ids"], p["block"] * bs, reqs[v["req"]][1]["ids"], v["j"], bs))
 
-        def moved_batch(bt):
+        tpred = [None]                                  # T's predictor for this run (its set chosen below)
+        flat = lambda x: x.reshape(-1).contiguous()
+
+        def moved_batch(bt, tp=None):
             tgt_w = torch.cat([fetch(pw, pages[i]["loc"]) for i in bt], 1)                    # [L, n, W]
             X = {"latest": [], "previous": [], "first": []}
             R = {"latest": [], "previous": [], "first": []}
@@ -398,6 +426,12 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
             ag = {k: np.concatenate(x) for k, x in ag.items()}
             multi = torch.as_tensor([len(vs[i]) >= 2 for i in bt], dtype=torch.long).repeat_interleave(bs)
             cls = torch.as_tensor(bucket_of(ag["latest"]), dtype=torch.long) + nb * multi    # what the decoder knows
+            tp = tp or tpred[0]
+            if tp is not None:                          # T from the page's own words at its own places
+                pos = torch.cat([torch.arange(pages[i]["block"] * bs, (pages[i]["block"] + 1) * bs) for i in bt])
+                with timer("predict t"):
+                    X["t_mu"], X["t_s"], X["t_m"] = tp(tgt_w, pos.to(dev))
+                pages_for["predict t"] += len(bt)
             return tgt_w, tgt_w.view(torch.bfloat16).to(torch.float32), X, cls.to(dev), R, ag
 
         def twin_batch(bt):
@@ -415,6 +449,24 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
                 yield xs[k:k + batch]
 
         is_train = lambda c: c in train
+        # T's set: the one coding the first training batches smallest with its own spread (layers 1..)
+        if t_sets:
+            first = list(chunks(moved_i, is_train, limit=2))
+            sb = {}
+            for sname, o in t_sets.items():
+                pr = make_t(o)
+                sb[sname] = 0.0
+                for bt in first:
+                    tgt_w, _t, X, _c, _R, _a = moved_batch(bt, pr)
+                    for _nm, a, b, sl in SL:
+                        if b >= 1:
+                            a = max(a, 1)
+                            sb[sname] += code(coder_u, flat(tgt_w[a:b + 1, :, sl]), flat(X["t_mu"][a:b + 1, :, sl]),
+                                              flat(X["t_s"][a:b + 1, :, sl]))[0]
+            res["t_set"] = min(sb, key=sb.get)
+            res["t_set_bytes"] = sb
+            tpred[0] = make_t(t_sets[res["t_set"]])
+        fit_t = rg.Fit(L - 1, C, NC, dev) if tpred[0] is not None else None
         # fit: weights (least squares), then spreads, then a spread multiplier per edge and bucket
         lsq = {v: LSQ(MODE[v], len(FEATS[v]), L, C, NC, dev) for v in EDGES if v in MODE}
         for bt in chunks(moved_i, is_train):
@@ -422,33 +474,62 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
             y = kv4(tgt, C).double()
             for v, q in lsq.items():
                 q.add([None if f is None else kv4(f, C).double() for f in feature_list(v, X)], y, bk)
+            if fit_t is not None:
+                fit_t.add_weights(tgt[1:], X["t_mu"][1:], X["latest"][1:], bk)
         weights = {v: q.solve() for v, q in lsq.items()}
         del lsq
+        if fit_t is not None:
+            fit_t.solve()
         spreads = {v: Spread(L, C, NC, dev) for v in list(EDGES) + ["twin"]}
         for bt in chunks(moved_i, is_train):
             _w, tgt, X, bk, _R, _a = moved_batch(bt)
             for v in EDGES:
                 spreads[v].add(tgt - predict(v, weights.get(v), X, bk, C), bk)
+            if fit_t is not None:
+                mu_t, m_t = X["t_mu"][1:], X["t_m"][1:]
+                fit_t.add_spread("t_fit", tgt[1:], mu_t, m_t, bk)
+                fit_t.add_spread("blend", tgt[1:], fit_t.blend(mu_t, X["latest"][1:], bk), m_t, bk)
+        t_mult = {v: torch.ones(NC, dtype=torch.float32, device=dev) for v in ("t_fit", "t_blend")}
+
+        def t_mus(X, bk, lat):
+            """T's edges [L, n, W]: layer 0 as the latest edge codes it (lat: its mu, s), layers 1.. T's."""
+            mu_t, s_t, m_t = X["t_mu"][1:], X["t_s"][1:], X["t_m"][1:]
+            cat = lambda a, b: torch.cat([a[:1], b], 0)
+            sp = lambda v, name: fit_t.spread(name, m_t, bk) * t_mult[v][bk][None, :, None]
+            return {"t": (cat(lat[0], mu_t), cat(lat[1], s_t)),
+                    "t_fit": (cat(lat[0], mu_t), cat(lat[1], sp("t_fit", "t_fit"))),
+                    "t_blend": (cat(lat[0], fit_t.blend(mu_t, X["latest"][1:], bk)), cat(lat[1], sp("t_blend", "blend")))}
         for bt in chunks(twin_i, is_train):
             _w, tgt, X, bk, _t = twin_batch(bt)
             spreads["twin"].add(tgt - X["twin"], bk)
-        tried = {v: np.zeros((len(MULTS), NC)) for v in spreads}
+        tried = {v: np.zeros((len(MULTS), NC)) for v in list(spreads) + list(t_mult)}
         for kind_i, maker in ((moved_i, moved_batch), (twin_i, twin_batch)):
             for bt in chunks(kind_i, is_train, limit=4):
                 got = maker(bt)
                 tgt_w, X, bk = got[0], got[2], got[3]
-                for v in (EDGES if maker is moved_batch else ("twin",)):
-                    mu, s = predict(v, weights.get(v), X, bk, C), spreads[v].get(bk)
+                cand = {v: (predict(v, weights.get(v), X, bk, C), spreads[v].get(bk), coder, 0)
+                        for v in (EDGES if maker is moved_batch else ("twin",))}
+                if maker is moved_batch and fit_t is not None:        # layers 1..: T's coder
+                    cand.update({v: (mu, s, coder_u, 1) for v, (mu, s) in t_mus(X, bk, cand["latest"][:2]).items()
+                                 if v in t_mult})
+                for v, (mu, s, cd, l0) in cand.items():
                     for q in torch.unique(bk).tolist():
                         tok = (bk == q).nonzero()[:, 0]
-                        w_, m_, s_ = (x[:, tok].reshape(-1).contiguous() for x in (tgt_w, mu, s))
+                        w_, m_, s_ = (x[l0:, tok].reshape(-1).contiguous() for x in (tgt_w, mu, s))
                         for a, mlt in enumerate(MULTS):
-                            tried[v][a, q] += ideal(coder, w_, m_, s_ * mlt)
+                            tried[v][a, q] += ideal(cd, w_, m_, s_ * mlt)
         for v, t in tried.items():
             for q in range(NC):
                 if t[:, q].any():
-                    spreads[v].mult[q] = MULTS[int(np.argmin(t[:, q]))]
-        res["spread_mult"] = {v: [float(x) for x in spreads[v].mult.tolist()] for v in spreads}
+                    (spreads[v].mult if v in spreads else t_mult[v])[q] = MULTS[int(np.argmin(t[:, q]))]
+        res["spread_mult"] = {v: [float(x) for x in (spreads[v].mult if v in spreads else t_mult[v]).tolist()]
+                              for v in tried if v in spreads or fit_t is not None}
+        res["edges"] = list(EDGES) + (list(T_EDGES) if fit_t is not None else [])
+        if fit_t is not None:                           # w by layer group and class (least squares over the group)
+            num, den = fit_t.num.cpu().numpy(), fit_t.den.cpu().numpy()                    # [L-1, 2, NC]
+            res["t_blend_weights"] = {f"{kv} {a}-{b}": [float(num[a - 1:b, j, q].sum() / den[a - 1:b, j, q].sum())
+                                                         if den[a - 1:b, j, q].sum() > 0 else None for q in range(NC)]
+                                      for a, b in groups_of(L) if b >= 1 for j, kv in enumerate("KV")}
         res["weights"] = weights_summary(weights, NC)
         # sample choice: spread over the moved pages (half with two versions or more) and the twins
         rng = np.random.default_rng(7)
@@ -462,6 +543,7 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
         # code every page: per edge and slice, one page at a time, decoded and checked; batches timed whole
         exact, calls = collections.Counter(), collections.Counter()
         equal_tw = collections.Counter()
+        batched = collections.defaultdict(lambda: [0.0, 0])     # edge -> bytes and pages, coded a batch at a time
 
         def row_base(i):
             p = pages[i]
@@ -475,9 +557,13 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
                 by = {}
                 for v in edges:
                     mu, s = mus[v]
+                    cd = coder_u if v in T_EDGES else coder
                     cell = []
-                    for _nm, a, b, sl in SL:
-                        n_, ok = code(coder, tgt_w[a:b + 1, tok, sl].reshape(-1).contiguous(),
+                    for si, (_nm, a, b, sl) in enumerate(SL):
+                        if v in T_EDGES and a == 0:     # layer 0 (alone in GROUPS): as the latest edge codes it
+                            cell.append(by["latest"][si])
+                            continue
+                        n_, ok = code(cd, tgt_w[a:b + 1, tok, sl].reshape(-1).contiguous(),
                                       mu[a:b + 1, tok, sl].reshape(-1).contiguous(),
                                       s[a:b + 1, tok, sl].reshape(-1).contiguous())
                         cell.append(n_)
@@ -494,6 +580,8 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
                               s.reshape(-1).contiguous(), timer, f"batch {v}")
                 exact[v] += ok
                 calls[v] += 1
+                batched[v][0] += _n
+                batched[v][1] += n
                 pages_for[f"batch {v} encode"] += n
                 pages_for[f"batch {v} decode"] += n
 
@@ -504,9 +592,11 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
                 with timer(f"predict {v}"):
                     mus[v] = (predict(v, weights.get(v), X, bk, C), spreads[v].get(bk))
                 pages_for[f"predict {v}"] += len(bt)
+            if fit_t is not None:
+                mus.update(t_mus(X, bk, mus["latest"]))
             time_batch(tgt_w, mus, ("latest", "second_order", "composite"), len(bt))
             vsame = (tgt_w[:, :, C:] == R["latest"][:, :, C:]).reshape(L, len(bt), bs, C)
-            for k, (i, by) in enumerate(zip(bt, code_rows(bt, tgt_w, mus, EDGES))):
+            for k, (i, by) in enumerate(zip(bt, code_rows(bt, tgt_w, mus, res["edges"]))):
                 v = vs[i]
                 a = ag["latest"][k * bs:(k + 1) * bs]
                 rows_out.append(dict(row_base(i), versions=len(v), shifts=[x["shift"] for x in v][-3:],
@@ -535,6 +625,7 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
                     smp["twin"].append({"row": len(rows_out) - 1, "target": _cut(tgt_w[:, sl], C, hd),
                                         "twin": _cut(twin_w[:, sl], C, hd)})
         res["exact"], res["calls"] = dict(exact), dict(calls)
+        res["batched"] = {v: {"bytes": b, "pages": n} for v, (b, n) in batched.items()}
         res["twin_equal_words"] = equal_tw["same"] / equal_tw["all"] if equal_tw["all"] else None
         res["chains"] = chains(pages, vs, kind)
         out["runs"][name] = res
@@ -559,7 +650,7 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
         p = od / "diffedge_sample.npz"
         write_sample(p, smp, inv, hd, C, rows_out)
         out["meta"]["sample"] = {"file": p.name, "moved": len(smp["moved"]), "twins": len(smp["twin"]),
-                                 "bytes": p.stat().st_size}
+                                 "bytes": p.stat().st_size, "layers": [x for x in SAMPLE_LAYERS if x < L]}
     return out
 
 
@@ -630,8 +721,18 @@ def bits(rows, edge, vpp, part=None):
     return (8 * sum(xs) / (len(xs) * vpp), len(xs)) if xs else (None, 0)
 
 
-def best_of(r, page_bytes):
-    return min([page_bytes] + [sum(x) for x in r["bytes"].values()])
+def best_of(r, page_bytes, edges=None):
+    """The page's smallest size: raw, or its smallest edge (of `edges`, else every edge it has)."""
+    return min([page_bytes] + [sum(x) for v, x in r["bytes"].items() if edges is None or v in edges])
+
+
+def best_row(P, pb, vpp, nb, edges=None):
+    pick = lambda r: min((v for v in r["bytes"] if edges is None or v in edges), key=lambda v: sum(r["bytes"][v]))
+    return {"all": (8 * sum(best_of(r, pb, edges) for r in P) / (len(P) * vpp)) if P else None,
+            "bucket": [(8 * sum(best_of(r, pb, edges) for r in P if r["bucket"] == q) /
+                        (sum(r["bucket"] == q for r in P) * vpp)) if any(r["bucket"] == q for r in P)
+                       else None for q in range(nb)],
+            "chosen": dict(collections.Counter(pick(r) if best_of(r, pb, edges) < pb else "raw" for r in P))}
 
 
 def summarise(out, rows):
@@ -641,6 +742,7 @@ def summarise(out, rows):
     pb = m["page_bytes"]
     nb = len(BLABEL)
     for name, res in out["runs"].items():
+        E = res.get("edges") or list(EDGES)
         R = [r for r in rows if r["run"] == name]
         mv = [r for r in R if r["edge"] == "moved"]
         tw = [r for r in R if r["edge"] == "twin"]
@@ -649,7 +751,7 @@ def summarise(out, rows):
             P = [r for r in mv if r["part"] == part]
             T = [r for r in tw if r["part"] == part]
             row = {}
-            for v in EDGES:
+            for v in E:
                 row[v] = {"all": bits(P, v, vpp)[0],
                           "bucket": [bits([r for r in P if r["bucket"] == q], v, vpp)[0] for q in range(nb)],
                           "versions": [bits([r for r in P if min(r["versions"], 3) == n], v, vpp)[0] for n in (1, 2, 3)],
@@ -657,15 +759,10 @@ def summarise(out, rows):
                                          (len(P) * vpp * slice_share(sl, m["layers"])) if P else None)
                                     for k, sl in enumerate(m["slices"])}}
             kinds = sorted({r["kind"] for r in P})
-            for v in EDGES:
+            for v in E:
                 row[v]["kind"] = {k: bits([r for r in P if r["kind"] == k], v, vpp)[0] for k in kinds}
-            row["best"] = {"all": (8 * sum(best_of(r, pb) for r in P) / (len(P) * vpp)) if P else None,
-                           "bucket": [(8 * sum(best_of(r, pb) for r in P if r["bucket"] == q) /
-                                       (sum(r["bucket"] == q for r in P) * vpp)) if any(r["bucket"] == q for r in P)
-                                      else None for q in range(nb)],
-                           "chosen": dict(collections.Counter(min(r["bytes"], key=lambda v: sum(r["bytes"][v]))
-                                                              if min(sum(x) for x in r["bytes"].values()) < pb
-                                                              else "raw" for r in P))}
+            row["best"] = best_row(P, pb, vpp, nb)
+            row["best_plain"] = best_row(P, pb, vpp, nb, EDGES)
             row["twin"] = {"all": bits(T, "twin", vpp)[0],
                            "slice": {sl: (8 * sum(r["bytes"]["twin"][k] for r in T) /
                                           (len(T) * vpp * slice_share(sl, m["layers"])) if T else None)
@@ -683,7 +780,7 @@ def summarise(out, rows):
             if not Tq:
                 rule.append("latest")
                 continue
-            cost = {v: sum(sum(r["bytes"][v]) for r in Tq) for v in EDGES}
+            cost = {v: sum(sum(r["bytes"][v]) for r in Tq) for v in E}
             cost["raw"] = pb * len(Tq)
             rule.append(min(cost, key=cost.get))
         res["bucket_rule"] = rule
@@ -695,6 +792,12 @@ def summarise(out, rows):
                                                    (sum(r["bucket"] == q for r in P) * vpp)
                                                    if any(r["bucket"] == q for r in P) else None for q in range(nb)]}
         res["tables"] = t
+        res["per_page_vs_batched"] = {}
+        for v, x in (res.get("batched") or {}).items():
+            P = tw if v == "twin" else mv
+            if x["pages"] and P:
+                res["per_page_vs_batched"][v] = {"per_page": bits(P, v, vpp)[0],
+                                                 "batched": 8 * x["bytes"] / (x["pages"] * vpp)}
         res["graph"] = {}
         for part in ("heldout", "train", "all"):
             sel = lambda r: part == "all" or r["part"] == part
@@ -705,10 +808,12 @@ def summarise(out, rows):
             g = {"blocks": blocks, "distinct": distinct, "raw_all_blocks": blocks * pb, "raw_distinct": distinct * pb,
                  "twin_equal": 0, "twins": sum(best_of(r, pb) for r in tw if sel(r)),
                  "moved_best": sum(best_of(r, pb) for r in mv if sel(r)),
+                 "moved_best_plain": sum(best_of(r, pb, EDGES) for r in mv if sel(r)),
                  "moved_latest": sum(min(pb, sum(r["bytes"]["latest"])) for r in mv if sel(r)),
                  "new_raw": kinds_part.get("new", 0) * pb, "pages": dict(kinds_part)}
             g["graph"] = g["twins"] + g["moved_best"] + g["new_raw"]
             g["graph_latest_only"] = g["twins"] + g["moved_latest"] + g["new_raw"]
+            g["graph_plain"] = g["twins"] + g["moved_best_plain"] + g["new_raw"]
             res["graph"][part] = g
 
 
@@ -767,7 +872,7 @@ def markdown(res):
     L, bs = m["layers"], m["block_size"]
     f2 = lambda x: "-" if x is None else f"{x:.2f}"
     mb = lambda b: f"{b / 1e6:,.1f}"
-    out = ["# Plain diff edges: pages coded against their earlier versions, no codec", "",
+    out = ["# Diff edges: pages coded against their earlier versions (plain), then with T's prediction", "",
            f"Pages of {bs} tokens x {L} layers. Every value coded with the value-slice coder ({m['coder']} mode) against "
            "a prediction made from the page's earlier versions by plain arithmetic (keys turned by RoPE to the page's "
            "place), decoded and checked. Weights and spreads fitted on the even conversations; held out: the odd ones. "
@@ -777,6 +882,8 @@ def markdown(res):
         out += ["", f"D's capture had no room for {m['twins_without_room']:,} held blocks that differ (not counted as "
                 "twins: raise KVPD_CAPTURE_D_GB)."]
     for name, r in res["runs"].items():
+        E = r.get("edges") or list(EDGES)
+        withT = any(v in T_EDGES for v in E)
         k = r["kinds"]
         out += ["", f"## {name}", "",
                 f"{r['blocks']:,} blocks in {r['conversations']} conversations: {r['references']:,} references (bytes P "
@@ -794,7 +901,7 @@ def markdown(res):
             out += ["", f"{title}: {x['moved_pages']:,} moved pages, bits per value by agreement bucket (pages)", "",
                     "| Edge | All | " + " | ".join(f"{b} ({n:,})" for b, n in zip(BLABEL, x["moved_by_bucket"])) + " |",
                     "| --- | ---: | " + " | ".join("---:" for _ in BLABEL) + " |"]
-            for v in list(EDGES) + ["best"]:
+            for v in E + (["best_plain", "best"] if withT else ["best"]):
                 out.append(f"| {LABEL[v]} | {f2(e[v]['all'])} | " + " | ".join(f2(y) for y in e[v]["bucket"]) + " |")
             out.append(f"| Rule by bucket, from training ({' / '.join(r['bucket_rule'])}) | {f2(e['rule']['all'])} | "
                        + " | ".join(f2(y) for y in e["rule"]["bucket"]) + " |")
@@ -805,18 +912,18 @@ def markdown(res):
                 out += ["", "Held out, by earlier versions (pages): diff of a diff needs two", "",
                         "| Edge | " + " | ".join(f"{n} ({c:,})" for n, c in zip(("1", "2", "3+"), x["moved_by_versions"]))
                         + " |", "| --- | ---: | ---: | ---: |"]
-                for v in EDGES:
+                for v in E:
                     out.append(f"| {LABEL[v]} | " + " | ".join(f2(y) for y in e[v]["versions"]) + " |")
                 kinds = sorted(x["moved_by_kind"])
                 out += ["", "Held out, by what the page holds (pages)", "",
                         "| Edge | " + " | ".join(f"{kk} ({x['moved_by_kind'][kk]:,})" for kk in kinds) + " |",
                         "| --- | " + " | ".join("---:" for _ in kinds) + " |"]
-                for v in EDGES:
+                for v in E:
                     out.append(f"| {LABEL[v]} | " + " | ".join(f2(e[v]["kind"].get(kk)) for kk in kinds) + " |")
                 sls = m["slices"]
                 out += ["", "Held out, by layer group and K/V", "", "| Edge | " + " | ".join(sls) + " |",
                         "| --- | " + " | ".join("---:" for _ in sls) + " |"]
-                for v in EDGES:
+                for v in E:
                     out.append(f"| {LABEL[v]} | " + " | ".join(f2(e[v]["slice"][s]) for s in sls) + " |")
                 if x["twin_pages"]:
                     out.append(f"| {LABEL['twin']} | " + " | ".join(f2(e["twin"]["slice"][s]) for s in sls) + " |")
@@ -826,17 +933,24 @@ def markdown(res):
         gr = r.get("graph") or {}
         if gr:
             parts = [p for p in ("heldout", "train", "all") if gr.get(p, {}).get("distinct")]
-            out += ["", "The plain graph (MB; no codec anywhere)", "", "| | " + " | ".join(
+            out += ["", "The graph (MB)" + (": plain edges, then with T's" if withT else "; no codec anywhere"), "",
+                    "| | " + " | ".join(
                 {"heldout": "Held out", "train": "Training", "all": "All"}[p] for p in parts) + " |",
                 "| --- | " + " | ".join("---:" for _ in parts) + " |"]
             rows = (("Raw, every block", "raw_all_blocks"), ("Raw, distinct pages (references free)", "raw_distinct"),
                     ("Twins (D's copy) as diffs, or raw", "twins"), ("Moved pages, best edge or raw", "moved_best"),
                     ("Moved pages, latest edge or raw", "moved_latest"), ("New pages raw", "new_raw"),
-                    ("**The plain graph**", "graph"), ("The plain graph, latest edge only", "graph_latest_only"))
+                    ("**The plain graph**", "graph_plain"), ("The plain graph, latest edge only", "graph_latest_only"))
+            if withT:
+                rows = rows[:3] + (("Moved pages, best plain edge or raw", "moved_best_plain"),
+                                   ("Moved pages, best edge with T's, or raw", "moved_best")) + rows[4:] + \
+                    (("**The graph with T's edges**", "graph"),)
             for lab, key in rows:
                 out.append(f"| {lab} | " + " | ".join(mb(gr[p][key]) for p in parts) + " |")
-            out.append("| Under raw distinct pages | " + " | ".join(
-                f"{100 * (1 - gr[p]['graph'] / gr[p]['raw_distinct']):.1f}%" for p in parts) + " |")
+            for lab, key in (("Plain graph under raw distinct pages", "graph_plain"),) + (
+                    (("With T's edges, under raw distinct pages", "graph"),) if withT else ()):
+                out.append(f"| {lab} | " + " | ".join(
+                    f"{100 * (1 - gr[p][key] / gr[p]['raw_distinct']):.1f}%" for p in parts) + " |")
         ch = r.get("chains") or {}
         if ch:
             out += ["", "Chains and stars (moved pages; a twin is depth 1)", "",
@@ -871,9 +985,27 @@ def markdown(res):
         if w.get("latest_affine"):
             out += ["", "Latest's scale and offset (mean over layers and channels): " + "; ".join(
                 f"{kv} {w['latest_affine'][kv][0]:.3f}, {w['latest_affine'][kv][1]:+.4f}" for kv in "KV") + "."]
+        if r.get("t_set"):
+            out += ["", f"T's edges: {m['t'].get('codec')}, set {r['t_set']} (smallest on the first training pages); "
+                    "layers 1.. with T's coder (uniform mode), layer 0 as the latest edge codes it."]
+            tw_ = r.get("t_blend_weights") or {}
+            if tw_:
+                out += ["Blend w (0: T alone, 1: the latest version), pages with two versions or more, by agreement "
+                        "bucket: " + "; ".join(f"{g} " + " / ".join("-" if x is None else f"{x:.2f}" for x in ws[nbk:])
+                                               for g, ws in tw_.items()) + ".",
+                        "With one version: " + "; ".join(f"{g} " + " / ".join("-" if x is None else f"{x:.2f}"
+                                                                           for x in ws[:nbk]) for g, ws in tw_.items())
+                        + "."]
+        elif m.get("t", {}).get("error"):
+            out += ["", f"T's edges left out: {m['t']['error']}"]
         if r.get("spread_mult"):
             out += ["", "Spread multipliers chosen (by class: buckets with one version, then two or more): " + "; ".join(
                 f"{v} " + "/".join(f"{x:g}" for x in xs) for v, xs in r["spread_mult"].items()) + "."]
+        pv = r.get("per_page_vs_batched") or {}
+        if pv:
+            out += ["", "Coded a page and a slice at a time (the tables) against whole batches of " + f"{BATCH} pages, all "
+                    "layers (bits per value; the difference is the coder's streams' overhead): " +
+                    "; ".join(f"{v} {f2(x['per_page'])} vs {f2(x['batched'])}" for v, x in pv.items()) + "."]
         bad = {v: (r["calls"].get(v, 0) - r["exact"].get(v, 0)) for v in r.get("calls", {})}
         out += ["", "Decoded exactly: " + ", ".join(f"{v} {r['exact'].get(v, 0):,} of {r['calls'][v]:,}"
                                                     for v in r.get("calls", {})) +
@@ -889,7 +1021,7 @@ def markdown(res):
     if sm:
         out += ["", f"Sample for analysis: `{sm['file']}` ({sm['bytes'] / 1e6:.1f} MB): {sm['moved']} moved pages with "
                 f"their latest, previous and first versions, {sm['twins']} twins with D's copy; layers "
-                f"{', '.join(map(str, SAMPLE_LAYERS))}, head 0's keys and values; per-page sizes in "
+                f"{', '.join(map(str, sm.get('layers', SAMPLE_LAYERS)))}, head 0's keys and values; per-page sizes in "
                 "`diffedge_pages.json`."]
     return "\n".join(out) + "\n"
 
@@ -903,10 +1035,13 @@ def main(argv=None):
     ap.add_argument("--batch", type=int, default=BATCH)
     ap.add_argument("--no-sample", action="store_true")
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--codecs-file", default=None, help="unused (the runner passes it to every stage)")
-    ap.add_argument("--codecs", default=None, help="unused")
+    ap.add_argument("--codecs-file", default=None, help="the codec constants (pd_codecs.pt): T's edges")
+    ap.add_argument("--t-codec", default="t2-hbh", help="T's codec for its edges (none: plain edges only)")
+    ap.add_argument("--codecs", default=None, help="unused (the runner passes it to every stage)")
     a = ap.parse_args(argv)
-    res = analyse(a.capture, a.run, a.model_dir, a.out, device=a.device, batch=a.batch, sample=not a.no_sample)
+    cf = a.codecs_file if a.codecs_file and os.path.isfile(a.codecs_file) else None
+    res = analyse(a.capture, a.run, a.model_dir, a.out, device=a.device, batch=a.batch, sample=not a.no_sample,
+                  codecs_file=cf, t_codec=a.t_codec)
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "diffedge_report.json").write_text(json.dumps(res, indent=1, default=str))

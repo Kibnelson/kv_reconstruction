@@ -180,7 +180,8 @@ RUN_TIMEOUT_S=${RUN_TIMEOUT_S:-$([ "${SMOKE:-0}" = 1 ] && echo 1200 || echo 1080
 # run), with the codec constants setup just built. diffgraph: our KV Diff Graph against EvidenceStore's
 # (scripts/pd_diffgraph.py); tree: the conversations' block tree kept by a rule, the rest recomputed
 # (scripts/pd_tree.py); region: T plus the base against T alone on pages with an earlier copy (scripts/pd_region.py);
-# diffedge: plain diff edges, every page against its earlier versions or D's copy, no codec (scripts/pd_diffedge.py)
+# diffedge: diff edges, every page against its earlier versions or D's copy: plain, then T alone and the blend
+# T + w (latest - T) (scripts/pd_diffedge.py; DIFFEDGE_CODEC, t2-hbh, or none)
 OFFLINE_DONE=0
 if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ] || [ "${STAGES:-}" = region ] || [ "${STAGES:-}" = diffedge ]; then
     OFF=$STAGES
@@ -203,7 +204,7 @@ if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ] || [ "${STAGES:-}" 
             OFF_ARGS=(--batch "${REGION_BATCH:-64}")
         elif [ "$OFF" = diffedge ]; then
             OFF_PY=scripts/pd_diffedge.py
-            OFF_ARGS=(--batch "${DIFFEDGE_BATCH:-32}")
+            OFF_ARGS=(--batch "${DIFFEDGE_BATCH:-32}" --t-codec "${DIFFEDGE_CODEC:-t2-hbh}")
         fi
         CUDA_VISIBLE_DEVICES=${DEVS[0]} PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
             "$VPY" -u "$OFF_PY" --capture "$DIFF_CAPTURE" --run "$DIFF_RUN" \
@@ -556,7 +557,7 @@ for OFF2 in tree region diffedge; do
     echo "== $OFF2: this run's capture $CAPTURE_DIR" | tee -a "$OUT/bench.log"
     OFF2_ARGS=(--probe "${TREE_PROBE:-24}")
     [ "$OFF2" = region ] && OFF2_ARGS=(--batch "${REGION_BATCH:-64}")
-    [ "$OFF2" = diffedge ] && OFF2_ARGS=(--batch "${DIFFEDGE_BATCH:-32}")
+    [ "$OFF2" = diffedge ] && OFF2_ARGS=(--batch "${DIFFEDGE_BATCH:-32}" --t-codec "${DIFFEDGE_CODEC:-t2-hbh}")
     set +e
     CUDA_VISIBLE_DEVICES=${DEVS[0]} PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "${OFFLINE_TIMEOUT_S:-5400}" \
         "$VPY" -u "scripts/pd_$OFF2.py" --capture "$CAPTURE_DIR" --run "$OUT" --codecs-file "$RUN/pd_codecs.pt" \

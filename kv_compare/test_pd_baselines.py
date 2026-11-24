@@ -1471,7 +1471,7 @@ class RunnerDryRunTests(unittest.TestCase):
                           "RUN_TIMEOUT_S=10800"])
 
     def test_diffedge_runs_offline_without_engines(self):
-        """STAGES=diffedge: as diffgraph, tree and region; MATRIX=diffedge lists that one run (no codec)."""
+        """STAGES=diffedge: as diffgraph, tree and region; MATRIX=diffedge lists that one run."""
         r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw", STAGES="diffedge",
                              KVPD_ROOT=str(self.tmp / "noroot"))
         self.assertEqual(eng, [])
@@ -1483,7 +1483,8 @@ class RunnerDryRunTests(unittest.TestCase):
         m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                            env=dict(os.environ, MATRIX="diffedge", PRINT_RUNS="1"))
         self.assertEqual([x for x in m.stdout.split("\n") if x],
-                         ["TRANSPORT=ring LINKS=100 CODECS=raw LAYOUT=1p3d STAGES=diffedge RUN_TIMEOUT_S=10800"])
+                         ["TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=diffedge "
+                          "RUN_TIMEOUT_S=10800"])
 
     def test_capture_run_configures_both_engines_and_runs_the_delta_stage(self):
         """MATRIX=capture's run: both engines get capture_dir (P its 16 GB, each D its CAPTURE_D_GB), the traced runs
@@ -2308,7 +2309,8 @@ sys.path.insert(0, os.path.join(sys.argv[1], "scripts"))
 from pathlib import Path
 import numpy as np
 import torch
-from kv_compare.pd import trace as tr
+from unittest import mock
+from kv_compare.pd import trace as tr, codecs as cdm
 import pd_delta_analysis as da
 import pd_diffedge as de
 L, bs, H, hd = 3, 16, 4, 8
@@ -2374,13 +2376,35 @@ dst.close()
 (run / "runs" / f"{nm}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
 (run / "proxy.jsonl").write_text("".join(json.dumps(r) + "\n" for r in prox))
 (run / "connector" / "trace_D_1_0.jsonl").write_text("".join(json.dumps(r) + "\n" for r in held))
-res = de.analyse(str(cap), str(run), str(mdir), str(out), device="cpu", batch=64, stream_values=16, log=lambda m: None)
+SIG = 0.3                                          # the stand-in T's error: the drift's size, independent of it
+
+
+class StandIn:                                     # T's prediction: the page itself plus independent noise
+    def __init__(self, o):
+        pass
+
+    def __call__(self, words, positions):
+        g = torch.Generator().manual_seed(int(words.long().sum()) % (2 ** 31))
+        tgt = words.view(torch.bfloat16).to(torch.float32)
+        mu = tgt + SIG * torch.randn(tgt.shape, generator=g)
+        return mu, torch.full_like(mu, 0.03), torch.ones(words.shape[0], words.shape[1])
+
+
+class Codec:
+    name = "t2-x"
+    sets = {"s": object()}
+
+
+with mock.patch.object(cdm, "build", lambda *a, **k: ({"t2-x": Codec()}, {}, {})):
+    res = de.analyse(str(cap), str(run), str(mdir), str(out), device="cpu", batch=64, stream_values=16,
+                     log=lambda m: None, t_codec="t2-x", predictor=StandIn)
 r = res["runs"][nm]
 assert (r["blocks"], r["references"], r["distinct"]) == (72, 8, 64), (r["blocks"], r["references"], r["distinct"])
 assert r["kinds"] == {"new": 40, "moved": 16, "twin": 4, "twin_equal": 4}, r["kinds"]
 assert r["versions"] == {1: 8, 2: 8}, r["versions"]
 assert all(r["exact"][v] == r["calls"][v] > 0 for v in r["calls"]), (r["exact"], r["calls"])
-assert set(r["calls"]) == set(de.EDGES) | {"twin"}, r["calls"]
+assert set(r["calls"]) == set(de.EDGES) | set(de.T_EDGES) | {"twin"}, r["calls"]
+assert r["edges"] == list(de.EDGES) + list(de.T_EDGES) and r["t_set"] == "s", (r["edges"], r.get("t_set"))
 h = r["tables"]["heldout"]
 assert (h["moved_pages"], h["twin_pages"], h["moved_by_versions"]) == (8, 2, [4, 4, 0]), h
 assert h["moved_by_bucket"][:2] == [4, 4], h["moved_by_bucket"]
@@ -2392,20 +2416,34 @@ one = {v: e[v]["versions"][0] for v in de.EDGES}
 assert two["second_order"] < two["latest"] - 4 and two["composite"] < two["latest"] - 1, two
 assert two["multi_ref"] < two["latest"] - 4, two
 assert abs(one["second_order"] - one["latest"]) < 0.5, one    # one version: no drift to go on
-assert e["best"]["all"] <= min(e[v]["all"] for v in de.EDGES) + 1e-9, e["best"]
+assert e["best"]["all"] <= min(e[v]["all"] for v in r["edges"]) + 1e-9, e["best"]
+assert e["best_plain"]["all"] <= min(e[v]["all"] for v in de.EDGES) + 1e-9, e["best_plain"]
+# T and the latest version wrong by equal, independent errors: the blend weighs them about equally and codes
+# layers 1.. smaller than T alone or the latest alone (about half a bit: half the error's variance); layer 0 is the
+# latest edge's
+sl = e["t_blend"]["slice"]
+for g in ("K 1-2", "V 1-2"):
+    assert sl[g] < e["t_fit"]["slice"][g] - 0.35 and sl[g] < e["latest"]["slice"][g] - 0.35, (g, e)
+assert sl["K 0-0"] == e["latest"]["slice"]["K 0-0"], e
+tw_ = r["t_blend_weights"]
+nbk = len(de.BUCKETS)
+for g in ("K 1-2", "V 1-2"):
+    assert all(0.35 < tw_[g][q] < 0.65 for q in (0, 1, nbk, nbk + 1)), tw_
 w = r["weights"]["second_order"]
 for kv in "KV":                                    # l about 1 where the page has two versions (buckets 0 and 1)
     assert all(0.85 < w[kv][len(de.BUCKETS) + q][1] < 1.15 for q in (0, 1)), w
-assert e["twin"]["all"] < 6, e["twin"]             # keys one step apart, values equal: cheap
+assert e["twin"]["slice"]["V 1-2"] < e["latest"]["slice"]["V 1-2"] - 4, e   # values equal to D's: cheap
 ch = r["chains"]
 assert ch["latest"]["depth"] == {1: 8, 2: 8} and ch["first"]["depth"] == {1: 16}, ch
 assert ch["latest"]["decode_pages_max"] == 2 and ch["latest"]["decode_pages_mean"] == 1.5, ch
 g = r["graph"]["all"]
 pb = res["meta"]["page_bytes"]
 assert g["raw_distinct"] == 64 * pb and g["new_raw"] == 40 * pb and g["pages"]["twin_equal"] == 4, g
-assert g["graph"] < g["raw_distinct"] - 4 * pb, g  # equal twins free, the rest smaller
+assert g["graph"] <= g["graph_plain"] < g["raw_distinct"] - 4 * pb, g  # equal twins free, the rest smaller
+assert set(r["per_page_vs_batched"]) == {"latest", "second_order", "composite", "twin"}, r["per_page_vs_batched"]
 rows = json.loads((out / "diffedge_pages.json").read_text())["rows"]
-assert len(rows) == 20 and all(len(x["bytes"]["latest" if x["edge"] == "moved" else "twin"]) == 2 for x in rows)
+assert len(rows) == 20 and all(len(x["bytes"]["latest" if x["edge"] == "moved" else "twin"]) == 4 for x in rows)
+assert all(x["bytes"]["t_blend"][0] == x["bytes"]["latest"][0] for x in rows if x["edge"] == "moved")  # layer 0
 z = np.load(out / "diffedge_sample.npz")
 assert z["moved_target"].shape == (16, 2, bs, 2 * hd) and z["twin_target"].shape == (4, 2, bs, 2 * hd), \
     (z["moved_target"].shape, z["twin_target"].shape)
@@ -2416,7 +2454,7 @@ k = [i for i, x in enumerate(m0) if x["versions"] == 2][0]
 assert list(z["moved_shift"][k]) == [16, 32, 32], z["moved_shift"][k]
 text = de.markdown(res)
 for s in ("The plain graph", "Second order: latest + l (latest - previous)", "by earlier versions", "Chains and stars",
-          "Decoded exactly", "(ALL)"):
+          "Decoded exactly", "(ALL)", "Blend: T + w (latest - T)", "The graph with T's edges", "T's edges: t2-x, set s"):
     assert s in text, (s, text)
 import pd_diffedge_explore as ex                    # the sample read back: the drift found again in numpy
 xr = ex.analyse(ex.load(out / "diffedge_sample.npz"))
@@ -2460,9 +2498,10 @@ class DiffEdgeTests(unittest.TestCase):
 
     def test_the_stage_on_a_stand_in_capture(self):
         """Four conversations of three turns: a passage seen every turn after another prefix, drifting by the same
-        step each turn (keys turned by RoPE), an answer D held with other bytes, one with the same. Every kind
-        found; the second order (and the edges holding it) codes the third turn's copy far under the latest alone;
-        chains of depth 2; every page decoded exactly; the per-page rows and the sample written."""
+        step each turn (keys turned by RoPE), an answer D held with other bytes, one with the same; a stand-in T as
+        wrong as the drift, independently. Every kind found; the second order (and the edges holding it) codes the
+        third turn's copy far under the latest alone; the blend weighs T and the latest about equally and codes under
+        either; chains of depth 2; every page decoded exactly; the per-page rows and the sample written and read."""
         import importlib.util
         if importlib.util.find_spec("triton") is None:
             self.skipTest("Triton is required")
