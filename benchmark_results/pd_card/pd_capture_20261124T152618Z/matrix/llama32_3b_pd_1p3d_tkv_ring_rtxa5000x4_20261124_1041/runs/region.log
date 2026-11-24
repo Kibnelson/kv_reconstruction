@@ -1,0 +1,104 @@
+== t2-hbh mtrag_raw_docs_first_conversation: 1842 pages with a base (2 of 4 conversations to fit)
+   set wikitext; weights {'K 1-4': 0.08432409375584954, 'V 1-4': 0.0806308045548191, 'K 5-13': 0.05857016135288671, 'V 5-13': 0.060290640913088396, 'K 14-27': 0.05002304265921866, 'V 14-27': 0.07116554772291898}
+== t2-hbh mtrag_raw_history_first_conversation: 1417 pages with a base (2 of 4 conversations to fit)
+   set wikitext; weights {'K 1-4': 0.08628668011335289, 'V 1-4': 0.0846119530476393, 'K 5-13': 0.06221296608361684, 'V 5-13': 0.06433635460517532, 'K 14-27': 0.05300432560961805, 'V 14-27': 0.07739634961494593}
+== t2-rank256 mtrag_raw_docs_first_conversation: 1842 pages with a base (2 of 4 conversations to fit)
+   set wikitext; weights {'K 1-4': 0.19484994259404345, 'V 1-4': 0.3132550400515676, 'K 5-13': 0.10917964857838851, 'V 5-13': 0.25255472252000694, 'K 14-27': 0.10128183810576749, 'V 14-27': 0.32144170625383095}
+== t2-rank256 mtrag_raw_history_first_conversation: 1417 pages with a base (2 of 4 conversations to fit)
+   set wikitext; weights {'K 1-4': 0.1981177384477044, 'V 1-4': 0.32101675303667526, 'K 5-13': 0.11594118316044547, 'V 5-13': 0.2674431440383345, 'K 14-27': 0.10478079068101043, 'V 14-27': 0.3325363534840062}
+# T plus the base against T alone, on pages with an earlier copy
+
+Layers 1-27 of every distinct page with a base (layer 0 recomputed, as T2 does), coded with T's value-slice coder against each prediction, decoded and checked. Fitted on the even conversations. Bits per value (16 raw) over all 28 layers, layer 0 at 0 bits (as pd_diffgraph.py's rows), held out (the odd conversations) and on the training pages; the K and V columns over their own values. Base: the latest earlier copy of the 16 tokens (keys turned), else the latest earlier turn's page at the same place.
+
+## t2-hbh mtrag_raw_docs_first_conversation
+
+1,842 pages with a base (position 1,010, text 832); held out 962, training 880. T's constants: set wikitext (the smallest on the first training pages).
+
+| Prediction | Held out | Training | K 1-4 | K 5-13 | K 14-27 | V 1-4 | V 5-13 | V 14-27 | Decoded exactly |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| T, its own spread (as now) | 8.32 | 8.23 | 8.00 | 8.30 | 8.11 | 9.10 | 9.04 | 9.12 | 43 of 43 calls |
+| T, fitted spread | 8.31 | 8.22 | 7.98 | 8.30 | 8.10 | 9.10 | 9.04 | 9.11 | 43 of 43 calls |
+| Base (the diff graph's delta) | 9.68 | 8.93 | 8.89 | 9.79 | 9.77 | 9.85 | 10.53 | 10.52 | 43 of 43 calls |
+| Base, spread with T's prior | 9.70 | 8.95 | 8.98 | 9.80 | 9.79 | 9.95 | 10.54 | 10.54 | 43 of 43 calls |
+| Blend: T + w (base - T) | 8.18 | 7.79 | 7.56 | 8.20 | 8.08 | 8.54 | 8.94 | 9.02 | 43 of 43 calls |
+
+Blend against T as now, held out: +1.6% (smaller).
+
+Blend weights w (0: T alone, 1: the base alone), least squares per layer group: K 1-4 0.08, V 1-4 0.08, K 5-13 0.06, V 5-13 0.06, K 14-27 0.05, V 14-27 0.07. By agreement bucket (tokens the text has agreed with the base's: 0-15 / 16-63 / 64-255 / 256+ / the same place, other text), all layers: K 0.19 / 0.22 / 0.46 / 0.77 / 0.01; V 0.23 / 0.26 / 0.49 / 0.81 / 0.01.
+
+Check, 6 whole requests (4,864 tokens, no padding): the codec's own size 8.35 bits per value (layer 0 recomputed), T's prediction through this coder 8.34 (the same layers); exact 6 of 6.
+
+## t2-hbh mtrag_raw_history_first_conversation
+
+1,417 pages with a base (position 904, text 513); held out 595, training 822. T's constants: set wikitext (the smallest on the first training pages).
+
+| Prediction | Held out | Training | K 1-4 | K 5-13 | K 14-27 | V 1-4 | V 5-13 | V 14-27 | Decoded exactly |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| T, its own spread (as now) | 8.31 | 8.25 | 8.00 | 8.27 | 8.13 | 9.12 | 9.02 | 9.12 | 40 of 40 calls |
+| T, fitted spread | 8.31 | 8.24 | 7.99 | 8.27 | 8.12 | 9.12 | 9.01 | 9.11 | 40 of 40 calls |
+| Base (the diff graph's delta) | 10.36 | 8.75 | 9.80 | 10.50 | 10.42 | 10.82 | 11.19 | 11.18 | 40 of 40 calls |
+| Base, spread with T's prior | 10.39 | 8.78 | 9.90 | 10.51 | 10.44 | 10.93 | 11.21 | 11.21 | 40 of 40 calls |
+| Blend: T + w (base - T) | 8.41 | 7.67 | 7.96 | 8.42 | 8.27 | 8.99 | 9.13 | 9.24 | 40 of 40 calls |
+
+Blend against T as now, held out: -1.2% (larger).
+
+Blend weights w (0: T alone, 1: the base alone), least squares per layer group: K 1-4 0.09, V 1-4 0.08, K 5-13 0.06, V 5-13 0.06, K 14-27 0.05, V 14-27 0.08. By agreement bucket (tokens the text has agreed with the base's: 0-15 / 16-63 / 64-255 / 256+ / the same place, other text), all layers: K 0.23 / 0.35 / 0.57 / 0.84 / 0.01; V 0.26 / 0.39 / 0.60 / 0.84 / 0.02.
+
+Check, 6 whole requests (4,352 tokens, no padding): the codec's own size 8.33 bits per value (layer 0 recomputed), T's prediction through this coder 8.33 (the same layers); exact 6 of 6.
+
+## t2-rank256 mtrag_raw_docs_first_conversation
+
+1,842 pages with a base (position 1,010, text 832); held out 962, training 880. T's constants: set wikitext (the smallest on the first training pages).
+
+| Prediction | Held out | Training | K 1-4 | K 5-13 | K 14-27 | V 1-4 | V 5-13 | V 14-27 | Decoded exactly |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| T, its own spread (as now) | 9.23 | 9.17 | 8.84 | 8.90 | 8.76 | 10.32 | 10.25 | 10.37 | 43 of 43 calls |
+| T, fitted spread | 9.22 | 9.16 | 8.81 | 8.90 | 8.75 | 10.31 | 10.24 | 10.36 | 43 of 43 calls |
+| Base (the diff graph's delta) | 9.68 | 8.93 | 8.89 | 9.79 | 9.77 | 9.85 | 10.53 | 10.52 | 43 of 43 calls |
+| Base, spread with T's prior | 9.68 | 8.93 | 8.91 | 9.79 | 9.78 | 9.87 | 10.53 | 10.53 | 43 of 43 calls |
+| Blend: T + w (base - T) | 8.86 | 8.32 | 8.04 | 8.68 | 8.63 | 9.27 | 9.88 | 9.96 | 43 of 43 calls |
+
+Blend against T as now, held out: +3.9% (smaller).
+
+Blend weights w (0: T alone, 1: the base alone), least squares per layer group: K 1-4 0.19, V 1-4 0.31, K 5-13 0.11, V 5-13 0.25, K 14-27 0.10, V 14-27 0.32. By agreement bucket (tokens the text has agreed with the base's: 0-15 / 16-63 / 64-255 / 256+ / the same place, other text), all layers: K 0.35 / 0.39 / 0.67 / 0.89 / 0.02; V 0.67 / 0.70 / 0.87 / 0.97 / 0.06.
+
+Check, 6 whole requests (4,864 tokens, no padding): the codec's own size 9.24 bits per value (layer 0 recomputed), T's prediction through this coder 9.26 (the same layers); exact 6 of 6.
+
+## t2-rank256 mtrag_raw_history_first_conversation
+
+1,417 pages with a base (position 904, text 513); held out 595, training 822. T's constants: set wikitext (the smallest on the first training pages).
+
+| Prediction | Held out | Training | K 1-4 | K 5-13 | K 14-27 | V 1-4 | V 5-13 | V 14-27 | Decoded exactly |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| T, its own spread (as now) | 9.22 | 9.18 | 8.83 | 8.87 | 8.77 | 10.32 | 10.23 | 10.36 | 40 of 40 calls |
+| T, fitted spread | 9.21 | 9.17 | 8.81 | 8.87 | 8.76 | 10.32 | 10.22 | 10.35 | 40 of 40 calls |
+| Base (the diff graph's delta) | 10.36 | 8.75 | 9.80 | 10.50 | 10.42 | 10.82 | 11.19 | 11.18 | 40 of 40 calls |
+| Base, spread with T's prior | 10.37 | 8.76 | 9.82 | 10.51 | 10.43 | 10.84 | 11.20 | 11.19 | 40 of 40 calls |
+| Blend: T + w (base - T) | 9.26 | 8.15 | 8.64 | 8.99 | 8.90 | 10.01 | 10.29 | 10.40 | 40 of 40 calls |
+
+Blend against T as now, held out: -0.4% (larger).
+
+Blend weights w (0: T alone, 1: the base alone), least squares per layer group: K 1-4 0.20, V 1-4 0.32, K 5-13 0.12, V 5-13 0.27, K 14-27 0.10, V 14-27 0.33. By agreement bucket (tokens the text has agreed with the base's: 0-15 / 16-63 / 64-255 / 256+ / the same place, other text), all layers: K 0.42 / 0.55 / 0.75 / 0.93 / 0.02; V 0.70 / 0.81 / 0.90 / 0.97 / 0.06.
+
+Check, 6 whole requests (4,352 tokens, no padding): the codec's own size 9.23 bits per value (layer 0 recomputed), T's prediction through this coder 9.25 (the same layers); exact 6 of 6.
+
+## Times (CUDA-synchronised, one GPU; batches of up to 64 pages, one call per layer group and K/V)
+
+| Step | calls | mean ms per call | ms per page | total s |
+| --- | ---: | ---: | ---: | ---: |
+| base decode | 996 | 3.47 | 0.531 | 3.5 |
+| base encode | 996 | 3.09 | 0.472 | 3.1 |
+| base_prior decode | 996 | 3.47 | 0.530 | 3.5 |
+| base_prior encode | 996 | 3.09 | 0.472 | 3.1 |
+| blend decode | 996 | 3.47 | 0.531 | 3.5 |
+| blend encode | 996 | 3.09 | 0.472 | 3.1 |
+| check T here encode | 48 | 3.47 | - | 0.2 |
+| check codec decode | 24 | 218.56 | - | 5.2 |
+| check codec encode | 24 | 17.04 | - | 0.4 |
+| set choice decode | 240 | 4.54 | - | 1.1 |
+| set choice encode | 240 | 4.15 | - | 1.0 |
+| t_fit decode | 996 | 3.48 | 0.532 | 3.5 |
+| t_fit encode | 996 | 3.09 | 0.472 | 3.1 |
+| t_own decode | 996 | 3.72 | 0.569 | 3.7 |
+| t_own encode | 996 | 3.35 | 0.512 | 3.3 |
+
