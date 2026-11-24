@@ -276,3 +276,42 @@ and blocks with an earlier block's bytes under another token prefix in the recor
 - the whole prompt padded to 256 with copies.
 
 The report is `tree_report.md` (`tree_report.json`), in the published run.
+
+## T plus the base against T alone (`MATRIX=region`)
+
+The deciding test for a region graph, one region per conversation, whose deltas give T the earlier copy as extra
+context. A plain delta, coded against the base alone, costs 9.2–10.1 bits per value on pages that have one. That is
+no better than T2 once its padding is gone (an estimated ~8.3). So a delta only pays if T and the base together beat
+T alone. `scripts/pd_region.py` measures it, offline like diffgraph, on the kept capture.
+
+**Pages:** every distinct page with a base. The base is the latest earlier copy of its 16 tokens, keys turned by
+RoPE, else the latest earlier turn's page at the same place.
+
+**Predictions:** layers 1–27 (layer 0 is recomputed, as T2 does) are coded with T's own value-slice coder, in its
+uniform mode, against each prediction, and every slice is decoded and checked:
+
+| Prediction | What it is |
+| --- | --- |
+| T, its own spread | T's prediction, rebuilt outside its kernels with the same arithmetic: each token's layer from its own previous layer and, in head groups, the same layer's earlier groups. T as it codes now |
+| T, fitted spread | the same prediction, the spread fitted as below |
+| Base | the base's words, keys turned: the diff graph's delta |
+| Base, prior | the same, the spread also scaled by T's per-token prior |
+| Blend | T + w × (base − T), w per layer, K or V, and how long the text has agreed with the base's (least squares) |
+
+**Spreads:** a scale per layer, K or V, and channel, times a factor per agreement bucket, times T's per-token
+multiplier (the decoder has it). Weights and spreads are fitted on the even conversations, and sizes are reported on
+the odd ones (held out) and on the training ones. Bits are per value over all 28 layers, with layer 0 at 0 bits, as
+in diffgraph's rows.
+
+**Times:** pages are coded 64 at a time, one call per layer group and K or V, which also times a batched delta's
+decode.
+
+**A check:** T's rebuilt prediction through this coder, against T2's own size on the same whole requests (no
+padding). A wrong prediction would show as a much larger size.
+
+| Result | Then |
+| --- | --- |
+| The blend clearly under T's own, held out | Deltas pay: build the region store (an index, T2 runs and blended delta runs per conversation, batched rebuilding) |
+| The blend about equal to T's own | Regions without deltas: T2 runs per conversation, batched decoding, the tree's keeping rule |
+
+The report is `region_report.md` (`region_report.json`).

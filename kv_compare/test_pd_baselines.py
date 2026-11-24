@@ -1454,6 +1454,22 @@ class RunnerDryRunTests(unittest.TestCase):
                          ["TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=tree "
                           "RUN_TIMEOUT_S=10800"])
 
+    def test_region_runs_offline_without_engines(self):
+        """STAGES=region: as diffgraph and tree; MATRIX=region lists that one run."""
+        r, eng = self.run_pd(LAYOUT="1p3d", TRANSPORT="ring", CODECS="raw,t2-hbh", STAGES="region",
+                             KVPD_ROOT=str(self.tmp / "noroot"))
+        self.assertEqual(eng, [])
+        self.assertIn("== region: capture none", r.stdout)
+        self.assertNotIn("PD RUN STOPPED", r.stdout + r.stderr, r.stderr[-2000:])
+        out = list((self.repo / "benchmark_results").glob("llama32_3b_pd_1p3d_tkv_ring_rtx*smoke*"))[-1]
+        res = json.loads((out / "results.json").read_text())
+        self.assertEqual((res["region"]["exit"], res["env"]["stage"]), (1, "region"))
+        m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="region", PRINT_RUNS="1"))
+        self.assertEqual([x for x in m.stdout.split("\n") if x],
+                         ["TRANSPORT=ring LINKS=100 CODECS=raw,t2-hbh,t2-rank256 LAYOUT=1p3d STAGES=region "
+                          "RUN_TIMEOUT_S=10800"])
+
     def test_capture_run_configures_both_engines_and_runs_the_delta_stage(self):
         """MATRIX=capture's run: both engines get capture_dir (P its 16 GB, D its 2), the traced runs ask for the first
         conversations' pages, and stage delta runs after mtrag (here no engine stores pages: it says so)."""
@@ -2080,6 +2096,129 @@ class TreeTests(unittest.TestCase):
         self.assertIn("Recompute is exact", text)
         self.assertIn("16.00", text)
         self.assertIn("2.000 ms per token", text)
+
+
+REGION_CHECK = r"""
+import os, sys, json, tempfile
+os.environ["TRITON_INTERPRET"] = "1"
+os.environ["DELTA_WORKERS"] = "1"
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(sys.argv[1], "scripts"))
+from pathlib import Path
+from unittest import mock
+import numpy as np
+import torch
+from kv_compare.pd import trace as tr, codecs as cdm
+import pd_delta_analysis as da
+import pd_region as rg
+L, bs, W = 3, 16, 64
+C = W // 2
+d = Path(tempfile.mkdtemp())
+cap, run, mdir, out = d / "cap", d / "run", d / "model", d / "out"
+for x in (cap, run / "runs", mdir, out):
+    x.mkdir(parents=True)
+(mdir / "config.json").write_text(json.dumps({"rope_theta": 10000.0, "head_dim": 8}))
+SIG = 0.1                                         # the base's error and the stand-in T's: equal, independent
+rng = np.random.default_rng(3)
+st = tr.PageStore(str(cap), "P", 1.0, L, bs, W)
+nm = "mtrag_raw_docs_first_conversation"
+recs, prox = [], []
+for c in range(4):
+    X = [int(v) for v in rng.integers(1000, 9000, size=9 * bs)]
+    Z = [int(v) for v in rng.integers(1000, 9000, size=bs)]
+    base = rng.standard_normal((L, 9 * bs, W)).astype(np.float32)
+    w0 = da.to_bf16(base)
+    w1 = np.concatenate([da.to_bf16(rng.standard_normal((L, bs, W)).astype(np.float32)),
+                         da.to_bf16(base[:, bs:] + SIG * rng.standard_normal((L, 8 * bs, W)).astype(np.float32))], 1)
+    for t, (ids, w) in enumerate(((X, w0), (Z + X[bs:], w1))):
+        tw = torch.from_numpy(np.ascontiguousarray(w))
+        rows = tr.capture_blocks(st, tw, tr.page_hashes(tw, bs), bs)
+        key = f"K{c}{t}"
+        st.record({"event": "request", "key": key, "conv": f"{c}", "t0": 0, "T": len(ids), "bs": bs, "rows": rows,
+                   "missing": 0})
+        recs.append({"tag": f"{nm}|{c}|{t}", "run": nm, "layout": "docs_first", "policy": "conversation", "conv": c,
+                     "turn": t, "prompt_tokens": len(ids), "ids": ids, "pieces": [["doc", "D", 0, len(ids)]]})
+        prox.append({"key": key, "tag": recs[-1]["tag"], "t_in": 10 * c + t})
+st.close()
+(run / "runs" / f"{nm}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+(run / "proxy.jsonl").write_text("".join(json.dumps(r) + "\n" for r in prox))
+
+
+class StandIn:
+    def __init__(self, o):
+        pass
+
+    def __call__(self, words, positions):
+        g = torch.Generator().manual_seed(int(words.long().sum()) % (2 ** 31))
+        tgt = words.view(torch.bfloat16).to(torch.float32)
+        mu = tgt + SIG * torch.randn(tgt.shape, generator=g)
+        return mu, torch.full_like(mu, 0.03), torch.ones(words.shape[0], words.shape[1])
+
+
+class Codec:
+    name = "t2-x"
+    sets = {"s": object()}
+
+
+with mock.patch.object(cdm, "build", lambda *a, **k: ({"t2-x": Codec()}, {}, {})):
+    res = rg.analyse(str(cap), str(run), None, str(mdir), str(out), names=("t2-x",), device="cpu", batch=64,
+                     check=0, predictor=StandIn, stream_values=128, log=lambda m: None)
+r = res["runs"]["t2-x " + nm]
+# turn 1's 8 pages of X by their text; its first block (other text) by the same place in turn 0
+assert r["pages_with_base"] == 4 * 9 and r["by_rule"] == {"text": 32, "position": 4}, r
+assert r["pages"] == {"heldout": 18, "train": 18}, r["pages"]
+assert all(r["exact"][v] == r["calls"][v] > 0 for v in rg.VARIANTS), (r["exact"], r["calls"])
+held = {v: sum(r["bytes"]["heldout"][v].values()) for v in rg.VARIANTS}
+assert held["blend"] < 0.96 * min(held["t_fit"], held["base"]), held        # two equal, independent errors
+wb = r["weights_by_bucket"]
+for kv in "KV":                     # the same text: about half each, from the first agreeing token on; the same place
+    assert all(0.4 < wb[kv][q] < 0.6 for q in (0, 1, 2)), wb      # with other text: the base is no use
+    assert wb[kv][3] is None and abs(wb[kv][4]) < 0.05, wb
+text = rg.markdown(res)
+assert "Blend against T as now, held out" in text and "| Blend: T + w (base - T) |" in text, text
+print("ok region", json.dumps(held))
+"""
+
+
+class RegionTests(unittest.TestCase):
+    """scripts/pd_region.py: T plus the base against T alone, on pages with an earlier copy."""
+
+    def test_the_fit_recovers_a_known_blend_and_spread(self):
+        import math
+        import torch
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_region as rg
+        g = torch.Generator().manual_seed(0)
+        L1, n, C = 2, 4000, 8
+        mu_t = torch.randn(L1, n, 2 * C, generator=g)
+        mu_b = torch.randn(L1, n, 2 * C, generator=g)
+        bk = torch.randint(0, 4, (n,), generator=g)
+        w_true = torch.tensor([0.2, 0.8])                       # keys lean on T, values on the base
+        mix = torch.cat([mu_t[..., :C] + w_true[0] * (mu_b[..., :C] - mu_t[..., :C]),
+                         mu_t[..., C:] + w_true[1] * (mu_b[..., C:] - mu_t[..., C:])], -1)
+        tgt = mix + 0.01 * torch.randn(mix.shape, generator=g)
+        f = rg.Fit(L1, C, 4, torch.device("cpu"))
+        f.add_weights(tgt, mu_t, mu_b, bk)
+        w = f.solve()
+        self.assertTrue(torch.allclose(w[:, 0], torch.full((L1, 4), 0.2, dtype=torch.float64), atol=0.01))
+        self.assertTrue(torch.allclose(w[:, 1], torch.full((L1, 4), 0.8, dtype=torch.float64), atol=0.01))
+        m = torch.full((L1, n), 2.0)                            # T's multiplier: the spread divides it out
+        f.add_spread("blend", tgt, f.blend(mu_t, mu_b, bk), m, bk)
+        s = f.spread("blend", torch.ones(L1, n), bk)
+        want = 0.01 * math.sqrt(2 / math.pi) / 2.0 / (2 * math.log(2))   # mean |N(0, 0.01)| / m / (2 ln 2)
+        self.assertAlmostEqual(float(s.mean()), want, delta=0.08 * want)
+
+    def test_the_stage_with_a_stand_in_prediction(self):
+        """The whole stage on a capture with known errors (T's coder interpreted): every page with a base found,
+        every variant decoded exactly; with the base's error and T's equal and independent, the blend weighs them
+        about equally and codes the held-out pages smaller than either."""
+        import importlib.util
+        if importlib.util.find_spec("triton") is None:
+            self.skipTest("Triton is required")
+        r = subprocess.run([sys.executable, "-c", REGION_CHECK, str(ROOT)], capture_output=True, text=True,
+                           timeout=3600)
+        self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-3000:])
+        self.assertIn("ok region", r.stdout)
 
 
 class DeltaAnalysisTests(unittest.TestCase):

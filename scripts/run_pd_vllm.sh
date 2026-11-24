@@ -179,9 +179,9 @@ RUN_TIMEOUT_S=${RUN_TIMEOUT_S:-$([ "${SMOKE:-0}" = 1 ] && echo 1200 || echo 1080
 # (DIFF_CAPTURE, default the newest in kvpd-captures) and its run's records (DIFF_RUN, default its campaign's packaged
 # run), with the codec constants setup just built. diffgraph: our KV Diff Graph against EvidenceStore's
 # (scripts/pd_diffgraph.py); tree: the conversations' block tree kept by a rule, the rest recomputed
-# (scripts/pd_tree.py)
+# (scripts/pd_tree.py); region: T plus the base against T alone on pages with an earlier copy (scripts/pd_region.py)
 OFFLINE_DONE=0
-if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ]; then
+if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ] || [ "${STAGES:-}" = region ]; then
     OFF=$STAGES
     CAPROOT=${KVPD_ROOT:-/tmp/$USER}/kvpd-captures
     DIFF_CAPTURE=${DIFF_CAPTURE:-$(ls -dt "$CAPROOT"/*/ 2>/dev/null | head -n 1 || true)}
@@ -197,6 +197,9 @@ if [ "${STAGES:-}" = diffgraph ] || [ "${STAGES:-}" = tree ]; then
         if [ "$OFF" = tree ]; then
             OFF_PY=scripts/pd_tree.py
             OFF_ARGS=(--probe "${TREE_PROBE:-24}")
+        elif [ "$OFF" = region ]; then
+            OFF_PY=scripts/pd_region.py
+            OFF_ARGS=(--batch "${REGION_BATCH:-64}")
         fi
         CUDA_VISIBLE_DEVICES=${DEVS[0]} PYTHONPATH=$REPO timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" \
             "$VPY" -u "$OFF_PY" --capture "$DIFF_CAPTURE" --run "$DIFF_RUN" \
@@ -547,7 +550,8 @@ DEST=$RESULTS_ROOT/$NAME
 mkdir -p "$DEST/runs" "$DEST/connector"
 for f in summary.md results.json opportunity.json env.json nvidia_smi.txt gpu_map.json bench.log proxy.log link.json \
          trace_report.md trace_report.json delta_report.md delta_report.json diffgraph_report.md \
-         diffgraph_report.json page_compare.md tree_report.md tree_report.json; do
+         diffgraph_report.json page_compare.md tree_report.md tree_report.json region_report.md \
+         region_report.json; do
     [ -f "$OUT/$f" ] && cp "$OUT/$f" "$DEST/"
 done
 cp "$OUT"/runs/*.json "$OUT"/runs/*.log "$DEST/runs/" 2>/dev/null || true   # the logs: 60 KB at most each

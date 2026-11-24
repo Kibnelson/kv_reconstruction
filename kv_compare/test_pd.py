@@ -990,6 +990,22 @@ assert "KV Diff Graph against EvidenceStore" in text and "rebuild cold" in text,
 assert "| Representation | MB | Bits |" in text and "delta against the base alone" in text, text[:3000]
 assert "repeats included" in text, text[:3000]
 print("ok diffgraph", json.dumps({k: r[k] for k in ("ours-kv_per_request", "ours-kv_per_page", "delta")}))
+# scripts/pd_region.py on the same capture: T's prediction rebuilt outside its kernels, through the slice coder, sizes
+# as T's own (a wrong prediction would cost far more), every variant decoded exactly
+import pd_region as rg
+rres = rg.analyse(str(cap), str(run), str(bpath), str(mdir), str(out), names=("ours-kv",), device="cpu", batch=4,
+                  check=2, log=lambda m: None)
+rr = rres["runs"]["ours-kv " + nm]
+# turn 1's three blocks of A by their text; its first block (B) by the same place in turn 0 (other text)
+assert rr["pages_with_base"] == 4 and rr["by_rule"] == {"text": 3, "position": 1}, rr
+assert rr["pages"] == {"train": 4}, rr
+assert all(rr["exact"][v] == rr["calls"][v] > 0 for v in rg.VARIANTS), (rr["exact"], rr["calls"])
+ck = rr["check"]
+assert len(ck) == 1 and ck[0]["exact"] and ck[0]["t2_layer0"] == "coded", ck
+ratio = ck[0]["here_bytes"] / ck[0]["t2_bytes"]
+assert 0.8 < ratio < 1.25, (ratio, ck)
+assert "Check, 1 whole requests" in rg.markdown(rres)
+print("ok region", ratio)
 """
 
 
@@ -1168,6 +1184,7 @@ class OursWireTests(unittest.TestCase):
                            timeout=7200)
         self.assertEqual(r.returncode, 0, r.stderr[-4000:])
         self.assertIn("ok diffgraph", r.stdout)
+        self.assertIn("ok region", r.stdout)
 
     def test_our_modes_round_trip_through_the_wire_interpreted(self):
         """Every mode of T (dense, keys then values, head groups, reduced rank): encode, only the used segment tails
