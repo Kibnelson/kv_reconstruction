@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 # Standard
+import kvtrace  # KVTRACE
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
@@ -179,6 +180,7 @@ class EventBus:
             if bus.has_subscribers(EventType.MP_LOOKUP):
                 bus.publish(Event(event_type=EventType.MP_LOOKUP, ...))
         """
+        if kvtrace.ON and getattr(event_type, "value", None) in kvtrace.LMC_WANTED: return True  # KVTRACE
         return bool(self._subscribers.get(event_type))
 
     def publish_on_stream(self, stream: Any, event: Event) -> None:
@@ -190,6 +192,7 @@ class EventBus:
         No-op when the EventBus is disabled, avoiding the overhead of
         scheduling a host function on the CUDA stream entirely.
         """
+        if kvtrace.ON: kvtrace.hook("lmc.bus.stream", event=event)  # KVTRACE
         if not self._config.enabled:
             return
         if _has_native_recorder:
@@ -217,6 +220,7 @@ class EventBus:
         When the queue is full the event is silently discarded with a
         rate-limited warning (at most once per second).
         """
+        if kvtrace.ON: kvtrace.hook("lmc.bus", event=event)  # KVTRACE
         if not self._config.enabled:
             return
 
@@ -341,6 +345,7 @@ class EventBus:
             for name, sid, ts, str_meta, int_meta in native_events:
                 metadata: dict[str, Any] = dict(str_meta)
                 metadata.update(int_meta)
+                if kvtrace.ON: kvtrace.hook("lmc.bus.native", event_name=name, session=sid, ts=ts, metadata=metadata)  # KVTRACE
                 self._queue.append(
                     Event(
                         event_type=EventType(name),

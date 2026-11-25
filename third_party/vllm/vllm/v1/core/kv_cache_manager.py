@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
+import kvtrace  # KVTRACE
 import itertools
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -318,6 +319,7 @@ class KVCacheManager:
         )
 
         blocks = self.create_kv_cache_blocks(computed_blocks)
+        if kvtrace.ON: kvtrace.hook("vllm.gpu.prefix_hit", request=request, tokens=num_new_computed_tokens, blocks=blocks)  # KVTRACE
         return blocks, num_new_computed_tokens, shared_prefix_boundary
 
     def get_computed_blocks_for_connector(
@@ -599,6 +601,7 @@ class KVCacheManager:
             num_encoder_tokens,
         )
 
+        if kvtrace.ON: kvtrace.hook("vllm.gpu.allocated", request=request, new_blocks=new_blocks, num_new_tokens=num_new_tokens, num_new_computed_tokens=num_new_computed_tokens, num_external_computed_tokens=num_external_computed_tokens, delay=delay_cache_blocks)  # KVTRACE
         # P/D: delay caching blocks if we have to recv from
         # remote. Update state for locally cached blocks.
         if delay_cache_blocks:
@@ -626,6 +629,7 @@ class KVCacheManager:
             request: The request to free the blocks.
 
         """
+        if kvtrace.ON: kvtrace.hook("vllm.request.blocks_freed", manager=self, request=request)  # KVTRACE
         self.coordinator.free(request.request_id)
 
     def remove_skipped_blocks(

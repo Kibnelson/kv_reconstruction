@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 # Standard
+import kvtrace  # KVTRACE
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 import math
@@ -964,6 +965,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
         if len(request_ids) == 0:
             return
 
+        if kvtrace.ON: kvtrace.hook("lmc.conn.retrieve_submitted", request_ids=request_ids)  # KVTRACE
         event = self.worker_adapter.create_recorded_event()
 
         self.worker_adapter.batched_submit_retrieve_requests(
@@ -1045,6 +1047,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
                 dispatch(self.dispatcher, "wait_for_save", event=None)
             return
 
+        if kvtrace.ON: kvtrace.hook("lmc.conn.store_submitted", request_ids=request_ids)  # KVTRACE
         event = self.worker_adapter.create_recorded_event()
 
         self.worker_adapter.batched_submit_store_requests(
@@ -1104,6 +1107,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
             val = self.worker_adapter.get_finished(
                 finished_req_ids if self._can_store else set()
             )
+        if kvtrace.ON: kvtrace.hook("lmc.conn.finished", result=val)  # KVTRACE
         # logger.error("Finished req ids: %s, %s", val[0], val[1])
         return val
 
@@ -1442,6 +1446,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
             return None, True
 
         if ret == 0:
+            if kvtrace.ON: kvtrace.hook("lmc.conn.lookup", request=request, vllm_hit=num_computed_tokens, lmc_hit=ret, load=0)  # KVTRACE
             return 0, False
 
         assert ret % self.scheduler_adapter.lmcache_tokens_per_chunk == 0
@@ -1480,6 +1485,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
         logger.debug(
             "vLLM hit is: %d, Need to load is %d", num_computed_tokens, need_to_load
         )
+        if kvtrace.ON: kvtrace.hook("lmc.conn.lookup", request=request, vllm_hit=num_computed_tokens, lmc_hit=ret, load=need_to_load)  # KVTRACE
         return need_to_load, need_to_load > 0
 
     def on_new_request(self, request: "Request") -> None:
@@ -1544,6 +1550,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
                 tuple(new_block_ids), self._mamba_relocation_window
             )
 
+        if kvtrace.ON: kvtrace.hook("lmc.conn.alloc", request=request, new_block_ids=new_block_ids, external=num_external_tokens, tracker=tracker)  # KVTRACE
         # Update the state of the tracker
         if tracker.state == LMCacheMPRequestState.BYPASS_LMCACHE:
             # Returning zero external tokens admitted this request for local
@@ -1697,6 +1704,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
                 "num_lmcache_extra_cached_tokens": max(0, num_lmcache - num_vllm),
             }
 
+        if kvtrace.ON: kvtrace.hook("lmc.conn.request_finished", request=request, tracker=self.request_trackers.get(request.request_id), can_store=self._can_store)  # KVTRACE
         # Clean up request tracker to prevent memory leak
         self._cleanup_request_tracker(request.request_id)
 
@@ -1823,6 +1831,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
                 group_tokens_per_block=self._group_tokens_per_block,
             )
             if r_metadata is not None:
+                if kvtrace.ON: kvtrace.hook("lmc.conn.retrieve_planned", meta=r_metadata)  # KVTRACE
                 metadata.add_request_metadata(r_metadata)
             request_tracker.state = LMCacheMPRequestState.READY
 
@@ -1852,6 +1861,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
                 save_decode_cache=self._save_decode_cache,
             )
             if r_meta is not None:
+                if kvtrace.ON: kvtrace.hook("lmc.conn.store_planned", meta=r_meta)  # KVTRACE
                 # In lazy_offload mode, add to pending queue instead of immediate store
                 if self.lazy_offload:
                     self._lazy_offload_manager.add_store_candidate(r_meta)
@@ -1895,6 +1905,7 @@ class LMCacheMPConnector(KVConnectorBase_V1, SupportsHMA):
             )
 
             if r_meta is not None:
+                if kvtrace.ON: kvtrace.hook("lmc.conn.store_planned", meta=r_meta)  # KVTRACE
                 # In lazy_offload mode, add to pending queue instead of immediate store
                 if self.lazy_offload:
                     self._lazy_offload_manager.add_store_candidate(r_meta)

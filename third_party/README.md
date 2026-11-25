@@ -33,5 +33,9 @@ verifies this against the hashes above. To see every hook:
 
 ```bash
 git grep -n "# KVTRACE" -- third_party/
-git diff <import commit> -- third_party/
+git diff b2189bd -- third_party/          # b2189bd: the import, unchanged
+python3 scripts/lmc_overlay.py hooks      # file, line and event of each
 ```
+
+The hooks (27 lines in 5 files: vLLM's scheduler, KV cache manager and block pool; LMCache's vLLM connector and
+event bus), the records they write and how the lifecycle report joins them: `docs/lmcache_lifecycle.md`.

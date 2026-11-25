@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+import kvtrace  # KVTRACE
 import itertools
 import time
 from collections import defaultdict, deque
@@ -2632,6 +2633,7 @@ class Scheduler(SchedulerInterface):
                 request.streaming_queue = deque()
             self._enqueue_waiting_request(request)
             self.requests[request.request_id] = request
+            if kvtrace.ON: kvtrace.hook("vllm.request.added", request=request)  # KVTRACE
             if self.spec_decode_metrics_level != "none":
                 request.spec_decode_metrics = RequestSpecDecodeMetrics.new(
                     self.num_spec_tokens
@@ -2738,6 +2740,7 @@ class Scheduler(SchedulerInterface):
             self.finished_req_ids_dict[request.client_index].add(request_id)
 
         delay_free_blocks |= connector_delay_free_blocks
+        if kvtrace.ON: kvtrace.hook("vllm.request.finished", request=request, delay=delay_free_blocks)  # KVTRACE
         if not delay_free_blocks:
             self._free_blocks(request)
 

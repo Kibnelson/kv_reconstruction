@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+import kvtrace  # KVTRACE
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
@@ -300,6 +301,7 @@ class BlockPool:
             if new_hashes is not None:
                 new_hashes.append(maybe_convert_block_hash(block_hash))
 
+        if kvtrace.ON: kvtrace.hook("vllm.gpu.cached", request=request, blocks=new_full_blocks, first=num_cached_blocks, hashes=new_block_hashes, group=kv_cache_group_id, mask=block_mask, block_size=block_size)  # KVTRACE
         if self.enable_kv_cache_events:
             if num_cached_blocks == 0:
                 parent_block_hash: ExternalBlockHash | None = None
@@ -746,6 +748,7 @@ class BlockPool:
             # The block doesn't have hash, eviction is not needed
             return False
 
+        if kvtrace.ON: kvtrace.hook("vllm.gpu.evicted", block=block, hashes=evicted_hashes)  # KVTRACE
         self._emit_block_removed_events(evicted_hashes)
         return True
 
@@ -859,6 +862,7 @@ class BlockPool:
             self.metrics_collector.reset()
 
         logger.info("Successfully reset prefix cache")
+        if kvtrace.ON: kvtrace.hook("vllm.gpu.reset")  # KVTRACE
 
         if self.enable_kv_cache_events:
             self.kv_event_queue.append(AllBlocksCleared())
