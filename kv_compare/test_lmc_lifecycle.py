@@ -588,9 +588,34 @@ class MatrixTests(unittest.TestCase):
         import pd_campaign
         runs = ["RUNNER=lmc_run.sh LMC_MODE=memory MTRAG_LIMIT=4 STORE_WAIT_MS=500",
                 "RUNNER=lmc_run.sh LMC_MODE=disk MTRAG_LIMIT=4 STORE_WAIT_MS=500"]
-        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs), 2.5 * 4 + 2 * 1.0)
-        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs[:1]), 1.0)
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs), 1.5 * 4 + 2 * 0.25)
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs[:1]), 0.25)
         self.assertIn("lmctrace", pd_campaign.MATRICES)
+
+    def test_the_environments_own_cuda13_compiler_as_a_toolkit(self):
+        """A stand-in of the pip packages' nvidia/cu13 (a fake nvcc that prints a version): links, lib64, and an
+        unversioned libcudart.so; without it, nothing is linked (the runfile path, not run here)."""
+        site, home = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        w = site / "nvidia" / "cu13"
+        for d in ("bin", "nvvm/bin", "include/crt", "include/cccl", "lib"):
+            (w / d).mkdir(parents=True)
+        (w / "bin" / "nvcc").write_text("#!/bin/sh\necho 'Cuda compilation tools, release 13.5, V13.5.37'\n")
+        (w / "nvvm" / "bin" / "cicc").write_text("")
+        for f in ("bin/nvcc", "nvvm/bin/cicc"):
+            os.chmod(w / f, 0o755)
+        (w / "include" / "cuda_runtime.h").write_text("")
+        (w / "include" / "crt" / "host_config.h").write_text("")
+        (w / "lib" / "libcudart.so.13").write_text("")
+        r = subprocess.run(["bash", str(ROOT / "scripts" / "cuda13_toolkit.sh")], capture_output=True, text=True,
+                           env=dict(os.environ, KV_HOME=str(home), CUDA13_FROM_SITE=str(site),
+                                    CUDA13_HOME=str(home / "cuda13")), timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        tk = Path(r.stdout.strip().splitlines()[-1])
+        self.assertEqual(tk, home / "build" / "cuda13_home")
+        self.assertEqual(os.path.realpath(tk / "lib64" / "libcudart.so"), str((w / "lib" / "libcudart.so.13").resolve()))
+        self.assertTrue((tk / "include" / "cuda_runtime.h").is_file() and os.access(tk / "bin" / "nvcc", os.X_OK))
+        self.assertIn("the environment's own", r.stderr)
+        self.assertFalse((home / "cuda13").exists())                     # nothing downloaded or installed
 
     def test_scripts_parse(self):
         for f in ("lmc_run.sh", "lmc_setup.sh", "pd_matrix.sh", "pd_card.sh", "cuda13_toolkit.sh"):

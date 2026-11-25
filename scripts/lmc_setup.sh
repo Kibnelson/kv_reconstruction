@@ -4,9 +4,9 @@
 #
 #   $KV_HOME/venv_lmcache      vLLM 0.32.0 and LMCache 0.5.7.post1: the release wheels, for their compiled parts
 #   $KV_HOME/build/lmc_ops     LMCache's compiled CUDA ops (lmcache.cuda_ops) built from our copy's csrc/ against
-#                              this torch (scripts/lmc_build_ops.py), with a CUDA 13 toolkit (scripts/cuda13_toolkit.sh,
-#                              kept in CUDA13_HOME): the wheel's do not load beside torch 2.13, and LMCache's torch
-#                              baseline crashed its server in both of job 30694's runs
+#                              this torch (scripts/lmc_build_ops.py), with the environment's own CUDA 13 compiler (its
+#                              pip packages, scripts/cuda13_toolkit.sh): the wheel's ops do not load beside torch
+#                              2.13, and LMCache's torch baseline crashed its server in both of job 30694's runs
 #   $KV_HOME/lmc_overlay       those wheels' packages with our copies' Python over them (third_party/, the trace
 #                              hooks; scripts/lmc_overlay.py checks every other file is the wheel's, byte for byte),
 #                              and our build of lmcache.cuda_ops in place of the wheel's
@@ -51,7 +51,11 @@ pip_freeze "$LPY" > "$KV_HOME/pip_freeze_lmcache.txt" || true
 EXT=() NEED_OPS=()
 if [ "${LMC_TORCH_BASELINE:-0}" != 1 ]; then
     echo "== LMCache's compiled CUDA ops, built from our copy (third_party/lmcache/csrc)"
-    TK13=$(CUDA13_HOME=${CUDA13_HOME:-$KV_HOME/cuda13} KV_HOME=$KV_HOME bash scripts/cuda13_toolkit.sh | tail -n 1)
+    SITE=$("$LPY" -I -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
+    # the environment's own compiler (its pip packages); the runfile only where a toolkit is cached already (the
+    # campaign's disk plan does not reserve its 15 GB)
+    TK13=$(CUDA13_FROM_SITE=$SITE CUDA13_NO_RUNFILE=1 CUDA13_HOME=${CUDA13_HOME:-$KV_HOME/cuda13} KV_HOME=$KV_HOME \
+        bash scripts/cuda13_toolkit.sh | tail -n 1)
     pip_in "$LPY" -q setuptools wheel ninja         # a build without isolation: the environment's own, with its torch
     ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | sort -u | paste -sd';' -)
     B=$KV_HOME/build/lmc_ops

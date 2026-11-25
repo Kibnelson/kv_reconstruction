@@ -46,8 +46,9 @@ How they run: the job installs the release wheels of exactly these versions (for
 `scripts/lmc_overlay.py build` makes a per-job tree with the wheels' packages hard-linked file by file and our five
 hooked files written over them, plus `kvtrace`; it first checks that every Python file of our copies, as imported,
 is byte-identical to the wheel's. One compiled part is ours: LMCache's CUDA ops (`lmcache.cuda_ops`), built from
-our copy's `csrc/` against this environment's torch (`scripts/lmc_build_ops.py`, with a CUDA 13 toolkit that
-`scripts/cuda13_toolkit.sh` installs once into the node's cache), because the wheel's do not load beside vLLM 0.32's
+our copy's `csrc/` against this environment's torch (`scripts/lmc_build_ops.py`, with the CUDA 13 compiler the
+environment already has from pip: `nvidia-cuda-nvcc`, `-nvvm`, `-crt`, `-cccl` in `nvidia/cu13/`, which
+`scripts/cuda13_toolkit.sh` presents as a toolkit folder of links), because the wheel's do not load beside vLLM 0.32's
 torch 2.13 and LMCache's torch fallback crashed the server (job 30694, below). The engines and the server run with
 `PYTHONPATH` on that tree, so the only code that differs from the release is the hooks and that build of the
 release's own kernel sources. `scripts/lmc_overlay.py verify` (run by the setup) checks that each hooked module,
@@ -206,14 +207,15 @@ what it computes), `MTRAG_LIMIT` (4), `MTRAG_LAYOUT` (interleaved), `MTRAG_CONCU
 (a small number shrinks every engine's GPU cache, so blocks are evicted from it and come back from LMCache),
 `D_PREFIX_CACHE` (1; 0 makes every turn pull its whole prefix), `KEEP_L2` (0), `ENGINE_EAGER` (0).
 `scripts/lmc_setup.sh`: `LMC_TORCH_BASELINE=1` skips the CUDA ops build (the wheel's ops, or LMCache's torch
-fallback, as job 30694 ran: not for real runs), `CUDA13_HOME` (the toolkit; the card sets it to the node's cache).
+fallback, as job 30694 ran: not for real runs), `CUDA13_HOME` (a toolkit already there, used only if the environment
+has no CUDA 13 compiler of its own; never downloaded by this setup).
 
 The matrix `lmctrace` (`scripts/pd_matrix.sh`) runs one per mode; set before the campaign starts:
 `KVPD_LMC_MODES` (memory,disk), `KVPD_LMC_CONVS` (4), `KVPD_LMC_STORE_WAIT_MS` (500). Its setup is
-`scripts/lmc_setup.sh` only (the LMCache environment, the CUDA 13 toolkit if the node's cache has none, LMCache's CUDA
-ops, the overlay, MTRAG, the model): no codec builds. The run stage defaults to 3 hours. The disk plan reserves the
-toolkit (about 4 GB kept, 11 GB while it installs) and 2.5 GB a conversation for the disk tier (each run deletes its
-files after its report, keeping their list in `server/l2_files.tsv`).
+`scripts/lmc_setup.sh` only (the LMCache environment, LMCache's CUDA ops, the overlay, MTRAG, the model): no codec
+builds, no toolkit download. The run stage defaults to 3 hours. The disk plan reserves 3 GB for the setup, 1.5 GB a
+conversation for the disk tier (job 30694's first 4 conversations: 3.4 GB in all) and 0.25 GB a run for its records,
+and keeps 10 GB free; each run deletes its disk tier after its report, keeping the file list in `server/l2_files.tsv`.
 
 To report again on a published run (no GPU, standard library only), from a checkout with the results:
 
@@ -284,6 +286,11 @@ the crash is whole: 4 stores (10 chunks, 293.6 MB), 4 pulls (all 10 chunks: from
 disk in the disk mode, 40.7 ms median for the server's lookup and read from disk, 66.3 ms to the copy on D's GPU
 done), every chunk's tokens equal to the prompt's, and all 160 pulled blocks with the same vLLM block hash on D as
 on P. Fixed in the next commit: LMCache's CUDA ops built from our copy, and the setup stops unless they load.
+
+**Job 30700** (pin `96f5833`): stopped before setup by the disk check: 18.4 GB free, and the plan asked for 23.4 GB
+plus 10 GB to spare, most of it for a CUDA 13 toolkit download and the codec setup's peak. Neither is needed: the
+environment's own pip packages carry a CUDA 13 compiler, and this matrix's setup is small; the plan now asks for
+about 9.5 GB.
 
 ## What to look out for
 

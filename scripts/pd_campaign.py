@@ -53,10 +53,13 @@ SETUP_DROPPED_GB = 6.6     # setup's captures, deleted before the matrix runs (D
 CAPTURE_GB_PER_CONV = 2.0  # MATRIX=capture: P's store a conversation (job 30555: 10.3 GB for 6), as pd_matrix.sh sets
 CAPTURE_D_GB = 2.0         # and each D engine's (KVPD_CAPTURE_D_GB): its copies of held blocks that differ
 CAPTURE_D_ENGINES = 3      # MATRIX=capture runs 1p3d
-LMC_GB_PER_CONV = 2.5      # MATRIX=lmctrace: the disk tier's files for one interleaved MTRAG conversation (its last
-                           # prompt's KV, about 17K tokens at 112 KB each; each chunk is stored once), one mode's run at a
-                           # time (scripts/lmc_run.sh deletes them after its report)
-LMC_RECORDS_GB = 1.0       # and the traces, records and results a run keeps
+LMC_GB_PER_CONV = 1.5      # MATRIX=lmctrace: the disk tier's files for one interleaved MTRAG conversation (its longest
+                           # prompt's whole chunks, 112 KB a token, each stored once: job 30694's first 4 had 9,765,
+                           # 9,097, 7,503 and 2,974 tokens, 3.4 GB in all), one mode's run at a time (scripts/lmc_run.sh
+                           # deletes them after its report)
+LMC_RECORDS_GB = 0.25      # and the traces, logs and results a run keeps (job 30694: about 15 MB a run)
+LMC_SETUP_GB = 3.0         # MATRIX=lmctrace's setup: the environments are links into uv's cache; the CUDA ops' build
+                           # (its objects), the overlay's few copies, the job's caches (not the codec setup's 14 GB)
 MODEL_DIR = "hub/models--unsloth--Llama-3.2-3B"
 CUDA12_CANDIDATES = ("/usr/local/pkgs/cuda/cuda-12.6", "/usr/local/pkgs/cuda/12.6", "/usr/local/cuda-12.6",
                      "/usr/local/pkgs/cuda/latest", "/usr/local/cuda-12", "/usr/local/cuda-12.3", "/usr/local/cuda")
@@ -365,9 +368,13 @@ def extra_gb(matrix, runs=()):
     return p_gb + CAPTURE_D_ENGINES * d_gb
 
 
-def disk_plan(p, want_ibp, extra_gb=0.0, need_cuda13=False):
+def disk_plan(p, want_ibp, extra_gb=0.0, need_cuda13=False, job_peak_gb=None, dropped_gb=None):
     """What the run will add to the disk, and whether it fits with MARGIN_GB to spare; IBP is dropped first.
-    need_cuda13: the setup needs the CUDA 13 toolkit whatever IBP does (MATRIX=lmctrace builds LMCache's CUDA ops)."""
+    need_cuda13: the setup needs the runfile's CUDA 13 toolkit whatever IBP does. job_peak_gb / dropped_gb: a
+    matrix's own setup peak and what it deletes before the runs, in place of the codec setup's (JOB_PEAK_GB,
+    SETUP_DROPPED_GB)."""
+    peak = JOB_PEAK_GB if job_peak_gb is None else float(job_peak_gb)
+    dropped = SETUP_DROPPED_GB if dropped_gb is None else float(dropped_gb)
     scale = float(os.environ.get("KVPD_NEED_SCALE", "1"))
     margin = float(os.environ.get("KVPD_MARGIN_GB", MARGIN_GB))
     have = {"uv": (p.cache / "uv").is_dir() and any((p.cache / "uv").iterdir()),
@@ -377,8 +384,8 @@ def disk_plan(p, want_ibp, extra_gb=0.0, need_cuda13=False):
     base = sum(NEED_GB[k] for k in missing) * scale
     cuda13 = (p.cache / "cuda13" / "bin" / "nvcc").is_file()
     free = shutil.disk_usage(p.root).free / 1e9
-    setup = JOB_PEAK_GB * scale                                       # setup's peak, its captures included
-    runs = (JOB_PEAK_GB - SETUP_DROPPED_GB) * scale + float(extra_gb)  # the matrix: setup's captures gone, its own added
+    setup = peak * scale                                              # setup's peak, its captures included
+    runs = (peak - dropped) * scale + float(extra_gb)                 # the matrix: setup's captures gone, its own added
 
     def need(ibp):
         if (ibp or need_cuda13) and not cuda13:
@@ -490,7 +497,10 @@ def stage_run(p, a, job):
     ibp_opt = os.environ.get("KVPD_IBP", "auto")
     uses_ibp = any(re.search(r"(^|[,=])ibp(,|\s|$)", r) for r in m["runs"])
     want_ibp = ibp_opt == "1" or (ibp_opt == "auto" and uses_ibp)
-    plan = disk_plan(p, want_ibp, extra_gb(a.matrix, m["runs"]), need_cuda13=a.matrix == "lmctrace")
+    # MATRIX=lmctrace: its own setup (no codec captures), and the environment's own CUDA 13 compiler (no runfile)
+    lmc = a.matrix == "lmctrace"
+    plan = disk_plan(p, want_ibp, extra_gb(a.matrix, m["runs"]), job_peak_gb=LMC_SETUP_GB if lmc else None,
+                     dropped_gb=0.0 if lmc else None)
     write_json(ev / "disk_plan.json", plan)
     if plan["ibp"] is None:
         rows = biggest(p.root)
