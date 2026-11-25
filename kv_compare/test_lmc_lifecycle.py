@@ -275,7 +275,10 @@ class LifecycleReportTests(unittest.TestCase):
         self.assertEqual(nums["chunks"]["read_outcomes"], {"pulled": 2, "new: stored by this request": 2})
         self.assertFalse(nums["health"]["server_crashed"])
         self.assertEqual(nums["checks"], {"chunk_tokens_match_prompt": "2 of 2", "pulled_blocks_same_hash_as_p": "4 of 4",
-                                          "chunks_with_full_chain": "2 of 2"})
+                                          "chunks_with_full_chain": "2 of 2",
+                                          "disk_mode_on_disk_then_out_of_memory": "2 of 2",
+                                          "disk_mode_pulls_from_disk": "2 of 2",
+                                          "disk_mode_pulls_while_still_in_memory": 0})
         self.assertEqual(nums["D"]["lmcache_loaded_tokens"], 64)
         self.assertEqual(nums["D"]["computed_tokens"], 5)
         self.assertEqual(nums["P"]["stored_tokens"], 64)

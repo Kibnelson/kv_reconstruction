@@ -595,6 +595,28 @@ class Run:
                        "pulled_blocks_same_hash_as_p": f"{sum(same)} of {len(same)}",
                        "chunks_with_full_chain": f"{len(chain)} of {len(stored)}"},
         }
+        if self.env.get("store_policy") == "skip_l1":   # the disk mode: on disk, then out of memory, read from disk
+            written = [c for c in stored if c.get("t_l1_written") is not None]
+            order = [c for c in written if c.get("t_l2_stored") is not None and c.get("t_l1_removed")
+                     and min(c["t_l1_removed"]) >= c["t_l2_stored"]]
+            early = [rd for c in stored for rd in c["reads"] if rd["how"] == "pulled"
+                     and (not c.get("t_l1_removed") or rd["t_lookup"] < min(c["t_l1_removed"]))]
+            out["checks"]["disk_mode_on_disk_then_out_of_memory"] = f"{len(order)} of {len(written)}"
+            out["checks"]["disk_mode_pulls_from_disk"] = f"{by_tier.get('L2', 0)} of {len(pulled)}"
+            out["checks"]["disk_mode_pulls_while_still_in_memory"] = len(early)
+            st = self.dir / "server"
+            status = next((f for f in (st / "status.txt", st / "status.json") if f.is_file()), None)
+            if status is not None:
+                try:
+                    l1 = json.loads(status.read_text())["storage_manager"]["l1_managers"]
+                    out["checks"]["disk_mode_server_memory_at_end"] = {
+                        k: f"{v.get('total_object_count')} objects, {v.get('memory_used_bytes')} bytes" for k, v in l1.items()}
+                except (ValueError, KeyError, TypeError):
+                    pass
+            files = st / "l2_files.tsv"
+            if files.is_file():
+                sizes = [int(ln.split("\t", 1)[0]) for ln in files.read_text().splitlines() if ln.strip()]
+                out["checks"]["disk_mode_files_at_end"] = f"{len(sizes)} files, {sum(sizes) / 1e9:.2f} GB"
         return out
 
 
@@ -895,8 +917,9 @@ def unpack(results, into):
     for name in ("env.json",):
         if (results / name).is_file():
             shutil.copyfile(results / name, into / name)
-    if (results / "logs").is_dir():
-        shutil.copytree(results / "logs", into / "logs", dirs_exist_ok=True)
+    for sub in ("logs", "server"):
+        if (results / sub).is_dir():
+            shutil.copytree(results / sub, into / sub, dirs_exist_ok=True)
     return into
 
 

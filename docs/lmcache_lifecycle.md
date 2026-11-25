@@ -25,6 +25,20 @@ together. It runs in two modes: the chunks in the server's memory, or every chun
 
 `O_DIRECT` matters for the disk mode: without it the kernel's page cache would answer reads from memory.
 
+How a disk-mode run shows that it did what it says (its report's checks, from the trace and the server's own
+snapshots at the end):
+
+- every chunk written to memory was then written to disk (`l2.keys.stored`) and only after that removed from
+  memory (`l1.keys.evicted`): "on disk then out of memory", N of N;
+- every pull read its chunks from disk ("pulls from disk", N of N: the file adapter's read, `lmc.l2.read`, or before
+  that hook LMCache's access events), and none was looked up while the chunk was still in memory;
+- the server's memory at the end is empty (its `/status`: 0 objects, 0 bytes), and the disk tier holds one file per
+  chunk (`server/l2_files.tsv`, listed before the run's folder is deleted).
+
+Job 30728: 114 of 114 on disk then out of memory (each removed within 1 ms of reaching disk, after 189 ms in memory
+at the median, 472 at most), 102 of 102 pulls from disk, none while in memory, memory at the end 0 objects and 0
+bytes, 114 files of 29,360,128 bytes (one chunk: 256 tokens of 112 KB) on disk.
+
 ## Our copies of vLLM and LMCache, and the hooks
 
 `third_party/vllm` (v0.32.0) and `third_party/lmcache` (v0.5.7.post1) are our own copies, imported once and
