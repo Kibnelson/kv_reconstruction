@@ -1,0 +1,105 @@
+{
+ "mode": "disk",
+ "env": {
+  "mode": "disk",
+  "l1_gb": 4.0,
+  "eviction": "noop",
+  "store_policy": "skip_l1",
+  "chunk": 256,
+  "odirect": true,
+  "d_role": "kv_consumer",
+  "mtrag_limit": 4,
+  "layout": "interleaved",
+  "store_wait_ms": 500.0,
+  "gpu_blocks": null,
+  "d_prefix_cache": true
+ },
+ "trace": {
+  "files": 5,
+  "records": 7633,
+  "unreadable_lines": 0,
+  "by_role": {
+   "P": 459,
+   "LMC": 1970,
+   "D3": 1157,
+   "D2": 1302,
+   "D1": 2745
+  },
+  "hook_errors": {},
+  "unknown_events": {
+   "lmc.mp.vllm.block_allocation": 290
+  }
+ },
+ "requests": {
+  "P": 30,
+  "D": 30,
+  "turns": 30
+ },
+ "prompt_tokens": {
+  "P": 127953,
+  "D": 127953
+ },
+ "P": {
+  "local_hit_tokens": 98400,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 29553,
+  "stored_tokens": 29184,
+  "store_bytes": 3347054592,
+  "store_s_median": 0.115938,
+  "store_s_p90": 0.160279
+ },
+ "D": {
+  "local_hit_tokens": 101632,
+  "lmcache_loaded_tokens": 23040,
+  "computed_tokens": 3281,
+  "requests_pulling": 30,
+  "retrieve_bytes": 2994733056,
+  "pull_s_median_l1": null,
+  "pull_s_p90_l1": null,
+  "pull_s_median_l2": 0.070944,
+  "pull_s_p90_l2": 0.097657,
+  "retrieve_s_median": 0.004774,
+  "prefetch_s_median_l1": null,
+  "prefetch_s_median_l2": 0.04399,
+  "looked_up_before_p_store_end": 0
+ },
+ "chunks": {
+  "stored": 114,
+  "in_memory": 114,
+  "stored_bytes": 3347054592,
+  "to_disk": 114,
+  "removed_from_memory": 114,
+  "pulled": 102,
+  "pulled_from": {
+   "L2": 102
+  },
+  "read_outcomes": {
+   "new: stored by this request": 114,
+   "pulled": 102,
+   "held (on GPU already)": 758
+  },
+  "never_pulled": 12,
+  "pulls_per_chunk": {
+   "1": 102,
+   "0": 12
+  },
+  "created_to_l1_s_median": 0.1324474811553955,
+  "l1_to_l2_s_median": 0.18828630447387695,
+  "lookups_of_unknown_chunks": 0
+ },
+ "checks": {
+  "chunk_tokens_match_prompt": "114 of 114",
+  "pulled_blocks_same_hash_as_p": "1632 of 1632",
+  "chunks_with_full_chain": "114 of 114"
+ },
+ "health": {
+  "server_fatal": null,
+  "server_last_log_s": 24.872,
+  "degraded": {},
+  "server_errors": 0,
+  "server_error_kinds": {},
+  "server_alive_at_end": true,
+  "server_crashed": false,
+  "server_failed": false
+ }
+}
