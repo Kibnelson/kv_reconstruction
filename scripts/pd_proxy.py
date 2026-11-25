@@ -16,6 +16,9 @@ Control (the benchmark driver):  POST /t/config {"codec": "ours-hbh", "verify": 
   baseline on the same GPUs, and the CPU-tier runs).
   mode nixl: vLLM's own NixlConnector (its toy proxy's flow): the prefill engine first (max_tokens 1,
   do_remote_decode), then the decode engine with the kv_transfer_params the prefill returned (it pulls the KV).
+  mode store: engines sharing one KV store (scripts/lmc_run.sh: one LMCache server): the prefill engine first
+  (max_tokens 1; it stores the prompt's KV), then the decode engine with the request as it came (it finds the KV in
+  the store). Nothing passes between them but the store; the prefill's end time is logged (t_prefill_done).
 Several --prefill engines: each request goes to the one with the fewest requests in flight (each has its own link).
 A request may name its engines ("t_prefill": j, "t_decode": i; taken out before it is passed on): the benchmark
 driver's warm-up sends one request over every prefill-decode pair. "t_tag" (logged with the request's key) and
@@ -55,6 +58,7 @@ class Proxy:
         self.conv = {}
         self.log_path = log_path
         self.session = None
+        self.store_wait_s = 0.0
 
     def log(self, rec):
         if self.log_path:
@@ -95,7 +99,7 @@ class Proxy:
         headers = {"X-Request-Id": key}
         d_body = dict(body)
         p_task = None
-        if cfg["mode"] == "nixl":
+        if cfg["mode"] in ("nixl", "store"):
             j = self.pick_prefill() if pin_p is None else int(pin_p) % len(self.prefills)
             rec["prefill"] = j
             p_body = dict(body, max_tokens=1, stream=False)
@@ -103,9 +107,10 @@ class Proxy:
             p_body.pop("min_tokens", None)
             if "max_completion_tokens" in p_body:
                 p_body["max_completion_tokens"] = 1
-            p_body["kv_transfer_params"] = {"do_remote_decode": True, "do_remote_prefill": False,
-                                            "remote_engine_id": None, "remote_block_ids": None, "remote_host": None,
-                                            "remote_port": None}
+            if cfg["mode"] == "nixl":
+                p_body["kv_transfer_params"] = {"do_remote_decode": True, "do_remote_prefill": False,
+                                                "remote_engine_id": None, "remote_block_ids": None,
+                                                "remote_host": None, "remote_port": None}
             self.p_inflight[j] += 1
             try:
                 async with self.session.post(self.prefills[j] + path, json=p_body, headers=headers) as r:
@@ -118,8 +123,10 @@ class Proxy:
                     ktp = json.loads(txt).get("kv_transfer_params")
             finally:
                 self.p_inflight[j] -= 1
-            if ktp:
+            if ktp and cfg["mode"] == "nixl":
                 d_body["kv_transfer_params"] = ktp
+            if cfg["mode"] == "store" and self.store_wait_s > 0:   # time for the store to finish (a knob, 0)
+                await asyncio.sleep(self.store_wait_s)
         if cfg["mode"] == "pd":
             j = self.pick_prefill() if pin_p is None else int(pin_p) % len(self.prefills)
             rec["prefill"] = j
@@ -210,9 +217,14 @@ def main():
     ap.add_argument("--policy", default="round_robin", choices=["round_robin", "least_loaded", "conversation"])
     ap.add_argument("--codec", default="raw")
     ap.add_argument("--log", default=None)
+    ap.add_argument("--mode", default="pd", choices=["pd", "local", "nixl", "store"])
+    ap.add_argument("--store-wait-ms", type=float, default=0.0,
+                    help="mode store: wait this long after the prefill before the decode engine")
     a = ap.parse_args()
-    decodes = [tuple(d.split("=", 1)) for d in a.decode]
+    decodes = [tuple(d.split("=", 1)) if "=" in d else (d, "") for d in a.decode]
     px = Proxy(a.prefill or [decodes[0][0]], decodes, a.policy, a.codec, a.log)
+    px.cfg["mode"] = a.mode
+    px.store_wait_s = a.store_wait_ms / 1000
     app = FastAPI()
 
     @app.on_event("startup")
@@ -234,7 +246,7 @@ def main():
     @app.post("/t/config")
     async def config(raw: Request):
         body = await raw.json()
-        if body.get("mode") not in (None, "pd", "local", "nixl"):
+        if body.get("mode") not in (None, "pd", "local", "nixl", "store"):
             return JSONResponse(status_code=400, content={"error": f"mode {body['mode']!r}"})
         px.cfg.update({k: v for k, v in body.items() if k in ("codec", "verify", "mode")})
         if body.get("policy") in ("round_robin", "least_loaded", "conversation"):

@@ -7,7 +7,7 @@
 #   bash scripts/pd_card.sh create|run|cleanup|verify-cleanup|review|publish PIN TAG
 #
 #   PIN   the 40-hex commit this checkout is at, GitHub's pd-baselines head (for create and run: exactly its head)
-#   TAG   pd_<matrix>_<name>: matrix smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree, region, diffedge or xfer
+#   TAG   pd_<matrix>_<name>: matrix smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree, region, diffedge, xfer or lmctrace
 #         (scripts/pd_matrix.sh)
 #
 # On the node, under /tmp/$USER (the node's own disk; it survives between jobs, not reboots):
@@ -17,7 +17,8 @@
 #   kvpd/<run job>               the run's runtime (environments, sources, captures, caches); cleanup deletes it
 #   kvpd-cache                   uv's package cache, the Python build, the model, the CUDA 13 toolkit: kept, reused
 #
-# Options (environment, checked on the node): KVPD_TIME (the run stage's limit; default 6 h for smoke, else 12 h),
+# Options (environment, checked on the node): KVPD_TIME (the run stage's limit; default 6 h for smoke, 3 h for
+# lmctrace, else 12 h),
 # KVPD_IBP (auto: build IBP when the matrix uses it and the disk allows; 0 or 1), KVPD_BRANCH (pd-baselines), RUNS
 # (scripts/pd_matrix.sh's own list instead of the matrix's).
 set -Eeuo pipefail
@@ -30,9 +31,9 @@ fi
 export KVPD_STAGE=$1 KVPD_PIN=$2 KVPD_TAG=$3
 case "$KVPD_STAGE" in create|run|cleanup|verify-cleanup|review|publish) ;; *) echo "STOP: unknown stage $KVPD_STAGE" >&2; exit 2 ;; esac
 [[ "$KVPD_PIN" =~ ^[0-9a-f]{40}$ ]] || { echo "STOP: PIN is a full 40-character commit" >&2; exit 2; }
-[[ "$KVPD_TAG" =~ ^pd_(smoke|ring1p3d|ring2p2d|direct|tier|t2eager|links|workloads|wlong|wlours|capacity|quick|trace|capture|diffgraph|tree|region|diffedge|xfer)_[A-Za-z0-9_-]+$ ]] || {
+[[ "$KVPD_TAG" =~ ^pd_(smoke|ring1p3d|ring2p2d|direct|tier|t2eager|links|workloads|wlong|wlours|capacity|quick|trace|capture|diffgraph|tree|region|diffedge|xfer|lmctrace)_[A-Za-z0-9_-]+$ ]] || {
     echo "STOP: TAG is pd_<matrix>_<name> with matrix smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links," \
-         "workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree, region, diffedge or xfer" >&2; exit 2; }
+         "workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree, region, diffedge, xfer or lmctrace" >&2; exit 2; }
 export KVPD_MATRIX=${BASH_REMATCH[1]}
 [ -z "${SLURM_JOB_ID:-}" ] || { echo "STOP: run the card on the login host, not inside an allocation" >&2; exit 2; }
 [[ "${USER:-}" =~ ^[A-Za-z0-9_]+$ ]] || { echo "STOP: USER is not set to a plain user name" >&2; exit 2; }
@@ -76,7 +77,8 @@ export KVPD_TOOLS=$KVPD_ROOT/kvpd-tools/$KVPD_PIN
 SRUN=(srun -p "${KVPD_PARTITION:-all}" -A "${KVPD_ACCOUNT:-oana2026}" -q "${KVPD_QOS:-research12h}" -N 1 -w "$KVPD_NODE"
       --chdir=/tmp --export=ALL --propagate=NONE)
 if [ "$KVPD_STAGE" = run ]; then
-    TIME=${KVPD_TIME:-$([ "$KVPD_MATRIX" = smoke ] && echo 06:00:00 || echo 12:00:00)}
+    case "$KVPD_MATRIX" in smoke) DEFAULT_TIME=06:00:00 ;; lmctrace) DEFAULT_TIME=03:00:00 ;; *) DEFAULT_TIME=12:00:00 ;; esac
+    TIME=${KVPD_TIME:-$DEFAULT_TIME}
     SRUN+=(--gpus=4 -c 16 --mem=192G -t "$TIME")
 else
     SRUN+=(-c 2 --mem=8G -t 01:00:00)

@@ -37,7 +37,7 @@ REPO=$PWD
 PD_CARD=${PD_CARD:-0}
 if [ "$PD_CARD" != 1 ]; then
     BRANCH=${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
-    case "$BRANCH" in pd-vllm-protocol|pd-baselines|pd-*) ;; *) echo "STOP: on branch $BRANCH, not a PD branch"; exit 1 ;; esac
+    case "$BRANCH" in pd-vllm-protocol|pd-baselines|pd-*|lmcache-*) ;; *) echo "STOP: on branch $BRANCH, not a PD branch"; exit 1 ;; esac
 fi
 RESULTS_ROOT=${RESULTS_ROOT:-benchmark_results}
 KV_HOME=${KV_HOME:-$HOME/kv_a5000}

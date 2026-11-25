@@ -52,7 +52,15 @@
 #   xfer        where the transfer dominates, and where it does not (SplitZip's regime and its caveats): prompts of
 #               8K-64K tokens one at a time at 10-100 Gb/s per prefill GPU and GPU to GPU; three prefill GPUs behind
 #               one link of 10-100 Gb/s (3.3-33 per GPU) with many requests at once; exactkv apart, last
-# or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh).
+#   lmctrace    a clean 1 prefill + 3 decode set-up with ONE LMCache server shared by all four engines, every block
+#               and chunk traced by hooks in our copies of vLLM and LMCache (third_party/, kvtrace): MTRAG's first
+#               KVPD_LMC_CONVS conversations (4) interleaved, P storing each turn's chunks and its D engine pulling
+#               them, once per mode in KVPD_LMC_MODES (memory,disk; or tiered): the chunks in the server's memory,
+#               or every chunk on disk (read back from disk for every pull). The proxy waits KVPD_LMC_STORE_WAIT_MS
+#               (500) between P's answer and D's request. scripts/lmc_run.sh per mode, then the modes compared
+#               (scripts/lmc_lifecycle.py; docs/lmcache_lifecycle.md). Its own setup: scripts/lmc_setup.sh
+# or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh, or with
+# RUNNER=lmc_run.sh those of scripts/lmc_run.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
 # PRINT_RUNS=1 prints the list and stops. PD_CARD=1 (scripts/pd_card.sh's run stage): no branch check and no commit;
 # the run folders and the combined report go to RESULTS_ROOT with matrix.json (the runs and which did not finish).
@@ -116,6 +124,10 @@ XLRUN="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$XLONG P_MEM=0.68 D_MEM=0.6
 XSHARE="2048:24:128:2:share,8192:12:128:2:share,16384:6:128:2:share"
 XSRUN="LAYOUT=3p1d SHARED_LINK=1 PROMPT_TOKENS=2048 RATES=2,4,8,inf NUM_PROMPTS=48 STAGES=check,sweep,shapes,report SHAPES=$XSHARE RUN_TIMEOUT_S=18000"
 WLLONG="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$WLONG RUN_TIMEOUT_S=10800"
+# lmctrace: one run of scripts/lmc_run.sh per mode
+LMCN=${KVPD_LMC_CONVS:-4}
+LMCM=${KVPD_LMC_MODES:-memory,disk}
+LMCW=${KVPD_LMC_STORE_WAIT_MS:-500}
 MATRIX=${MATRIX:-smoke}
 if [ -z "${RUNS:-}" ]; then
     case "$MATRIX" in
@@ -181,11 +193,25 @@ if [ -z "${RUNS:-}" ]; then
                     TRANSPORT=ring LINKS=10,25,50,100 CODECS=$XFER $XSRUN;
                     TRANSPORT=p2p LINKS=native CODECS=$XFER $XLRUN;
                     TRANSPORT=ring LINKS=10,25 CODECS=$XKV $XLRUN" ;;
+        lmctrace)
+            case "$LMCN" in ''|*[!0-9]*) echo "STOP: KVPD_LMC_CONVS=$LMCN: a whole number of conversations, 1 to 110" >&2
+                exit 2 ;; esac
+            if [ "$LMCN" -lt 1 ] || [ "$LMCN" -gt 110 ]; then
+                echo "STOP: KVPD_LMC_CONVS=$LMCN: 1 to 110 conversations" >&2; exit 2
+            fi
+            [[ "$LMCW" =~ ^[0-9]+$ ]] || { echo "STOP: KVPD_LMC_STORE_WAIT_MS=$LMCW: whole milliseconds" >&2; exit 2; }
+            RUNS=""
+            for x in $(echo "$LMCM" | tr ',' ' '); do
+                case "$x" in memory|disk|tiered) ;;
+                    *) echo "STOP: KVPD_LMC_MODES=$LMCM: memory, disk or tiered, by commas" >&2; exit 2 ;; esac
+                RUNS+="RUNNER=lmc_run.sh LMC_MODE=$x MTRAG_LIMIT=$LMCN STORE_WAIT_MS=$LMCW;"
+            done
+            [ -n "$RUNS" ] || { echo "STOP: KVPD_LMC_MODES is empty" >&2; exit 2; } ;;
         wlong) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$XKV $WLLONG" ;;
-        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree, region, diffedge or xfer" \
+        *) echo "STOP: MATRIX is smoke, ring1p3d, ring2p2d, direct, tier, t2eager, links, workloads, wlong, wlours, capacity, quick, trace, capture, diffgraph, tree, region, diffedge, xfer or lmctrace" \
                 "(or set RUNS)"
            exit 1 ;;
     esac
@@ -213,8 +239,12 @@ for run in "${LIST[@]}"; do
     n=$((n + 1))
     echo
     echo "==== run $n of ${#LIST[@]}: $run"
+    # RUNNER=lmc_run.sh in a run: that script instead of scripts/run_pd_vllm.sh (the only two)
+    runner=run_pd_vllm.sh
+    case " $run " in *" RUNNER="*) runner=$(echo " $run " | sed -E 's/.* RUNNER=([^ ]*) .*/\1/') ;; esac
+    case "$runner" in run_pd_vllm.sh|lmc_run.sh) ;; *) echo "STOP: RUNNER=$runner: run_pd_vllm.sh or lmc_run.sh" >&2; exit 2 ;; esac
     # shellcheck disable=SC2086
-    if ! env $run PD_MATRIX=1 NO_PUSH=1 bash scripts/run_pd_vllm.sh; then
+    if ! env $run PD_MATRIX=1 NO_PUSH=1 bash "scripts/$runner"; then
         failed+=("$run")
         echo "==== run $n did not finish (its results, if any, are kept as _partial); going on"
     fi
@@ -229,10 +259,21 @@ GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n 1p | tr 'A-
 DEST=$RESULTS_ROOT/pd_matrix_${MATRIX}_${GPU_TAG}_${STAMP}
 mkdir -p "$DEST"
 KV_HOME=${KV_HOME:-$HOME/kv_a5000}
-"$KV_HOME/venv_vllm/bin/python" scripts/pd_matrix_report.py --runs "$NEW" --root "$RESULTS_ROOT" \
-    --title "PD matrix $MATRIX on $(hostname -s)" --failed "$(printf '%s;' "${failed[@]}")" --output "$DEST/summary.md" || \
-    echo "WARNING: the combined report failed; every run's own summary.md is in its folder"
-"$KV_HOME/venv_vllm/bin/python" - "$DEST/matrix.json" "$MATRIX" "$NEW" "${#failed[@]}" "${done_runs[@]}" \
+MPY=$KV_HOME/venv_vllm/bin/python
+[ -x "$MPY" ] || MPY=$(command -v python3)
+if [ "$MATRIX" = lmctrace ]; then                 # the modes side by side (each run's folder has its own report)
+    LMC_DIRS=$(echo "$NEW" | tr ',' '\n' | { grep '_lmc_' || true; } | sed "s#^#$RESULTS_ROOT/#" | paste -sd, -)
+    if python3 -I scripts/lmc_lifecycle.py compare --dirs "$LMC_DIRS" --output "$DEST"; then
+        cp "$DEST/compare.md" "$DEST/summary.md"
+    else
+        echo "WARNING: the comparison failed; every run's own summary.md is in its folder"
+    fi
+else
+    "$MPY" scripts/pd_matrix_report.py --runs "$NEW" --root "$RESULTS_ROOT" \
+        --title "PD matrix $MATRIX on $(hostname -s)" --failed "$(printf '%s;' "${failed[@]}")" --output "$DEST/summary.md" || \
+        echo "WARNING: the combined report failed; every run's own summary.md is in its folder"
+fi
+"$MPY" - "$DEST/matrix.json" "$MATRIX" "$NEW" "${#failed[@]}" "${done_runs[@]}" \
     "${failed[@]}" <<'EOF' || true
 import json, sys
 out, matrix, new, nfail, rest = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5:]

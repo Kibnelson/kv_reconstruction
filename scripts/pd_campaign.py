@@ -39,7 +39,7 @@ import time
 
 SCHEMA = 1
 KIND = "kvpd_campaign"
-MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links", "workloads", "wlong", "wlours", "capacity", "quick", "trace", "capture", "diffgraph", "tree", "region", "diffedge", "xfer")
+MATRICES = ("smoke", "ring1p3d", "ring2p2d", "direct", "tier", "t2eager", "links", "workloads", "wlong", "wlours", "capacity", "quick", "trace", "capture", "diffgraph", "tree", "region", "diffedge", "xfer", "lmctrace")
 # Disk (GB) on the node's root file system, which /tmp is: the shared cache's parts when missing, then a job's peak.
 # Measured sizes go into disk_after.json; these only decide whether to start.
 NEED_GB = {"uv": 17.0, "python": 0.2, "hf": 6.6}   # measured on gpu-grad-01 (job 30170): 16.7, 0.1, 6.5
@@ -53,6 +53,10 @@ SETUP_DROPPED_GB = 6.6     # setup's captures, deleted before the matrix runs (D
 CAPTURE_GB_PER_CONV = 2.0  # MATRIX=capture: P's store a conversation (job 30555: 10.3 GB for 6), as pd_matrix.sh sets
 CAPTURE_D_GB = 2.0         # and each D engine's (KVPD_CAPTURE_D_GB): its copies of held blocks that differ
 CAPTURE_D_ENGINES = 3      # MATRIX=capture runs 1p3d
+LMC_GB_PER_CONV = 2.5      # MATRIX=lmctrace: the disk tier's files for one interleaved MTRAG conversation (its last
+                           # prompt's KV, about 17K tokens at 112 KB each; each chunk is stored once), one mode's run at a
+                           # time (scripts/lmc_run.sh deletes them after its report)
+LMC_RECORDS_GB = 1.0       # and the traces, records and results a run keeps
 MODEL_DIR = "hub/models--unsloth--Llama-3.2-3B"
 CUDA12_CANDIDATES = ("/usr/local/pkgs/cuda/cuda-12.6", "/usr/local/pkgs/cuda/12.6", "/usr/local/cuda-12.6",
                      "/usr/local/pkgs/cuda/latest", "/usr/local/cuda-12", "/usr/local/cuda-12.3", "/usr/local/cuda")
@@ -341,10 +345,15 @@ def find_uv(cache):
 
 # a matrix's own files beyond a job's peak: capture keeps the raw pages it stores (kvpd-captures/<tag>, kept after
 # cleanup for offline analysis; scripts/pd_matrix.sh CAPTURE_GB)
-def extra_gb(matrix):
+def extra_gb(matrix, runs=()):
     """What a matrix adds to the disk after setup, and keeps (GB): MATRIX=capture's stores as pd_matrix.sh sets them:
     P's (16 GB for the default 6 conversations, else 2 GB each: KVPD_CAPTURE_CONVS) and each of the 3 D engines'
-    (KVPD_CAPTURE_D_GB, 2)."""
+    (KVPD_CAPTURE_D_GB, 2). MATRIX=lmctrace: its runs' disk tier (the most conversations of a run with one) and
+    records."""
+    if matrix == "lmctrace":
+        disk = [int(m.group(1)) for r in runs if re.search(r"LMC_MODE=(disk|tiered)\b", r)
+                for m in [re.search(r"MTRAG_LIMIT=(\d+)", r)] if m]
+        return (LMC_GB_PER_CONV * max(disk) if disk else 0.0) + LMC_RECORDS_GB * max(1, len(runs))
     if matrix != "capture":
         return 0.0
     n = os.environ.get("KVPD_CAPTURE_CONVS", "6")
@@ -480,7 +489,7 @@ def stage_run(p, a, job):
     ibp_opt = os.environ.get("KVPD_IBP", "auto")
     uses_ibp = any(re.search(r"(^|[,=])ibp(,|\s|$)", r) for r in m["runs"])
     want_ibp = ibp_opt == "1" or (ibp_opt == "auto" and uses_ibp)
-    plan = disk_plan(p, want_ibp, extra_gb(a.matrix))
+    plan = disk_plan(p, want_ibp, extra_gb(a.matrix, m["runs"]))
     write_json(ev / "disk_plan.json", plan)
     if plan["ibp"] is None:
         rows = biggest(p.root)
@@ -533,7 +542,9 @@ def stage_run(p, a, job):
     rec.update(uv=call(uv, "--version", check=False), cuda12_home=cuda12, ibp=bool(plan["ibp"]),
                environment=env_vars, dropped_from_paths=dropped)
     write_json(ev / "run.json", rec)
-    setup = os.environ.get("KVPD_SETUP_CMD", "bash scripts/a5000_setup.sh && bash scripts/pd_setup.sh")
+    # MATRIX=lmctrace needs only vLLM with LMCache, our overlay, MTRAG and the model (scripts/lmc_setup.sh)
+    setup = os.environ.get("KVPD_SETUP_CMD", "bash scripts/lmc_setup.sh" if a.matrix == "lmctrace" else
+                           "bash scripts/a5000_setup.sh && bash scripts/pd_setup.sh")
     # what the node is while this campaign runs (other jobs share it): GPUs, PCIe, every link measured
     specs = os.environ.get("KVPD_SPECS_CMD", "python3 -u scripts/node_specs.py --output "
                            f"{sh_quote(ev / 'node_specs')} --kv-home \"$KV_HOME\"")
@@ -853,7 +864,14 @@ def stage_review(p, a, job):
     if status == "started":                         # killed before it could write its end: Slurm's record says how
         row = (ev / "run_job_sacct.psv").read_text().strip() if (ev / "run_job_sacct.psv").is_file() else ""
         status = f"ended without a final status (Slurm: {row.split('|')[1] if row.count('|') else 'unknown'})"
-    if folders:
+    if folders and a.matrix == "lmctrace":          # the modes side by side, then each mode's own report
+        call(sys.executable, "-I", "-B", p.tools / "scripts" / "lmc_lifecycle.py", "compare", "--dirs",
+             ",".join(str(res / f) for f in folders), "--output", rv)
+        parts = [f"# PD matrix {a.matrix} on {run.get('node')}, job {run['run_job']} ({status}), reviewed from the "
+                 "kept results\n", (rv / "compare.md").read_text()]
+        parts += [(res / f / "summary.md").read_text() for f in folders if (res / f / "summary.md").is_file()]
+        write_text(rv / "summary.md", "\n\n".join(parts))
+    elif folders:
         call(sys.executable, "-I", "-B", p.tools / "scripts" / "pd_matrix_report.py", "--runs", ",".join(folders),
              "--root", res, "--title", f"PD matrix {a.matrix} on {run.get('node')}, job {run['run_job']} "
              f"({status}), reviewed from the kept results", "--failed",

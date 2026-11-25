@@ -1,0 +1,267 @@
+# LMCache lifecycle: every block and chunk, from P's GPU to LMCache and to D's GPU
+
+Branch `lmcache-lifecycle` (from `pd-blend`). A clean 1 prefill + 3 decode set-up in which **P and the three D
+engines share one LMCache server**. P computes each prompt and its connector stores the prompt's chunks in the
+server; the turn's D engine looks the prompt up there and pulls what it does not already hold. Hooks in our own
+copies of vLLM and LMCache record every step of every block's and chunk's life, and a report puts them back
+together. It runs in two modes: the chunks in the server's memory, or every chunk on disk and read back from disk.
+
+| | |
+| --- | --- |
+| Model | Llama 3.2 3B (`unsloth/Llama-3.2-3B` at `d4446454`), bf16, 16-token vLLM blocks |
+| Engines | vLLM 0.32.0, P on GPU 0 (`kv_both`), D1-D3 on GPUs 1-3 (`kv_consumer`: they only pull) |
+| Cache | LMCache 0.5.7.post1 in multi-process mode: one `lmcache server` that sees all four GPUs; each engine's `LMCacheMPConnector` talks to it over ZMQ and the server copies KV to and from each engine's GPU memory over CUDA IPC |
+| Chunk | 256 tokens (16 vLLM blocks); LMCache names it by a hash of its tokens and everything before them (blake3) |
+| Workload | MTRAG's first 4 conversations, interleaved layout (each turn's prompt is the previous prompt, its answer, the new passages and question); routed by conversation, so a conversation's turns go to one D engine |
+| Proxy | store mode: P gets the prompt with one token to generate (its connector stores the chunks), then after `STORE_WAIT_MS` (500 ms) the D engine gets the full request |
+
+## The two modes
+
+| Mode | Server memory (L1) | Disk (L2) | What a D pull reads |
+| --- | --- | --- | --- |
+| `memory` | 16 GB, LRU | none | memory |
+| `disk` | 4 GB, a write buffer only (eviction `noop`) | `fs` adapter, one file per chunk, `O_DIRECT` (no page cache); store policy `skip_l1`: a chunk is deleted from memory as soon as it is on disk; prefetch policy `default`: a chunk read from disk is not kept in memory | disk, every time |
+| `tiered` (optional) | 2 GB, LRU | the same files, written through (store policy `default`) | memory while the chunk is there, disk after it is evicted |
+
+`O_DIRECT` matters for the disk mode: without it the kernel's page cache would answer reads from memory.
+
+## Our copies of vLLM and LMCache, and the hooks
+
+`third_party/vllm` (v0.32.0) and `third_party/lmcache` (v0.5.7.post1) are our own copies, imported once and
+unchanged (commit `b2189bd`), detached from upstream; `third_party/README.md` says what was imported and how it was
+checked against the release wheels. Every change since is a trace hook:
+
+- A hook is one whole added line ending in `# KVTRACE`, for example
+  `if kvtrace.ON: kvtrace.hook("vllm.gpu.cached", request=request, blocks=new_full_blocks, ...)  # KVTRACE`.
+  It passes the objects at hand and nothing else; `kvtrace/events.py` turns them into a small record. No upstream
+  line is changed or removed.
+- Removing every line ending in `# KVTRACE` gives back the imported file exactly. `python3 scripts/lmc_overlay.py
+  check` verifies that against the import's hashes (`third_party/*.sha256`), and that no file was added.
+- To see every hook: `git grep -n "# KVTRACE" -- third_party/`, `git diff b2189bd -- third_party/`, or
+  `python3 scripts/lmc_overlay.py hooks`.
+- Tracing is on only when `KVTRACE_DIR` is set; otherwise every hook costs one attribute test. A hook never raises:
+  an extractor's error becomes a `kvtrace.error` record (at most 20 per event name) and the engine goes on.
+
+How they run: the job installs the release wheels of exactly these versions (for their compiled kernels), then
+`scripts/lmc_overlay.py build` makes a per-job tree with the wheels' packages hard-linked file by file and our five
+hooked files written over them, plus `kvtrace`; it first checks that every Python file of our copies, as imported,
+is byte-identical to the wheel's. The engines and the server run with `PYTHONPATH` on that tree, so the only code
+that differs from the release is the hooks. `scripts/lmc_setup.sh` checks that each hooked module is imported from
+the tree, with its hooks.
+
+### Where the hooks are
+
+| File | Function | Line | Event |
+| --- | --- | ---: | --- |
+| `vllm/v1/core/sched/scheduler.py` | `add_request` | 2636 | `vllm.request.added` |
+| `vllm/v1/core/sched/scheduler.py` | `_free_request` | 2743 | `vllm.request.finished` |
+| `vllm/v1/core/kv_cache_manager.py` | `get_computed_blocks` | 322 | `vllm.gpu.prefix_hit` |
+| `vllm/v1/core/kv_cache_manager.py` | `allocate_slots` | 604 | `vllm.gpu.allocated` |
+| `vllm/v1/core/kv_cache_manager.py` | `free` | 632 | `vllm.request.blocks_freed` |
+| `vllm/v1/core/block_pool.py` | `cache_full_blocks` | 304 | `vllm.gpu.cached` |
+| `vllm/v1/core/block_pool.py` | `_maybe_evict_cached_block` | 751 | `vllm.gpu.evicted` |
+| `vllm/v1/core/block_pool.py` | `reset_prefix_cache` | 865 | `vllm.gpu.reset` |
+| `lmcache/integration/vllm/lmcache_mp_connector.py` | `get_num_new_matched_tokens` | 1449, 1488 | `lmc.conn.lookup` |
+| `lmcache/integration/vllm/lmcache_mp_connector.py` | `update_state_after_alloc` | 1553 | `lmc.conn.alloc` |
+| `lmcache/integration/vllm/lmcache_mp_connector.py` | `_process_retrieve_requests` | 1834 | `lmc.conn.retrieve_planned` |
+| `lmcache/integration/vllm/lmcache_mp_connector.py` | `_process_new_requests`, `_process_cached_requests` | 1864, 1908 | `lmc.conn.store_planned` |
+| `lmcache/integration/vllm/lmcache_mp_connector.py` | `start_load_kv` | 968 | `lmc.conn.retrieve_submitted` |
+| `lmcache/integration/vllm/lmcache_mp_connector.py` | `wait_for_save` | 1050 | `lmc.conn.store_submitted` |
+| `lmcache/integration/vllm/lmcache_mp_connector.py` | `get_finished` | 1110 | `lmc.conn.finished` |
+| `lmcache/integration/vllm/lmcache_mp_connector.py` | `request_finished` | 1707 | `lmc.conn.request_finished` |
+| `lmcache/v1/mp_observability/event_bus.py` | `publish` | 223 | `lmc.<event>` (every event LMCache publishes) |
+| `lmcache/v1/mp_observability/event_bus.py` | `publish_on_stream` | 195 | `lmc.<event>`, `via: stream` |
+| `lmcache/v1/mp_observability/event_bus.py` | `_drain_all` | 348 | `lmc.<event>`, `via: native` |
+| `lmcache/v1/mp_observability/event_bus.py` | `has_subscribers` | 183 | none: says yes for `mp.lookup`, `mp.tokens` and `l1.keys.accessed`, which LMCache builds only when someone listens |
+
+Plus `import kvtrace  # KVTRACE` at the top of each of the five files: 27 lines in all. Line numbers are in our
+copies (`third_party/<copy>/...`).
+
+The event-bus hooks see LMCache's own observability events (`lmcache/v1/mp_observability/event.py`), in the server
+and in the engines' connectors, before LMCache's own enabled check and queue (so none is lost to a full queue).
+LMCache keeps its own subscribers (metrics, logging) as they were.
+
+## The records
+
+Each process writes `KVTRACE_DIR/kvtrace_<role>_<pid>.jsonl` (a forked child its own file), buffered and flushed
+every second and at exit. Every record has:
+
+| Field | Meaning |
+| --- | --- |
+| `ev` | the event name (below) |
+| `t` | wall-clock time, `time.time()` seconds: one clock for every process on the node |
+| `role` | `P`, `D1`, `D2`, `D3` (each engine's API server and engine core), `LMC` (the server) |
+| `pid` | the process |
+
+Hashes and keys are written as 16 hex characters: the first 8 bytes of vLLM's block hash (sha256; the 4-byte group
+id dropped), or of LMCache's chunk hash. Requests are vLLM's request ids, `cmpl-<key>-0-<random>`, where `<key>` is
+the proxy's 32-hex key for the turn, the same for P and D (the proxy sends it as `X-Request-Id`).
+
+### vLLM (scheduler and KV cache manager, in each engine's core process)
+
+| Event | When | Fields |
+| --- | --- | --- |
+| `vllm.request.added` | a request enters the scheduler | `req`; `n_prompt` tokens; `hashes`, the block hash of each full 16-token block of the prompt, in order (block i holds tokens 16i..16i+15); `n_hashes`; `kvp`, the keys of its `kv_transfer_params` |
+| `vllm.gpu.prefix_hit` | the engine's own prefix cache is searched | `req`; `tokens` found in its GPU cache; `blocks`, their GPU block ids |
+| `vllm.gpu.allocated` | GPU blocks are given to a request | `req`; `new` tokens to compute; `local_hit`; `external` tokens to come from LMCache; `delay_cache` (true while a load is pending: the blocks are cached when it lands); `blocks`, the new GPU block ids; `n_computed` |
+| `vllm.gpu.cached` | full blocks enter the prefix cache (their hash now finds them): the block's KV is complete on this GPU, computed or loaded | `req`; `index`, each block's place in the request; `blocks`, its GPU block id; `hashes`; `first`; `group`; `block_size` |
+| `vllm.gpu.evicted` | a cached block's hash is dropped so the block can be reused | `block` (GPU id); `hashes` |
+| `vllm.gpu.reset` | the prefix cache emptied | none |
+| `vllm.request.blocks_freed` | a finished request's blocks go back to the free queue (they stay cached until reused) | `req`; `blocks` |
+| `vllm.request.finished` | the request leaves the scheduler | `req`; `status`; `n_out`; `n_tokens`; `delay_free` (true while a store is still in flight) |
+
+### LMCache's connector inside each engine
+
+| Event | When | Fields |
+| --- | --- | --- |
+| `lmc.conn.lookup` | the connector learns how much of the prompt LMCache holds | `req`; `vllm_hit` (tokens on the GPU already); `lmc_hit` (tokens LMCache holds, a multiple of 256); `load` (tokens it will load); `n_tokens` |
+| `lmc.conn.alloc` | vLLM gave the request its blocks | `req`; `new_blocks`; `external`; `state` (the connector's state for it) |
+| `lmc.conn.retrieve_planned` | the scheduler plans a load for this step | `req`; `start`, `end` (tokens; `start` is the GPU hit rounded down to a chunk); `skip` (tokens at the start already on the GPU, not written); `blocks`, the GPU block ids for tokens `start..end` (block k holds tokens `start + 16k ...`); `n_blocks` |
+| `lmc.conn.store_planned` | the scheduler plans a store for this step | the same fields, for the chunks to store (whole chunks of the prompt not stored yet) |
+| `lmc.conn.retrieve_submitted` | the worker sends the step's loads to the server | `reqs` |
+| `lmc.conn.store_submitted` | the worker sends the step's stores to the server (after the step's forward pass) | `reqs` |
+| `lmc.conn.finished` | the worker reports finished transfers | `sending` (stores done), `receiving` (loads done): request ids |
+| `lmc.conn.request_finished` | the connector's last word on a request | `req`; `vllm_hit`; `lmc_hit`; `stored` tokens; `delay_free` |
+
+### LMCache's server (its event bus)
+
+Every event LMCache publishes is recorded as `lmc.<its name>` with `session` (the vLLM request id, for request
+events) and its metadata, keys as hashes (`keys`, with `n_keys`), token lists as their length and a CRC-32 per
+chunk. Left out: `trace.call`, `mp.transfer.phase_samples`, `sm.capacity.changed`, `l1.eviction.loop_tick`. Events
+LMCache schedules on a CUDA stream (the store's and retrieve's start and end) are seen when queued
+(`via: stream`) and again when the GPU reached them (`via: native`, from LMCache's native recorder, or published
+again by the host callback); the report keeps the second, with `t_queued`. A `native` record's `t` is the
+recorder's time and `t_hook` when the bus drained it.
+
+The ones the report reads:
+
+| Event | Meaning | Fields |
+| --- | --- | --- |
+| `lmc.mp.tokens` | a store bound chunks to their tokens | `session` (the storing request); `chunk_hashes`; `token_offsets` (each chunk's first token in the prompt); `chunk_tokens`; `chunk_crc` (CRC-32 of the chunk's token ids as int32); `parent_hashes` (the chunk before it) |
+| `lmc.mp.store.submitted`, `.start`, `.end` | a store's arrival, start and end on the server | `session`; `transfer_key`; at the end `stored_count`, `total_bytes`, `num_tokens`, `engine_id` |
+| `lmc.l1.write.reserved`, `lmc.l1.write.finished` | memory reserved for chunks, then written | `keys`; `sizes` (bytes, when finished) |
+| `lmc.l2.store.submitted`, `.completed` | a write to disk submitted and done | `task_id`, `key_count`, `total_bytes`; `succeeded_count`, `failed_count` |
+| `lmc.l2.keys.stored` | chunks on disk | `keys`, `sizes`, `backend` |
+| `lmc.l1.keys.evicted` | chunks removed from memory: evicted (LRU), or, in the disk mode, deleted once on disk | `keys`, `sizes` |
+| `lmc.mp.lookup` | an engine's lookup of a prompt | `session`; `chunk_hashes` (every whole chunk of the prompt, in order); `seq_len`; `n_token_ids` |
+| `lmc.mp.lookup_prefetch.start`, `.end` | the lookup and its prefetch: at the end, how many chunks were found and where | `found_count` (chunks from the start); `hit_tokens`, `l1_hit_tokens`, `l2_hit_tokens`; `requested_tokens`; `engine_hit_tokens` |
+| `lmc.l2.prefetch.lookup.submitted`, `lmc.l2.prefetch.load.submitted`, `.completed`, `lmc.l2.load_task.*` | the disk part of a prefetch | `request_id`, `key_count`, `loaded_count`, `failed_count` |
+| `lmc.l2.keys.accessed` | chunks read from disk | `keys` |
+| `lmc.sm.read.prefetched_finished` | prefetched chunks ready in memory | `succeeded_keys`, `failed_keys` |
+| `lmc.l1.read.reserved`, `.finished` | chunks read from memory (for a copy to a GPU) | `keys` |
+| `lmc.mp.retrieve.submitted`, `.start`, `.end` | the copy to the engine's GPU | `session`; `transfer_key`; at the end `retrieved_count`, `total_bytes`, `num_tokens` |
+| `lmc.l1.keys.accessed` | chunks touched in memory (LRU) | `keys` |
+| `lmc.mp.request.start`, `.end`, `lmc.mp.vllm.end_session` | the server's view of a request's life | `session` |
+
+## How the report joins them (`scripts/lmc_lifecycle.py`)
+
+The keys that tie everything together:
+
+| From | To | By |
+| --- | --- | --- |
+| a turn of MTRAG (`mtrag.jsonl`) | the proxy's request (`proxy.jsonl`) | the turn's tag |
+| the proxy's request | P's and D's vLLM requests | the 32-hex key inside the vLLM request id |
+| a vLLM request | the server's records of it | the server's `session` is the vLLM request id |
+| a stored chunk | its tokens, its place in the prompt and its MTRAG pieces (system, document, question, answer) | `mp.tokens` (`token_offsets`, `chunk_crc`) and the turn's prompt pieces |
+| a stored chunk | P's GPU blocks it was made from | the storing request's block hashes for tokens `offset .. offset+256`, and P's `vllm.gpu.cached` of those hashes |
+| a stored chunk | memory and disk | its chunk hash in `keys` of the `l1.*` and `l2.*` events |
+| a D lookup | the chunks it asked for, found or missed | `mp.lookup`'s `chunk_hashes` (chunk j is tokens `256j ..`) and `mp.lookup_prefetch.end`'s `found_count` |
+| a pulled chunk | D's GPU blocks it went into | `lmc.conn.retrieve_planned`'s `blocks`, and D's `vllm.gpu.cached` of the same block indexes |
+| a pulled chunk | whether it came from disk | `l2.keys.accessed` for its key between D's lookup and the retrieve's end |
+
+What it reports for each chunk (`chunks.jsonl.gz`): its hash, conversation, turn, tokens, pieces, bytes; P's blocks
+(index, GPU block, hash, when cached, which request computed it); when the store was planned and submitted; when it
+was bound, reserved and written in memory, written to disk, removed from memory, read from disk, deleted; and every
+lookup of it: which engine and turn, the outcome (`pulled`, `held (on GPU already)`, `hit, not loaded`,
+`miss: not yet stored`, `miss: evicted`, `miss: never stored`), the tier it was pulled from, when, and D's blocks
+(index, GPU block, whether written, its hash and whether it equals P's).
+
+For each engine request (`requests.jsonl.gz`): prompt tokens, its own GPU hit, LMCache's hit, tokens loaded and
+computed, its chunks by outcome and tier, the retrieve's range and bytes, its stores, and the times (added, lookup,
+found, retrieve start and end, load seen by the worker, store planned and ended, finished, blocks freed; the proxy's
+arrival, P's answer and D's first byte), and three durations: `prefetch_s` (the server's lookup to its prefetch
+done: where a chunk on disk is read into memory), `retrieve_s` (the copy to the GPU) and `pull_s` (the server's
+lookup to the copy done). For D: whether its lookup finished before P's store of the same turn had ended, and by
+how much.
+
+For each engine request and prompt block (`blocks.jsonl.gz`): the block's hash, its chunk, where it came from
+(`local prefix cache`, `LMCache`, `computed`), its GPU block, when cached and when evicted.
+
+`results.json` has the totals and medians; `summary.md` says what happened, then tells one chunk's whole life and
+one D request's, as timelines. Checks it makes: every chunk's tokens against the prompt (CRC), every pulled block's
+hash against P's, every stored chunk with its whole chain (computed on P, in memory). `compare.md` puts the modes
+side by side.
+
+## Options
+
+`scripts/lmc_run.sh` (environment): `LMC_MODE` (memory, disk, tiered), `LMC_L1_GB`, `LMC_CHUNK` (256),
+`LMC_ODIRECT` (1), `LMC_WORKERS` (4), `LMC_SAVE_DECODE` (0), `LMC_D_ROLE` (kv_consumer; kv_both lets D store
+what it computes), `MTRAG_LIMIT` (4), `MTRAG_LAYOUT` (interleaved), `MTRAG_CONCURRENCY` (4), `MAX_TOKENS` (128),
+`STORE_WAIT_MS` (500; 0 shows how often D looks up before P's store has landed), `GPU_MEM` (0.80), `GPU_BLOCKS`
+(a small number shrinks every engine's GPU cache, so blocks are evicted from it and come back from LMCache),
+`D_PREFIX_CACHE` (1; 0 makes every turn pull its whole prefix), `KEEP_L2` (0), `ENGINE_EAGER` (0).
+
+The matrix `lmctrace` (`scripts/pd_matrix.sh`) runs one per mode; set before the campaign starts:
+`KVPD_LMC_MODES` (memory,disk), `KVPD_LMC_CONVS` (4), `KVPD_LMC_STORE_WAIT_MS` (500). Its setup is
+`scripts/lmc_setup.sh` only (the LMCache environment, the overlay, MTRAG, the model): no codec builds. The run stage
+defaults to 3 hours. The disk plan reserves 2.5 GB a conversation for the disk tier (each run deletes its files
+after its report, keeping their list in `server/l2_files.tsv`).
+
+## Runbook (gpu-grad-01, the card)
+
+The same card as every campaign (`docs/pd_baselines.md`, "On gpu-grad-01: the card"): the login host only checks
+and submits; the run stage builds everything itself in its allocation (the LMCache environment from the shared uv
+cache, our overlay, MTRAG, the model), runs both modes, and the results go to their own branch. From the login
+host, inside tmux:
+
+```bash
+module load slurm
+bash <<'LOGIN'
+set -Eeuo pipefail
+umask 077
+trap 'printf "PD CAMPAIGN STOPPED: line=%s exit=%s; the campaign and its output are kept\n" "$LINENO" "$?" >&2' ERR
+test -z "${SLURM_JOB_ID:-}"
+cd ~/kv_reconstruction
+test -z "$(git status --porcelain --untracked-files=no)"
+git fetch -q --no-tags origin lmcache-lifecycle
+git switch -q lmcache-lifecycle 2>/dev/null || git switch -q -c lmcache-lifecycle --track origin/lmcache-lifecycle
+git merge -q --ff-only origin/lmcache-lifecycle
+export KVPD_BRANCH=lmcache-lifecycle
+export KVPD_PIN=$(git rev-parse HEAD)
+test "$(git ls-remote origin refs/heads/lmcache-lifecycle | awk '{print $1}')" = "$KVPD_PIN"
+export KVPD_MATRIX=lmctrace
+export KVPD_TAG="pd_${KVPD_MATRIX}_$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p ~/.kvpd_campaigns
+STATE=~/.kvpd_campaigns/$KVPD_TAG.sh
+printf 'export KVPD_BRANCH=%q\nexport KVPD_PIN=%q\nexport KVPD_TAG=%q\n' "$KVPD_BRANCH" "$KVPD_PIN" "$KVPD_TAG" > "$STATE"
+printf 'PIN=%s\nTAG=%s\nSTATE=%s\n' "$KVPD_PIN" "$KVPD_TAG" "$STATE"
+for STAGE in create run cleanup verify-cleanup review publish; do
+    bash scripts/pd_card.sh "$STAGE" "$KVPD_PIN" "$KVPD_TAG"
+done
+echo "Campaign $KVPD_TAG published (the PUBLISHED line above names its branch)."
+LOGIN
+```
+
+Options go before `bash <<'LOGIN'`, exported: for example `export KVPD_LMC_MODES=memory,disk,tiered` or
+`export KVPD_LMC_CONVS=8`. To resume after a stop: `source ~/.kvpd_campaigns/<tag>.sh`, `git switch -q --detach
+"$KVPD_PIN"`, then the remaining stages as in `docs/pd_baselines.md`.
+
+The published branch is `evidence/lmcache-lifecycle/<pin12>/lmctrace/job<run job>`. In it,
+`benchmark_results/pd_card/<tag>/matrix/` has one folder per mode (`llama32_3b_lmc_<mode>_rtxa5000_<time>/`:
+`summary.md`, `results.json`, `chunks.jsonl.gz`, `requests.jsonl.gz`, `blocks.jsonl.gz`, `kvtrace.tar.gz` with every
+raw record, `proxy.jsonl.gz`, `mtrag.jsonl.gz`, `env.json`, `server/` snapshots of the server's status, config,
+objects and metrics, `logs/` with each process's log tail) and `pd_matrix_lmctrace_*/compare.md`.
+
+## What to look out for
+
+- **The store can still be in flight when D looks up.** P answers once its single token is out; its store is
+  submitted in the same step and lands on the server a little later. The proxy waits `STORE_WAIT_MS` for it; the
+  report counts the D lookups that finished before P's store ended, and the chunks they missed (`miss: not yet
+  stored`).
+- **D holds earlier turns itself.** A conversation stays on one D engine, so D's own GPU prefix cache serves the
+  turns before; D pulls only what is new (the chunks from the end of what it holds). `held (on GPU already)` counts
+  those. `D_PREFIX_CACHE=0` or a small `GPU_BLOCKS` makes D pull more.
+- **Only whole chunks are stored.** The prompt's last partial chunk is computed by D; it is stored by P on the
+  next turn, when the prompt has grown past it.
+- **One clock.** Times compare across processes because they are all `time.time()` on one node.
+- **Hashes are cut to 8 bytes** in the records; for a few thousand chunks a clash is not a concern.
