@@ -1,0 +1,54 @@
+0, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+== our copies: only the trace hooks differ from the import
+OK: 5 hooked files, 27 hook lines; every other file as imported
+== LMCache environment /tmp/nbore/kvpd/30716/home/venv_lmcache (the release wheels)
+[32;20m[2026-11-25 16:56:27,036] LMCache INFO:[0m torch_dev=<module 'torch.cuda' from '/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/torch/cuda/__init__.py'>, torch_device_type=cuda [3m(_device_detect.py:311:lmcache.v1.platform._device_detect)[0m
+[32;20m[2026-11-25 16:56:27,037] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[33;20m[2026-11-25 16:56:27,038] LMCache WARNING:[0m lmcache.cuda_ops compiled extension not found; CudaDeviceOps stays on the torch baseline for all ops. [3m(device_ops.py:128:lmcache.v1.platform.devices.cuda.device_ops)[0m
+   vllm 0.32.0, lmcache 0.5.7.post1, torch 2.13.0+cu130 (CUDA 13.0)
+== LMCache's compiled CUDA ops, built from our copy (third_party/lmcache/csrc)
+   CUDA 13 toolkit: the environment's own (/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/nvidia/cu13: Build cuda_13.5.r13.5/compiler.39125733_0), as /tmp/nbore/kvpd/30716/home/build/cuda13_home
+STOP: lmcache.cuda_ops did not build; the end of /tmp/nbore/kvpd/30716/home/lmc_ops_build.log:
+    sys.exit(main())
+             ^^^^^^
+  File "/tmp/nbore/kvpd-tools/f0dac4a8ccfab35de20dacf1e2ba5e1f75db65de/scripts/lmc_build_ops.py", line 61, in main
+    setup(name="lmcache-cuda-ops-build", ext_modules=[ext], cmdclass={"build_ext": cpp_extension.BuildExtension},
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/__init__.py", line 117, in setup
+    return distutils.core.setup(**attrs)  # type: ignore[return-value]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/_distutils/core.py", line 186, in setup
+    return run_commands(dist)
+           ^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/_distutils/core.py", line 202, in run_commands
+    dist.run_commands()
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/_distutils/dist.py", line 1002, in run_commands
+    self.run_command(cmd)
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/dist.py", line 1107, in run_command
+    super().run_command(command)
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/_distutils/dist.py", line 1021, in run_command
+    cmd_obj.run()
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/command/build_ext.py", line 97, in run
+    _build_ext.run(self)
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/_distutils/command/build_ext.py", line 368, in run
+    self.build_extensions()
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/torch/utils/cpp_extension.py", line 1289, in build_extensions
+    super().build_extensions()
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/_distutils/command/build_ext.py", line 484, in build_extensions
+    self._build_extensions_serial()
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/_distutils/command/build_ext.py", line 510, in _build_extensions_serial
+    self.build_extension(ext)
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/command/build_ext.py", line 262, in build_extension
+    _build_ext.build_extension(self, ext)
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/setuptools/_distutils/command/build_ext.py", line 565, in build_extension
+    objects = self.compiler.compile(
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/torch/utils/cpp_extension.py", line 1027, in unix_wrap_ninja_compile
+    _write_ninja_file_and_compile_objects(
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/torch/utils/cpp_extension.py", line 2475, in _write_ninja_file_and_compile_objects
+    _run_ninja_build(
+  File "/tmp/nbore/kvpd/30716/home/venv_lmcache/lib/python3.12/site-packages/torch/utils/cpp_extension.py", line 2910, in _run_ninja_build
+    raise RuntimeError(message) from e
+RuntimeError: Error compiling objects for extension
