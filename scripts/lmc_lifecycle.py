@@ -365,7 +365,9 @@ class Run:
                     c["unknown_store"] = True
                 lo, hi = j * ch, (j + 1) * ch
                 hit = found is not None and j < found
-                if not hit:
+                if not hit and c.get("stored_by") == req["rid"]:
+                    how = "new: stored by this request"       # P looks its prompt up before it stores it
+                elif not hit:
                     tw = c.get("t_l1_written")
                     if tw is None:
                         how = "miss: never stored"
@@ -616,6 +618,56 @@ def story_chunk(c):
     return sorted((t, w) for t, w in ev if t is not None)
 
 
+LOG_T = re.compile(r"\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)[,.](\d{3})\]")
+
+
+def health(run, t0):
+    """Whether the LMCache server stayed up, and when each engine's connector gave up on it ("degraded mode"), from
+    the run's logs (the run folder's, or a results folder's logs/*_tail.log). Log times are local wall-clock."""
+    import datetime
+    run = pathlib.Path(run)
+
+    def logs(stem):
+        """The run's logs: whole (the run folder's), or as a results folder keeps them (gzipped, else the tail)."""
+        found = sorted(run.glob(f"{stem}.log"))
+        if not found:
+            found = sorted((run / "logs").glob(f"{stem}.log.gz")) or sorted((run / "logs").glob(f"{stem}_tail.log"))
+        return found
+
+    def text(f):
+        if f.suffix == ".gz":
+            with gzip.open(f, "rt", errors="replace") as g:
+                return g.read()
+        return f.read_text(errors="replace")
+
+    def when(line):
+        m = LOG_T.search(line)
+        if not m:
+            return None
+        t = datetime.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").timestamp() + int(m.group(2)) / 1000
+        return round(t - t0, 3)
+
+    out = {"server_fatal": None, "server_last_log_s": None, "degraded": {}}
+    for f in logs("lmcache_server"):
+        last = None
+        for ln in text(f).splitlines():
+            if LOG_T.search(ln):
+                last = when(ln)
+            if out["server_fatal"] is None and ("Fatal Python error" in ln or "Segmentation fault" in ln):
+                out["server_fatal"] = ln.strip()[:200]
+        out["server_last_log_s"] = last
+    for f in logs("engine_*"):
+        role = f.name.split("_")[1].split(".")[0]
+        for ln in text(f).splitlines():
+            if "degraded mode" in ln:
+                out["degraded"].setdefault(role, when(ln))
+    env = run / "env.json"
+    if env.is_file():
+        out["server_alive_at_end"] = json.loads(env.read_text()).get("server_alive_at_end")
+    out["server_crashed"] = bool(out["server_fatal"]) or out.get("server_alive_at_end") is False
+    return out
+
+
 def write_report(run, out):
     out = pathlib.Path(out)
     out.mkdir(parents=True, exist_ok=True)
@@ -623,12 +675,22 @@ def write_report(run, out):
     R.analyse()
     reqs, chunks, blocks = R.request_rows(), R.chunk_rows(), R.block_rows()
     nums = R.numbers(reqs, list(R.chunks.values()))
+    hl = nums["health"] = health(run, R.t0)
+    seen = [v for v in hl["degraded"].values() if v is not None]
+    if seen:                                         # what came after the engines gave up on the server
+        hl["requests_after_degraded"] = sum(1 for r in reqs if r["t_added"] is not None and r["t_added"] >= min(seen))
     for name, rows in (("requests", reqs), ("chunks", chunks), ("blocks", blocks)):
         with gzip.open(out / f"{name}.jsonl.gz", "wt") as fh:
             for row in rows:
                 fh.write(json.dumps(row, separators=(",", ":")) + "\n")
     (out / "results.json").write_text(json.dumps(nums, indent=1))
     md = [f"# LMCache lifecycle: {R.mode}", ""]
+    if hl["server_crashed"] or hl["degraded"]:
+        md += [f"**The LMCache server did not last the run.** {hl['server_fatal'] or 'It was gone at the end.'} "
+               f"Its last log line: {fmt(hl['server_last_log_s'])} s; the engines gave up on it (degraded mode) at "
+               + (", ".join(f"{k} {fmt(v)} s" for k, v in sorted(hl["degraded"].items())) or "–")
+               + f"; {hl.get('requests_after_degraded', '–')} engine requests came after that and ran without LMCache. "
+               "Everything below is what happened before.", ""]
     e = R.env
     md += [f"1 prefill engine (P) and 3 decode engines (D1-D3), one LMCache server shared by all four; mode **{R.mode}**"
            f" (memory {e.get('l1_gb')} GB, eviction {e.get('eviction')}, store policy {e.get('store_policy')}, chunk "
@@ -726,7 +788,8 @@ def compare(dirs, out):
         p = pathlib.Path(d) / "results.json"
         if p.is_file():
             runs.append((pathlib.Path(d).name, json.loads(p.read_text())))
-    rows = [("stored chunks", lambda n: n["chunks"]["stored"]),
+    rows = [("LMCache server lasted the run", lambda n: not (n.get("health") or {}).get("server_crashed")),
+            ("stored chunks", lambda n: n["chunks"]["stored"]),
             ("stored MB", lambda n: round(n["chunks"]["stored_bytes"] / 1e6, 1)),
             ("chunks to disk", lambda n: n["chunks"]["to_disk"]),
             ("chunks removed from memory", lambda n: n["chunks"]["removed_from_memory"]),
@@ -765,18 +828,48 @@ def compare(dirs, out):
     return table
 
 
+def unpack(results, into):
+    """A published results folder (kvtrace.tar.gz, proxy.jsonl.gz, mtrag.jsonl.gz, env.json, logs/) as a run
+    folder, to report on it again."""
+    import shutil
+    import tarfile
+    results, into = pathlib.Path(results), pathlib.Path(into)
+    into.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(results / "kvtrace.tar.gz") as tf:
+        for m in tf.getmembers():                   # only plain files under kvtrace/
+            if m.isfile() and m.name.startswith("kvtrace/") and ".." not in m.name.split("/"):
+                tf.extract(m, into, filter="data") if hasattr(tarfile, "data_filter") else tf.extract(m, into)
+    for name in ("proxy.jsonl", "mtrag.jsonl"):
+        if (results / f"{name}.gz").is_file():
+            with gzip.open(results / f"{name}.gz", "rb") as g:
+                (into / name).write_bytes(g.read())
+    for name in ("env.json",):
+        if (results / name).is_file():
+            shutil.copyfile(results / name, into / name)
+    if (results / "logs").is_dir():
+        shutil.copytree(results / "logs", into / "logs", dirs_exist_ok=True)
+    return into
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("report")
-    r.add_argument("--run", required=True)
+    r.add_argument("--run", help="a run folder (scripts/lmc_run.sh's)")
+    r.add_argument("--results", help="or a published results folder, unpacked into --unpack-to first")
+    r.add_argument("--unpack-to", help="where to unpack --results (default: OUTPUT/run)")
     r.add_argument("--output", required=True)
     c = sub.add_parser("compare")
     c.add_argument("--dirs", required=True, help="results folders, by commas")
     c.add_argument("--output", required=True)
     a = ap.parse_args(argv)
     if a.cmd == "report":
-        write_report(pathlib.Path(a.run), a.output)
+        run = a.run
+        if run is None:
+            if not a.results:
+                ap.error("report needs --run or --results")
+            run = unpack(a.results, a.unpack_to or pathlib.Path(a.output) / "run")
+        write_report(pathlib.Path(run), a.output)
     else:
         compare([d for d in a.dirs.split(",") if d], a.output)
     return 0

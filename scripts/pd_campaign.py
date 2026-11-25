@@ -365,8 +365,9 @@ def extra_gb(matrix, runs=()):
     return p_gb + CAPTURE_D_ENGINES * d_gb
 
 
-def disk_plan(p, want_ibp, extra_gb=0.0):
-    """What the run will add to the disk, and whether it fits with MARGIN_GB to spare; IBP is dropped first."""
+def disk_plan(p, want_ibp, extra_gb=0.0, need_cuda13=False):
+    """What the run will add to the disk, and whether it fits with MARGIN_GB to spare; IBP is dropped first.
+    need_cuda13: the setup needs the CUDA 13 toolkit whatever IBP does (MATRIX=lmctrace builds LMCache's CUDA ops)."""
     scale = float(os.environ.get("KVPD_NEED_SCALE", "1"))
     margin = float(os.environ.get("KVPD_MARGIN_GB", MARGIN_GB))
     have = {"uv": (p.cache / "uv").is_dir() and any((p.cache / "uv").iterdir()),
@@ -380,7 +381,7 @@ def disk_plan(p, want_ibp, extra_gb=0.0):
     runs = (JOB_PEAK_GB - SETUP_DROPPED_GB) * scale + float(extra_gb)  # the matrix: setup's captures gone, its own added
 
     def need(ibp):
-        if ibp and not cuda13:
+        if (ibp or need_cuda13) and not cuda13:
             return base + CUDA13_GB * scale + max(CUDA13_INSTALL_GB * scale, setup, runs)
         return base + max(setup, runs)
 
@@ -489,7 +490,7 @@ def stage_run(p, a, job):
     ibp_opt = os.environ.get("KVPD_IBP", "auto")
     uses_ibp = any(re.search(r"(^|[,=])ibp(,|\s|$)", r) for r in m["runs"])
     want_ibp = ibp_opt == "1" or (ibp_opt == "auto" and uses_ibp)
-    plan = disk_plan(p, want_ibp, extra_gb(a.matrix, m["runs"]))
+    plan = disk_plan(p, want_ibp, extra_gb(a.matrix, m["runs"]), need_cuda13=a.matrix == "lmctrace")
     write_json(ev / "disk_plan.json", plan)
     if plan["ibp"] is None:
         rows = biggest(p.root)
@@ -594,6 +595,7 @@ def collect(p, runtime, ev):
     out.mkdir(mode=0o700, exist_ok=True)
     home, runs = runtime / "home", runtime / "runs"
     picks = list(home.glob("pip_freeze*.txt")) + list(home.glob("lmc_verify.json")) + \
+        list(home.glob("lmc_ops_build.json")) + \
         list(runs.glob("*/pd_selftest*.json")) + \
         list(runs.glob("*/pd_profile.*")) + \
         list(runs.glob("*/exans/exans_info.json")) + list(home.glob("venv*/pyvenv.cfg")) + \

@@ -45,9 +45,13 @@ checked against the release wheels. Every change since is a trace hook:
 How they run: the job installs the release wheels of exactly these versions (for their compiled kernels), then
 `scripts/lmc_overlay.py build` makes a per-job tree with the wheels' packages hard-linked file by file and our five
 hooked files written over them, plus `kvtrace`; it first checks that every Python file of our copies, as imported,
-is byte-identical to the wheel's. The engines and the server run with `PYTHONPATH` on that tree, so the only code
-that differs from the release is the hooks. `scripts/lmc_setup.sh` checks that each hooked module is imported from
-the tree, with its hooks.
+is byte-identical to the wheel's. One compiled part is ours: LMCache's CUDA ops (`lmcache.cuda_ops`), built from
+our copy's `csrc/` against this environment's torch (`scripts/lmc_build_ops.py`, with a CUDA 13 toolkit that
+`scripts/cuda13_toolkit.sh` installs once into the node's cache), because the wheel's do not load beside vLLM 0.32's
+torch 2.13 and LMCache's torch fallback crashed the server (job 30694, below). The engines and the server run with
+`PYTHONPATH` on that tree, so the only code that differs from the release is the hooks and that build of the
+release's own kernel sources. `scripts/lmc_overlay.py verify` (run by the setup) checks that each hooked module,
+kvtrace and the CUDA ops are imported from the tree, and stops otherwise.
 
 ### Where the hooks are
 
@@ -201,12 +205,23 @@ what it computes), `MTRAG_LIMIT` (4), `MTRAG_LAYOUT` (interleaved), `MTRAG_CONCU
 `STORE_WAIT_MS` (500; 0 shows how often D looks up before P's store has landed), `GPU_MEM` (0.80), `GPU_BLOCKS`
 (a small number shrinks every engine's GPU cache, so blocks are evicted from it and come back from LMCache),
 `D_PREFIX_CACHE` (1; 0 makes every turn pull its whole prefix), `KEEP_L2` (0), `ENGINE_EAGER` (0).
+`scripts/lmc_setup.sh`: `LMC_TORCH_BASELINE=1` skips the CUDA ops build (the wheel's ops, or LMCache's torch
+fallback, as job 30694 ran: not for real runs), `CUDA13_HOME` (the toolkit; the card sets it to the node's cache).
 
 The matrix `lmctrace` (`scripts/pd_matrix.sh`) runs one per mode; set before the campaign starts:
 `KVPD_LMC_MODES` (memory,disk), `KVPD_LMC_CONVS` (4), `KVPD_LMC_STORE_WAIT_MS` (500). Its setup is
-`scripts/lmc_setup.sh` only (the LMCache environment, the overlay, MTRAG, the model): no codec builds. The run stage
-defaults to 3 hours. The disk plan reserves 2.5 GB a conversation for the disk tier (each run deletes its files
-after its report, keeping their list in `server/l2_files.tsv`).
+`scripts/lmc_setup.sh` only (the LMCache environment, the CUDA 13 toolkit if the node's cache has none, LMCache's CUDA
+ops, the overlay, MTRAG, the model): no codec builds. The run stage defaults to 3 hours. The disk plan reserves the
+toolkit (about 4 GB kept, 11 GB while it installs) and 2.5 GB a conversation for the disk tier (each run deletes its
+files after its report, keeping their list in `server/l2_files.tsv`).
+
+To report again on a published run (no GPU, standard library only), from a checkout with the results:
+
+```bash
+python3 -I scripts/lmc_lifecycle.py report \
+    --results benchmark_results/pd_card/<tag>/matrix/llama32_3b_lmc_<mode>_rtxa5000_<time> --output /tmp/re_<mode>
+python3 -I scripts/lmc_lifecycle.py compare --dirs /tmp/re_memory,/tmp/re_disk --output /tmp/re_compare
+```
 
 ## Runbook (gpu-grad-01, the card)
 
@@ -253,6 +268,23 @@ The published branch is `evidence/lmcache-lifecycle/<pin12>/lmctrace/job<run job
 raw record, `proxy.jsonl.gz`, `mtrag.jsonl.gz`, `env.json`, `server/` snapshots of the server's status, config,
 objects and metrics, `logs/` with each process's log tail) and `pd_matrix_lmctrace_*/compare.md`.
 
+## Runs
+
+**Job 30688** (pin `ef21c33`): stopped in setup, before any engine: the import check ran from the checkout and
+picked up its `kvtrace/` instead of the overlay's. Fixed in `29a277b` (`verify`, run with `python -P` from a folder
+of its own).
+
+**Job 30694** (pin `29a277b`; `benchmark_results/pd_card/pd_lmctrace_20261125T203203Z/`): both modes ran, and in both
+the LMCache server crashed about 3 seconds into the workload with a segmentation fault, with the wheel's compiled
+CUDA ops not loaded. The memory run's log shows where: LMCache's torch fallback (`torch_ops/mp_mem_kernels.py`,
+`_transfer_per_layer_fused`), copying a chunk from server memory to an engine's GPU; the disk run's kept tail ends
+before the crashing thread (runs now keep every log whole, gzipped). The engines gave up on the server 20 seconds in ("degraded
+mode") and served the rest without it: 44 of the 60 engine requests ran without LMCache. What was traced before
+the crash is whole: 4 stores (10 chunks, 293.6 MB), 4 pulls (all 10 chunks: from memory in the memory mode, from
+disk in the disk mode, 40.7 ms median for the server's lookup and read from disk, 66.3 ms to the copy on D's GPU
+done), every chunk's tokens equal to the prompt's, and all 160 pulled blocks with the same vLLM block hash on D as
+on P. Fixed in the next commit: LMCache's CUDA ops built from our copy, and the setup stops unless they load.
+
 ## What to look out for
 
 - **The store can still be in flight when D looks up.** P answers once its single token is out; its store is
@@ -265,10 +297,15 @@ objects and metrics, `logs/` with each process's log tail) and `pd_matrix_lmctra
 - **Only whole chunks are stored.** The prompt's last partial chunk is computed by D; it is stored by P on the
   next turn, when the prompt has grown past it.
 - **One clock.** Times compare across processes because they are all `time.time()` on one node.
-- **LMCache's compiled CUDA ops.** The release wheel's `lmcache.cuda_ops` may not load beside vLLM 0.32's torch
-  2.13 (job 30688's setup logged "compiled extension not found"). LMCache then runs on its torch baseline, and its
-  stream events (the store's and retrieve's start and end) are timed when queued, not when the GPU reached them.
-  The setup records which it is (`lmc_verify.json`, with the import error), and each run keeps a copy in `server/`.
+- **LMCache's compiled CUDA ops.** The release wheel's `lmcache.cuda_ops` does not load beside vLLM 0.32's torch
+  2.13 (`undefined symbol: c10::cuda::CUDAErrorLogCapture`: it was built against another torch). LMCache then falls
+  back to plain torch, and that crashed the server in job 30694. The setup builds them from our copy instead and
+  stops unless they load; `lmc_verify.json` (with the setup's records, and in each run's `server/`) says which ops
+  ran, and `lmc_ops_build.json` what they were built from. With them, the store's and retrieve's start and end are
+  timed when the GPU reached them (LMCache's CUDA event recorder); without, when queued.
+- **The server's health.** If the LMCache server stops, the engines' connectors say "entering degraded mode" and
+  go on without it. The run then fails, and the report opens by saying when the server stopped, when each engine
+  gave up on it and how many requests came after.
 - **The setup's import check** runs with `python -P` from a folder of its own: run from the checkout, the
   checkout's own `kvtrace/` came first on the path and the check stopped (job 30688). The engines and the server
   run in the run's folder for the same reason.

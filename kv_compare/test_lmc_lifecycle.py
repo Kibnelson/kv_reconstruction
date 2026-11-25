@@ -169,6 +169,10 @@ def simulate(d, mode="disk", race=False):
     t = 100.0
     s.hook("P", t, "vllm.request.added", request=pr)
     s.hook("P", t + .001, "vllm.gpu.prefix_hit", request=pr, tokens=0, blocks=Blocks([]))
+    s.hook("LMC", t + .0012, "lmc.bus", event=Ev("mp.lookup", prid, request_id=prid, chunk_hashes=[c0, c1],
+                                                  model_name="m", chunk_size=32, seq_len=69, token_ids=ids))
+    s.hook("LMC", t + .0015, "lmc.bus", event=Ev("mp.lookup_prefetch.end", prid, found_count=0, l1_hit_tokens=0,
+                                                  l2_hit_tokens=0, hit_tokens=0))
     s.hook("P", t + .002, "lmc.conn.lookup", request=pr, vllm_hit=0, lmc_hit=0, load=0)
     s.hook("P", t + .003, "vllm.gpu.allocated", request=pr, new_blocks=([Blk(10), Blk(11), Blk(12), Blk(13), Blk(14)],),
            num_new_tokens=69, num_new_computed_tokens=0, num_external_computed_tokens=0, delay=False)
@@ -266,6 +270,8 @@ class LifecycleReportTests(unittest.TestCase):
         self.assertEqual(nums["chunks"]["removed_from_memory"], 2)
         self.assertEqual((nums["chunks"]["pulled"], nums["chunks"]["pulled_from"]), (2, {"L2": 2}))
         self.assertEqual(nums["chunks"]["never_pulled"], 0)
+        self.assertEqual(nums["chunks"]["read_outcomes"], {"pulled": 2, "new: stored by this request": 2})
+        self.assertFalse(nums["health"]["server_crashed"])
         self.assertEqual(nums["checks"], {"chunk_tokens_match_prompt": "2 of 2", "pulled_blocks_same_hash_as_p": "4 of 4",
                                           "chunks_with_full_chain": "2 of 2"})
         self.assertEqual(nums["D"]["lmcache_loaded_tokens"], 64)
@@ -277,8 +283,10 @@ class LifecycleReportTests(unittest.TestCase):
         c0 = rows["chunks"][0]
         self.assertEqual((c0["offset"], c0["ntok"], c0["bytes"], c0["pieces"]), (0, 32, 1000, ["system", "doc d1"]))
         self.assertEqual([b["gpu"] for b in c0["p_blocks"]], [10, 11])
-        self.assertEqual([b["gpu"] for b in c0["reads"][0]["d_blocks"]], [20, 21])
-        self.assertEqual(c0["reads"][0]["how"], "pulled")
+        pulled = [rd for rd in c0["reads"] if rd["how"] == "pulled"]
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual([b["gpu"] for b in pulled[0]["d_blocks"]], [20, 21])
+        self.assertEqual(pulled[0]["role"], "D1")
         # the store's end: the GPU's time (native), not the queue's; queued kept
         self.assertAlmostEqual(rows["requests"][0]["t_store_end"], 0.072 + 0.0, places=4)
         src = {(b["role"], b["index"]): b["source"] for b in rows["blocks"]}
@@ -297,9 +305,37 @@ class LifecycleReportTests(unittest.TestCase):
 
     def test_a_lookup_before_the_store_landed_is_a_miss_and_counted(self):
         nums, rows, _ = self.report(mode="disk", race=True)
-        self.assertEqual(nums["chunks"]["read_outcomes"], {"miss: not yet stored": 2})
+        self.assertEqual(nums["chunks"]["read_outcomes"], {"miss: not yet stored": 2,
+                                                            "new: stored by this request": 2})
         self.assertEqual(nums["D"]["looked_up_before_p_store_end"], 1)
         self.assertEqual(nums["D"]["computed_tokens"], 69)
+
+    def test_a_server_that_died_is_reported(self):
+        run, out = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate(run, mode="memory")
+        t0 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(100.0 + 2))   # 2 s after the first record
+        (run / "lmcache_server.log").write_text(f"[{t0},500] LMCache INFO: Stored 64 tokens\n"
+                                                "Fatal Python error: Segmentation fault\n")
+        t1 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(100.0 + 20))
+        (run / "engine_D1.log").write_text(f"[{t1},000] LMCache WARNING: LMCache server is unhealthy — entering "
+                                            "degraded mode\n")
+        nums = lmc_lifecycle.write_report(run, out)
+        h = nums["health"]
+        self.assertTrue(h["server_crashed"])
+        self.assertAlmostEqual(h["server_last_log_s"], 2.5, places=3)
+        self.assertAlmostEqual(h["degraded"]["D1"], 20.0, places=3)
+        self.assertIn("did not last the run", (out / "summary.md").read_text())
+
+    def test_a_published_folder_reports_again(self):
+        run, res = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate(run, mode="disk")
+        subprocess.run(["tar", "-C", str(run), "-czf", str(res / "kvtrace.tar.gz"), "kvtrace"], check=True)
+        for n in ("proxy.jsonl", "mtrag.jsonl"):
+            (res / f"{n}.gz").write_bytes(gzip.compress((run / n).read_bytes()))
+        (res / "env.json").write_text((run / "env.json").read_text())
+        out = Path(tempfile.mkdtemp())
+        lmc_lifecycle.main(["report", "--results", str(res), "--output", str(out)])
+        self.assertEqual(json.loads((out / "results.json").read_text())["chunks"]["pulled_from"], {"L2": 2})
 
     def test_compare(self):
         a, b = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
@@ -360,6 +396,7 @@ class OverlayTests(unittest.TestCase):
                 man.append(f"{hashlib.sha256(text.encode()).hexdigest()}  {rel}")
             (root / "third_party" / f"{copy}.sha256").write_text("\n".join(man) + "\n")
         (site / "vllm" / "_C.so").write_bytes(b"\x7fELF")
+        (site / "lmcache" / "cuda_ops.cpython-312-x86_64-linux-gnu.so").write_bytes(b"\x7fELF wheel")
         (root / "kvtrace").mkdir()
         for f in (ROOT / "kvtrace").glob("*.py"):                           # the real module
             (root / "kvtrace" / f.name).write_text(f.read_text())
@@ -367,6 +404,32 @@ class OverlayTests(unittest.TestCase):
         core.write_text("import kvtrace  # KVTRACE\ndef f():\n    if kvtrace.ON: kvtrace.hook(\"x\")  # KVTRACE\n"
                         "    return 1\n")
         return root, site
+
+    def test_build_puts_our_compiled_ops_in_place_of_the_wheels(self):
+        import hashlib
+        root, site = self.tree()
+        ext = Path(tempfile.mkdtemp())
+        (ext / "lmcache").mkdir()
+        ours = b"\x7fELF ours"
+        (ext / "lmcache" / "cuda_ops.cpython-312-x86_64-linux-gnu.so").write_bytes(ours)
+        (ext / "BUILD.json").write_text(json.dumps({"module": "lmcache.cuda_ops",
+                                                    "file": "cuda_ops.cpython-312-x86_64-linux-gnu.so",
+                                                    "sha256": hashlib.sha256(ours).hexdigest(), "from": "x",
+                                                    "torch": "t", "nvcc": "n"}))
+        out = Path(tempfile.mkdtemp()) / "overlay"
+        info = lmc_overlay.build(site, out, root, log=lambda m: None, ext_dirs=[ext])
+        so = out / "lmcache" / "cuda_ops.cpython-312-x86_64-linux-gnu.so"
+        self.assertEqual(so.read_bytes(), ours)
+        self.assertEqual((site / "lmcache" / "cuda_ops.cpython-312-x86_64-linux-gnu.so").read_bytes(),
+                         b"\x7fELF wheel")                                       # the environment untouched
+        self.assertEqual(info["built"][0]["replaced"], ["cuda_ops.cpython-312-x86_64-linux-gnu.so"])
+        # verify --need-ops: a file that is not a loadable module stops it
+        env = dict(os.environ, PYTHONPATH=str(out), KVTRACE_DIR=tempfile.mkdtemp())
+        r = subprocess.run([sys.executable, "-P", str(ROOT / "scripts" / "lmc_overlay.py"), "verify", "--out",
+                            str(out), "--need-ops"], cwd=tempfile.mkdtemp(), env=env, capture_output=True, text=True,
+                           timeout=60)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("compiled CUDA ops do not load", r.stdout)
 
     def test_build_lays_our_hooked_files_over_the_wheel(self):
         root, site = self.tree()
@@ -530,7 +593,7 @@ class MatrixTests(unittest.TestCase):
         self.assertIn("lmctrace", pd_campaign.MATRICES)
 
     def test_scripts_parse(self):
-        for f in ("lmc_run.sh", "lmc_setup.sh", "pd_matrix.sh", "pd_card.sh"):
+        for f in ("lmc_run.sh", "lmc_setup.sh", "pd_matrix.sh", "pd_card.sh", "cuda13_toolkit.sh"):
             r = subprocess.run(["bash", "-n", str(ROOT / "scripts" / f)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, f + r.stderr)
 

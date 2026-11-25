@@ -22,10 +22,12 @@ copies is byte-identical to the wheel's (vLLM 2,641 of 2,641, LMCache 904 of 904
 build generates: `_version.py`, generated protobuf modules, vendored kernels' Python (vLLM's `third_party/deep_gemm`),
 and the compiled `.so` files.
 
-**How they run.** The compiled kernels are not rebuilt: the job's setup installs the release wheels of exactly these
-versions for their compiled parts, then lays our copies' Python over them in a per-job tree (`scripts/lmc_overlay.py`).
-Before that it checks that every file we did not hook is byte-identical to the wheel's, so the only code that runs
-differently is our hooks. The kernel sources are here, so a full build from these copies stays possible.
+**How they run.** The job's setup installs the release wheels of exactly these versions for their compiled parts,
+then lays our copies' Python over them in a per-job tree (`scripts/lmc_overlay.py`). Before that it checks that every
+file we did not hook is byte-identical to the wheel's, so the only Python that runs differently is our hooks. One
+compiled part is built from these copies: LMCache's CUDA ops (`lmcache.cuda_ops`, from `lmcache/csrc/cuda`,
+`scripts/lmc_build_ops.py`), because the wheel's were built against another torch and do not load beside vLLM
+0.32's torch 2.13 (LMCache's torch fallback then crashed its server: job 30694). vLLM's kernels are the wheel's.
 
 **Trace hooks.** A hook is a whole added line ending in `# KVTRACE`, calling our module `kvtrace` (in the repository
 root). Removing every line ending in `# KVTRACE` gives back the imported file exactly; `scripts/lmc_overlay.py check`

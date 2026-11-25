@@ -218,6 +218,7 @@ for port in "$P_PORT" "${D_PORTS[@]}"; do
     curl -sf "http://127.0.0.1:$port/health" >/dev/null || { UP=0; break; }
 done
 STATUS=0
+SERVER_ALIVE=
 if [ "$UP" = 1 ]; then
     grep -h "GPU KV cache size\|Resolved LMCache MP geometry" "$OUT"/engine_*.log | sed 's/^/   /' || true
     echo "== proxy (store mode, wait $STORE_WAIT_MS ms) and MTRAG"
@@ -237,6 +238,15 @@ if [ "$UP" = 1 ]; then
     STATUS=${PIPESTATUS[0]}
     set -e
     sleep "${KVTRACE_SETTLE_S:-3}"                # the last stores land and every process flushes its trace
+    # the server lasted the run? (job 30694: it crashed a minute in, and the engines went on without it)
+    SERVER_ALIVE=1
+    { kill -0 "${PIDS[0]}" 2>/dev/null && curl -sf "http://127.0.0.1:$LMC_HTTP/healthcheck" >/dev/null; } || SERVER_ALIVE=0
+    if [ "$SERVER_ALIVE" = 0 ]; then
+        echo "STOP: the LMCache server is gone; from its log and the engines':"
+        grep -n -m 3 "Fatal Python error\|Segmentation fault\|Traceback" "$OUT/lmcache_server.log" || true
+        grep -h "degraded mode" "$OUT"/engine_*.log | head -n 4 || true
+        STATUS=1
+    fi
     for q in status config "cache/objects?tier=l1&page_size=1000" "cache/objects?tier=l2&page_size=1000" metrics; do
         name=$(echo "$q" | sed 's/[?&=]/_/g; s#/#_#g')
         curl -sf "http://127.0.0.1:$LMC_HTTP/$q" > "$OUT/server/$name.txt" 2>/dev/null || rm -f "$OUT/server/$name.txt"
@@ -254,7 +264,7 @@ trap - EXIT
 cp "$KV_HOME/lmc_verify.json" "$OUT/server/lmc_verify.json" 2>/dev/null || true
 "$LPY" -I - "$OUT/env.json" "$MODE" "$L1_GB" "$EVICT" "$STORE_POLICY" "$CHUNK" "$ODIRECT" "$SAVE_DECODE" "$D_ROLE" \
     "$LIMIT" "$LAYOUT" "$CONC" "$MAX_TOKENS" "$STORE_WAIT_MS" "$GPU_MEM" "${GPU_BLOCKS:-}" "${D_PREFIX_CACHE:-1}" \
-    "$OVERLAY/OVERLAY.json" "$ALL_GPUS" "$(git rev-parse HEAD 2>/dev/null || echo '?')" <<'EOF'
+    "$OVERLAY/OVERLAY.json" "$ALL_GPUS" "$(git rev-parse HEAD 2>/dev/null || echo '?')" "$SERVER_ALIVE" <<'EOF'
 import json, subprocess, sys
 a = sys.argv[1:]
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
@@ -263,7 +273,8 @@ json.dump({"mode": a[1], "l1_gb": float(a[2]), "eviction": a[3], "store_policy":
            "layout": a[10], "concurrency": int(a[11]), "max_tokens": int(a[12]), "store_wait_ms": float(a[13]),
            "gpu_mem": float(a[14]), "gpu_blocks": a[15] or None, "d_prefix_cache": a[16] == "1",
            "overlay": json.load(open(a[17])), "gpus": a[18], "gpu_names": sorted(set(gpus.split("\n")) - {""}),
-           "commit": a[19], "vllm": "0.32.0", "lmcache": "0.5.7.post1", "engines": {"P": "kv_both", "D": a[8]}},
+           "commit": a[19], "vllm": "0.32.0", "lmcache": "0.5.7.post1", "engines": {"P": "kv_both", "D": a[8]},
+           "server_alive_at_end": {"1": True, "0": False}.get(a[20])},
           open(a[0], "w"), indent=1)
 EOF
 if [ "$MODE" != memory ] && [ -d "$L2DIR" ]; then
@@ -286,7 +297,9 @@ cp "$OUT/env.json" "$RES/"
 mkdir -p "$RES/server" "$RES/logs"
 cp "$OUT"/server/* "$RES/server/" 2>/dev/null || true
 for f in "$OUT"/engine_*.log "$OUT/lmcache_server.log" "$OUT/proxy.log" "$OUT/mtrag.log"; do
-    [ -f "$f" ] && tail -n 400 "$f" > "$RES/logs/$(basename "$f" .log)_tail.log"
+    [ -f "$f" ] || continue
+    tail -n 400 "$f" > "$RES/logs/$(basename "$f" .log)_tail.log"
+    gzip -c "$f" > "$RES/logs/$(basename "$f").gz"        # whole (job 30694: the crash was above the tail)
 done
 du -sh "$RES" | sed 's/^/   results /'
 [ "$STATUS" = 0 ] || { echo "LMC RUN $MODE: not finished (status $STATUS); what there is is in $RES"; exit 1; }

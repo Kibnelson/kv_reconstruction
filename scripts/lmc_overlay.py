@@ -20,7 +20,8 @@ DIR/kvtrace our trace module. PYTHONPATH=DIR runs the wheels with our hooks; DIR
 verify imports kvtrace, vllm, lmcache and every hooked module as an engine would, and stops unless each comes from
 DIR (with its hooks) and kvtrace writes a record. Run it with python -P (no script folder or current folder first
 on the path: the repository's own kvtrace/ would shadow DIR's) and from a folder that holds no package. It also
-says whether LMCache's compiled CUDA ops load (without them LMCache uses its torch baseline).
+says whether LMCache's compiled CUDA ops load (without them LMCache uses its torch baseline), and with --need-ops
+stops unless they do and are the ones built from our copy (build --ext: scripts/lmc_build_ops.py's folder).
 """
 from __future__ import annotations
 
@@ -102,7 +103,9 @@ def hooks(root=ROOT):
     return out
 
 
-def build(site, out, root=ROOT, log=print):
+def build(site, out, root=ROOT, log=print, ext_dirs=()):
+    """ext_dirs: build folders of extensions made from our copies (scripts/lmc_build_ops.py: BUILD.json and the
+    module's file); each replaces the wheel's compiled file of the same module."""
     site, out = pathlib.Path(site), pathlib.Path(out)
     problems, hooked = check(root)
     if problems:
@@ -145,22 +148,38 @@ def build(site, out, root=ROOT, log=print):
             d.unlink()                                   # a new file: the hard link to the environment stays as was
         d.write_bytes((root / "third_party" / copy / path).read_bytes())
         stats["replaced"].append(path)
+    built = []
+    for d in ext_dirs:
+        d = pathlib.Path(d)
+        b = json.loads((d / "BUILD.json").read_text())
+        pkg, mod = b["module"].rsplit(".", 1)
+        src = d / pkg.replace(".", "/") / b["file"]
+        if sha(src.read_bytes()) != b["sha256"]:
+            return {"error": f"{src} is not the file its build recorded"}
+        dst_dir = out / pkg.replace(".", "/")
+        old = sorted(dst_dir.glob(mod + ".*.so")) + sorted(dst_dir.glob(mod + ".so"))
+        for f in old:                                # the wheel's (a link): removed from the overlay only
+            f.unlink()
+        shutil.copy2(src, dst_dir / b["file"])
+        built.append(dict(b, replaced=[f.name for f in old]))
     kt = out / "kvtrace"
     kt.mkdir()
     for p in sorted((root / "kvtrace").glob("*.py")):
         shutil.copy2(p, kt / p.name)
     info = {"site": str(site), "out": str(out), "hooked_files": stats["replaced"], "hooks": len(hooks(root)),
-            "linked": stats["linked"], "copied": stats["copied"],
+            "linked": stats["linked"], "copied": stats["copied"], "built": built,
             "checked_py": sum(1 for c, pk in COPIES.items() for pth in manifest(root, c)
                               if pth.startswith(pk + "/") and pth.endswith(".py"))}
     (out / "OVERLAY.json").write_text(json.dumps(info, indent=1))
     log(f"overlay {out}: {info['checked_py']} Python files equal to the wheels'; {len(stats['replaced'])} hooked "
-        f"files over them ({info['hooks']} hook lines); {stats['linked']} files linked, {stats['copied']} copied")
+        f"files over them ({info['hooks']} hook lines); {stats['linked']} files linked, {stats['copied']} copied"
+        + "".join(f"; {b['module']} built from {b['from']} (torch {b['torch']}, {b['nvcc']})" for b in built))
     return info
 
 
-def verify(out, log=print):
-    """What the engines will import, checked in this process (PYTHONPATH=out, KVTRACE_DIR set)."""
+def verify(out, log=print, need_ops=False):
+    """What the engines will import, checked in this process (PYTHONPATH=out, KVTRACE_DIR set). need_ops: LMCache's
+    compiled CUDA ops must load (its torch baseline crashed the server in job 30694), and be the ones we built."""
     import importlib
     out = pathlib.Path(out).resolve()
     info = json.loads((out / "OVERLAY.json").read_text())
@@ -198,15 +217,27 @@ def verify(out, log=print):
         recs = [json.loads(ln) for p in d.glob("*.jsonl") for ln in p.read_text().splitlines() if ln.strip()]
         if not any(r.get("ev") == "kvtrace.check" and r.get("value") == 1 for r in recs):
             bad.append(f"kvtrace wrote no record to {d}")
-    native = None
+    native, loaded = None, False
     try:
-        importlib.import_module("lmcache.cuda_ops")
-        native = "loads"
+        ops = importlib.import_module("lmcache.cuda_ops")
+        f, ok = where(ops)
+        mine = [b for b in info.get("built") or [] if b["module"] == "lmcache.cuda_ops"]
+        native = f"loads from {f.name}" + (" (ours, built from third_party/lmcache/csrc)" if mine and ok and
+                                           sha(f.read_bytes()) == mine[0]["sha256"] else " (the wheel's)")
+        loaded = True
+        if mine and not (ok and sha(f.read_bytes()) == mine[0]["sha256"]):
+            bad.append(f"lmcache.cuda_ops loads from {f}, not the one built")
+        if not hasattr(ops, "record_event_on_stream"):
+            native += "; no native event recorder in it"
     except Exception as exc:                      # LMCache falls back to its torch baseline; worth knowing
         native = f"does not load ({type(exc).__name__}: {str(exc)[:300]})"
     except BaseException:
         native = "does not load"
-    res = {"ok": not bad, "problems": bad, "versions": vers, "lmcache_cuda_ops": native}
+    if need_ops and not loaded:
+        bad.append("LMCache's compiled CUDA ops do not load (its torch baseline crashed the server in job 30694): "
+                   + native)
+    res = {"ok": not bad, "problems": bad, "versions": vers, "lmcache_cuda_ops": native,
+           "built": info.get("built") or []}
     try:
         (out / "VERIFY.json").write_text(json.dumps(res, indent=1))
     except OSError:
@@ -227,8 +258,10 @@ def main(argv=None):
     b = sub.add_parser("build")
     b.add_argument("--site", required=True)
     b.add_argument("--out", required=True)
+    b.add_argument("--ext", action="append", default=[], help="a build folder of scripts/lmc_build_ops.py (repeat)")
     v = sub.add_parser("verify")
     v.add_argument("--out", required=True)
+    v.add_argument("--need-ops", action="store_true", help="stop unless LMCache's compiled CUDA ops load")
     for p in (ap,):
         p.add_argument("--root", default=str(ROOT))
     a = ap.parse_args(argv)
@@ -252,8 +285,8 @@ def main(argv=None):
                 print(f"{f}:{n}: {ev}: {t}")
         return 0
     if a.cmd == "verify":
-        return 0 if verify(a.out)["ok"] else 1
-    info = build(a.site, a.out, root)
+        return 0 if verify(a.out, need_ops=a.need_ops)["ok"] else 1
+    info = build(a.site, a.out, root, ext_dirs=a.ext)
     if "error" in info:
         print("STOP:", json.dumps(info, indent=1))
         return 2
