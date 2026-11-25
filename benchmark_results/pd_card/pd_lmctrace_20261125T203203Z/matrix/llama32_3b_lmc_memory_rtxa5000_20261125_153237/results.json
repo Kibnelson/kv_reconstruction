@@ -1,0 +1,92 @@
+{
+ "mode": "memory",
+ "env": {
+  "mode": "memory",
+  "l1_gb": 16.0,
+  "eviction": "LRU",
+  "store_policy": "default",
+  "chunk": 256,
+  "odirect": true,
+  "d_role": "kv_consumer",
+  "mtrag_limit": 4,
+  "layout": "interleaved",
+  "store_wait_ms": 500.0,
+  "gpu_blocks": null,
+  "d_prefix_cache": true
+ },
+ "trace": {
+  "files": 5,
+  "records": 36308,
+  "unreadable_lines": 0,
+  "by_role": {
+   "P": 378,
+   "LMC": 159,
+   "D2": 12392,
+   "D1": 22494,
+   "D3": 885
+  },
+  "hook_errors": {},
+  "unknown_events": {
+   "lmc.mp.vllm.block_allocation": 31
+  }
+ },
+ "requests": {
+  "P": 30,
+  "D": 30,
+  "turns": 30
+ },
+ "prompt_tokens": {
+  "P": 127313,
+  "D": 127313
+ },
+ "P": {
+  "local_hit_tokens": 97888,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 29425,
+  "stored_tokens": 121344,
+  "store_bytes": 293601280,
+  "store_s_median": 0.319458,
+  "store_s_p90": 0.329502
+ },
+ "D": {
+  "local_hit_tokens": 100624,
+  "lmcache_loaded_tokens": 2864,
+  "computed_tokens": 23825,
+  "requests_pulling": 5,
+  "retrieve_bytes": 293601280,
+  "pull_s_median_l1": 0.071601,
+  "pull_s_p90_l1": 0.07562,
+  "pull_s_median_l2": null,
+  "pull_s_p90_l2": null,
+  "retrieve_s_median": 0.064405,
+  "prefetch_s_median_l1": 0.0016,
+  "prefetch_s_median_l2": null,
+  "looked_up_before_p_store_end": 0
+ },
+ "chunks": {
+  "stored": 10,
+  "stored_bytes": 293601280,
+  "to_disk": 0,
+  "removed_from_memory": 0,
+  "pulled": 10,
+  "pulled_from": {
+   "L1": 10
+  },
+  "read_outcomes": {
+   "miss: not yet stored": 10,
+   "pulled": 10
+  },
+  "never_pulled": 0,
+  "pulls_per_chunk": {
+   "1": 10
+  },
+  "created_to_l1_s_median": 0.3166952133178711,
+  "l1_to_l2_s_median": null,
+  "lookups_of_unknown_chunks": 0
+ },
+ "checks": {
+  "chunk_tokens_match_prompt": "10 of 10",
+  "pulled_blocks_same_hash_as_p": "160 of 160",
+  "chunks_with_full_chain": "10 of 10"
+ }
+}
