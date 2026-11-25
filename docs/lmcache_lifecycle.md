@@ -218,7 +218,8 @@ For each engine request and prompt block (`blocks.jsonl.gz`): the block's hash, 
 (`local prefix cache`, `LMCache`, `computed`), its GPU block, when cached and when evicted.
 
 `results.json` has the totals and medians; `summary.md` says what happened, then tells one chunk's whole life and
-one D request's, as timelines. Checks it makes: every chunk's tokens against the prompt (CRC), every pulled block's
+one D request's, as timelines. `conversations/` has one page per conversation, from its prompt's pieces to its
+chunks and blocks, turn by turn (`docs/lmcache_views/`: job 30728's, both modes). Checks it makes: every chunk's tokens against the prompt (CRC), every pulled block's
 hash against P's, every stored chunk with its whole chain (computed on P, in memory). `compare.md` puts the modes
 side by side.
 

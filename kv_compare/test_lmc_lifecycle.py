@@ -388,6 +388,15 @@ class LifecycleReportTests(unittest.TestCase):
         lmc_lifecycle.main(["report", "--results", str(res), "--output", str(out)])
         self.assertEqual(json.loads((out / "results.json").read_text())["chunks"]["pulled_from"], {"L2": 2})
 
+    def test_a_page_per_conversation(self):
+        nums, rows, out = self.report(mode="disk")
+        page = (out / "conversations" / "conversation_0.md").read_text()
+        self.assertIn("[conversation_0.md](conversation_0.md)", (out / "conversations" / "index.md").read_text())
+        self.assertIn("P  ##+", page)                      # two whole chunks computed and stored, a partial tail
+        self.assertIn("D  SS+", page)                      # both pulled from disk, the tail computed
+        self.assertIn("| 0 | 0-32 | system: 10; doc d1: 22 | 0-1 | P 10-11; D 20-21; 2/2 hashes = P's |", page)
+        self.assertIn("One chunk, block by block", page)
+
     def test_compare(self):
         a, b = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
         for d, mode in ((a, "memory"), (b, "disk")):
