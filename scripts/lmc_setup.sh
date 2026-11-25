@@ -52,10 +52,19 @@ EXT=() NEED_OPS=()
 if [ "${LMC_TORCH_BASELINE:-0}" != 1 ]; then
     echo "== LMCache's compiled CUDA ops, built from our copy (third_party/lmcache/csrc)"
     SITE=$("$LPY" -I -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
-    # the environment's own compiler (its pip packages); the runfile only where a toolkit is cached already (the
-    # campaign's disk plan does not reserve its 15 GB)
-    TK13=$(CUDA13_FROM_SITE=$SITE CUDA13_NO_RUNFILE=1 CUDA13_HOME=${CUDA13_HOME:-$KV_HOME/cuda13} KV_HOME=$KV_HOME \
-        bash scripts/cuda13_toolkit.sh | tail -n 1)
+    # the environment's CUDA 13 headers and libraries (its pip packages), with a compiler of their CUDA version from pip
+    # into a folder of its own (job 30716: the environment's own nvcc is 13.5, its runtime headers 13.0, and CCCL
+    # refuses the pair); the runfile only where a toolkit is cached already (the disk plan has no room for it)
+    RT=$(sed -n 's/^#define[[:space:]]*CUDART_VERSION[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$SITE/nvidia/cu13/include/cuda_runtime_api.h" | head -n 1)
+    RT_MM=$((RT / 1000)).$(((RT % 1000) / 10))
+    RT_PKG=$("$LPY" -I -c 'import importlib.metadata as m; print(m.version("nvidia-cuda-runtime"))')
+    CU_C=$KV_HOME/build/cu13_compiler
+    rm -rf "$CU_C"
+    pip_in "$LPY" -q --no-deps --target "$CU_C" "nvidia-cuda-nvcc==$RT_MM.*" "nvidia-nvvm==$RT_MM.*" \
+        "nvidia-cuda-crt==$RT_MM.*" "nvidia-cuda-cccl==$RT_MM.*" "nvidia-cuda-runtime==$RT_PKG"
+    echo "   the CUDA $RT_MM compiler (pip, $(du -sh "$CU_C" | cut -f1)) for the environment's CUDA $RT_MM headers (nvidia-cuda-runtime $RT_PKG)"
+    TK13=$(CUDA13_FROM_SITE=$SITE CUDA13_COMPILER=$CU_C CUDA13_NO_RUNFILE=1 CUDA13_HOME=${CUDA13_HOME:-$KV_HOME/cuda13} \
+        KV_HOME=$KV_HOME bash scripts/cuda13_toolkit.sh | tail -n 1)
     pip_in "$LPY" -q setuptools wheel ninja         # a build without isolation: the environment's own, with its torch
     ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | sort -u | paste -sd';' -)
     B=$KV_HOME/build/lmc_ops

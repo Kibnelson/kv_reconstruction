@@ -6,30 +6,53 @@
 #
 #   CUDA13_HOME=/path KV_HOME=/path bash scripts/cuda13_toolkit.sh     prints the toolkit's path on its last line
 #
-# First choice, CUDA13_FROM_SITE=<site-packages>: the CUDA 13 compiler an environment already has from pip (vLLM
-# 0.32's environment does: nvidia-cuda-nvcc, -nvvm, -crt, -cccl, -runtime and the libraries' headers, all in
-# nvidia/cu13/), as a toolkit folder of links (KV_HOME/build/cuda13_home): nothing downloaded, nothing installed.
-# The links add only what a torch extension's link step looks for and the wheels leave out: lib64/, and an
-# unversioned libcudart.so beside libcudart.so.13. Only without it, the runfile into CUDA13_HOME (about 4 GB kept,
-# 11 GB while it installs).
+# First choice, CUDA13_FROM_SITE=<site-packages>: the CUDA 13 headers and libraries an environment already has from
+# pip (vLLM 0.32's: the runtime torch was built with, the libraries' headers, all in nvidia/cu13/), with a compiler of
+# the same CUDA version: CUDA13_COMPILER=<folder> (pip packages nvidia-cuda-nvcc, -nvvm, -crt, -cccl of that version,
+# installed with --target; default: the environment's own). Job 30716: the environment's own nvcc is 13.5 and its
+# runtime headers 13.0, and CCCL refuses that pair ("CUDA compiler and CUDA toolkit headers are incompatible"), so
+# the two versions are checked first. The toolkit is a folder of links (KV_HOME/build/cuda13_home): the compiler's
+# bin/ and nvvm/, the environment's include/ and lib/ with the compiler's own headers (crt/, cccl/) over them,
+# lib64/, targets/x86_64-linux/ (where the 13.0 compiler's profile looks), an unversioned libcudart.so. Nothing in
+# the environment changes. Only without such a compiler, a runfile toolkit already in CUDA13_HOME (or, unless
+# CUDA13_NO_RUNFILE=1, the runfile: about 4 GB kept, 11 GB while it installs).
 set -Eeuo pipefail
 KV_HOME=${KV_HOME:?}
 TK13=${CUDA13_HOME:-$KV_HOME/cuda13}
 TMPD=${TMPDIR:-$KV_HOME/tmp}
 mkdir -p "$TMPD"
 W=${CUDA13_FROM_SITE:+$CUDA13_FROM_SITE/nvidia/cu13}
-if [ -n "$W" ] && [ -x "$W/bin/nvcc" ] && [ -x "$W/nvvm/bin/cicc" ] && [ -f "$W/include/cuda_runtime.h" ] && \
-        [ -f "$W/include/crt/host_config.h" ] && [ -d "$W/include/cccl" ] && ls "$W"/lib/libcudart.so.* >/dev/null 2>&1; then
+C=${CUDA13_COMPILER:+$CUDA13_COMPILER/nvidia/cu13}
+[ -n "$C" ] || C=$W
+if [ -n "$W" ] && [ -x "$C/bin/nvcc" ] && [ -x "$C/nvvm/bin/cicc" ] && [ -f "$W/include/cuda_runtime_api.h" ] && \
+        ls "$W"/lib/libcudart.so.* >/dev/null 2>&1; then
+    RT=$(sed -n 's/^#define[[:space:]]*CUDART_VERSION[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$W/include/cuda_runtime_api.h" | head -n 1)
+    RT_MM=$((RT / 1000)).$(((RT % 1000) / 10))
+    NV_MM=$("$C/bin/nvcc" --version | sed -n 's/.*release \([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n 1)
+    if [ "$NV_MM" != "$RT_MM" ]; then
+        echo "STOP: the compiler in $C is CUDA $NV_MM and the runtime headers in $W are CUDA $RT_MM; CCCL refuses" \
+             "that pair (job 30716). Install the compiler of CUDA $RT_MM (CUDA13_COMPILER)." >&2
+        exit 1
+    fi
     SHIM=${CUDA13_SHIM:-$KV_HOME/build/cuda13_home}
-    rm -rf "$SHIM" && mkdir -p "$SHIM/lib"
-    for d in bin include nvvm; do ln -s "$W/$d" "$SHIM/$d"; done
-    for f in "$W"/lib/*; do ln -s "$f" "$SHIM/lib/"; done
-    for f in "$W"/lib/lib*.so.*; do                  # libcudart.so.13 -> libcudart.so, for -lcudart
+    rm -rf "$SHIM" && mkdir -p "$SHIM/include" "$SHIM/lib" "$SHIM/targets/x86_64-linux"
+    ln -s "$C/bin" "$SHIM/bin"
+    ln -s "$C/nvvm" "$SHIM/nvvm"
+    for e in "$W"/include/*; do ln -s "$e" "$SHIM/include/"; done
+    [ "$C" = "$W" ] || for e in "$C"/include/*; do ln -sfn "$e" "$SHIM/include/${e##*/}"; done   # the compiler's own
+    for e in "$W"/lib/*; do ln -s "$e" "$SHIM/lib/"; done
+    [ "$C" = "$W" ] || for e in "$C"/lib/*; do ln -sfn "$e" "$SHIM/lib/${e##*/}"; done
+    for f in "$SHIM"/lib/lib*.so.*; do               # libcudart.so.13 -> libcudart.so, for -lcudart
         stem=${f##*/}; stem=${stem%%.so.*}.so
-        [ -e "$SHIM/lib/$stem" ] || ln -s "$f" "$SHIM/lib/$stem"
+        [ -e "$SHIM/lib/$stem" ] || ln -s "$(readlink -f "$f")" "$SHIM/lib/$stem"
     done
     ln -s lib "$SHIM/lib64"
-    echo "   CUDA 13 toolkit: the environment's own ($W: $("$SHIM/bin/nvcc" --version | tail -n 1)), as $SHIM" >&2
+    for d in include lib lib64; do ln -s "../../${d/lib64/lib}" "$SHIM/targets/x86_64-linux/$d"; done
+    for need in include/crt/host_config.h include/cccl include/cuda_runtime.h; do
+        [ -e "$SHIM/$need" ] || { echo "STOP: no $need in the CUDA 13 packages ($C, $W)" >&2; exit 1; }
+    done
+    echo "   CUDA 13 toolkit: compiler CUDA $NV_MM ($C: $("$SHIM/bin/nvcc" --version | tail -n 1)), runtime headers" \
+         "CUDA $RT_MM ($W), as $SHIM" >&2
     echo "$SHIM"
     exit 0
 fi

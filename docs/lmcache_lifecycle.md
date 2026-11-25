@@ -46,9 +46,11 @@ How they run: the job installs the release wheels of exactly these versions (for
 `scripts/lmc_overlay.py build` makes a per-job tree with the wheels' packages hard-linked file by file and our five
 hooked files written over them, plus `kvtrace`; it first checks that every Python file of our copies, as imported,
 is byte-identical to the wheel's. One compiled part is ours: LMCache's CUDA ops (`lmcache.cuda_ops`), built from
-our copy's `csrc/` against this environment's torch (`scripts/lmc_build_ops.py`, with the CUDA 13 compiler the
-environment already has from pip: `nvidia-cuda-nvcc`, `-nvvm`, `-crt`, `-cccl` in `nvidia/cu13/`, which
-`scripts/cuda13_toolkit.sh` presents as a toolkit folder of links), because the wheel's do not load beside vLLM 0.32's
+our copy's `csrc/` against this environment's torch (`scripts/lmc_build_ops.py`), with the environment's own CUDA
+headers and libraries (its pip packages in `nvidia/cu13/`: the CUDA 13.0 runtime torch was built with) and a
+compiler of the same CUDA version from pip (`nvidia-cuda-nvcc`, `-nvvm`, `-crt`, `-cccl` 13.0, about 130 MB in a
+folder of their own; `scripts/cuda13_toolkit.sh` joins the two as a toolkit folder of links and checks the versions
+agree), because the wheel's do not load beside vLLM 0.32's
 torch 2.13 and LMCache's torch fallback crashed the server (job 30694, below). The engines and the server run with
 `PYTHONPATH` on that tree, so the only code that differs from the release is the hooks and that build of the
 release's own kernel sources. `scripts/lmc_overlay.py verify` (run by the setup) checks that each hooked module,
@@ -291,6 +293,12 @@ on P. Fixed in the next commit: LMCache's CUDA ops built from our copy, and the 
 plus 10 GB to spare, most of it for a CUDA 13 toolkit download and the codec setup's peak. Neither is needed: the
 environment's own pip packages carry a CUDA 13 compiler, and this matrix's setup is small; the plan now asks for
 about 9.5 GB.
+
+**Job 30716** (pin `f0dac4a`): the CUDA ops did not build. The environment's own compiler is CUDA 13.5
+(`nvidia-cuda-nvcc 13.5.37`, pulled in by another package) and its runtime headers CUDA 13.0 (`nvidia-cuda-runtime
+13.0.96`, torch's), and CCCL refuses that pair at the first `#include`: "CUDA compiler and CUDA toolkit headers are
+incompatible". The setup now installs the compiler of the headers' version (13.0) into a folder of its own, and
+the toolkit script stops early if the two ever disagree.
 
 ## What to look out for
 

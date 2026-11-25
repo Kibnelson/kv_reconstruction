@@ -26,7 +26,7 @@ and the compiled `.so` files.
 then lays our copies' Python over them in a per-job tree (`scripts/lmc_overlay.py`). Before that it checks that every
 file we did not hook is byte-identical to the wheel's, so the only Python that runs differently is our hooks. One
 compiled part is built from these copies: LMCache's CUDA ops (`lmcache.cuda_ops`, from `lmcache/csrc/cuda`,
-`scripts/lmc_build_ops.py`, with the CUDA 13 compiler vLLM's environment has from pip), because the wheel's were built against another torch and do not load beside vLLM
+`scripts/lmc_build_ops.py`, with vLLM's environment's CUDA 13.0 headers and the CUDA 13.0 compiler from pip), because the wheel's were built against another torch and do not load beside vLLM
 0.32's torch 2.13 (LMCache's torch fallback then crashed its server: job 30694). vLLM's kernels are the wheel's.
 
 **Trace hooks.** A hook is a whole added line ending in `# KVTRACE`, calling our module `kvtrace` (in the repository

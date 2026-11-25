@@ -592,29 +592,60 @@ class MatrixTests(unittest.TestCase):
         self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs[:1]), 0.25)
         self.assertIn("lmctrace", pd_campaign.MATRICES)
 
-    def test_the_environments_own_cuda13_compiler_as_a_toolkit(self):
-        """A stand-in of the pip packages' nvidia/cu13 (a fake nvcc that prints a version): links, lib64, and an
-        unversioned libcudart.so; without it, nothing is linked (the runfile path, not run here)."""
-        site, home = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
-        w = site / "nvidia" / "cu13"
+    @staticmethod
+    def _cu13(prefix, nvcc_release, runtime=None, compiler=True, crt_tag=""):
+        """A stand-in of pip's nvidia/cu13 packages: a compiler (a fake nvcc printing its release), and/or the
+        runtime headers (CUDART_VERSION) and library."""
+        w = prefix / "nvidia" / "cu13"
         for d in ("bin", "nvvm/bin", "include/crt", "include/cccl", "lib"):
-            (w / d).mkdir(parents=True)
-        (w / "bin" / "nvcc").write_text("#!/bin/sh\necho 'Cuda compilation tools, release 13.5, V13.5.37'\n")
-        (w / "nvvm" / "bin" / "cicc").write_text("")
-        for f in ("bin/nvcc", "nvvm/bin/cicc"):
-            os.chmod(w / f, 0o755)
-        (w / "include" / "cuda_runtime.h").write_text("")
-        (w / "include" / "crt" / "host_config.h").write_text("")
-        (w / "lib" / "libcudart.so.13").write_text("")
-        r = subprocess.run(["bash", str(ROOT / "scripts" / "cuda13_toolkit.sh")], capture_output=True, text=True,
-                           env=dict(os.environ, KV_HOME=str(home), CUDA13_FROM_SITE=str(site),
-                                    CUDA13_HOME=str(home / "cuda13")), timeout=60)
+            (w / d).mkdir(parents=True, exist_ok=True)
+        if compiler:
+            (w / "bin" / "nvcc").write_text(f"#!/bin/sh\necho 'Cuda compilation tools, release {nvcc_release}, V0'\n")
+            (w / "nvvm" / "bin" / "cicc").write_text("")
+            for f in ("bin/nvcc", "nvvm/bin/cicc"):
+                os.chmod(w / f, 0o755)
+            (w / "include" / "crt" / "host_config.h").write_text(crt_tag)
+        if runtime is not None:
+            (w / "include" / "cuda_runtime_api.h").write_text(f"#define CUDART_VERSION {runtime}\n")
+            (w / "include" / "cuda_runtime.h").write_text("")
+            (w / "lib" / "libcudart.so.13").write_text("")
+        return w
+
+    def toolkit(self, site, home, compiler=None):
+        env = dict(os.environ, KV_HOME=str(home), CUDA13_FROM_SITE=str(site), CUDA13_HOME=str(home / "cuda13"),
+                   CUDA13_NO_RUNFILE="1")
+        if compiler is not None:
+            env["CUDA13_COMPILER"] = str(compiler)
+        return subprocess.run(["bash", str(ROOT / "scripts" / "cuda13_toolkit.sh")], capture_output=True, text=True,
+                              env=env, timeout=60)
+
+    def test_a_compiler_of_another_cuda_version_than_the_headers_is_refused(self):
+        """Job 30716: the environment's nvcc 13.5 with its runtime headers 13.0 (CCCL refuses the pair)."""
+        site, home = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        self._cu13(site, "13.5", runtime=13000)
+        r = self.toolkit(site, home)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("CUDA 13.5", r.stderr)
+        self.assertIn("CUDA 13.0", r.stderr)
+
+    def test_the_environments_headers_with_a_compiler_of_their_version(self):
+        site, home, comp = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        w = self._cu13(site, "13.5", runtime=13000, crt_tag="13.5")
+        c = self._cu13(comp, "13.0", crt_tag="13.0")
+        (c / "lib" / "libnvvm.so.4").write_text("")
+        r = self.toolkit(site, home, compiler=comp)
         self.assertEqual(r.returncode, 0, r.stderr)
         tk = Path(r.stdout.strip().splitlines()[-1])
         self.assertEqual(tk, home / "build" / "cuda13_home")
+        self.assertEqual(os.path.realpath(tk / "bin" / "nvcc"), str((c / "bin" / "nvcc").resolve()))
+        self.assertEqual((tk / "include" / "crt" / "host_config.h").read_text(), "13.0")        # the compiler's own
+        self.assertEqual(os.path.realpath(tk / "include" / "cuda_runtime_api.h"),
+                         str((w / "include" / "cuda_runtime_api.h").resolve()))                 # the environment's
         self.assertEqual(os.path.realpath(tk / "lib64" / "libcudart.so"), str((w / "lib" / "libcudart.so.13").resolve()))
-        self.assertTrue((tk / "include" / "cuda_runtime.h").is_file() and os.access(tk / "bin" / "nvcc", os.X_OK))
-        self.assertIn("the environment's own", r.stderr)
+        self.assertTrue((tk / "lib" / "libnvvm.so").exists())
+        for d in ("include/cuda_runtime.h", "include/cccl", "lib/libcudart.so"):            # the 13.0 profile's paths
+            self.assertTrue((tk / "targets" / "x86_64-linux" / d).exists(), d)
+        self.assertIn("compiler CUDA 13.0", r.stderr)
         self.assertFalse((home / "cuda13").exists())                     # nothing downloaded or installed
 
     def test_scripts_parse(self):
