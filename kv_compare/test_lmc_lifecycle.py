@@ -326,6 +326,25 @@ class LifecycleReportTests(unittest.TestCase):
         self.assertAlmostEqual(h["degraded"]["D1"], 20.0, places=3)
         self.assertIn("did not last the run", (out / "summary.md").read_text())
 
+    def test_server_errors_are_reported(self):
+        """Job 30722: every store failed with an exception and the server stayed up."""
+        run, out = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate(run, mode="memory")
+        t0 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(100.0 + 1))
+        err = (f"\x1b[31;20m[{t0},000] LMCache ERROR:\x1b[0m Cannot store keys due to exception "
+               "\x1b[3m(lmcache_driven_transfer.py:813:lmcache.v1.multiprocess.modules.lmcache_driven_transfer)\x1b[0m\n"
+               "Traceback (most recent call last):\n  File x\n"
+               "TypeError: __init__(): incompatible constructor arguments.\n")
+        (run / "lmcache_server.log").write_text(err * 3)
+        nums = lmc_lifecycle.write_report(run, out)
+        h = nums["health"]
+        self.assertEqual(h["server_errors"], 3)
+        self.assertTrue(h["server_failed"])
+        self.assertFalse(h["server_crashed"])
+        self.assertEqual(list(h["server_error_kinds"].values()), [3])
+        self.assertIn("Cannot store keys due to exception -> TypeError", list(h["server_error_kinds"])[0])
+        self.assertIn("logged 3 errors", (out / "summary.md").read_text())
+
     def test_a_published_folder_reports_again(self):
         run, res = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
         simulate(run, mode="disk")
@@ -412,10 +431,9 @@ class OverlayTests(unittest.TestCase):
         (ext / "lmcache").mkdir()
         ours = b"\x7fELF ours"
         (ext / "lmcache" / "cuda_ops.cpython-312-x86_64-linux-gnu.so").write_bytes(ours)
-        (ext / "BUILD.json").write_text(json.dumps({"module": "lmcache.cuda_ops",
-                                                    "file": "cuda_ops.cpython-312-x86_64-linux-gnu.so",
-                                                    "sha256": hashlib.sha256(ours).hexdigest(), "from": "x",
-                                                    "torch": "t", "nvcc": "n"}))
+        (ext / "BUILD.json").write_text(json.dumps({"modules": [{
+            "module": "lmcache.cuda_ops", "file": "cuda_ops.cpython-312-x86_64-linux-gnu.so",
+            "sha256": hashlib.sha256(ours).hexdigest()}], "from": "x", "torch": "t", "nvcc": "n"}))
         out = Path(tempfile.mkdtemp()) / "overlay"
         info = lmc_overlay.build(site, out, root, log=lambda m: None, ext_dirs=[ext])
         so = out / "lmcache" / "cuda_ops.cpython-312-x86_64-linux-gnu.so"
@@ -647,6 +665,15 @@ class MatrixTests(unittest.TestCase):
             self.assertTrue((tk / "targets" / "x86_64-linux" / d).exists(), d)
         self.assertIn("compiler CUDA 13.0", r.stderr)
         self.assertFalse((home / "cuda13").exists())                     # nothing downloaded or installed
+
+    def test_the_build_makes_all_four_of_the_wheels_modules(self):
+        import lmc_build_ops
+        src = ROOT / "third_party" / "lmcache"
+        names = [n for n, _f, _i in lmc_build_ops.common_specs(src)]
+        self.assertEqual(sorted(names + ["cuda_ops"]), ["cuda_ops", "lmcache_fs", "lmcache_native", "lmcache_redis"])
+        self.assertEqual(len(lmc_build_ops.cuda_sources(src)), 13)
+        for _n, files, _i in lmc_build_ops.common_specs(src):
+            self.assertTrue(all((src / f).is_file() for f in files))
 
     def test_scripts_parse(self):
         for f in ("lmc_run.sh", "lmc_setup.sh", "pd_matrix.sh", "pd_card.sh", "cuda13_toolkit.sh"):

@@ -152,16 +152,18 @@ def build(site, out, root=ROOT, log=print, ext_dirs=()):
     for d in ext_dirs:
         d = pathlib.Path(d)
         b = json.loads((d / "BUILD.json").read_text())
-        pkg, mod = b["module"].rsplit(".", 1)
-        src = d / pkg.replace(".", "/") / b["file"]
-        if sha(src.read_bytes()) != b["sha256"]:
-            return {"error": f"{src} is not the file its build recorded"}
-        dst_dir = out / pkg.replace(".", "/")
-        old = sorted(dst_dir.glob(mod + ".*.so")) + sorted(dst_dir.glob(mod + ".so"))
-        for f in old:                                # the wheel's (a link): removed from the overlay only
-            f.unlink()
-        shutil.copy2(src, dst_dir / b["file"])
-        built.append(dict(b, replaced=[f.name for f in old]))
+        common = {k: v for k, v in b.items() if k not in ("modules", "module", "file", "sha256", "sources")}
+        for m in b.get("modules") or [{"module": b["module"], "file": b["file"], "sha256": b["sha256"]}]:
+            pkg, mod = m["module"].rsplit(".", 1)
+            src = d / pkg.replace(".", "/") / m["file"]
+            if sha(src.read_bytes()) != m["sha256"]:
+                return {"error": f"{src} is not the file its build recorded"}
+            dst_dir = out / pkg.replace(".", "/")
+            old = sorted(dst_dir.glob(mod + ".*.so")) + sorted(dst_dir.glob(mod + ".so"))
+            for f in old:                            # the wheel's (a link): removed from the overlay only
+                f.unlink()
+            shutil.copy2(src, dst_dir / m["file"])
+            built.append(dict(common, **m, replaced=[f.name for f in old]))
     kt = out / "kvtrace"
     kt.mkdir()
     for p in sorted((root / "kvtrace").glob("*.py")):
@@ -173,7 +175,8 @@ def build(site, out, root=ROOT, log=print, ext_dirs=()):
     (out / "OVERLAY.json").write_text(json.dumps(info, indent=1))
     log(f"overlay {out}: {info['checked_py']} Python files equal to the wheels'; {len(stats['replaced'])} hooked "
         f"files over them ({info['hooks']} hook lines); {stats['linked']} files linked, {stats['copied']} copied"
-        + "".join(f"; {b['module']} built from {b['from']} (torch {b['torch']}, {b['nvcc']})" for b in built))
+        + (f"; built from {built[0]['from']} (torch {built[0]['torch']}, {built[0]['nvcc']}): "
+           + ", ".join(b["module"] for b in built) if built else ""))
     return info
 
 
@@ -218,17 +221,37 @@ def verify(out, log=print, need_ops=False):
         if not any(r.get("ev") == "kvtrace.check" and r.get("value") == 1 for r in recs):
             bad.append(f"kvtrace wrote no record to {d}")
     native, loaded = None, False
+    built = {b["module"]: b for b in info.get("built") or []}
+    for name, b in sorted(built.items()):          # every module built from our copy: loads, from the overlay, ours
+        if name == "lmcache.cuda_ops":
+            continue
+        try:
+            m = importlib.import_module(name)
+            f, ok = where(m)
+            if not ok or sha(f.read_bytes()) != b["sha256"]:
+                bad.append(f"{name} loads from {f}, not the one built")
+        except Exception as exc:
+            bad.append(f"{name} (built from our copy) does not load: {type(exc).__name__}: {str(exc)[:300]}")
     try:
         ops = importlib.import_module("lmcache.cuda_ops")
         f, ok = where(ops)
-        mine = [b for b in info.get("built") or [] if b["module"] == "lmcache.cuda_ops"]
+        mine = built.get("lmcache.cuda_ops")
         native = f"loads from {f.name}" + (" (ours, built from third_party/lmcache/csrc)" if mine and ok and
-                                           sha(f.read_bytes()) == mine[0]["sha256"] else " (the wheel's)")
+                                           sha(f.read_bytes()) == mine["sha256"] else " (the wheel's)")
         loaded = True
-        if mine and not (ok and sha(f.read_bytes()) == mine[0]["sha256"]):
+        if mine and not (ok and sha(f.read_bytes()) == mine["sha256"]):
             bad.append(f"lmcache.cuda_ops loads from {f}, not the one built")
         if not hasattr(ops, "record_event_on_stream"):
             native += "; no native event recorder in it"
+        # the call every store makes (job 30722: refused for lmcache_native's descriptor, the two built apart)
+        if hasattr(ops, "DirectCopyGroupSpec"):
+            try:
+                nat = importlib.import_module("lmcache.lmcache_native")
+                ops.DirectCopyGroupSpec([0], nat.PageBufferShapeDesc(), 0, 1, 0, [0])
+                native += "; takes lmcache_native's types"
+            except Exception as exc:
+                bad.append("lmcache.cuda_ops does not take lmcache_native's PageBufferShapeDesc (job 30722: every "
+                           f"store failed): {type(exc).__name__}: {str(exc)[:200]}")
     except Exception as exc:                      # LMCache falls back to its torch baseline; worth knowing
         native = f"does not load ({type(exc).__name__}: {str(exc)[:300]})"
     except BaseException:
@@ -237,7 +260,8 @@ def verify(out, log=print, need_ops=False):
         bad.append("LMCache's compiled CUDA ops do not load (its torch baseline crashed the server in job 30694): "
                    + native)
     res = {"ok": not bad, "problems": bad, "versions": vers, "lmcache_cuda_ops": native,
-           "built": info.get("built") or []}
+           "built": [{k: b[k] for k in ("module", "file", "sha256", "torch", "nvcc") if k in b}
+                     for b in info.get("built") or []]}
     try:
         (out / "VERIFY.json").write_text(json.dumps(res, indent=1))
     except OSError:

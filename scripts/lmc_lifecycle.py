@@ -560,7 +560,8 @@ class Run:
                   "prefetch_s_median_l1": q([r.get("prefetch_s") for r in d_pull if not r["pulled_by_tier"].get("L2")], 0.5),
                   "prefetch_s_median_l2": q([r.get("prefetch_s") for r in d_pull if r["pulled_by_tier"].get("L2")], 0.5),
                   "looked_up_before_p_store_end": len(races)},
-            "chunks": {"stored": len(stored), "stored_bytes": sum(c.get("bytes") or 0 for c in stored),
+            "chunks": {"stored": len(stored), "in_memory": sum(1 for c in stored if c.get("t_l1_written") is not None),
+                       "stored_bytes": sum(c.get("bytes") or 0 for c in stored),
                        "to_disk": sum(1 for c in stored if c.get("t_l2_stored") is not None),
                        "removed_from_memory": sum(1 for c in stored if c.get("t_l1_removed")),
                        "pulled": len(pulled), "pulled_from": dict(by_tier),
@@ -647,15 +648,26 @@ def health(run, t0):
         t = datetime.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").timestamp() + int(m.group(2)) / 1000
         return round(t - t0, 3)
 
-    out = {"server_fatal": None, "server_last_log_s": None, "degraded": {}}
+    out = {"server_fatal": None, "server_last_log_s": None, "degraded": {}, "server_errors": 0,
+           "server_error_kinds": {}}
+    kinds = collections.Counter()
     for f in logs("lmcache_server"):
-        last = None
+        last, pending = None, None
         for ln in text(f).splitlines():
             if LOG_T.search(ln):
                 last = when(ln)
             if out["server_fatal"] is None and ("Fatal Python error" in ln or "Segmentation fault" in ln):
                 out["server_fatal"] = ln.strip()[:200]
+            if "LMCache ERROR" in ln:                  # job 30722: every store failed, the server stayed up
+                out["server_errors"] += 1
+                msg = re.sub(r"\x1b\[[0-9;]*m", "", ln.split("LMCache ERROR", 1)[1]).strip(" :")
+                pending = re.sub(r"\s*\(\S+\.py:\d+:\S+\)\s*$", "", msg)[:120]
+                out.setdefault("server_first_error_s", when(ln))
+            elif pending and re.match(r"^[A-Za-z_.]*(Error|Exception)\b", ln):
+                kinds[f"{pending} -> {ln.strip()[:160]}"] += 1
+                pending = None
         out["server_last_log_s"] = last
+    out["server_error_kinds"] = dict(kinds.most_common(5))
     for f in logs("engine_*"):
         role = f.name.split("_")[1].split(".")[0]
         for ln in text(f).splitlines():
@@ -665,6 +677,7 @@ def health(run, t0):
     if env.is_file():
         out["server_alive_at_end"] = json.loads(env.read_text()).get("server_alive_at_end")
     out["server_crashed"] = bool(out["server_fatal"]) or out.get("server_alive_at_end") is False
+    out["server_failed"] = out["server_crashed"] or out["server_errors"] > 0
     return out
 
 
@@ -685,6 +698,11 @@ def write_report(run, out):
                 fh.write(json.dumps(row, separators=(",", ":")) + "\n")
     (out / "results.json").write_text(json.dumps(nums, indent=1))
     md = [f"# LMCache lifecycle: {R.mode}", ""]
+    if hl["server_errors"] and not hl["server_crashed"]:
+        md += [f"**The LMCache server logged {hl['server_errors']} errors** (the first at "
+               f"{fmt(hl.get('server_first_error_s'))} s): "
+               + "; ".join(f"{k} ({v}x)" for k, v in hl["server_error_kinds"].items())
+               + ". What failed there is missing from the lifecycle below.", ""]
     if hl["server_crashed"] or hl["degraded"]:
         md += [f"**The LMCache server did not last the run.** {hl['server_fatal'] or 'It was gone at the end.'} "
                f"Its last log line: {fmt(hl['server_last_log_s'])} s; the engines gave up on it (degraded mode) at "
@@ -711,8 +729,9 @@ def write_report(run, out):
            f"| computed | {nums['P']['computed_tokens']} | {nums['D']['computed_tokens']} |",
            f"| stored to LMCache (tokens) | {nums['P']['stored_tokens']} | – |", ""]
     md += ["## Chunks", "",
-           f"- stored: {ck['stored']} chunks, {ck['stored_bytes'] / 1e6:.1f} MB; to disk {ck['to_disk']}; removed from "
-           f"memory {ck['removed_from_memory']}",
+           f"- bound to their tokens by P's stores: {ck['stored']} chunks; written to the server's memory "
+           f"{ck['in_memory']} ({ck['stored_bytes'] / 1e6:.1f} MB); to disk {ck['to_disk']}; removed from memory "
+           f"{ck['removed_from_memory']}",
            f"- pulled by D or P: {ck['pulled']} times, from {ck['pulled_from'] or '–'}; never pulled: {ck['never_pulled']}",
            f"- every lookup's outcome per chunk: {ck['read_outcomes']}",
            f"- pulls per stored chunk: {dict(sorted(ck['pulls_per_chunk'].items()))}",
@@ -789,7 +808,9 @@ def compare(dirs, out):
         if p.is_file():
             runs.append((pathlib.Path(d).name, json.loads(p.read_text())))
     rows = [("LMCache server lasted the run", lambda n: not (n.get("health") or {}).get("server_crashed")),
-            ("stored chunks", lambda n: n["chunks"]["stored"]),
+            ("LMCache server errors", lambda n: (n.get("health") or {}).get("server_errors")),
+            ("chunks bound by P's stores", lambda n: n["chunks"]["stored"]),
+            ("chunks written to memory", lambda n: n["chunks"].get("in_memory")),
             ("stored MB", lambda n: round(n["chunks"]["stored_bytes"] / 1e6, 1)),
             ("chunks to disk", lambda n: n["chunks"]["to_disk"]),
             ("chunks removed from memory", lambda n: n["chunks"]["removed_from_memory"]),

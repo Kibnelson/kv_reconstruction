@@ -3,7 +3,8 @@
 # MATRIX=lmctrace campaign needs (scripts/pd_campaign.py runs it in place of the codec setup). Adds under KV_HOME:
 #
 #   $KV_HOME/venv_lmcache      vLLM 0.32.0 and LMCache 0.5.7.post1: the release wheels, for their compiled parts
-#   $KV_HOME/build/lmc_ops     LMCache's compiled CUDA ops (lmcache.cuda_ops) built from our copy's csrc/ against
+#   $KV_HOME/build/lmc_ops     LMCache's compiled modules (cuda_ops, lmcache_native, _fs, _redis: all four the wheel
+#                              has, so they share their types, job 30722) built from our copy's csrc/ against
 #                              this torch (scripts/lmc_build_ops.py), with the environment's own CUDA 13 compiler (its
 #                              pip packages, scripts/cuda13_toolkit.sh): the wheel's ops do not load beside torch
 #                              2.13, and LMCache's torch baseline crashed its server in both of job 30694's runs
@@ -50,7 +51,7 @@ pip_freeze "$LPY" > "$KV_HOME/pip_freeze_lmcache.txt" || true
 
 EXT=() NEED_OPS=()
 if [ "${LMC_TORCH_BASELINE:-0}" != 1 ]; then
-    echo "== LMCache's compiled CUDA ops, built from our copy (third_party/lmcache/csrc)"
+    echo "== LMCache's compiled modules, built from our copy (third_party/lmcache/csrc)"
     SITE=$("$LPY" -I -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
     # the environment's CUDA 13 headers and libraries (its pip packages), with a compiler of their CUDA version from pip
     # into a folder of its own (job 30716: the environment's own nvcc is 13.5, its runtime headers 13.0, and CCCL
@@ -72,7 +73,7 @@ if [ "${LMC_TORCH_BASELINE:-0}" != 1 ]; then
     if ! ( cd "$B" && CUDA_HOME=$TK13 PATH="$TK13/bin:$KV_HOME/venv_lmcache/bin:$PATH" TORCH_CUDA_ARCH_LIST=$ARCH \
             MAX_JOBS=${MAX_JOBS:-8} "$LPY" "$REPO/scripts/lmc_build_ops.py" --src "$REPO/third_party/lmcache" \
             --out "$B/out" ) > "$KV_HOME/lmc_ops_build.log" 2>&1; then
-        echo "STOP: lmcache.cuda_ops did not build; the end of $KV_HOME/lmc_ops_build.log:"
+        echo "STOP: LMCache's compiled modules did not build; the end of $KV_HOME/lmc_ops_build.log:"
         tail -n 40 "$KV_HOME/lmc_ops_build.log"
         exit 1
     fi

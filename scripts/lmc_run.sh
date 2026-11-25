@@ -241,6 +241,13 @@ if [ "$UP" = 1 ]; then
     # the server lasted the run? (job 30694: it crashed a minute in, and the engines went on without it)
     SERVER_ALIVE=1
     { kill -0 "${PIDS[0]}" 2>/dev/null && curl -sf "http://127.0.0.1:$LMC_HTTP/healthcheck" >/dev/null; } || SERVER_ALIVE=0
+    # and stored what it was sent? (job 30722: every store failed with an exception, the server stayed up)
+    N_ERR=$(grep -c "LMCache ERROR" "$OUT/lmcache_server.log" || true)
+    if [ "${N_ERR:-0}" -gt 0 ]; then
+        echo "STOP: the LMCache server logged $N_ERR errors; the first:"
+        grep -m 1 -A 14 "LMCache ERROR" "$OUT/lmcache_server.log" | cut -c1-300 || true
+        STATUS=1
+    fi
     if [ "$SERVER_ALIVE" = 0 ]; then
         echo "STOP: the LMCache server is gone; from its log and the engines':"
         grep -n -m 3 "Fatal Python error\|Segmentation fault\|Traceback" "$OUT/lmcache_server.log" || true

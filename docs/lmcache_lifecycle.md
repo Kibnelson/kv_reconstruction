@@ -45,8 +45,10 @@ checked against the release wheels. Every change since is a trace hook:
 How they run: the job installs the release wheels of exactly these versions (for their compiled kernels), then
 `scripts/lmc_overlay.py build` makes a per-job tree with the wheels' packages hard-linked file by file and our five
 hooked files written over them, plus `kvtrace`; it first checks that every Python file of our copies, as imported,
-is byte-identical to the wheel's. One compiled part is ours: LMCache's CUDA ops (`lmcache.cuda_ops`), built from
-our copy's `csrc/` against this environment's torch (`scripts/lmc_build_ops.py`), with the environment's own CUDA
+is byte-identical to the wheel's. LMCache's compiled modules are ours: all four the wheel has (`cuda_ops`,
+`lmcache_native`, `lmcache_fs`, `lmcache_redis`), built together from our copy's `csrc/` against this environment's
+torch (`scripts/lmc_build_ops.py`; together, because pybind11 shares a type between modules only when they are built
+alike: job 30722), with the environment's own CUDA
 headers and libraries (its pip packages in `nvidia/cu13/`: the CUDA 13.0 runtime torch was built with) and a
 compiler of the same CUDA version from pip (`nvidia-cuda-nvcc`, `-nvvm`, `-crt`, `-cccl` 13.0, about 130 MB in a
 folder of their own; `scripts/cuda13_toolkit.sh` joins the two as a toolkit folder of links and checks the versions
@@ -300,6 +302,17 @@ about 9.5 GB.
 incompatible". The setup now installs the compiler of the headers' version (13.0) into a folder of its own, and
 the toolkit script stops early if the two ever disagree.
 
+**Job 30722** (pin `4f9fc89`; `benchmark_results/pd_card/pd_lmctrace_20261125T220106Z/`): the CUDA ops built and
+loaded, both modes ran to the end, and the server stayed up, but every store failed: "Cannot store keys due to
+exception: DirectCopyGroupSpec(): incompatible constructor arguments" (30 in each mode). The descriptor a store
+passes (`PageBufferShapeDesc`) is a type of `lmcache_native`, still the wheel's, and our `cuda_ops`, built with torch
+2.13's pybind11, does not recognise the wheel's types. So nothing reached the server's memory or disk, every D
+lookup missed, and D computed what it did not hold itself (26,305 tokens; 101,648 from its own GPU cache). What the
+trace did show: P's stores bound 114 chunks to their tokens (all 114 equal to the prompt's), 758 lookups found the
+chunk on the engine's GPU already. Fixed in the next commit: all four of LMCache's compiled modules built from our
+copy, the setup checks that `cuda_ops` takes `lmcache_native`'s descriptor, and a run whose server logs errors
+fails, with the errors at the top of its report.
+
 ## What to look out for
 
 - **The store can still be in flight when D looks up.** P answers once its single token is out; its store is
@@ -319,8 +332,9 @@ the toolkit script stops early if the two ever disagree.
   ran, and `lmc_ops_build.json` what they were built from. With them, the store's and retrieve's start and end are
   timed when the GPU reached them (LMCache's CUDA event recorder); without, when queued.
 - **The server's health.** If the LMCache server stops, the engines' connectors say "entering degraded mode" and
-  go on without it. The run then fails, and the report opens by saying when the server stopped, when each engine
-  gave up on it and how many requests came after.
+  go on without it; if a store or load fails, the server logs an error and goes on. Either way the run fails, and
+  the report opens by saying so: when the server stopped, when each engine gave up on it and how many requests
+  came after, or how many errors the server logged, of which kinds.
 - **The setup's import check** runs with `python -P` from a folder of its own: run from the checkout, the
   checkout's own `kvtrace/` came first on the path and the check stopped (job 30688). The engines and the server
   run in the run's folder for the same reason.
