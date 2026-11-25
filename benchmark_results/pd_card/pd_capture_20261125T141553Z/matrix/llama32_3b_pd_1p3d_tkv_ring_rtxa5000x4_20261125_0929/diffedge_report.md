@@ -1,0 +1,155 @@
+# Diff edges: pages coded against their earlier versions (plain), then with T's prediction
+
+Pages of 16 tokens x 28 layers. Every value coded with the value-slice coder (exact mode) against a prediction made from the page's earlier versions by plain arithmetic (keys turned by RoPE to the page's place), decoded and checked. Weights and spreads fitted on the even conversations; held out: the odd ones. Bits per value (raw 16), all layers coded. Agreement bucket: the median over the page's tokens of how many tokens up to them its text has agreed with its latest version's.
+
+## mtrag_raw_interleaved_conversation
+
+7,985 blocks in 4 conversations: 6,150 references (bytes P stored before), 1,835 distinct pages: 1,440 twins with D's bytes, 208 twins with other bytes, 49 moved (1 / 2 / 3+ earlier versions: 8 / 0 / 41), 138 new.
+
+Held out: 7 moved pages, bits per value by agreement bucket (pages)
+
+| Edge | All | 0-15 (1) | 16-63 (3) | 64-255 (3) | 256-1023 (0) | 1024+ (0) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Its first version (star) | 9.16 | 9.30 | 9.24 | 9.04 | - | - |
+| Its latest version (chain) | 10.29 | 9.28 | 9.63 | 11.28 | - | - |
+| Latest, scale + offset per channel | 10.24 | 9.25 | 9.58 | 11.22 | - | - |
+| Second order: latest + l (latest - previous) | 10.32 | 9.22 | 9.58 | 11.43 | - | - |
+| a latest + b previous + c first | 10.32 | 9.22 | 9.58 | 11.42 | - | - |
+| Composite: a latest + b drift + c first + d, per channel | 10.44 | 9.28 | 9.66 | 11.59 | - | - |
+| T alone, its own spread (as now) | 8.22 | 8.23 | 8.21 | 8.23 | - | - |
+| T alone, fitted spread | 8.23 | 8.24 | 8.22 | 8.23 | - | - |
+| Blend: T + w (latest - T) | 8.89 | 8.17 | 8.24 | 9.79 | - | - |
+| Best plain edge per page (or raw) | 9.13 | 9.22 | 9.20 | 9.04 | - | - |
+| Best edge per page (or raw) | 8.17 | 8.17 | 8.11 | 8.23 | - | - |
+| Rule by bucket, from training (t_blend / composite / composite / composite / latest) | 10.28 | 8.17 | 9.66 | 11.59 | - | - |
+
+Values equal to the latest version's (V; keys are turned): 4.3%. Best edge per page: t_fit 3, t_blend 3, t 1.
+
+Held out, by earlier versions (pages): diff of a diff needs two
+
+| Edge | 1 (7) | 2 (0) | 3+ (0) |
+| --- | ---: | ---: | ---: |
+| Its first version (star) | 9.16 | - | - |
+| Its latest version (chain) | 10.29 | - | - |
+| Latest, scale + offset per channel | 10.24 | - | - |
+| Second order: latest + l (latest - previous) | 10.32 | - | - |
+| a latest + b previous + c first | 10.32 | - | - |
+| Composite: a latest + b drift + c first + d, per channel | 10.44 | - | - |
+| T alone, its own spread (as now) | 8.22 | - | - |
+| T alone, fitted spread | 8.23 | - | - |
+| Blend: T + w (latest - T) | 8.89 | - | - |
+
+Held out, by what the page holds (pages)
+
+| Edge | answer (1) | doc (6) |
+| --- | ---: | ---: |
+| Its first version (star) | 8.73 | 9.23 |
+| Its latest version (chain) | 9.08 | 10.49 |
+| Latest, scale + offset per channel | 9.09 | 10.43 |
+| Second order: latest + l (latest - previous) | 9.17 | 10.51 |
+| a latest + b previous + c first | 9.16 | 10.51 |
+| Composite: a latest + b drift + c first + d, per channel | 9.27 | 10.63 |
+| T alone, its own spread (as now) | 8.35 | 8.20 |
+| T alone, fitted spread | 8.34 | 8.21 |
+| Blend: T + w (latest - T) | 9.92 | 8.72 |
+
+Held out, by layer group and K/V
+
+| Edge | K 0-0 | V 0-0 | K 1-4 | V 1-4 | K 5-13 | V 5-13 | K 14-27 | V 14-27 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Its first version (star) | 2.47 | 0.28 | 7.12 | 7.80 | 9.35 | 10.15 | 9.38 | 10.27 |
+| Its latest version (chain) | 2.34 | 0.28 | 7.32 | 8.10 | 10.58 | 11.18 | 10.85 | 11.72 |
+| Latest, scale + offset per channel | 2.35 | 0.28 | 7.28 | 8.07 | 10.56 | 11.13 | 10.83 | 11.60 |
+| Second order: latest + l (latest - previous) | 2.35 | 0.28 | 7.40 | 8.13 | 10.64 | 11.20 | 10.89 | 11.73 |
+| a latest + b previous + c first | 2.34 | 0.28 | 7.42 | 8.14 | 10.64 | 11.20 | 10.88 | 11.73 |
+| Composite: a latest + b drift + c first + d, per channel | 2.30 | 0.28 | 7.43 | 8.18 | 10.75 | 11.33 | 11.04 | 11.87 |
+| T alone, its own spread (as now) | 2.34 | 0.28 | 7.84 | 8.97 | 8.22 | 9.02 | 7.79 | 9.03 |
+| T alone, fitted spread | 2.34 | 0.28 | 7.84 | 8.99 | 8.22 | 9.03 | 7.79 | 9.02 |
+| Blend: T + w (latest - T) | 2.34 | 0.28 | 9.66 | 10.60 | 8.98 | 9.53 | 8.16 | 9.53 |
+| Twin: P's page against D's copy | 3.02 | 5.00 | 3.10 | 3.73 | 4.21 | 4.97 | 4.17 | 4.88 |
+
+Held out: 104 twins: 4.37 bits per value; 26.2% of their words equal to D's.
+
+Training (fitted on these): 42 moved pages, bits per value by agreement bucket (pages)
+
+| Edge | All | 0-15 (2) | 16-63 (9) | 64-255 (21) | 256-1023 (10) | 1024+ (0) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Its first version (star) | 9.27 | 9.58 | 9.35 | 9.29 | 9.09 | - |
+| Its latest version (chain) | 6.79 | 8.62 | 6.86 | 6.76 | 6.41 | - |
+| Latest, scale + offset per channel | 6.77 | 8.58 | 6.86 | 6.74 | 6.39 | - |
+| Second order: latest + l (latest - previous) | 6.73 | 8.50 | 6.83 | 6.71 | 6.33 | - |
+| a latest + b previous + c first | 6.73 | 8.51 | 6.83 | 6.71 | 6.33 | - |
+| Composite: a latest + b drift + c first + d, per channel | 6.64 | 8.45 | 6.74 | 6.65 | 6.15 | - |
+| T alone, its own spread (as now) | 8.22 | 8.31 | 8.16 | 8.21 | 8.26 | - |
+| T alone, fitted spread | 8.18 | 8.30 | 8.13 | 8.17 | 8.21 | - |
+| Blend: T + w (latest - T) | 6.79 | 7.94 | 6.86 | 6.81 | 6.44 | - |
+| Best plain edge per page (or raw) | 6.63 | 8.41 | 6.74 | 6.65 | 6.15 | - |
+| Best edge per page (or raw) | 6.60 | 7.87 | 6.73 | 6.64 | 6.15 | - |
+| Rule by bucket, from training (t_blend / composite / composite / composite / latest) | 6.61 | 7.94 | 6.74 | 6.65 | 6.15 | - |
+
+Training (fitted on these): 104 twins: 3.86 bits per value; 28.0% of their words equal to D's.
+
+The graph (MB): plain edges, then with T's
+
+| | Held out | Training | All |
+| --- | ---: | ---: | ---: |
+| Raw, every block | 6,580.3 | 8,072.2 | 14,652.5 |
+| Raw, distinct pages (references free) | 1,471.7 | 1,895.6 | 3,367.2 |
+| Twins (D's copy) as diffs, or raw | 52.1 | 46.1 | 98.2 |
+| Moved pages, best plain edge or raw | 7.3 | 31.9 | 39.3 |
+| Moved pages, best edge with T's, or raw | 6.6 | 31.8 | 38.4 |
+| Moved pages, latest edge or raw | 8.3 | 32.7 | 41.0 |
+| New pages raw | 122.9 | 130.3 | 253.2 |
+| **The plain graph** | 182.4 | 208.3 | 390.7 |
+| The plain graph, latest edge only | 183.3 | 209.0 | 392.3 |
+| **The graph with T's edges** | 181.6 | 208.1 | 389.8 |
+| Plain graph under raw distinct pages | 87.6% | 89.0% | 88.4% |
+| With T's edges, under raw distinct pages | 87.7% | 89.0% | 88.4% |
+
+Chains and stars (moved pages; a twin is depth 1)
+
+| Coded against | depth: pages | pages to decode, mean / p90 / max |
+| --- | --- | --- |
+| latest | 1: 49 | 1.0 / 1 / 1 |
+| first | 1: 49 | 1.0 / 1 / 1 |
+
+Rebuild: turning a version 2.94 ms per page, decoding 6.821 ms per page (batches of 32); recomputing: 0.55 ms per page (P's prefill in this run, 30 requests).
+
+Fitted weights, pages with two versions or more, by agreement bucket (mean over layers): second order's l: K -0.54 / -0.17 / -0.25 / -0.23 / 0.00; V -0.54 / -0.27 / -0.29 / -0.30 / 0.00.
+a latest + b previous + c first, (a, b, c): K (0.51, 0.49, 0.00) / (0.85, 0.14, 0.01) / (0.76, 0.24, 0.01) / (0.78, 0.22, -0.01) / (1.00, 0.00, 0.00); V (0.43, 0.52, 0.02) / (0.72, 0.26, 0.02) / (0.70, 0.29, 0.01) / (0.70, 0.30, -0.01) / (1.00, 0.00, 0.00).
+Composite (a, b, c, d), mean over channels too: K (0.97, -0.52, 0.01, 0.00) / (0.98, -0.26, 0.01, 0.00) / (0.98, -0.29, 0.01, -0.00) / (1.00, -0.27, -0.00, -0.00) / (1.00, 0.00, 0.00, 0.00); V (0.94, -0.49, 0.02, -0.00) / (0.97, -0.27, 0.02, 0.00) / (0.97, -0.29, 0.01, 0.00) / (0.99, -0.30, -0.00, -0.00) / (1.00, 0.00, 0.00, 0.00).
+
+Latest's scale and offset (mean over layers and channels): K 0.982, -0.0009; V 0.965, -0.0001.
+
+T's edges: t2-hbh, set wikitext (smallest on the first training pages); layers 1.. with T's coder (uniform mode), layer 0 as the latest edge codes it.
+Blend w (0: T alone, 1: the latest version), pages with two versions or more, by agreement bucket: K 1-4 0.96 / 0.96 / 0.99 / 0.99 / -; V 1-4 0.93 / 0.95 / 0.98 / 0.99 / -; K 5-13 0.57 / 0.83 / 0.81 / 0.89 / -; V 5-13 0.49 / 0.75 / 0.72 / 0.83 / -; K 14-27 0.43 / 0.72 / 0.64 / 0.83 / -; V 14-27 0.57 / 0.78 / 0.77 / 0.90 / -.
+With one version: K 1-4 0.48 / 0.50 / - / - / -; V 1-4 0.40 / 0.42 / - / - / -; K 5-13 0.11 / 0.09 / - / - / -; V 5-13 0.10 / 0.10 / - / - / -; K 14-27 0.05 / 0.11 / - / - / -; V 14-27 0.07 / 0.13 / - / - / -.
+
+Spread multipliers chosen (by class: buckets with one version, then two or more): first 1/1/1/1/1/1/1/1/1/1; latest 1/1/1/1/1/1/1/1/1/1; latest_affine 1/1/1/1/1/1/1/1/1/1; second_order 1/1/1/1/1/1/1/1/1/1; multi_ref 1/1/1/1/1/1/1/1/1/1; composite 1/1/1/1/1/1/1/1/1/1; twin 1/1/1/1/1/1/1/1/1/1; t_fit 1/1/1/1/1/1/1/1/1/1; t_blend 1/1/1/1/1/1/1/1/1/1.
+
+Coded a page and a slice at a time (the tables) against whole batches of 32 pages, all layers (bits per value; the difference is the coder's streams' overhead): latest 7.29 vs 7.27; second_order 7.24 vs 7.22; composite 7.18 vs 7.16; twin 4.11 vs 4.09.
+
+Decoded exactly: latest 394 of 394, second_order 394 of 394, composite 394 of 394, first 392 of 392, latest_affine 392 of 392, multi_ref 392 of 392, t 294 of 294, t_fit 294 of 294, t_blend 294 of 294, twin 1,671 of 1,671 (ALL).
+
+## Times (CUDA-synchronised, one GPU)
+
+| Step | calls | ms per page | mean ms per call |
+| --- | ---: | ---: | ---: |
+| batch composite decode | 2 | 0.20 | 4.89 |
+| batch composite encode | 2 | 0.13 | 3.06 |
+| batch latest decode | 2 | 6.82 | 167.10 |
+| batch latest encode | 2 | 5.22 | 127.88 |
+| batch second_order decode | 2 | 0.20 | 4.89 |
+| batch second_order encode | 2 | 0.12 | 3.05 |
+| batch twin decode | 7 | 0.14 | 4.22 |
+| batch twin encode | 7 | 0.11 | 3.16 |
+| predict composite | 2 | 0.24 | 5.89 |
+| predict first | 2 | 0.07 | 1.75 |
+| predict latest | 2 | 0.07 | 1.61 |
+| predict latest_affine | 2 | 0.11 | 2.59 |
+| predict multi_ref | 2 | 0.15 | 3.65 |
+| predict second_order | 2 | 0.12 | 2.99 |
+| predict t | 18 | 1.43 | 30.56 |
+| turn versions | 18 | 2.94 | 188.65 |
+
+Sample for analysis: `diffedge_sample.npz` (17.2 MB): 49 moved pages with their latest, previous and first versions, 64 twins with D's copy; layers 0, 1, 3, 4, 12, 13, 26, 27, head 0's keys and values; per-page sizes in `diffedge_pages.json`.

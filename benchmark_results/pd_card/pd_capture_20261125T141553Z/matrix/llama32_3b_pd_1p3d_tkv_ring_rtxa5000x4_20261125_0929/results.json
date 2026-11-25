@@ -1,0 +1,133 @@
+{
+ "env": {
+  "model": "unsloth/Llama-3.2-3B",
+  "prefills": 1,
+  "decodes": 3,
+  "layout": "1p3d",
+  "connector": "tkv",
+  "transport": "ring",
+  "eager": false,
+  "vllm": "0.32.0",
+  "torch": "2.13.0+cu130",
+  "gpus": "NVIDIA RTX A5000",
+  "nixl_all_gpus": false,
+  "decode_chunks": 1,
+  "piece_tokens": 4096,
+  "async_install": true,
+  "async_encode": true,
+  "pipeline_tokens": 4096,
+  "shared_link": false,
+  "trace_pages": true,
+  "encode_once": true,
+  "decode_graphs": true,
+  "group_product": "fused",
+  "nixl": "?",
+  "dataset": "prompts_mixed.jsonl"
+ },
+ "check": {
+  "raw": {
+   "prompts": 4,
+   "same_text_as_local": 3,
+   "transfers": {
+    "sends": 4,
+    "send_errors": 0,
+    "blob_bytes_total": 1971716096,
+    "installs": 4,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 6.97355018928647,
+    "encode_ms": 2.616351470351219,
+    "link_ms": 40.5812649987638,
+    "queue_ms": 0.0909566879272461,
+    "achieved_gbps": 95.13245890690773,
+    "wire_gbps": 95.97921073202848,
+    "rel_err": null,
+    "install_ms": 39.484995882958174,
+    "issue_ms": 26.743320748209953,
+    "install_queued_ms": 0.2563595771789551,
+    "wait_ms": 1063.9235377311707,
+    "exact": 4,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "recv_on_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   },
+   "ok": true,
+   "errors": [],
+   "resets": {
+    "engines": 4,
+    "failed": {}
+   },
+   "lossy": false
+  }
+ },
+ "mtrag": {
+  "mtrag_raw_interleaved_conversation": {
+   "codec": "raw",
+   "layout": "interleaved",
+   "policy": "conversation",
+   "trace": true,
+   "exit": 0,
+   "t0": 1795617105.6848562,
+   "t1": 1795617128.3344934,
+   "summary": {
+    "run": "mtrag_raw_interleaved_conversation",
+    "layout": "interleaved",
+    "policy": "conversation",
+    "conversations": 4,
+    "requests": 30,
+    "errors": 0,
+    "duration_s": 22.049805164337158,
+    "ttft_p50_ms": 817.2303438186646,
+    "latency_p50_s": 2.3129297494888306,
+    "prompt_tokens_mean": 4265.1,
+    "prompt_tokens_max": 9765,
+    "answer_tokens_mean": 128,
+    "answer_ids_from": {
+     "engine": 30,
+     "retokenized": 0
+    },
+    "first_errors": []
+   },
+   "transfers": {
+    "sends": 30,
+    "send_errors": 0,
+    "blob_bytes_total": 14674673664,
+    "installs": 30,
+    "install_errors": 0,
+    "timeouts": 0,
+    "bits": 16.0,
+    "gather_ms": 49.07176923006773,
+    "encode_ms": 2.573783074816068,
+    "link_ms": 41.319600554804005,
+    "queue_ms": 0.1512765884399414,
+    "achieved_gbps": 60.96262259492715,
+    "wire_gbps": 28.366759571823465,
+    "rel_err": null,
+    "install_ms": 270.9492491558194,
+    "issue_ms": 270.33173001060885,
+    "install_queued_ms": 0.22342999776204428,
+    "wait_ms": 771.7577377955118,
+    "exact": 0,
+    "inexact": 0,
+    "spilled_to_host": 0,
+    "recv_on_host": 0,
+    "layer0_recomputed": null,
+    "layer0_coded": null,
+    "layer0_checks": null,
+    "sets": null
+   }
+  }
+ },
+ "delta": {
+  "exit": 0,
+  "seconds": 253.59131956100464,
+  "capture_dir": "/tmp/nbore/kvpd-captures/pd_capture_20261125T141553Z",
+  "capture_gb": 3.800301568
+ },
+ "jit": []
+}

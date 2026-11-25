@@ -1,0 +1,400 @@
+[09:25:27] calib: captured cal_news_0
+[09:25:31] calib: captured cal_news_1
+[09:25:34] calib: captured cal_news_2
+[09:25:37] calib: captured cal_news_3
+T2 set news: captured 4 calibration windows
+T2 set news: 3 calibration documents (Penn Treebank train)
+   deleted 3.5 GiB of calibration windows
+{
+ "written": "/tmp/nbore/kvpd/30663/runs/llama32_3b/pd_codecs.pt",
+ "model": "unsloth/Llama-3.2-3B",
+ "revision": "d4446454d87d51aa42e1fb174f25acc5f8762331",
+ "train_set": "wikitext",
+ "calibration": [
+  "wtrain0",
+  "wtrain1",
+  "wtrain2",
+  "wtrain3",
+  "wtrain4",
+  "wtrain5"
+ ],
+ "splitzip_book_from": "wtrain0",
+ "rope_layout": "half",
+ "L": 28,
+ "W": 2048,
+ "C": 1024,
+ "hd": 128,
+ "rank": 256,
+ "groups": [
+  2,
+  4,
+  16
+ ],
+ "max_positions": 32768,
+ "aqua_bits": [
+  2,
+  3
+ ],
+ "t2_sets": [
+  "wikitext",
+  "code",
+  "math",
+  "exam",
+  "news"
+ ]
+}
+== self-test in the vLLM environment (every codec through the paced transport)
+pd codecs: ibp not available (ImportError('IBP left out: the matrix does not use it'))
+{"codec": "raw", "tokens": 8192, "encode_ms": 0.020381063222885132, "bits": 16.0, "decode_ms": 2.840150147676468, "exact": true}
+{"codec": "ours-dense", "tokens": 8192, "encode_ms": 57.58892372250557, "bits": 8.745545251028878, "decode_ms": 30.582522973418236, "exact": true}
+{"codec": "ours-kv", "tokens": 8192, "encode_ms": 60.147352516651154, "bits": 8.380765642438616, "decode_ms": 38.88361155986786, "exact": true}
+{"codec": "ours-4g", "tokens": 8192, "encode_ms": 60.22555194795132, "bits": 8.145614079066686, "decode_ms": 48.23223873972893, "exact": true}
+{"codec": "ours-hbh", "tokens": 8192, "encode_ms": 59.88456681370735, "bits": 8.009789875575475, "decode_ms": 75.25741867721081, "exact": true}
+{"codec": "ours-rank256", "tokens": 8192, "encode_ms": 33.690398558974266, "bits": 9.219076974051339, "decode_ms": 26.28524787724018, "exact": true}
+{"codec": "t2-dense", "tokens": 8192, "encode_ms": 75.55895298719406, "bits": 8.745545251028878, "set": "wikitext", "layer0": "coded", "decode_ms": 32.568201422691345, "exact": true}
+{"codec": "t2-hbh", "tokens": 8192, "encode_ms": 78.31409387290478, "bits": 8.009789875575475, "set": "wikitext", "layer0": "coded", "decode_ms": 72.62380048632622, "exact": true}
+{"codec": "t2-rank256", "tokens": 8192, "encode_ms": 52.23396606743336, "bits": 9.219076974051339, "set": "wikitext", "layer0": "coded", "decode_ms": 25.708040222525597, "exact": true}
+{"codec": "splitzip", "tokens": 8192, "encode_ms": 7.480418309569359, "bits": 12.049286961555481, "decode_ms": 5.432829260826111, "exact": true}
+{"codec": "adacode", "tokens": 8192, "encode_ms": 21.988797932863235, "bits": 11.37075240271432, "decode_ms": 8.260073140263557, "exact": true}
+{"codec": "exactkv", "tokens": 8192, "encode_ms": 16.547970473766327, "bits": 12.575496128627233, "decode_ms": 27.078302577137947, "exact": true}
+{"codec": "exans", "tokens": 8192, "encode_ms": 186.62771210074425, "bits": 10.905555759157453, "decode_ms": 29.50868010520935, "exact": true}
+{"codec": "aquakv-2", "tokens": 8192, "encode_ms": 562.5570770353079, "bits": 2.109464372907366, "decode_ms": 161.5134384483099, "exact": null, "lossy": true, "rel_err": 0.08662944460126866, "rel_err_received": 0.08662944460126887}
+{"codec": "aquakv-3", "tokens": 8192, "encode_ms": 911.899983882904, "bits": 3.073279244559152, "decode_ms": 182.77626298367977, "exact": null, "lossy": true, "rel_err": 0.04638151640626951, "rel_err_received": 0.046381516406269516}
+{"codec": "raw", "tokens": 3000, "encode_ms": 0.020390376448631287, "bits": 16.0, "decode_ms": 1.0806042701005936, "exact": true}
+{"codec": "ours-dense", "tokens": 3000, "encode_ms": 22.342251613736153, "bits": 9.269865327380952, "decode_ms": 12.561460956931114, "exact": true}
+{"codec": "ours-kv", "tokens": 3000, "encode_ms": 23.047862574458122, "bits": 8.90550669642857, "decode_ms": 14.44929651916027, "exact": true}
+{"codec": "ours-4g", "tokens": 3000, "encode_ms": 22.675158455967903, "bits": 8.668667410714285, "decode_ms": 19.99644935131073, "exact": true}
+{"codec": "ours-hbh", "tokens": 3000, "encode_ms": 22.028541192412376, "bits": 8.531450892857142, "decode_ms": 31.20945207774639, "exact": true}
+{"codec": "ours-rank256", "tokens": 3000, "encode_ms": 12.663044035434723, "bits": 9.74771800595238, "decode_ms": 10.140206664800644, "exact": true}
+{"codec": "t2-dense", "tokens": 3000, "encode_ms": 31.564775854349136, "bits": 9.269865327380952, "set": "wikitext", "layer0": "coded", "decode_ms": 12.777876108884811, "exact": true}
+{"codec": "t2-hbh", "tokens": 3000, "encode_ms": 32.13271498680115, "bits": 8.531450892857142, "set": "wikitext", "layer0": "coded", "decode_ms": 31.227322295308113, "exact": true}
+{"codec": "t2-rank256", "tokens": 3000, "encode_ms": 22.386083379387856, "bits": 9.74771800595238, "set": "wikitext", "layer0": "coded", "decode_ms": 10.053396224975586, "exact": true}
+{"codec": "splitzip", "tokens": 3000, "encode_ms": 3.54183092713356, "bits": 12.04319921875, "decode_ms": 2.107979729771614, "exact": true}
+{"codec": "adacode", "tokens": 3000, "encode_ms": 11.69607788324356, "bits": 11.372570824032739, "decode_ms": 3.2592974603176117, "exact": true}
+{"codec": "exactkv", "tokens": 3000, "encode_ms": 13.479186221957207, "bits": 12.612559523809523, "decode_ms": 9.772591292858124, "exact": true}
+{"codec": "exans", "tokens": 3000, "encode_ms": 69.81887295842171, "bits": 10.918740420386905, "decode_ms": 12.118285521864891, "exact": true}
+{"codec": "aquakv-2", "tokens": 3000, "encode_ms": 220.98936699330807, "bits": 2.121208333333333, "decode_ms": 66.15825742483139, "exact": null, "lossy": true, "rel_err": 0.08997521961700125, "rel_err_received": 0.08997521961700129}
+{"codec": "aquakv-3", "tokens": 3000, "encode_ms": 348.11947122216225, "bits": 3.084208333333333, "decode_ms": 73.50266352295876, "exact": null, "lossy": true, "rel_err": 0.04816976613506609, "rel_err_received": 0.04816976613506603}
+{"transport": "ring", "codec": "ours-dense", "bytes": 199339184, "gbps_set": 100.0, "exact": true, "wall_s": 0.21675418689846992, "achieved_gbps": 7.357244142863923, "link_s": 0.016371820122003555}
+{"transport": "tcp", "codec": "ours-dense", "bytes": 199339184, "gbps_set": 100.0, "exact": true, "wall_s": 0.17212441191077232, "achieved_gbps": 9.264888427486303, "link_s": 0.14708737470209599}
+SELFTEST OK (30 codec runs, errors: {'ibp': "ImportError('IBP left out: the matrix does not use it')"})
+{"codec": "nvcomp-ans", "tokens": 8192, "encode_ms": 44.9940599501133, "bits": 13.359218869890485, "decode_ms": 41.25972464680672, "exact": true}
+{"codec": "nvcomp-zstd", "tokens": 8192, "encode_ms": 548.4826620668173, "bits": 12.903557641165596, "decode_ms": 99.25665520131588, "exact": true}
+{"codec": "nvcomp-bitcomp", "tokens": 8192, "encode_ms": 40.90576060116291, "bits": 13.793133326939174, "decode_ms": 43.94865594804287, "exact": true}
+{"codec": "nvcomp-ans", "tokens": 3000, "encode_ms": 18.741700798273087, "bits": 13.349644345238096, "decode_ms": 15.304910019040108, "exact": true}
+{"codec": "nvcomp-zstd", "tokens": 3000, "encode_ms": 204.91203479468822, "bits": 12.900041666666667, "decode_ms": 37.93410025537014, "exact": true}
+{"codec": "nvcomp-bitcomp", "tokens": 3000, "encode_ms": 18.63803155720234, "bits": 13.77544494047619, "decode_ms": 16.346096992492676, "exact": true}
+{"transport": "ring", "codec": "nvcomp-ans", "bytes": 287070752, "gbps_set": 100.0, "exact": true, "wall_s": 0.22262749448418617, "achieved_gbps": 10.315734008151143, "link_s": 0.0236221831291914}
+{"transport": "tcp", "codec": "nvcomp-ans", "bytes": 287070752, "gbps_set": 100.0, "exact": true, "wall_s": 0.2580124940723181, "achieved_gbps": 8.90098762177113, "link_s": 0.24064206704497337}
+SELFTEST OK (6 codec runs, errors: none)
+== profile of encode and decode (kv_compare/pd/profile.py)
+USDT:2026-11-25 09:27:43 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:43 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:43 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:43 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "ours-hbh", "tokens": 512, "bits": 8.099931989397321, "exact": true, "encode_twice": {"wall_ms": 6.644356995820999, "issue_ms": 6.555365398526192}, "decode_eager": {"wall_ms": 22.312484681606293, "issue_ms": 21.676313132047653}, "decode_before": {"wall_ms": 30.474232509732246, "issue_ms": 30.437681823968887}, "encode": {"wall_ms": 4.812980070710182, "issue_ms": 4.724368453025818, "gpu_ms": 4.157463000000008, "launches": 222}, "decode": {"wall_ms": 23.5932394862175, "issue_ms": 0.6250385195016861, "gpu_ms": 21.357690000000055, "launches": 945}}
+USDT:2026-11-25 09:27:43 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:43 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:43 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:43 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "t2-hbh", "tokens": 512, "bits": 8.099931989397321, "exact": true, "encode_twice": {"wall_ms": 11.86562143266201, "issue_ms": 11.778231710195541}, "decode_eager": {"wall_ms": 26.460833847522736, "issue_ms": 26.42648108303547}, "decode_before": {"wall_ms": 40.556278079748154, "issue_ms": 40.51321558654308}, "encode": {"wall_ms": 9.43419523537159, "issue_ms": 9.34971496462822, "gpu_ms": 8.490997999999994, "launches": 484}, "decode": {"wall_ms": 21.704142913222313, "issue_ms": 1.0887477546930313, "gpu_ms": 21.35972199999994, "launches": 945}}
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "t2-rank256", "tokens": 512, "bits": 9.315870012555804, "exact": true, "encode_twice": {"wall_ms": 10.496411472558975, "issue_ms": 10.398400947451591}, "decode_eager": {"wall_ms": 3.7451833486557007, "issue_ms": 2.8710197657346725}, "decode_before": {"wall_ms": 3.743773326277733, "issue_ms": 2.880653366446495}, "encode": {"wall_ms": 9.131643921136856, "issue_ms": 9.034693241119385, "gpu_ms": 8.082012000000006, "launches": 454}, "decode": {"wall_ms": 3.7561431527137756, "issue_ms": 2.8833243995904922, "gpu_ms": 3.3917379999999997, "launches": 131}}
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "raw", "tokens": 512, "bits": 16.0, "exact": true, "encode": {"wall_ms": 0.007249414920806885, "issue_ms": 0.0010095536708831787, "gpu_ms": 0.0, "launches": 0}, "decode": {"wall_ms": 0.22876448929309845, "issue_ms": 0.2179909497499466, "gpu_ms": 0.1911720000000017, "launches": 28}}
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "splitzip", "tokens": 512, "bits": 12.041053771972656, "exact": true, "encode": {"wall_ms": 3.041483461856842, "issue_ms": 3.0216220766305923, "gpu_ms": 0.7420780000000065, "launches": 196}, "decode": {"wall_ms": 1.1511854827404022, "issue_ms": 1.1369846761226654, "gpu_ms": 0.29123100000000074, "launches": 84}}
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:44 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "adacode", "tokens": 512, "bits": 11.385751451764788, "exact": true, "encode": {"wall_ms": 14.29714635014534, "issue_ms": 14.275087043642998, "gpu_ms": 2.2176499999999493, "launches": 952}, "decode": {"wall_ms": 2.5027580559253693, "issue_ms": 2.4895891547203064, "gpu_ms": 0.443233000000002, "launches": 112}}
+USDT:2026-11-25 09:27:45 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:45 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:45 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:45 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "exactkv", "tokens": 512, "bits": 12.584821428571429, "exact": true, "encode": {"wall_ms": 11.786062270402908, "issue_ms": 11.758541688323021, "gpu_ms": 1.728083000000006, "launches": 896}, "decode": {"wall_ms": 2.4907849729061127, "issue_ms": 2.4706032127141953, "gpu_ms": 1.4844560000000047, "launches": 152}}
+USDT:2026-11-25 09:27:45 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:45 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:45 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:45 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "exans", "tokens": 512, "bits": 11.013909476143974, "exact": true, "encode": {"wall_ms": 13.470854610204697, "issue_ms": 13.337744399905205, "gpu_ms": 12.795253000000008, "launches": 83}, "decode": {"wall_ms": 3.6963243037462234, "issue_ms": 3.678523004055023, "gpu_ms": 3.1283690000000006, "launches": 155}}
+USDT:2026-11-25 09:27:46 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:46 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:46 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:46 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "aquakv-2", "tokens": 512, "bits": 2.2112513950892856, "exact": null, "encode": {"wall_ms": 39.94806855916977, "issue_ms": 39.904095232486725, "gpu_ms": 36.644913000000145, "launches": 3286}, "decode": {"wall_ms": 15.927562490105629, "issue_ms": 15.895500779151917, "gpu_ms": 10.724313999999993, "launches": 1397}}
+USDT:2026-11-25 09:27:47 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:47 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:47 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:47 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "ours-hbh", "tokens": 2048, "bits": 8.050223214285714, "exact": true, "encode_twice": {"wall_ms": 22.61863648891449, "issue_ms": 22.25271984934807}, "decode_eager": {"wall_ms": 27.25951373577118, "issue_ms": 26.27195045351982}, "decode_before": {"wall_ms": 40.62461853027344, "issue_ms": 40.580978617072105}, "encode": {"wall_ms": 14.684371650218964, "issue_ms": 14.316165819764137, "gpu_ms": 13.587249000000007, "launches": 222}, "decode": {"wall_ms": 26.62486396729946, "issue_ms": 1.1240355670452118, "gpu_ms": 26.879373999999995, "launches": 945}}
+USDT:2026-11-25 09:27:48 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:48 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:48 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:48 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "t2-hbh", "tokens": 2048, "bits": 8.050223214285714, "exact": true, "encode_twice": {"wall_ms": 32.091543078422546, "issue_ms": 31.723927706480026}, "decode_eager": {"wall_ms": 27.233824133872986, "issue_ms": 26.34202316403389}, "decode_before": {"wall_ms": 40.813641622662544, "issue_ms": 40.76416976749897}, "encode": {"wall_ms": 23.916415870189667, "issue_ms": 23.54579046368599, "gpu_ms": 22.67275199999997, "launches": 484}, "decode": {"wall_ms": 26.631345972418785, "issue_ms": 1.123424619436264, "gpu_ms": 26.315736000000026, "launches": 945}}
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "t2-rank256", "tokens": 2048, "bits": 9.260718209402901, "exact": true, "encode_twice": {"wall_ms": 19.662044942378998, "issue_ms": 19.219016656279564}, "decode_eager": {"wall_ms": 6.335461512207985, "issue_ms": 2.910831943154335}, "decode_before": {"wall_ms": 6.380802020430565, "issue_ms": 2.89987213909626}, "encode": {"wall_ms": 17.680495977401733, "issue_ms": 17.238397151231766, "gpu_ms": 17.221259000000003, "launches": 454}, "decode": {"wall_ms": 6.3445717096328735, "issue_ms": 2.910112962126732, "gpu_ms": 5.873038000000001, "launches": 131}}
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "raw", "tokens": 2048, "bits": 16.0, "exact": true, "encode": {"wall_ms": 0.007798895239830017, "issue_ms": 0.001261010766029358, "gpu_ms": 0.0, "launches": 0}, "decode": {"wall_ms": 0.7595326751470566, "issue_ms": 0.21758116781711578, "gpu_ms": 0.7321190000000005, "launches": 28}}
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "splitzip", "tokens": 2048, "bits": 12.042319774627686, "exact": true, "encode": {"wall_ms": 3.0318237841129303, "issue_ms": 3.0107516795396805, "gpu_ms": 1.8964060000000011, "launches": 196}, "decode": {"wall_ms": 1.5042424201965332, "issue_ms": 1.1396761983633041, "gpu_ms": 1.441660999999999, "launches": 84}}
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "adacode", "tokens": 2048, "bits": 11.374289172036308, "exact": true, "encode": {"wall_ms": 14.872776344418526, "issue_ms": 14.848403632640839, "gpu_ms": 4.832400999999993, "launches": 952}, "decode": {"wall_ms": 2.4602841585874557, "issue_ms": 2.4166032671928406, "gpu_ms": 2.184572000000005, "launches": 112}}
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:49 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:50 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:50 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "exactkv", "tokens": 2048, "bits": 12.579677036830358, "exact": true, "encode": {"wall_ms": 13.00070807337761, "issue_ms": 12.97161914408207, "gpu_ms": 3.7698690000000323, "launches": 896}, "decode": {"wall_ms": 6.919410079717636, "issue_ms": 2.5315359234809875, "gpu_ms": 6.266743000000009, "launches": 152}}
+USDT:2026-11-25 09:27:50 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:50 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:50 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:50 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "exans", "tokens": 2048, "bits": 10.88146904536656, "exact": true, "encode": {"wall_ms": 47.12246172130108, "issue_ms": 46.62277363240719, "gpu_ms": 44.83352300000008, "launches": 261}, "decode": {"wall_ms": 7.7971238642930984, "issue_ms": 7.268048822879791, "gpu_ms": 6.0053549999999865, "launches": 509}}
+USDT:2026-11-25 09:27:51 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:51 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:52 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:52 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "aquakv-2", "tokens": 2048, "bits": 2.12982177734375, "exact": null, "encode": {"wall_ms": 144.33114975690842, "issue_ms": 144.22176778316498, "gpu_ms": 143.35090500000035, "launches": 3294}, "decode": {"wall_ms": 41.22649505734444, "issue_ms": 15.52010327577591, "gpu_ms": 39.524148000000054, "launches": 1341}}
+USDT:2026-11-25 09:27:55 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:55 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:55 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:55 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "ours-hbh", "tokens": 8192, "bits": 8.009789875575475, "exact": true, "encode_twice": {"wall_ms": 91.88291057944298, "issue_ms": 91.15013107657433}, "decode_eager": {"wall_ms": 73.51703196763992, "issue_ms": 61.899736523628235}, "decode_before": {"wall_ms": 96.96719609200954, "issue_ms": 87.6490268856287}, "encode": {"wall_ms": 60.52538752555847, "issue_ms": 59.78424660861492, "gpu_ms": 56.44794299999995, "launches": 446}, "decode": {"wall_ms": 73.25774058699608, "issue_ms": 36.569809541106224, "gpu_ms": 73.37796599999999, "launches": 1918}}
+USDT:2026-11-25 09:27:58 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:58 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:27:58 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:27:59 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "t2-hbh", "tokens": 8192, "bits": 8.009789875575475, "exact": true, "encode_twice": {"wall_ms": 110.70509068667889, "issue_ms": 109.9761314690113}, "decode_eager": {"wall_ms": 73.50027374923229, "issue_ms": 61.784643679857254}, "decode_before": {"wall_ms": 96.87959402799606, "issue_ms": 87.40986697375774}, "encode": {"wall_ms": 79.00895550847054, "issue_ms": 78.28212343156338, "gpu_ms": 76.27611299999987, "launches": 970}, "decode": {"wall_ms": 73.19076731801033, "issue_ms": 36.551618948578835, "gpu_ms": 72.08622899999995, "launches": 1918}}
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "t2-rank256", "tokens": 8192, "bits": 9.219076974051339, "exact": true, "encode_twice": {"wall_ms": 58.57959762215614, "issue_ms": 57.679614052176476}, "decode_eager": {"wall_ms": 25.89486353099346, "issue_ms": 14.657670632004738}, "decode_before": {"wall_ms": 25.903405621647835, "issue_ms": 14.646422117948532}, "encode": {"wall_ms": 52.56960168480873, "issue_ms": 51.6651775687933, "gpu_ms": 51.35937700000003, "launches": 910}, "decode": {"wall_ms": 25.777872651815414, "issue_ms": 14.62848111987114, "gpu_ms": 24.101396999999988, "launches": 290}}
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "raw", "tokens": 8192, "bits": 16.0, "exact": true, "encode": {"wall_ms": 0.0077802687883377075, "issue_ms": 0.00077858567237854, "gpu_ms": 0.0, "launches": 0}, "decode": {"wall_ms": 2.829901874065399, "issue_ms": 0.2225041389465332, "gpu_ms": 2.8007160000000018, "launches": 28}}
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "splitzip", "tokens": 8192, "bits": 12.049286961555481, "exact": true, "encode": {"wall_ms": 7.682889699935913, "issue_ms": 7.613079622387886, "gpu_ms": 7.0252880000000095, "launches": 196}, "decode": {"wall_ms": 5.4553598165512085, "issue_ms": 1.1797677725553513, "gpu_ms": 5.373908999999999, "launches": 84}}
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:00 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:01 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:01 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "adacode", "tokens": 8192, "bits": 11.37075240271432, "exact": true, "encode": {"wall_ms": 22.409364581108093, "issue_ms": 22.37904444336891, "gpu_ms": 20.481443999999986, "launches": 952}, "decode": {"wall_ms": 8.282899856567383, "issue_ms": 2.4833157658576965, "gpu_ms": 8.192651999999995, "launches": 112}}
+USDT:2026-11-25 09:28:01 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:01 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:01 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:01 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "exactkv", "tokens": 8192, "bits": 12.575496128627233, "exact": true, "encode": {"wall_ms": 18.34479533135891, "issue_ms": 18.308555707335472, "gpu_ms": 11.870198999999952, "launches": 896}, "decode": {"wall_ms": 24.953043088316917, "issue_ms": 2.6378948241472244, "gpu_ms": 24.226870000000012, "launches": 152}}
+USDT:2026-11-25 09:28:02 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:03 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:03 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:03 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "exans", "tokens": 8192, "bits": 10.905555759157453, "exact": true, "encode": {"wall_ms": 188.71089071035385, "issue_ms": 186.72544322907925, "gpu_ms": 179.62687900000017, "launches": 1041}, "decode": {"wall_ms": 30.93239851295948, "issue_ms": 28.347859159111977, "gpu_ms": 23.819451999999977, "launches": 1949}}
+USDT:2026-11-25 09:28:08 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:08 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:09 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:09 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "aquakv-2", "tokens": 8192, "bits": 2.109464372907366, "exact": null, "encode": {"wall_ms": 562.010645866394, "issue_ms": 561.9100444018841, "gpu_ms": 563.2056680000011, "launches": 4746}, "decode": {"wall_ms": 162.0917282998562, "issue_ms": 39.022624492645264, "gpu_ms": 159.97128400000034, "launches": 1341}}
+USDT:2026-11-25 09:28:15 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:15 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:15 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:15 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "ours-hbh", "tokens": 16384, "bits": 10.862199238368444, "exact": true, "encode_twice": {"wall_ms": 186.6771336644888, "issue_ms": 185.32816134393215}, "decode_eager": {"wall_ms": 153.52990105748177, "issue_ms": 135.73884591460228}, "decode_before": {"wall_ms": 200.92682726681232, "issue_ms": 185.20654924213886}, "encode": {"wall_ms": 122.1929881721735, "issue_ms": 120.82570046186447, "gpu_ms": 120.1793940000001, "launches": 892}, "decode": {"wall_ms": 153.54774333536625, "issue_ms": 136.15760020911694, "gpu_ms": 151.91405199999943, "launches": 3806}}
+USDT:2026-11-25 09:28:21 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:21 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:21 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:22 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "t2-hbh", "tokens": 16384, "bits": 10.862199238368444, "exact": true, "encode_twice": {"wall_ms": 223.64655695855618, "issue_ms": 222.3083283752203}, "decode_eager": {"wall_ms": 153.64621207118034, "issue_ms": 135.9478160738945}, "decode_before": {"wall_ms": 201.75279304385185, "issue_ms": 185.69939024746418}, "encode": {"wall_ms": 159.3498457223177, "issue_ms": 158.0080073326826, "gpu_ms": 156.26869299999967, "launches": 1940}, "decode": {"wall_ms": 153.82679924368858, "issue_ms": 136.004950851202, "gpu_ms": 151.52842400000003, "launches": 3806}}
+USDT:2026-11-25 09:28:24 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:24 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "t2-rank256", "tokens": 16384, "bits": 10.388965742928642, "exact": true, "encode_twice": {"wall_ms": 118.19527111947536, "issue_ms": 117.03794449567795}, "decode_eager": {"wall_ms": 54.78121526539326, "issue_ms": 39.146555587649345}, "decode_before": {"wall_ms": 54.61111292243004, "issue_ms": 39.03120569884777}, "encode": {"wall_ms": 105.90217448771, "issue_ms": 104.75348867475986, "gpu_ms": 104.24549800000034, "launches": 1820}, "decode": {"wall_ms": 54.95849624276161, "issue_ms": 39.35411013662815, "gpu_ms": 51.902893999999954, "launches": 552}}
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "raw", "tokens": 16384, "bits": 16.0, "exact": true, "encode": {"wall_ms": 0.008281320333480835, "issue_ms": 0.0012200325727462769, "gpu_ms": 0.0, "launches": 0}, "decode": {"wall_ms": 5.588972941040993, "issue_ms": 0.24027377367019653, "gpu_ms": 5.555677000000003, "launches": 28}}
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:25 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "splitzip", "tokens": 16384, "bits": 12.049286961555481, "exact": true, "encode": {"wall_ms": 14.695784077048302, "issue_ms": 14.474079012870789, "gpu_ms": 13.563246999999993, "launches": 196}, "decode": {"wall_ms": 10.699935257434845, "issue_ms": 1.1900868266820908, "gpu_ms": 10.607415000000001, "launches": 84}}
+USDT:2026-11-25 09:28:26 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:26 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:26 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:26 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "adacode", "tokens": 16384, "bits": 11.37075240271432, "exact": true, "encode": {"wall_ms": 40.63212685286999, "issue_ms": 40.52720591425896, "gpu_ms": 39.15734800000005, "launches": 952}, "decode": {"wall_ms": 16.230694949626923, "issue_ms": 2.5130771100521088, "gpu_ms": 16.10622699999999, "launches": 112}}
+USDT:2026-11-25 09:28:26 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:26 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:26 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:26 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "exactkv", "tokens": 16384, "bits": 12.575496128627233, "exact": true, "encode": {"wall_ms": 26.176929473876953, "issue_ms": 26.133200153708458, "gpu_ms": 22.591609000000023, "launches": 896}, "decode": {"wall_ms": 49.20768365263939, "issue_ms": 2.8529223054647446, "gpu_ms": 48.43682000000003, "launches": 152}}
+USDT:2026-11-25 09:28:30 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:30 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:30 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:30 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "exans", "tokens": 16384, "bits": 10.902515121868678, "exact": true, "encode": {"wall_ms": 377.4817157536745, "issue_ms": 373.5866080969572, "gpu_ms": 359.6132559999988, "launches": 2080}, "decode": {"wall_ms": 61.74655258655548, "issue_ms": 56.42641708254814, "gpu_ms": 47.727885, "launches": 3869}}
+USDT:2026-11-25 09:28:40 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:41 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+USDT:2026-11-25 09:28:42 597761:597761 SyncActivityProfilerHandler.cpp:52] profiler_start
+USDT:2026-11-25 09:28:42 597761:597761 SyncActivityProfilerHandler.cpp:59] profiler_stop
+{"codec": "aquakv-2", "tokens": 16384, "bits": 2.1060714721679688, "exact": null, "encode": {"wall_ms": 1121.2529316544533, "issue_ms": 1120.9676396101713, "gpu_ms": 1128.0345269999984, "launches": 6682}, "decode": {"wall_ms": 322.1631031483412, "issue_ms": 77.18376815319061, "gpu_ms": 320.5130330000011, "launches": 1341}}
+PROFILE OK (36 codec runs)
+   deleting the captures: 6.2G	/tmp/nbore/kvpd/30663/runs/llama32_3b/captures
+PD SETUP DONE
+== system
+== bandwidth with /tmp/nbore/kvpd/30663/home/venv/bin/python
+	[4mGPU0	GPU1	GPU2	GPU3	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	NODE	NODE	NODE	0-7,128-135	0		N/A
+GPU1	NODE	 X 	PIX	PIX	0-7,128-135	0		N/A
+GPU2	NODE	PIX	 X 	PIX	0-7,128-135	0		N/A
+GPU3	NODE	PIX	PIX	 X 	0-7,128-135	0		N/A
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+
+4 GPUs: NVIDIA RTX A5000, NVIDIA RTX A5000, NVIDIA RTX A5000, NVIDIA RTX A5000; torch 2.11.0+cu128, CUDA 12.8
+
+ GPU    to pinned  from pinned  to pageable  from pageable
+   0      26.4 GB/s      27.0 GB/s      23.1 GB/s      24.9 GB/s
+   1      26.4 GB/s      27.0 GB/s      22.5 GB/s      24.9 GB/s
+   2      26.4 GB/s      27.0 GB/s      17.3 GB/s      24.9 GB/s
+   3      26.4 GB/s      27.0 GB/s      23.0 GB/s      24.9 GB/s
+
+  pair  peer           direct             host        host_pipe
+  0->1   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  0->2   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  0->3   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  1->0   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  1->2   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  1->3   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  2->0   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  2->1   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  2->3   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  3->0   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  3->1   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+  3->2   True    9.5 GB/s   76Gb   13.3 GB/s  107Gb   25.4 GB/s  203Gb
+
+One 8K document of Llama-3.2-3B KV, wire time at the slowest / fastest measured pair (25.4 / 25.4 GB/s):
+  raw BF16                           896 MiB     37.0 ms /    37.0 ms
+  SplitZip                           675 MiB     27.9 ms /    27.8 ms
+  ours lossless                      504 MiB     20.8 ms /    20.8 ms
+  ours / AQUA-KV lossy, ~2 bits      117 MiB      4.8 ms /     4.8 ms
+wrote /tmp/nbore/kvpd/30663/tmp/link_probe_597948.json
+
+concurrent patterns, 896 MiB per leg, best of 5:
+  1p3d, prefill GPU 0          direct 0->1 0->2 0->3           aggregate    9.5 GB/s, per leg   9.5   4.8   3.2  NOT CORRECT
+  1p3d, prefill GPU 0          host   0->1 0->2 0->3           aggregate   26.0 GB/s, per leg  25.4  12.9   8.7
+  1p3d, prefill GPU 1          direct 1->0 1->2 1->3           aggregate    9.5 GB/s, per leg   9.5   4.8   3.2  NOT CORRECT
+  1p3d, prefill GPU 1          host   1->0 1->2 1->3           aggregate   26.0 GB/s, per leg  25.4  12.9   8.7
+  1p3d, prefill GPU 2          direct 2->0 2->1 2->3           aggregate    9.5 GB/s, per leg   9.5   4.8   3.2  NOT CORRECT
+  1p3d, prefill GPU 2          host   2->0 2->1 2->3           aggregate   26.0 GB/s, per leg  25.4  12.9   8.7
+  1p3d, prefill GPU 3          direct 3->0 3->1 3->2           aggregate    9.5 GB/s, per leg   9.5   4.8   3.2  NOT CORRECT
+  1p3d, prefill GPU 3          host   3->0 3->1 3->2           aggregate   26.0 GB/s, per leg  25.4  12.9   8.7
+  2p2d, prefill 0,1            direct 0->2 1->3                aggregate   16.7 GB/s, per leg   8.4   8.4  NOT CORRECT
+  2p2d, prefill 0,1            host   0->2 1->3                aggregate   47.6 GB/s, per leg  24.5  23.8
+  2p2d, prefill 0,1            direct 0->3 1->2                aggregate   19.0 GB/s, per leg   9.5   9.5  NOT CORRECT
+  2p2d, prefill 0,1            host   0->3 1->2                aggregate   47.8 GB/s, per leg  24.5  23.9
+  2p2d, prefill 0,2            direct 0->1 2->3                aggregate   19.1 GB/s, per leg  10.6   9.5  NOT CORRECT
+  2p2d, prefill 0,2            host   0->1 2->3                aggregate   47.7 GB/s, per leg  24.5  23.9
+  2p2d, prefill 0,2            direct 0->3 2->1                aggregate   18.9 GB/s, per leg   9.5   9.4  NOT CORRECT
+  2p2d, prefill 0,2            host   0->3 2->1                aggregate   47.8 GB/s, per leg  24.6  23.9
+  2p2d, prefill 0,3            direct 0->1 3->2                aggregate   19.1 GB/s, per leg   9.5   9.5  NOT CORRECT
+  2p2d, prefill 0,3            host   0->1 3->2                aggregate   47.8 GB/s, per leg  24.5  23.9
+  2p2d, prefill 0,3            direct 0->2 3->1                aggregate   19.1 GB/s, per leg  10.4   9.5  NOT CORRECT
+  2p2d, prefill 0,3            host   0->2 3->1                aggregate   47.7 GB/s, per leg  24.6  23.9
+  2p2d, prefill 1,2            direct 1->0 2->3                aggregate   18.7 GB/s, per leg   9.5   9.4  NOT CORRECT
+  2p2d, prefill 1,2            host   1->0 2->3                aggregate   33.4 GB/s, per leg  24.6  16.7
+  2p2d, prefill 1,2            direct 1->3 2->0                aggregate   19.0 GB/s, per leg   9.5   9.5  NOT CORRECT
+  2p2d, prefill 1,2            host   1->3 2->0                aggregate   33.7 GB/s, per leg  16.8  16.8
+  2p2d, prefill 1,3            direct 1->0 3->2                aggregate   19.1 GB/s, per leg  11.1   9.5  NOT CORRECT
+  2p2d, prefill 1,3            host   1->0 3->2                aggregate   33.5 GB/s, per leg  24.6  16.7
+  2p2d, prefill 1,3            direct 1->2 3->0                aggregate   19.1 GB/s, per leg   9.5   9.5  NOT CORRECT
+  2p2d, prefill 1,3            host   1->2 3->0                aggregate   33.8 GB/s, per leg  16.9  16.9
+  2p2d, prefill 2,3            direct 2->0 3->1                aggregate   19.0 GB/s, per leg   9.5   9.5  NOT CORRECT
+  2p2d, prefill 2,3            host   2->0 3->1                aggregate   33.4 GB/s, per leg  24.6  16.7
+  2p2d, prefill 2,3            direct 2->1 3->0                aggregate   19.1 GB/s, per leg   9.5   9.5  NOT CORRECT
+  2p2d, prefill 2,3            host   2->1 3->0                aggregate   33.8 GB/s, per leg  16.9  16.9
+  cache reload to 1 GPU(s)     direct host->0                  aggregate   27.0 GB/s, per leg  27.0
+  cache reload to 2 GPU(s)     direct host->0 host->1          aggregate   54.0 GB/s, per leg  27.0  27.0
+  cache reload to 3 GPU(s)     direct host->0 host->1 host->2  aggregate   79.6 GB/s, per leg  27.0  26.6  26.5
+  cache reload to 4 GPU(s)     direct host->0 host->1 host->2 host->3 aggregate   71.0 GB/s, per leg  27.0  17.8  17.8  17.8
+  cache store from 4 GPU(s)    direct 0->host 1->host 2->host 3->host aggregate   70.4 GB/s, per leg  26.4  17.6  17.6  17.6
+wrote /tmp/nbore/kvpd-evidence/pd_capture_20261125T141553Z/repo/benchmark_results/pd_card/pd_capture_20261125T141553Z/node_specs/specs.json and summary.md
+
+==== run 1 of 1: TRANSPORT=ring LINKS=100 CODECS=raw LAYOUT=1p3d STAGES=check,mtrag,delta,report,tree,diffedge TRACE_PAGES=1 MAXLEN=32768 RUN_TIMEOUT_S=10800 CAPTURE_GB=8 CAPTURE_D_GB=2 MTRAG_LIMIT=4 MTRAG_CAPTURE_CONVS=4 MTRAG_LAYOUTS=interleaved MTRAG_POLICIES=conversation
+== PD run /tmp/nbore/kvpd/30663/runs/llama32_3b/pd/20261125_0929_1p3d_tkv_ring: 1p3d (1 prefill on GPUs 0, 3 decode on 1 2 3), connector tkv, transport ring, eager 0; job GPUs 0 1 2 3; commit 277bea7 diffedge: T alone and the blend T + w (latest - T) beside the plain edges
+0, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 1 MiB, 24564 MiB, 595.71.05
+   GPUs 0=GPU-256b70c0-c8bc-c483-c767-3a5c27ed7286, 1=GPU-683e95a6-81fe-c256-8c35-a91c6e3d38ff, 2=GPU-2680c039-8dff-cb93-2c6a-9e89e46586d7, 3=GPU-06931f50-f453-a006-ef25-da5c555c0b34
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4237.95it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (289076 > 131072). Running this sequence through the model will result in indexing errors
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+{"out": "/tmp/nbore/kvpd/30663/runs/llama32_3b/pd/prompts_2048_8192_check_1000_3000_5000_8192", "datasets": ["wikitext2", "humaneval", "gsm8k", "mmlu", "ptb"], "tokens": "2048,8192", "per_length": 48}
+   ports 31500-31953 free
+   prefill1 on GPU 0 (visible 0), port 31601 (log /tmp/nbore/kvpd/30663/runs/llama32_3b/pd/20261125_0929_1p3d_tkv_ring/engine_prefill1.log)
+   decode1 on GPU 1 (visible 1), port 31701 (log /tmp/nbore/kvpd/30663/runs/llama32_3b/pd/20261125_0929_1p3d_tkv_ring/engine_decode1.log)
+   decode2 on GPU 2 (visible 2), port 31702 (log /tmp/nbore/kvpd/30663/runs/llama32_3b/pd/20261125_0929_1p3d_tkv_ring/engine_decode2.log)
+   decode3 on GPU 3 (visible 3), port 31703 (log /tmp/nbore/kvpd/30663/runs/llama32_3b/pd/20261125_0929_1p3d_tkv_ring/engine_decode3.log)
+== waiting for the engines
+   (EngineCore pid=598671) INFO 11-25 09:31:07 [kv_cache_utils.py:2327] GPU KV cache size: 60,720 tokens, Maximum concurrency for 32,768 tokens per request: 1.85x
+   (EngineCore pid=598650) INFO 11-25 09:31:07 [kv_cache_utils.py:2327] GPU KV cache size: 60,720 tokens, Maximum concurrency for 32,768 tokens per request: 1.85x
+   (EngineCore pid=598669) INFO 11-25 09:31:07 [kv_cache_utils.py:2327] GPU KV cache size: 60,720 tokens, Maximum concurrency for 32,768 tokens per request: 1.85x
+   (EngineCore pid=598657) INFO 11-25 09:31:07 [kv_cache_utils.py:2327] GPU KV cache size: 49,696 tokens, Maximum concurrency for 32,768 tokens per request: 1.52x
+09:31:36 == check
+09:31:45 check raw: OK - 4/4 transfers bit-exact, 3/4 outputs equal to local prefill, bits 16.000
+09:31:45 == mtrag
+09:32:08 mtrag_raw_interleaved_conversation: exit 0, 30 requests (0 failed), TTFT p50 817.230 ms, 30 transfers
+09:32:28 trace report: 
+09:32:28 == delta
+09:36:42 delta: exit 0 in 254 s, 3.8 GB of stored pages in /tmp/nbore/kvpd-captures/pd_capture_20261125T141553Z
+09:36:42 == report
+09:36:42 report: /tmp/nbore/kvpd/30663/runs/llama32_3b/pd/20261125_0929_1p3d_tkv_ring/summary.md
+== tree: this run's capture /tmp/nbore/kvpd-captures/pd_capture_20261125T141553Z
+== tree: exit 0 (runs/tree.log)
+== diffedge: this run's capture /tmp/nbore/kvpd-captures/pd_capture_20261125T141553Z
+== diffedge: exit 0 (runs/diffedge.log)
+RESULTS /tmp/nbore/kvpd-evidence/pd_capture_20261125T141553Z/repo/benchmark_results/pd_card/pd_capture_20261125T141553Z/matrix/llama32_3b_pd_1p3d_tkv_ring_rtxa5000x4_20261125_0929
+wrote /tmp/nbore/kvpd-evidence/pd_capture_20261125T141553Z/repo/benchmark_results/pd_card/pd_capture_20261125T141553Z/matrix/pd_matrix_capture_rtxa5000_20261125_0929/summary.md
+PD MATRIX capture: 1 runs (0 not finished); results in /tmp/nbore/kvpd-evidence/pd_capture_20261125T141553Z/repo/benchmark_results/pd_card/pd_capture_20261125T141553Z/matrix
