@@ -132,8 +132,8 @@ def analyse(s):
                 Y = r[tr][:, j, :, sl].reshape(-1, hd).astype(np.float64)
                 if len(X) < hd or not te.any():
                     continue
-                lamr = 1e-3 * np.trace(X.T @ X) / hd
-                Wm = np.linalg.solve(X.T @ X + lamr * np.eye(hd), X.T @ Y)
+                lamr = 1e-3 * np.trace(X.T @ X) / hd + 1e-12        # a residual can be all zero (layer 0's V)
+                Wm = np.linalg.lstsq(X.T @ X + lamr * np.eye(hd), X.T @ Y, rcond=None)[0]
                 Xt = r[te][:, i, :, sl].reshape(-1, hd)
                 Yt = r[te][:, j, :, sl].reshape(-1, hd)
                 cl.append({"layers": f"{layers[i]}->{layers[j]}", "kv": k, "left": left(Yt, Xt @ Wm)})

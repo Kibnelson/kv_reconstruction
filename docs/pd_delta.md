@@ -419,6 +419,27 @@ place, 4 conversations need 21.4 GB beyond the 10 kept free (P's 8 GB, 3 × 2 GB
 export KVPD_CAPTURE_CONVS=4 KVPD_CAPTURE_LAYOUTS=interleaved KVPD_CAPTURE_AFTER=tree,diffedge
 ```
 
+**First results** (job 30663's interleaved capture, 4 conversations, 30 requests; the stage re-run as job 30673
+after the twin fix). Of 7,985 blocks, 6,150 are prefix reuse (the radix tree). Of the 1,835 distinct pages: 1,084
+new, 545 moved (mostly documents retrieved again; 194 with one earlier version, 351 with two or more), 206 twins
+(D's decoded answers, prefilled again by P: none with the same bytes). Held out, bits per value:
+
+| Pages | Plain, best edge | T alone | Blend T + w (latest − T) | Twin against D's copy |
+| --- | ---: | ---: | ---: | ---: |
+| Moved (130) | 8.86 (composite; latest 9.02, first 9.27) | 8.30 | 8.12 | – |
+| Twins (102) | – | – | – | 4.38 |
+
+- Plain diffs of moved pages lose to T: the copy predicts layers 1–4 about a bit better than T, layers 5–27 about
+  a bit worse. The blend takes the copy in layers 1–4 (w 0.85–0.99) and mostly T deeper (w 0.05–0.75, rising with
+  agreement and with more versions): 2% under T.
+- No diff of a diff: λ is near 0 or negative (copies do not drift one way); a·latest + b·previous gives a ≈ 0.9.
+- Chains to the latest version are 0.25 bits smaller than stars to the first but need 6.9 pages decoded on average
+  (up to 28); a star needs 1. Decoding a page: 0.21 ms plus 0.13 ms to turn its copy; recomputing: 0.55 ms.
+- Against T on every distinct page (52% of raw; new pages at T's rate on moved ones, an estimate), the graph with
+  T's edges and twin diffs is 6.4% smaller held out (7.6% over all pages): 6.0 points from twins, 0.4 from moved.
+- The sample (`pd_diffedge_explore.py`): residuals shrink with agreement (keys 0.33 → 0.23 of the page's rms,
+  values 0.69 → 0.52); in layers 1–4 they are smooth across tokens and low-rank, deeper they are not.
+
 **On a kept capture** (`MATRIX=diffedge`: no engines, one GPU, the newest capture in `kvpd-captures` and its
 campaign's packaged run): the same stage, for example with T's edges on a capture whose stage ran without them.
 It needs 14 GB beyond the 10 kept free.
