@@ -1,0 +1,98 @@
+{
+ "mode": "disk",
+ "env": {
+  "mode": "disk",
+  "l1_gb": 4.0,
+  "eviction": "noop",
+  "store_policy": "skip_l1",
+  "chunk": 256,
+  "odirect": true,
+  "d_role": "kv_consumer",
+  "mtrag_limit": 4,
+  "layout": "interleaved",
+  "store_wait_ms": 500.0,
+  "gpu_blocks": null,
+  "d_prefix_cache": true
+ },
+ "trace": {
+  "files": 5,
+  "records": 6070,
+  "unreadable_lines": 0,
+  "by_role": {
+   "P": 445,
+   "LMC": 1217,
+   "D3": 1028,
+   "D2": 1030,
+   "D1": 2350
+  },
+  "hook_errors": {},
+  "unknown_events": {
+   "lmc.mp.vllm.block_allocation": 273
+  }
+ },
+ "requests": {
+  "P": 30,
+  "D": 30,
+  "turns": 30
+ },
+ "prompt_tokens": {
+  "P": 127953,
+  "D": 127953
+ },
+ "P": {
+  "local_hit_tokens": 98400,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 29553,
+  "stored_tokens": 29184,
+  "store_bytes": 0,
+  "store_s_median": 0.120335,
+  "store_s_p90": 0.197158
+ },
+ "D": {
+  "local_hit_tokens": 101648,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 26305,
+  "requests_pulling": 0,
+  "retrieve_bytes": 0,
+  "pull_s_median_l1": null,
+  "pull_s_p90_l1": null,
+  "pull_s_median_l2": null,
+  "pull_s_p90_l2": null,
+  "retrieve_s_median": null,
+  "prefetch_s_median_l1": null,
+  "prefetch_s_median_l2": null,
+  "looked_up_before_p_store_end": 0
+ },
+ "chunks": {
+  "stored": 114,
+  "stored_bytes": 0,
+  "to_disk": 0,
+  "removed_from_memory": 0,
+  "pulled": 0,
+  "pulled_from": {},
+  "read_outcomes": {
+   "new: stored by this request": 114,
+   "miss: never stored": 102,
+   "held (on GPU already)": 758
+  },
+  "never_pulled": 114,
+  "pulls_per_chunk": {
+   "0": 114
+  },
+  "created_to_l1_s_median": null,
+  "l1_to_l2_s_median": null,
+  "lookups_of_unknown_chunks": 0
+ },
+ "checks": {
+  "chunk_tokens_match_prompt": "114 of 114",
+  "pulled_blocks_same_hash_as_p": "0 of 0",
+  "chunks_with_full_chain": "0 of 114"
+ },
+ "health": {
+  "server_fatal": null,
+  "server_last_log_s": 26.223,
+  "degraded": {},
+  "server_alive_at_end": true,
+  "server_crashed": false
+ }
+}
