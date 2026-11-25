@@ -156,7 +156,7 @@ def events_default(o):
     return kvtrace._default(o)
 
 
-def simulate(d, mode="disk", race=False):
+def simulate(d, mode="disk", race=False, reads_hook=True):
     """One turn: P computes and stores a 69-token prompt (2 chunks of 32 tokens, 4 blocks of 16), D1 looks it up and
     pulls both chunks (from disk in disk mode); with race, D1 looks up before P's store has landed (a miss)."""
     s = Sim(d)
@@ -219,6 +219,8 @@ def simulate(d, mode="disk", race=False):
                hashes=hashes, group=0, mask=None, block_size=16)
     else:
         if mode == "disk":
+            if reads_hook:                                             # our hook at the file adapter's read
+                s.hook("LMC", t2 + .010, "lmc.l2.read", keys=[ObjKey(c0), ObjKey(c1)], task_id=7, requested=2)
             s.hook("LMC", t2 + .010, "lmc.bus", event=Ev("l2.keys.accessed", keys=[ObjKey(c0), ObjKey(c1)],
                                                          backend="fs", shared=False))
         s.hook("LMC", t2 + .020, "lmc.bus", event=Ev("mp.lookup_prefetch.end", drid, found_count=2,
@@ -298,6 +300,33 @@ class LifecycleReportTests(unittest.TestCase):
         self.assertIn("One chunk's life", md)
         self.assertIn("read from disk (L2)", md)
 
+    def test_reads_from_disk_and_touches_apart(self):
+        """With the read and touch hooks: a pull is from disk when the file adapter read the chunk; a touch (no I/O,
+        published by LMCache as l2.keys.accessed too) is not a read."""
+        run, out = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate(run, mode="disk")
+        s = Sim.__new__(Sim)
+        s.d = run
+        c0 = hb(0x40, 32)
+        s.hook("LMC", 103.0, "lmc.touch", keys=[ObjKey(c0)])
+        s.hook("LMC", 103.0, "lmc.bus", event=Ev("l2.keys.accessed", keys=[ObjKey(c0)], backend="fs", shared=False))
+        nums = lmc_lifecycle.write_report(run, out)
+        ck = nums["chunks"]
+        self.assertTrue(ck["reads_hook"])
+        self.assertEqual((ck["disk_reads"], ck["touches"]), (2, 1))
+        self.assertEqual(ck["pulled_from"], {"L2": 2})
+        md = (out / "summary.md").read_text()
+        self.assertIn("a touch: no I/O", md)
+        self.assertIn("reads from disk: 2; touches", md)
+
+    def test_a_trace_from_before_the_read_hook(self):
+        run, out = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate(run, mode="disk", reads_hook=False)
+        nums = lmc_lifecycle.write_report(run, out)
+        self.assertFalse(nums["chunks"]["reads_hook"])
+        self.assertEqual(nums["chunks"]["pulled_from"], {"L2": 2})                   # from l2.keys.accessed
+        self.assertIn("a read from disk, or a touch", (out / "summary.md").read_text())
+
     def test_memory_mode_pulls_from_memory(self):
         nums, rows, _ = self.report(mode="memory")
         self.assertEqual((nums["chunks"]["pulled_from"], nums["chunks"]["to_disk"]), ({"L1": 2}, 0))
@@ -372,7 +401,7 @@ class HookTests(unittest.TestCase):
     def test_the_copies_are_the_import_plus_hooks(self):
         problems, hooked = lmc_overlay.check(ROOT)
         self.assertEqual(problems, [])
-        self.assertEqual(len(hooked), 5)
+        self.assertEqual(len(hooked), 7)
 
     def test_every_hook_calls_its_extractor_with_the_names_it_takes(self):
         n = 0

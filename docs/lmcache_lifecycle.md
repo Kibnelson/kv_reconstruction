@@ -82,8 +82,12 @@ kvtrace and the CUDA ops are imported from the tree, and stops otherwise.
 | `lmcache/v1/mp_observability/event_bus.py` | `publish_on_stream` | 195 | `lmc.<event>`, `via: stream` |
 | `lmcache/v1/mp_observability/event_bus.py` | `_drain_all` | 348 | `lmc.<event>`, `via: native` |
 | `lmcache/v1/mp_observability/event_bus.py` | `has_subscribers` | 183 | none: says yes for `mp.lookup`, `mp.tokens` and `l1.keys.accessed`, which LMCache builds only when someone listens |
+| `lmcache/v1/distributed/l2_adapters/fs_l2_adapter.py` | `_execute_load` | 823 | `lmc.l2.read` |
+| `lmcache/v1/distributed/storage_manager.py` | `touch_cached_keys` | 648 | `lmc.touch` |
 
-Plus `import kvtrace  # KVTRACE` at the top of each of the five files: 27 lines in all. Line numbers are in our
+Plus `import kvtrace  # KVTRACE` at the top of each of the seven files: 31 lines in all. (The last two came after
+job 30728: LMCache publishes `l2.keys.accessed` both for a real read from disk and for a touch, which only refreshes
+the eviction order and moves no bytes, so only these two hooks tell them apart.) Line numbers are in our
 copies (`third_party/<copy>/...`).
 
 The event-bus hooks see LMCache's own observability events (`lmcache/v1/mp_observability/event.py`), in the server
@@ -155,7 +159,9 @@ The ones the report reads:
 | `lmc.mp.lookup` | an engine's lookup of a prompt | `session`; `chunk_hashes` (every whole chunk of the prompt, in order); `seq_len`; `n_token_ids` |
 | `lmc.mp.lookup_prefetch.start`, `.end` | the lookup and its prefetch: at the end, how many chunks were found and where | `found_count` (chunks from the start); `hit_tokens`, `l1_hit_tokens`, `l2_hit_tokens`; `requested_tokens`; `engine_hit_tokens` |
 | `lmc.l2.prefetch.lookup.submitted`, `lmc.l2.prefetch.load.submitted`, `.completed`, `lmc.l2.load_task.*` | the disk part of a prefetch | `request_id`, `key_count`, `loaded_count`, `failed_count` |
-| `lmc.l2.keys.accessed` | chunks read from disk | `keys` |
+| `lmc.l2.keys.accessed` | chunks read from disk, or touched (eviction order refreshed, no I/O): LMCache publishes both alike | `keys` |
+| `lmc.l2.read` (our hook) | the file adapter read these chunks from disk | `keys`, `n_keys`, `task_id`, `requested` |
+| `lmc.touch` (our hook) | the storage manager refreshed these chunks' eviction order in memory and on disk, no I/O | `keys`, `n_keys` |
 | `lmc.sm.read.prefetched_finished` | prefetched chunks ready in memory | `succeeded_keys`, `failed_keys` |
 | `lmc.l1.read.reserved`, `.finished` | chunks read from memory (for a copy to a GPU) | `keys` |
 | `lmc.mp.retrieve.submitted`, `.start`, `.end` | the copy to the engine's GPU | `session`; `transfer_key`; at the end `retrieved_count`, `total_bytes`, `num_tokens` |
@@ -177,7 +183,7 @@ The keys that tie everything together:
 | a stored chunk | memory and disk | its chunk hash in `keys` of the `l1.*` and `l2.*` events |
 | a D lookup | the chunks it asked for, found or missed | `mp.lookup`'s `chunk_hashes` (chunk j is tokens `256j ..`) and `mp.lookup_prefetch.end`'s `found_count` |
 | a pulled chunk | D's GPU blocks it went into | `lmc.conn.retrieve_planned`'s `blocks`, and D's `vllm.gpu.cached` of the same block indexes |
-| a pulled chunk | whether it came from disk | `l2.keys.accessed` for its key between D's lookup and the retrieve's end |
+| a pulled chunk | whether it came from disk | `lmc.l2.read` for its key between D's lookup and the retrieve's end (traces before that hook: `l2.keys.accessed`) |
 
 What it reports for each chunk (`chunks.jsonl.gz`): its hash, conversation, turn, tokens, pieces, bytes; P's blocks
 (index, GPU block, hash, when cached, which request computed it); when the store was planned and submitted; when it
@@ -312,6 +318,34 @@ trace did show: P's stores bound 114 chunks to their tokens (all 114 equal to th
 chunk on the engine's GPU already. Fixed in the next commit: all four of LMCache's compiled modules built from our
 copy, the setup checks that `cuda_ops` takes `lmcache_native`'s descriptor, and a run whose server logs errors
 fails, with the errors at the top of its report.
+
+**Job 30728** (pin `f159ef6`; `benchmark_results/pd_card/pd_lmctrace_20261125T221525Z/`): the first whole run. All
+four of LMCache's compiled modules ours, the server up and without errors in both modes, and every chunk's life
+traced end to end:
+
+| | memory | disk |
+| --- | ---: | ---: |
+| chunks P's stores wrote to the server (all bound to their tokens, all equal to the prompt's) | 114 (3.35 GB) | 114, then to disk and out of memory |
+| pulled into a D engine | 102, from memory | 102, from disk |
+| never pulled | 12 | 12 |
+| D's tokens: from its own GPU / loaded from LMCache / computed | 101,632 / 23,040 / 3,281 | the same |
+| pulled blocks with the same vLLM hash on D as on P | 1,632 of 1,632 | 1,632 of 1,632 |
+| a pull (median: 4 chunks, 117 MB): the server's lookup and prefetch | 2.2 ms | 47 ms (the disk read, about 2 GB/s) |
+| then the copy to D's GPU | 5.1 ms (about 22 GB/s) | 4.8 ms |
+| the server's lookup to the copy done | 13.9 ms | 70.9 ms (p90 97.7) |
+| D's request taken to its first token at the proxy | 50 ms | 115 ms |
+| P's stores, planned to stored (median) | 129 ms | 116 ms; memory to disk 188 ms more |
+| D lookups that came before P's store had landed | 0 | 0 |
+
+What it shows. In the disk mode every chunk P stores is written to disk and dropped from memory within about a
+third of a second, and every pull reads it back from disk; the disk read costs about 45 ms a pull here, the copy
+to the GPU the same 5 ms as from memory. D's own GPU cache serves most of every prompt (the conversation's earlier
+turns), and LMCache supplies what is new this turn: 23,040 tokens, nearly all of what D did not hold (D computed
+3,281: each turn's last partial chunk). The 12 chunks never pulled are all ones that hold an earlier answer: D
+generated that answer itself and holds its blocks, while P never saw it and had to prefill it, and stored the
+chunk. The 500 ms wait was always enough: no lookup came before its store had landed. The chunk timelines of this
+run show "disk tier accessed" at every later lookup of a chunk D already held; most of those are touches (LMCache
+refreshing eviction order, no I/O), which this trace could not tell from reads; the two hooks added after it do.
 
 ## What to look out for
 

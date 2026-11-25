@@ -4,6 +4,7 @@ Distributed multi-tier storage manager for MP mode
 """
 
 # Standard
+import kvtrace  # KVTRACE
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from contextlib import ExitStack, contextmanager, nullcontext
@@ -644,6 +645,7 @@ class StorageManager:
         Args:
             keys (list[ObjectKey]): List of object keys to touch.
         """
+        if kvtrace.ON: kvtrace.hook("lmc.touch", keys=keys)  # KVTRACE
         for manager in self._l1_managers_by_id.values():
             manager.touch_keys(keys)
         for _adapter_id, _desc, adapter in self._snapshot_adapters():

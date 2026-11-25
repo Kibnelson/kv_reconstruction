@@ -153,6 +153,7 @@ class Run:
         self.prefetch = []                                # L2 prefetch / load task events (by request_id)
         self.errors = collections.Counter()
         self.unknown = collections.Counter()
+        self.has_read_hook = False                   # traces from before the lmc.l2.read hook (jobs up to 30728)
         self._engine()
         self._server()
 
@@ -255,6 +256,13 @@ class Run:
                 self.sessions[r.get("session")]["mp.lookup"].append(r)
             elif name in SESSION_EVENTS:
                 self.sessions[r.get("session")][name].append(r)
+            elif name == "l2.read":                  # our hook: a real read from disk
+                self.has_read_hook = True
+                for h in r.get("keys") or []:
+                    self.C(h)["l2"].append(("l2.read", t, None))
+            elif name == "touch":                    # our hook: eviction order refreshed, no I/O
+                for h in r.get("keys") or []:
+                    self.C(h).setdefault("touch", []).append(t)
             elif name in L1_EVENTS:
                 sizes = r.get("sizes") or []
                 for i, h in enumerate(r.get("keys") or []):
@@ -304,6 +312,8 @@ class Run:
         c["t_l2_stored"] = first([t for nm, t, _ in l2 if nm == "l2.keys.stored"])
         c["t_l1_removed"] = [t for nm, t, _ in l1 if nm == "l1.keys.evicted"]
         c["t_l2_accessed"] = [t for nm, t, _ in l2 if nm == "l2.keys.accessed"]
+        c["t_l2_read"] = [t for nm, t, _ in l2 if nm == "l2.read"]
+        c.setdefault("touch", [])
         c["t_l2_deleted"] = first([t for nm, t, _ in l2 if nm == "l2.keys.deleted"])
         c["reads"] = []
 
@@ -385,7 +395,8 @@ class Run:
                 tier = None
                 if how == "pulled":
                     t_hi = (r_end or {}).get("t", look["t"] + 600)
-                    tier = "L2" if any(look["t"] - 0.001 <= t <= t_hi + 0.001 for t in c["t_l2_accessed"]) else "L1"
+                    reads = c["t_l2_read"] if self.has_read_hook else c["t_l2_accessed"]
+                    tier = "L2" if any(look["t"] - 0.001 <= t <= t_hi + 0.001 for t in reads) else "L1"
                 c["reads"].append({"role": req["role"], "key": req["key"], "conv": req["conv"], "turn": req["turn"],
                                    "index": j, "how": how, "tier": tier, "t_lookup": look["t"],
                                    "t_found": (pend or {}).get("t"), "t_retrieved": (r_end or {}).get("t")
@@ -485,6 +496,8 @@ class Run:
                 row[k] = self.rel(c.get(k))
             row["t_l1_removed"] = [self.rel(t) for t in c.get("t_l1_removed") or []]
             row["t_l2_accessed"] = [self.rel(t) for t in c.get("t_l2_accessed") or []]
+            row["t_l2_read"] = [self.rel(t) for t in c.get("t_l2_read") or []]
+            row["t_touched"] = [self.rel(t) for t in c.get("touch") or []]
             row["p_blocks"] = [dict(b, t_cached=self.rel(b["t_cached"])) for b in c.get("p_blocks") or []]
             row["reads"] = [dict(rd, t_lookup=self.rel(rd["t_lookup"]), t_found=self.rel(rd["t_found"]),
                                  t_retrieved=self.rel(rd["t_retrieved"]),
@@ -567,6 +580,11 @@ class Run:
                        "pulled": len(pulled), "pulled_from": dict(by_tier),
                        "read_outcomes": dict(collections.Counter(rd["how"] for rd in reads)),
                        "never_pulled": len(never),
+                       "never_pulled_holding_an_answer": sum(1 for c in never if any(
+                           str(p).startswith(("answer", "assistant")) for p in c.get("pieces") or [])),
+                       "disk_reads": sum(len(c.get("t_l2_read") or []) for c in chunks),
+                       "touches": sum(len(c.get("touch") or []) for c in chunks),
+                       "reads_hook": self.has_read_hook,
                        "pulls_per_chunk": dict(collections.Counter(
                            sum(1 for rd in c["reads"] if rd["how"] == "pulled") for c in stored)),
                        "created_to_l1_s_median": q([c["t_l1_written"] - c["t_created"] for c in chain], 0.5),
@@ -589,7 +607,7 @@ def fmt(x, nd=3):
     return str(x)
 
 
-def story_chunk(c):
+def story_chunk(c, reads_hook=False):
     """One chunk's life as rows (time from the run's first record, what happened)."""
     ev = []
     for b in c.get("p_blocks") or []:
@@ -605,8 +623,14 @@ def story_chunk(c):
             ev.append((c[k], what))
     for t in c.get("t_l1_removed") or []:
         ev.append((t, "removed from memory (L1)"))
-    for t in c.get("t_l2_accessed") or []:
-        ev.append((t, "read from disk (L2)"))
+    if reads_hook:
+        for t in c.get("t_l2_read") or []:
+            ev.append((t, "read from disk (L2)"))
+        for t in c.get("t_touched") or []:
+            ev.append((t, "eviction order refreshed (a touch: no I/O)"))
+    else:                                            # a trace without the read hook: a read or a touch
+        for t in c.get("t_l2_accessed") or []:
+            ev.append((t, "disk tier accessed (a read from disk, or a touch: no I/O)"))
     for rd in c.get("reads") or []:
         ev.append((rd["t_lookup"], f"{rd['role']} looked it up (turn {rd['turn']}): {rd['how']}"
                                    + (f", from {rd['tier']}" if rd.get("tier") else "")))
@@ -732,7 +756,11 @@ def write_report(run, out):
            f"- bound to their tokens by P's stores: {ck['stored']} chunks; written to the server's memory "
            f"{ck['in_memory']} ({ck['stored_bytes'] / 1e6:.1f} MB); to disk {ck['to_disk']}; removed from memory "
            f"{ck['removed_from_memory']}",
-           f"- pulled by D or P: {ck['pulled']} times, from {ck['pulled_from'] or '–'}; never pulled: {ck['never_pulled']}",
+           f"- pulled by D or P: {ck['pulled']} times, from {ck['pulled_from'] or '–'}; never pulled: {ck['never_pulled']}"
+           f" ({ck['never_pulled_holding_an_answer']} of them hold an earlier answer, which D generated itself and holds)",
+           (f"- reads from disk: {ck['disk_reads']}; touches (eviction order refreshed, no I/O): {ck['touches']}"
+            if ck["reads_hook"] else "- reads from disk and touches are one event in this trace (before the read "
+            "hook): a pull's tier comes from LMCache's access events (in the disk mode every chunk is on disk only)"),
            f"- every lookup's outcome per chunk: {ck['read_outcomes']}",
            f"- pulls per stored chunk: {dict(sorted(ck['pulls_per_chunk'].items()))}",
            f"- median time from a chunk's last block computed on P to the chunk in memory: "
@@ -768,7 +796,7 @@ def write_report(run, out):
                f"{(pick['offset'] or 0) + (pick['ntok'] or 0)} ({', '.join(pick.get('pieces') or []) or '?'}); "
                f"{fmt(pick['bytes'])} bytes. Seconds from the run's first record:", "",
                "| s | what |", "| ---: | --- |"]
-        md += [f"| {t:.4f} | {w} |" for t, w in story_chunk(pick)]
+        md += [f"| {t:.4f} | {w} |" for t, w in story_chunk(pick, R.has_read_hook)]
         md.append("")
     dreq = max((r for r in reqs if r["role"] != "P"), key=lambda r: (r["pulled_by_tier"].get("L2", 0), r["load"] or 0),
                default=None)

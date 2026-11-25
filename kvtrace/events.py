@@ -16,6 +16,8 @@ Names (docs/lmcache_lifecycle.md has each with the file and function of its hook
   lmc.conn.retrieve_submitted / lmc.conn.store_submitted   the worker sends them to the LMCache server
   lmc.conn.finished         the worker's finished transfers (sending, receiving)
   lmc.conn.request_finished the connector's last word on a request (its vLLM and LMCache hits)
+  lmc.l2.read               the file adapter read chunks from disk (LMCache's l2.keys.accessed is also a touch)
+  lmc.touch                 the storage manager refreshed chunks' eviction order, no I/O
   lmc.<event>               every event LMCache publishes on its event bus (l1.write.finished, l1.keys.evicted,
                             l2.store.completed, l2.prefetch.load.completed, mp.tokens, ...), in the server and in
                             the engines' connectors. "via" says how it came: absent for EventBus.publish, "stream"
@@ -246,6 +248,20 @@ def lmc_native(event_name, session, ts, metadata):
     return rec
 
 
+def l2_read(keys, task_id, requested):
+    """The file adapter read these chunks from disk (FSL2Adapter._execute_load): LMCache's own l2.keys.accessed is
+    also published for touches, which move no bytes."""
+    keys = list(keys or ())
+    return {"keys": [hx(k) for k in keys[:KEYS_MAX]], "n_keys": len(keys), "task_id": str(task_id),
+            "requested": int(requested)}
+
+
+def touch(keys):
+    """StorageManager.touch_cached_keys: eviction order refreshed in memory and on disk, no I/O."""
+    keys = list(keys or ())
+    return {"keys": [hx(k) for k in keys[:KEYS_MAX]], "n_keys": len(keys)}
+
+
 def generic(**objs):
     return {k: _md(v) for k, v in objs.items()}
 
@@ -270,5 +286,7 @@ EXTRACT = {
     "lmc.bus": lmc_event,
     "lmc.bus.stream": lambda event: lmc_event(event, via="stream"),
     "lmc.bus.native": lmc_native,
+    "lmc.l2.read": l2_read,
+    "lmc.touch": touch,
 }
 

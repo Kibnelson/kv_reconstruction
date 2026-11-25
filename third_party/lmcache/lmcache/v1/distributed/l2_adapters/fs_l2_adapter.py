@@ -11,6 +11,7 @@ name encodes all key fields so it can be reversed on startup.
 from __future__ import annotations
 
 # Standard
+import kvtrace  # KVTRACE
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 import asyncio
@@ -819,6 +820,7 @@ class FSL2Adapter(L2AdapterInterface):
                 continue
 
         loaded_keys = [keys[i] for i in bitmap.get_indices_list()]
+        if kvtrace.ON: kvtrace.hook("lmc.l2.read", keys=loaded_keys, task_id=task_id, requested=len(keys))  # KVTRACE
         if loaded_keys:
             self._notify_keys_accessed(loaded_keys)
 
