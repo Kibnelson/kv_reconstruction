@@ -4,6 +4,8 @@
 
 Legend for the strips (one character a chunk): P: `=` on P's GPU from an earlier turn, `#` computed and stored now, `+` computed, not stored (a partial chunk). D: `=` on D's GPU from an earlier turn, `M` pulled from memory, `S` pulled from disk, `+` computed by D (a partial chunk), `?` missed.
 
+The prompts' text is rebuilt from the MTRAG file the run read, by the driver's own code (scripts/pd_mtrag.py build()), and matches the run's record piece for piece; token counts and places are the run's. D's answers were not kept by this run's driver, only their token ids. Lines over 100 characters are wrapped here for reading.
+
 | turn | prompt | chunks + tail | P: own GPU / computed / stored | D: own GPU / loaded / computed | pulled | pull ms | D first token ms |
 | ---: | ---: | --- | --- | --- | --- | ---: | ---: |
 | [0](#turn-0) | 817 | 3 + 49 | 16 / 801 / 3 chunks | 0 / 768 / 49 | 3 chunks (memory 3) | 24.3 | 64.5 |
@@ -14,6 +16,21 @@ Legend for the strips (one character a chunk): P: `=` on P's GPU from an earlier
 | [5](#turn-5) | 6,925 | 27 + 13 | 5,808 / 1,117 / 5 chunks | 5,936 / 976 / 13 | 4 chunks (memory 4) | 37.9 | 109.7 |
 | [6](#turn-6) | 8,025 | 31 + 89 | 6,912 / 1,113 / 4 chunks | 7,040 / 896 / 89 | 4 chunks (memory 4) | 34.9 | 117.4 |
 | [7](#turn-7) | 9,097 | 35 + 137 | 8,016 / 1,081 / 4 chunks | 8,144 / 816 / 137 | 4 chunks (memory 4) | 37.6 | 128.4 |
+
+## How the prompt grows
+
+Each turn's prompt is the previous one, token for token, and then: D's answer to the previous turn, this turn's documents, its question and the framing (the system prompt on turn 0, `Assistant:` and newlines). Only the new tokens can make new chunks: the previous prompt's partial chunk fills first. A document sent before comes again at another place, so in other chunks.
+
+| turn | prompt | new | previous answer | documents | question | framing | whole chunks |
+| ---: | ---: | ---: | ---: | --- | --- | ---: | --- |
+| 0 | 817 | +817 | – | 4 docs, 774 | 13: where do the arizona cardinals play this week | 30 | 3 (+3) |
+| 1 | 1,799 | +982 | 128 | 5 docs, 840 (3 sent before: 627) | 11: Do the Arizona Cardinals play outside the US? | 3 | 7 (+4) |
+| 2 | 3,494 | +1,695 | 128 | 7 docs, 1,550 (3 sent before: 681) | 14: Are the Arizona Cardinals and the Chicago Cardinals the same team? | 3 | 13 (+6) |
+| 3 | 4,561 | +1,067 | 128 | 5 docs, 926 (3 sent before: 681) | 10: How many teams are in the NFL? | 3 | 17 (+4) |
+| 4 | 5,813 | +1,252 | 128 | 6 docs, 1,110 (4 sent before: 778) | 11: How many teams are in the NFL playoffs? | 3 | 22 (+5) |
+| 5 | 6,925 | +1,112 | 128 | 5 docs, 969 (3 sent before: 681) | 12: Which team has won the most Super Bowls? | 3 | 27 (+5) |
+| 6 | 8,025 | +1,100 | 128 | 5 docs, 954 (3 sent before: 681) | 15: How many times have the New England Patriots played the super bowl? | 3 | 31 (+4) |
+| 7 | 9,097 | +1,072 | 128 | 5 docs, 932 (3 sent before: 681) | 9: Who is the Patriot's coach? | 3 | 35 (+4) |
 
 ### One chunk, block by block: chunk 0 of turn 0 (`f6bcdcf6a0cbe97e`)
 
@@ -42,17 +59,100 @@ Tokens 0-256 (system: 28; doc 822086267_6698: 137; doc 822086267_7384: 91). P co
 
 817 prompt tokens: 3 whole chunks and 49 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 16 tokens on its GPU, computed 801 and stored 3 new chunks; D1 held 0, loaded 768 from LMCache and computed 49.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 822086267_6698 | 28-165 | 137 |  |
-| doc 822086267_7384 | 165-576 | 411 |  |
-| doc 822086267_6171 | 576-723 | 147 |  |
-| doc 822086267_3295 | 723-802 | 79 |  |
-| question 0 | 802-815 | 13 |  |
-| `assistant:` 0 | 815-817 | 2 |  |
+The whole prompt, piece by piece:
+
+- **system prompt** · tokens 0-28 (28) · chunk 0
+
+```text
+You are a helpful assistant. Answer the user's last question from the documents. If they do not hold
+the answer, say so.
+```
+
+<details><summary>document <code>822086267_6698-7277-0-579</code> · tokens 28-165 (137) · chunk 0</summary>
+
+```text
+Document: 2017 Arizona Cardinals season
+2017 Arizona Cardinals season
+On December 13 , 2016 , the NFL announced that the Cardinals will play the Los Angeles Rams as one
+of the NFL International Series at Twickenham Stadium in London , England , with the Rams serving as
+the home team . It will be the Cardinals ' first appearance in the International Series , though the
+Cardinals played in Mexico in 2005 against the San Francisco 49ers . The game will occur during Week
+7 on Sunday , October 22 , and will be televised in the United States . The network and date were
+announced in conjunction with the release of the 2017 regular season schedule .
+```
+
+</details>
+
+<details><summary>document <code>822086267_7384-8758-0-1374</code> · tokens 165-576 (411) · chunks 0-2</summary>
+
+```text
+Document: 2017 Arizona Cardinals season
+2017 Arizona Cardinals season
+Week Date Opponent Result Record Game site NFL.com recap September 10 at Detroit Lions L 23 -- 35 0
+-- 1 Ford Field Recap September 17 at Indianapolis Colts W 16 -- 13 ( OT ) 1 -- 1 Lucas Oil Stadium
+Recap September 25 Dallas Cowboys L 17 -- 28 1 -- 2 University of Phoenix Stadium Recap October 1
+San Francisco 49ers W 18 -- 15 ( OT ) 2 -- 2 University of Phoenix Stadium Recap 5 October 8 at
+Philadelphia Eagles L 7 -- 34 2 -- 3 Lincoln Financial Field Recap 6 October 15 Tampa Bay Buccaneers
+W 38 -- 33 3 -- 3 University of Phoenix Stadium Recap 7 October 22 at Los Angeles Rams L 0 -- 33 3
+-- 4 Twickenham Stadium ( London , England ) Recap 8 Bye 9 November 5 at San Francisco 49ers W 20 --
+10 4 -- 4 Levi 's Stadium Recap 10 November 9 Seattle Seahawks L 16 -- 22 4 -- 5 University of
+Phoenix Stadium Recap 11 November 19 at Houston Texans L 21 -- 31 4 -- 6 NRG Stadium Recap 12
+November 26 Jacksonville Jaguars W 27 -- 24 5 -- 6 University of Phoenix Stadium Recap 13 December 3
+Los Angeles Rams L 16 -- 32 5 -- 7 University of Phoenix Stadium Recap 14 December 10 Tennessee
+Titans W 12 -- 7 6 -- 7 University of Phoenix Stadium Recap 15 December 17 at Washington Redskins L
+15 -- 20 6 -- 8 FedExField Recap 16 December 24 New York Giants W 23 -- 0 7 -- 8 University of
+Phoenix Stadium Recap 17 December 31 at Seattle Seahawks W 26 -- 24 8 -- 8 CenturyLink Field Recap
+```
+
+</details>
+
+<details><summary>document <code>822086267_6171-6655-0-484</code> · tokens 576-723 (147) · chunk 2</summary>
+
+```text
+Document: 2017 Arizona Cardinals season
+2017 Arizona Cardinals season
+Week Date Opponent Result Record Game site NFL.com recap HOF August 3 vs. Dallas Cowboys L 18 -- 20
+0 -- 1 Tom Benson Hall of Fame Stadium ( Canton , Ohio ) Recap August 12 Oakland Raiders W 20 -- 10
+1 -- 1 University of Phoenix Stadium Recap August 19 Chicago Bears L 23 -- 24 1 -- 2 University of
+Phoenix Stadium Recap August 26 at Atlanta Falcons W 24 -- 14 2 -- 2 Mercedes - Benz Stadium Recap
+August 31 at Denver Broncos L 2 -- 30 2 -- 3 Sports Authority Field at Mile High Recap
+```
+
+</details>
+
+<details><summary>document <code>822086267_32952-33189-0-237</code> · tokens 723-802 (79) · chunks 2-3</summary>
+
+```text
+Document: 2017 Arizona Cardinals season
+2017 Arizona Cardinals season
+Date : December 10 Game time : 2 : 05 p.m. MST Game weather : Played indoors ( retractable roof
+closed ) Game attendance : 64,153 Referee : Jerome Boger TV announcers ( CBS ) : Andrew Catalon ,
+James Lofton and Jay Feely Recap , Gamebook
+```
+
+</details>
+
+- **question 0** · tokens 802-815 (13) · chunk 3
+
+```text
+User: where do the arizona cardinals play this week
+```
+
+- `Assistant:` · tokens 815-817 (2) · chunk 3
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 822086267_6698 | 28-165 | 137 | 0 |  |
+| doc 822086267_7384 | 165-576 | 411 | 0-2 |  |
+| doc 822086267_6171 | 576-723 | 147 | 2 |  |
+| doc 822086267_3295 | 723-802 | 79 | 2-3 |  |
+| question 0 | 802-815 | 13 | 3 |  |
+| `assistant:` 0 | 815-817 | 2 | 3 |  |
 
 ```
 P  ###+
@@ -70,26 +170,77 @@ D  MMM+
 
 1,799 prompt tokens: 7 whole chunks and 7 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 816 tokens on its GPU, computed 983 and stored 4 new chunks; D1 held 944, loaded 848 from LMCache and computed 7.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 822086267_6698 | 28-165 | 137 |  |
-| doc 822086267_7384 | 165-576 | 411 |  |
-| doc 822086267_6171 | 576-723 | 147 |  |
-| doc 822086267_3295 | 723-802 | 79 |  |
-| question 0 | 802-815 | 13 |  |
-| `assistant:` 0 | 815-817 | 2 |  |
-| answer 0 | 817-945 | 128 | new this turn |
-| newline 0 | 945-946 | 1 | new this turn |
-| doc 822086267_3295 | 946-1025 | 79 | new this turn |
-| doc 822086267_3634 | 1025-1105 | 80 | new this turn |
-| doc 822086267_7384 | 1105-1516 | 411 | new this turn |
-| doc 822086267_6698 | 1516-1653 | 137 | new this turn |
-| doc 822086267_453- | 1653-1786 | 133 | new this turn |
-| question 1 | 1786-1797 | 11 | new this turn |
-| `assistant:` 1 | 1797-1799 | 2 | new this turn |
+Tokens 0-817: [turn 0](#turn-0)'s prompt, unchanged (checked: its first 817 token ids are the previous prompt's), so chunks 0-2 are the same chunks; chunk 3 (partial then, 49 tokens) fills now. New from token 817:
+
+- **D's answer to turn 0** · tokens 817-945 (128) · chunk 3
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 945-946 (1) · chunk 3
+
+- document `822086267_32952-33189-0-237` · tokens 946-1025 (79) · chunks 3-4 · **again**: sent on [turn 0](#turn-0) already (the same 79 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+<details><summary>document <code>822086267_36346-36586-0-240</code> · tokens 1025-1105 (80) · chunk 4</summary>
+
+```text
+Document: 2017 Arizona Cardinals season
+2017 Arizona Cardinals season
+Date : December 24 Game time : 2 : 25 p.m. MST Game weather : Played indoors ( retractable roof
+closed ) Game attendance : 63,850 Referee : John Parry TV announcers ( Fox ) : Dick Stockton , Mark
+Schlereth and Shannon Spake Recap , Gamebook
+```
+
+</details>
+
+- document `822086267_7384-8758-0-1374` · tokens 1105-1516 (411) · chunks 4-5 · **again**: sent on [turn 0](#turn-0) already (the same 411 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_6698-7277-0-579` · tokens 1516-1653 (137) · chunks 5-6 · **again**: sent on [turn 0](#turn-0) already (the same 137 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+<details><summary>document <code>822086267_453-961-0-508</code> · tokens 1653-1786 (133) · chunk 6</summary>
+
+```text
+Document: 2017 Arizona Cardinals season
+2017 Arizona Cardinals season
+The 2017 Arizona Cardinals season was the franchise 's 98th season in the National Football League ,
+the 30th in Arizona and 12th at University of Phoenix Stadium . It was also the fifth and final
+season under head coach Bruce Arians . The Cardinals played one road game in London at Twickenham
+Stadium against the Los Angeles Rams as one of the NFL London Games . They improved on a 7 -- 8 -- 1
+season they had in 2016 , finishing 8 -- 8 . However , they missed the playoffs for the second
+straight season .
+```
+
+</details>
+
+- **question 1** · tokens 1786-1797 (11) · chunks 6-7
+
+```text
+User: Do the Arizona Cardinals play outside the US?
+```
+
+- `Assistant:` · tokens 1797-1799 (2) · chunk 7
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 822086267_6698 | 28-165 | 137 | 0 |  |
+| doc 822086267_7384 | 165-576 | 411 | 0-2 |  |
+| doc 822086267_6171 | 576-723 | 147 | 2 |  |
+| doc 822086267_3295 | 723-802 | 79 | 2-3 |  |
+| question 0 | 802-815 | 13 | 3 |  |
+| `assistant:` 0 | 815-817 | 2 | 3 |  |
+| answer 0 | 817-945 | 128 | 3 | new this turn |
+| newline 0 | 945-946 | 1 | 3 | new this turn |
+| doc 822086267_3295 | 946-1025 | 79 | 3-4 | new this turn |
+| doc 822086267_3634 | 1025-1105 | 80 | 4 | new this turn |
+| doc 822086267_7384 | 1105-1516 | 411 | 4-5 | new this turn |
+| doc 822086267_6698 | 1516-1653 | 137 | 5-6 | new this turn |
+| doc 822086267_453- | 1653-1786 | 133 | 6 | new this turn |
+| question 1 | 1786-1797 | 11 | 6-7 | new this turn |
+| `assistant:` 1 | 1797-1799 | 2 | 7 | new this turn |
 
 ```
 P  ===####+
@@ -111,37 +262,137 @@ D  ===MMMM+
 
 3,494 prompt tokens: 13 whole chunks and 166 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 1,792 tokens on its GPU, computed 1,702 and stored 6 new chunks; D1 held 1,920, loaded 1,408 from LMCache and computed 166.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 822086267_6698 | 28-165 | 137 |  |
-| doc 822086267_7384 | 165-576 | 411 |  |
-| doc 822086267_6171 | 576-723 | 147 |  |
-| doc 822086267_3295 | 723-802 | 79 |  |
-| question 0 | 802-815 | 13 |  |
-| `assistant:` 0 | 815-817 | 2 |  |
-| answer 0 | 817-945 | 128 |  |
-| newline 0 | 945-946 | 1 |  |
-| doc 822086267_3295 | 946-1025 | 79 |  |
-| doc 822086267_3634 | 1025-1105 | 80 |  |
-| doc 822086267_7384 | 1105-1516 | 411 |  |
-| doc 822086267_6698 | 1516-1653 | 137 |  |
-| doc 822086267_453- | 1653-1786 | 133 |  |
-| question 1 | 1786-1797 | 11 |  |
-| `assistant:` 1 | 1797-1799 | 2 |  |
-| answer 1 | 1799-1927 | 128 | new this turn |
-| newline 1 | 1927-1928 | 1 | new this turn |
-| doc 822086267_6698 | 1928-2065 | 137 | new this turn |
-| doc 822086267_7384 | 2065-2476 | 411 | new this turn |
-| doc 822086267_453- | 2476-2609 | 133 | new this turn |
-| doc 866343245_6575 | 2609-2714 | 105 | new this turn |
-| doc 837407666_8367 | 2714-2903 | 189 | new this turn |
-| doc 836236385_7052 | 2903-3311 | 408 | new this turn |
-| doc 837407666_122- | 3311-3478 | 167 | new this turn |
-| question 2 | 3478-3492 | 14 | new this turn |
-| `assistant:` 2 | 3492-3494 | 2 | new this turn |
+Tokens 0-1,799: [turn 1](#turn-1)'s prompt, unchanged (checked: its first 1,799 token ids are the previous prompt's), so chunks 0-6 are the same chunks; chunk 7 (partial then, 7 tokens) fills now. New from token 1,799:
+
+- **D's answer to turn 1** · tokens 1799-1927 (128) · chunk 7
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 1927-1928 (1) · chunk 7
+
+- document `822086267_6698-7277-0-579` · tokens 1928-2065 (137) · chunks 7-8 · **again**: sent on [turn 0](#turn-0) already (the same 137 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_7384-8758-0-1374` · tokens 2065-2476 (411) · chunks 8-9 · **again**: sent on [turn 0](#turn-0) already (the same 411 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_453-961-0-508` · tokens 2476-2609 (133) · chunks 9-10 · **again**: sent on [turn 1](#turn-1) already (the same 133 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+<details><summary>document <code>866343245_65754-66191-0-437</code> · tokens 2609-2714 (105) · chunk 10</summary>
+
+```text
+Document: Illinois
+Illinois
+The NFL 's Arizona Cardinals , who currently play in the Phoenix suburb of Glendale , Arizona ,
+played in Chicago as the Chicago Cardinals , until moving to St. Louis , Missouri after the 1959
+season . An NBA expansion team known as the Chicago Packers in 1961 -- 1962 , and as the Chicago
+Zephyrs the following year , moved to Baltimore after the 1962 -- 1963 season . The franchise is now
+known as the Washington Wizards . Professional
+```
+
+</details>
+
+<details><summary>document <code>837407666_8367-9237-0-870</code> · tokens 2714-2903 (189) · chunks 10-11</summary>
+
+```text
+Document: History of the National Football League
+History of the National Football League
+Two charter members , the Chicago Cardinals ( now the Arizona Cardinals ) and the Decatur Staleys (
+now the Chicago Bears ) , are still in existence . The Green Bay Packers franchise , founded in 1919
+, is the oldest team not to change locations , but did not begin league play until 1921 . The New
+York Football Giants joined in 1925 , followed by the Portsmouth Spartans in 1930 , relocating to
+Detroit in 1934 to become the Lions . The Indianapolis Colts franchise traces its history through
+several predecessors , including one of the league 's founding teams -- the Dayton Triangles -- but
+is considered a separate franchise from those teams and was founded as the Baltimore Colts in 1953 .
+Although the original NFL teams representing Buffalo , Cleveland , Chicago and Detroit no longer
+exist , replacement franchises have since been established for those cities .
+```
+
+</details>
+
+<details><summary>document <code>836236385_70524-72270-0-1746</code> · tokens 2903-3311 (408) · chunks 11-12</summary>
+
+```text
+Document: Missouri
+Missouri
+National Football League : St. Louis Cardinals ( moved from Chicago in 1960 ; moved to Tempe ,
+Arizona in 1988 and are now the Arizona Cardinals ) St. Louis All Stars ( active in 1923 only )
+Kansas City Blues / Cowboys ( active 1924 -- 1926 , folded ) St. Louis Gunners ( independent team ,
+joined the NFL for the last three weeks of the 1934 season and folded thereafter ) St. Louis Rams
+1995 -- 2015 moved from Los Angeles and then back to Los Angeles Major League Baseball ( American
+League ) : St. Louis Browns ( moved from Milwaukee in 1902 ; moved to Baltimore , Maryland after the
+1953 season and are now the Baltimore Orioles ) Kansas City Athletics ( moved from Philadelphia in
+1955 ; moved to Oakland , California after the 1967 season and are now the Oakland Athletics )
+National Basketball Association : St. Louis Bombers ( charter BAA franchise in 1946 , joined the NBA
+when it formed in 1949 ; ceased operations in 1950 ) St. Louis Hawks ( moved from Milwaukee in 1955
+; moved to Atlanta in 1968 and are now the Atlanta Hawks ) Kansas City Kings ( moved from Cincinnati
+in 1972 ; moved to Sacramento in 1985 and are now the Sacramento Kings ; prior to locating in Kansas
+City , they were known as the Cincinnati Royals ) National Hockey League : Kansas City Scouts ( 1974
+expansion team , moved to Denver , Colorado in 1976 and became the Colorado Rockies , and would move
+again to Newark , New Jersey ; now called the New Jersey Devils ) St. Louis Eagles ( 1934 relocation
+of the original Ottawa Senators , folded after the 1934 -- 35 season ) Major League Soccer : Kansas
+City Wiz / Kansas City Wizards ( founded in 1995 , but moved from Kansas City , Missouri , to Kansas
+City , Kansas , in 2010 and became Sporting Kansas City )
+```
+
+</details>
+
+<details><summary>document <code>837407666_122-881-0-759</code> · tokens 3311-3478 (167) · chunks 12-13</summary>
+
+```text
+Document: History of the National Football League
+History of the National Football League
+The National Football League ( NFL ) was founded in 1899 as the American Professional Football
+Association ( APFA ) with ten teams from four states , all of whom existed in some form as
+participants of regional leagues in their respective territories ; it took on its current name in
+1922 . The NFL was the first professional football league to successfully establish a nationwide
+presence , after several decades of failed attempts . Only two teams currently in the NFL , the
+Decatur Staleys ( now the Chicago Bears ) and the Chicago Cardinals ( now the Arizona Cardinals ) ,
+are founding members . The Green Bay Packers , founded 1919 ( joined the NFL in 1921 ) , is the
+oldest NFL franchise in continuous operation with the same name in the same location .
+```
+
+</details>
+
+- **question 2** · tokens 3478-3492 (14) · chunk 13
+
+```text
+User: Are the Arizona Cardinals and the Chicago Cardinals the same team?
+```
+
+- `Assistant:` · tokens 3492-3494 (2) · chunk 13
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 822086267_6698 | 28-165 | 137 | 0 |  |
+| doc 822086267_7384 | 165-576 | 411 | 0-2 |  |
+| doc 822086267_6171 | 576-723 | 147 | 2 |  |
+| doc 822086267_3295 | 723-802 | 79 | 2-3 |  |
+| question 0 | 802-815 | 13 | 3 |  |
+| `assistant:` 0 | 815-817 | 2 | 3 |  |
+| answer 0 | 817-945 | 128 | 3 |  |
+| newline 0 | 945-946 | 1 | 3 |  |
+| doc 822086267_3295 | 946-1025 | 79 | 3-4 |  |
+| doc 822086267_3634 | 1025-1105 | 80 | 4 |  |
+| doc 822086267_7384 | 1105-1516 | 411 | 4-5 |  |
+| doc 822086267_6698 | 1516-1653 | 137 | 5-6 |  |
+| doc 822086267_453- | 1653-1786 | 133 | 6 |  |
+| question 1 | 1786-1797 | 11 | 6-7 |  |
+| `assistant:` 1 | 1797-1799 | 2 | 7 |  |
+| answer 1 | 1799-1927 | 128 | 7 | new this turn |
+| newline 1 | 1927-1928 | 1 | 7 | new this turn |
+| doc 822086267_6698 | 1928-2065 | 137 | 7-8 | new this turn |
+| doc 822086267_7384 | 2065-2476 | 411 | 8-9 | new this turn |
+| doc 822086267_453- | 2476-2609 | 133 | 9-10 | new this turn |
+| doc 866343245_6575 | 2609-2714 | 105 | 10 | new this turn |
+| doc 837407666_8367 | 2714-2903 | 189 | 10-11 | new this turn |
+| doc 836236385_7052 | 2903-3311 | 408 | 11-12 | new this turn |
+| doc 837407666_122- | 3311-3478 | 167 | 12-13 | new this turn |
+| question 2 | 3478-3492 | 14 | 13 | new this turn |
+| `assistant:` 2 | 3492-3494 | 2 | 13 | new this turn |
 
 ```
 P  =======######+
@@ -169,46 +420,100 @@ D  =======MMMMMM+
 
 4,561 prompt tokens: 17 whole chunks and 209 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 3,488 tokens on its GPU, computed 1,073 and stored 4 new chunks; D1 held 3,616, loaded 736 from LMCache and computed 209.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 822086267_6698 | 28-165 | 137 |  |
-| doc 822086267_7384 | 165-576 | 411 |  |
-| doc 822086267_6171 | 576-723 | 147 |  |
-| doc 822086267_3295 | 723-802 | 79 |  |
-| question 0 | 802-815 | 13 |  |
-| `assistant:` 0 | 815-817 | 2 |  |
-| answer 0 | 817-945 | 128 |  |
-| newline 0 | 945-946 | 1 |  |
-| doc 822086267_3295 | 946-1025 | 79 |  |
-| doc 822086267_3634 | 1025-1105 | 80 |  |
-| doc 822086267_7384 | 1105-1516 | 411 |  |
-| doc 822086267_6698 | 1516-1653 | 137 |  |
-| doc 822086267_453- | 1653-1786 | 133 |  |
-| question 1 | 1786-1797 | 11 |  |
-| `assistant:` 1 | 1797-1799 | 2 |  |
-| answer 1 | 1799-1927 | 128 |  |
-| newline 1 | 1927-1928 | 1 |  |
-| doc 822086267_6698 | 1928-2065 | 137 |  |
-| doc 822086267_7384 | 2065-2476 | 411 |  |
-| doc 822086267_453- | 2476-2609 | 133 |  |
-| doc 866343245_6575 | 2609-2714 | 105 |  |
-| doc 837407666_8367 | 2714-2903 | 189 |  |
-| doc 836236385_7052 | 2903-3311 | 408 |  |
-| doc 837407666_122- | 3311-3478 | 167 |  |
-| question 2 | 3478-3492 | 14 |  |
-| `assistant:` 2 | 3492-3494 | 2 |  |
-| answer 2 | 3494-3622 | 128 | new this turn |
-| newline 2 | 3622-3623 | 1 | new this turn |
-| doc 822086267_6698 | 3623-3760 | 137 | new this turn |
-| doc 822086267_7384 | 3760-4171 | 411 | new this turn |
-| doc 822086267_453- | 4171-4304 | 133 | new this turn |
-| doc 832860310_2886 | 4304-4401 | 97 | new this turn |
-| doc 837407666_1762 | 4401-4549 | 148 | new this turn |
-| question 3 | 4549-4559 | 10 | new this turn |
-| `assistant:` 3 | 4559-4561 | 2 | new this turn |
+Tokens 0-3,494: [turn 2](#turn-2)'s prompt, unchanged (checked: its first 3,494 token ids are the previous prompt's), so chunks 0-12 are the same chunks; chunk 13 (partial then, 166 tokens) fills now. New from token 3,494:
+
+- **D's answer to turn 2** · tokens 3494-3622 (128) · chunks 13-14
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 3622-3623 (1) · chunk 14
+
+- document `822086267_6698-7277-0-579` · tokens 3623-3760 (137) · chunk 14 · **again**: sent on [turn 0](#turn-0) already (the same 137 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_7384-8758-0-1374` · tokens 3760-4171 (411) · chunks 14-16 · **again**: sent on [turn 0](#turn-0) already (the same 411 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_453-961-0-508` · tokens 4171-4304 (133) · chunk 16 · **again**: sent on [turn 1](#turn-1) already (the same 133 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+<details><summary>document <code>832860310_2886-3341-0-455</code> · tokens 4304-4401 (97) · chunks 16-17</summary>
+
+```text
+Document: NFL playoffs
+NFL playoffs
+The 32 - team National Football League is divided into two conferences , American Football
+Conference ( AFC ) and National Football Conference ( NFC ) , each with 16 teams . Since 2002 , each
+conference has been further divided into four divisions of four teams each . The tournament brackets
+are made up of six teams from each of the league 's two conferences , following the end of the
+regular season . Qualification into the playoffs works as follows :
+```
+
+</details>
+
+<details><summary>document <code>837407666_1762-2394-0-632</code> · tokens 4401-4549 (148) · chunk 17</summary>
+
+```text
+Document: History of the National Football League
+History of the National Football League
+The rival American Football League was founded in 1960 . It was very successful , and forced a
+merger with the older NFL that resulted in a greatly expanded league and the creation of the Super
+Bowl , which has become the most - watched annual sporting event in the United States . The league
+continued to expand to its current size of 32 teams . A series of labor agreements during the 1990s
+and increasingly large television contracts has helped keep the league one of the most profitable in
+the U.S. , and the only major league in the U.S. since 1990 to avoid a work stoppage that resulted
+in the loss of regular - season games .
+```
+
+</details>
+
+- **question 3** · tokens 4549-4559 (10) · chunk 17
+
+```text
+User: How many teams are in the NFL?
+```
+
+- `Assistant:` · tokens 4559-4561 (2) · chunk 17
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 822086267_6698 | 28-165 | 137 | 0 |  |
+| doc 822086267_7384 | 165-576 | 411 | 0-2 |  |
+| doc 822086267_6171 | 576-723 | 147 | 2 |  |
+| doc 822086267_3295 | 723-802 | 79 | 2-3 |  |
+| question 0 | 802-815 | 13 | 3 |  |
+| `assistant:` 0 | 815-817 | 2 | 3 |  |
+| answer 0 | 817-945 | 128 | 3 |  |
+| newline 0 | 945-946 | 1 | 3 |  |
+| doc 822086267_3295 | 946-1025 | 79 | 3-4 |  |
+| doc 822086267_3634 | 1025-1105 | 80 | 4 |  |
+| doc 822086267_7384 | 1105-1516 | 411 | 4-5 |  |
+| doc 822086267_6698 | 1516-1653 | 137 | 5-6 |  |
+| doc 822086267_453- | 1653-1786 | 133 | 6 |  |
+| question 1 | 1786-1797 | 11 | 6-7 |  |
+| `assistant:` 1 | 1797-1799 | 2 | 7 |  |
+| answer 1 | 1799-1927 | 128 | 7 |  |
+| newline 1 | 1927-1928 | 1 | 7 |  |
+| doc 822086267_6698 | 1928-2065 | 137 | 7-8 |  |
+| doc 822086267_7384 | 2065-2476 | 411 | 8-9 |  |
+| doc 822086267_453- | 2476-2609 | 133 | 9-10 |  |
+| doc 866343245_6575 | 2609-2714 | 105 | 10 |  |
+| doc 837407666_8367 | 2714-2903 | 189 | 10-11 |  |
+| doc 836236385_7052 | 2903-3311 | 408 | 11-12 |  |
+| doc 837407666_122- | 3311-3478 | 167 | 12-13 |  |
+| question 2 | 3478-3492 | 14 | 13 |  |
+| `assistant:` 2 | 3492-3494 | 2 | 13 |  |
+| answer 2 | 3494-3622 | 128 | 13-14 | new this turn |
+| newline 2 | 3622-3623 | 1 | 14 | new this turn |
+| doc 822086267_6698 | 3623-3760 | 137 | 14 | new this turn |
+| doc 822086267_7384 | 3760-4171 | 411 | 14-16 | new this turn |
+| doc 822086267_453- | 4171-4304 | 133 | 16 | new this turn |
+| doc 832860310_2886 | 4304-4401 | 97 | 16-17 | new this turn |
+| doc 837407666_1762 | 4401-4549 | 148 | 17 | new this turn |
+| question 3 | 4549-4559 | 10 | 17 | new this turn |
+| `assistant:` 3 | 4559-4561 | 2 | 17 | new this turn |
 
 ```
 P  =============####+
@@ -240,56 +545,117 @@ D  ==============MMM+
 
 5,813 prompt tokens: 22 whole chunks and 181 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 4,560 tokens on its GPU, computed 1,253 and stored 5 new chunks; D1 held 4,688, loaded 944 from LMCache and computed 181.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 822086267_6698 | 28-165 | 137 |  |
-| doc 822086267_7384 | 165-576 | 411 |  |
-| doc 822086267_6171 | 576-723 | 147 |  |
-| doc 822086267_3295 | 723-802 | 79 |  |
-| question 0 | 802-815 | 13 |  |
-| `assistant:` 0 | 815-817 | 2 |  |
-| answer 0 | 817-945 | 128 |  |
-| newline 0 | 945-946 | 1 |  |
-| doc 822086267_3295 | 946-1025 | 79 |  |
-| doc 822086267_3634 | 1025-1105 | 80 |  |
-| doc 822086267_7384 | 1105-1516 | 411 |  |
-| doc 822086267_6698 | 1516-1653 | 137 |  |
-| doc 822086267_453- | 1653-1786 | 133 |  |
-| question 1 | 1786-1797 | 11 |  |
-| `assistant:` 1 | 1797-1799 | 2 |  |
-| answer 1 | 1799-1927 | 128 |  |
-| newline 1 | 1927-1928 | 1 |  |
-| doc 822086267_6698 | 1928-2065 | 137 |  |
-| doc 822086267_7384 | 2065-2476 | 411 |  |
-| doc 822086267_453- | 2476-2609 | 133 |  |
-| doc 866343245_6575 | 2609-2714 | 105 |  |
-| doc 837407666_8367 | 2714-2903 | 189 |  |
-| doc 836236385_7052 | 2903-3311 | 408 |  |
-| doc 837407666_122- | 3311-3478 | 167 |  |
-| question 2 | 3478-3492 | 14 |  |
-| `assistant:` 2 | 3492-3494 | 2 |  |
-| answer 2 | 3494-3622 | 128 |  |
-| newline 2 | 3622-3623 | 1 |  |
-| doc 822086267_6698 | 3623-3760 | 137 |  |
-| doc 822086267_7384 | 3760-4171 | 411 |  |
-| doc 822086267_453- | 4171-4304 | 133 |  |
-| doc 832860310_2886 | 4304-4401 | 97 |  |
-| doc 837407666_1762 | 4401-4549 | 148 |  |
-| question 3 | 4549-4559 | 10 |  |
-| `assistant:` 3 | 4559-4561 | 2 |  |
-| answer 3 | 4561-4689 | 128 | new this turn |
-| newline 3 | 4689-4690 | 1 | new this turn |
-| doc 822086267_6698 | 4690-4827 | 137 | new this turn |
-| doc 822086267_7384 | 4827-5238 | 411 | new this turn |
-| doc 822086267_453- | 5238-5371 | 133 | new this turn |
-| doc 832860310_2886 | 5371-5468 | 97 | new this turn |
-| doc 832860310_2802 | 5468-5634 | 166 | new this turn |
-| doc 832860310_2539 | 5634-5800 | 166 | new this turn |
-| question 4 | 5800-5811 | 11 | new this turn |
-| `assistant:` 4 | 5811-5813 | 2 | new this turn |
+Tokens 0-4,561: [turn 3](#turn-3)'s prompt, unchanged (checked: its first 4,561 token ids are the previous prompt's), so chunks 0-16 are the same chunks; chunk 17 (partial then, 209 tokens) fills now. New from token 4,561:
+
+- **D's answer to turn 3** · tokens 4561-4689 (128) · chunks 17-18
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 4689-4690 (1) · chunk 18
+
+- document `822086267_6698-7277-0-579` · tokens 4690-4827 (137) · chunk 18 · **again**: sent on [turn 0](#turn-0) already (the same 137 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_7384-8758-0-1374` · tokens 4827-5238 (411) · chunks 18-20 · **again**: sent on [turn 0](#turn-0) already (the same 411 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_453-961-0-508` · tokens 5238-5371 (133) · chunk 20 · **again**: sent on [turn 1](#turn-1) already (the same 133 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `832860310_2886-3341-0-455` · tokens 5371-5468 (97) · chunks 20-21 · **again**: sent on [turn 3](#turn-3) already (the same 97 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+<details><summary>document <code>832860310_28027-28822-0-795</code> · tokens 5468-5634 (166) · chunks 21-22</summary>
+
+```text
+Document: NFL playoffs
+NFL playoffs
+As a result of this seeding issue , frequent calls have been made to modify the playoff format even
+further . One proposal has been to expand the playoffs to 14 teams . Proponents of expansion note
+the increased revenue that could be gained from an additional two playoff games . They also note
+that the 12 - team playoff system was implemented when the league only had 28 teams and six
+divisions ( of 4 to 5 teams each ) . The opposition to such a move notes that an expansion of the
+playoffs would `` water down '' the field by giving access to lower - caliber teams . Opponents to
+expansion further point to the NBA playoffs and the NHL playoffs where more than half of the teams
+qualify for the postseason , and there is often a decreased emphasis on regular season performance
+as a result .
+```
+
+</details>
+
+<details><summary>document <code>832860310_25394-26168-0-774</code> · tokens 5634-5800 (166) · chunk 22</summary>
+
+```text
+Document: NFL playoffs
+NFL playoffs
+There are some limitations that exist in the current 12 - team playoff system . Since being a
+division winner is a guaranteed playoff berth , there have been many cases in which a team that wins
+a `` weak '' division either barely has a winning record or has a . 500 or losing record altogether
+( such as the 2010 Seattle Seahawks ) . At the same time , since a division winner is seeded higher
+than the wild cards , non-division winners may end up playing a road game during Wild Card Weekend
+against a team with an inferior record , or may end up outright missing the playoffs . And going on
+the road during the first postseason round does not guarantee success : the first time that all four
+road teams won during Wild Card Weekend occurred during the 2015 -- 16 season .
+```
+
+</details>
+
+- **question 4** · tokens 5800-5811 (11) · chunk 22
+
+```text
+User: How many teams are in the NFL playoffs?
+```
+
+- `Assistant:` · tokens 5811-5813 (2) · chunk 22
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 822086267_6698 | 28-165 | 137 | 0 |  |
+| doc 822086267_7384 | 165-576 | 411 | 0-2 |  |
+| doc 822086267_6171 | 576-723 | 147 | 2 |  |
+| doc 822086267_3295 | 723-802 | 79 | 2-3 |  |
+| question 0 | 802-815 | 13 | 3 |  |
+| `assistant:` 0 | 815-817 | 2 | 3 |  |
+| answer 0 | 817-945 | 128 | 3 |  |
+| newline 0 | 945-946 | 1 | 3 |  |
+| doc 822086267_3295 | 946-1025 | 79 | 3-4 |  |
+| doc 822086267_3634 | 1025-1105 | 80 | 4 |  |
+| doc 822086267_7384 | 1105-1516 | 411 | 4-5 |  |
+| doc 822086267_6698 | 1516-1653 | 137 | 5-6 |  |
+| doc 822086267_453- | 1653-1786 | 133 | 6 |  |
+| question 1 | 1786-1797 | 11 | 6-7 |  |
+| `assistant:` 1 | 1797-1799 | 2 | 7 |  |
+| answer 1 | 1799-1927 | 128 | 7 |  |
+| newline 1 | 1927-1928 | 1 | 7 |  |
+| doc 822086267_6698 | 1928-2065 | 137 | 7-8 |  |
+| doc 822086267_7384 | 2065-2476 | 411 | 8-9 |  |
+| doc 822086267_453- | 2476-2609 | 133 | 9-10 |  |
+| doc 866343245_6575 | 2609-2714 | 105 | 10 |  |
+| doc 837407666_8367 | 2714-2903 | 189 | 10-11 |  |
+| doc 836236385_7052 | 2903-3311 | 408 | 11-12 |  |
+| doc 837407666_122- | 3311-3478 | 167 | 12-13 |  |
+| question 2 | 3478-3492 | 14 | 13 |  |
+| `assistant:` 2 | 3492-3494 | 2 | 13 |  |
+| answer 2 | 3494-3622 | 128 | 13-14 |  |
+| newline 2 | 3622-3623 | 1 | 14 |  |
+| doc 822086267_6698 | 3623-3760 | 137 | 14 |  |
+| doc 822086267_7384 | 3760-4171 | 411 | 14-16 |  |
+| doc 822086267_453- | 4171-4304 | 133 | 16 |  |
+| doc 832860310_2886 | 4304-4401 | 97 | 16-17 |  |
+| doc 837407666_1762 | 4401-4549 | 148 | 17 |  |
+| question 3 | 4549-4559 | 10 | 17 |  |
+| `assistant:` 3 | 4559-4561 | 2 | 17 |  |
+| answer 3 | 4561-4689 | 128 | 17-18 | new this turn |
+| newline 3 | 4689-4690 | 1 | 18 | new this turn |
+| doc 822086267_6698 | 4690-4827 | 137 | 18 | new this turn |
+| doc 822086267_7384 | 4827-5238 | 411 | 18-20 | new this turn |
+| doc 822086267_453- | 5238-5371 | 133 | 20 | new this turn |
+| doc 832860310_2886 | 5371-5468 | 97 | 20-21 | new this turn |
+| doc 832860310_2802 | 5468-5634 | 166 | 21-22 | new this turn |
+| doc 832860310_2539 | 5634-5800 | 166 | 22 | new this turn |
+| question 4 | 5800-5811 | 11 | 22 | new this turn |
+| `assistant:` 4 | 5811-5813 | 2 | 22 | new this turn |
 
 ```
 P  =================#####+
@@ -326,65 +692,121 @@ D  ==================MMMM+
 
 6,925 prompt tokens: 27 whole chunks and 13 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 5,808 tokens on its GPU, computed 1,117 and stored 5 new chunks; D1 held 5,936, loaded 976 from LMCache and computed 13.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 822086267_6698 | 28-165 | 137 |  |
-| doc 822086267_7384 | 165-576 | 411 |  |
-| doc 822086267_6171 | 576-723 | 147 |  |
-| doc 822086267_3295 | 723-802 | 79 |  |
-| question 0 | 802-815 | 13 |  |
-| `assistant:` 0 | 815-817 | 2 |  |
-| answer 0 | 817-945 | 128 |  |
-| newline 0 | 945-946 | 1 |  |
-| doc 822086267_3295 | 946-1025 | 79 |  |
-| doc 822086267_3634 | 1025-1105 | 80 |  |
-| doc 822086267_7384 | 1105-1516 | 411 |  |
-| doc 822086267_6698 | 1516-1653 | 137 |  |
-| doc 822086267_453- | 1653-1786 | 133 |  |
-| question 1 | 1786-1797 | 11 |  |
-| `assistant:` 1 | 1797-1799 | 2 |  |
-| answer 1 | 1799-1927 | 128 |  |
-| newline 1 | 1927-1928 | 1 |  |
-| doc 822086267_6698 | 1928-2065 | 137 |  |
-| doc 822086267_7384 | 2065-2476 | 411 |  |
-| doc 822086267_453- | 2476-2609 | 133 |  |
-| doc 866343245_6575 | 2609-2714 | 105 |  |
-| doc 837407666_8367 | 2714-2903 | 189 |  |
-| doc 836236385_7052 | 2903-3311 | 408 |  |
-| doc 837407666_122- | 3311-3478 | 167 |  |
-| question 2 | 3478-3492 | 14 |  |
-| `assistant:` 2 | 3492-3494 | 2 |  |
-| answer 2 | 3494-3622 | 128 |  |
-| newline 2 | 3622-3623 | 1 |  |
-| doc 822086267_6698 | 3623-3760 | 137 |  |
-| doc 822086267_7384 | 3760-4171 | 411 |  |
-| doc 822086267_453- | 4171-4304 | 133 |  |
-| doc 832860310_2886 | 4304-4401 | 97 |  |
-| doc 837407666_1762 | 4401-4549 | 148 |  |
-| question 3 | 4549-4559 | 10 |  |
-| `assistant:` 3 | 4559-4561 | 2 |  |
-| answer 3 | 4561-4689 | 128 |  |
-| newline 3 | 4689-4690 | 1 |  |
-| doc 822086267_6698 | 4690-4827 | 137 |  |
-| doc 822086267_7384 | 4827-5238 | 411 |  |
-| doc 822086267_453- | 5238-5371 | 133 |  |
-| doc 832860310_2886 | 5371-5468 | 97 |  |
-| doc 832860310_2802 | 5468-5634 | 166 |  |
-| doc 832860310_2539 | 5634-5800 | 166 |  |
-| question 4 | 5800-5811 | 11 |  |
-| `assistant:` 4 | 5811-5813 | 2 |  |
-| answer 4 | 5813-5941 | 128 | new this turn |
-| newline 4 | 5941-5942 | 1 | new this turn |
-| doc 822086267_6698 | 5942-6079 | 137 | new this turn |
-| doc 822086267_7384 | 6079-6490 | 411 | new this turn |
-| doc 822086267_453- | 6490-6623 | 133 | new this turn |
-| doc 826807874_2330 | 6623-6665 | 42 | new this turn |
-| doc 826807874_1205 | 6665-6911 | 246 | new this turn |
-| question 5 | 6911-6923 | 12 | new this turn |
-| `assistant:` 5 | 6923-6925 | 2 | new this turn |
+Tokens 0-5,813: [turn 4](#turn-4)'s prompt, unchanged (checked: its first 5,813 token ids are the previous prompt's), so chunks 0-21 are the same chunks; chunk 22 (partial then, 181 tokens) fills now. New from token 5,813:
+
+- **D's answer to turn 4** · tokens 5813-5941 (128) · chunks 22-23
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 5941-5942 (1) · chunk 23
+
+- document `822086267_6698-7277-0-579` · tokens 5942-6079 (137) · chunk 23 · **again**: sent on [turn 0](#turn-0) already (the same 137 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_7384-8758-0-1374` · tokens 6079-6490 (411) · chunks 23-25 · **again**: sent on [turn 0](#turn-0) already (the same 411 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_453-961-0-508` · tokens 6490-6623 (133) · chunk 25 · **again**: sent on [turn 1](#turn-1) already (the same 133 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+<details><summary>document <code>826807874_23300-23459-0-159</code> · tokens 6623-6665 (42) · chunks 25-26</summary>
+
+```text
+Document: Super Bowl
+Super Bowl
+The following season , the Steelers logged their record sixth Super Bowl title ( XLIII ) in a 27 --
+23 , final - minute victory against the Arizona Cardinals .
+```
+
+</details>
+
+<details><summary>document <code>826807874_12058-13245-0-1187</code> · tokens 6665-6911 (246) · chunk 26</summary>
+
+```text
+Document: Super Bowl
+Super Bowl
+The Pittsburgh Steelers have won six Super Bowls , the most of any team ; the Dallas Cowboys , New
+England Patriots and San Francisco 49ers have five victories each , while the Green Bay Packers and
+New York Giants have four Super Bowl championships . Fourteen other NFL franchises have won at least
+one Super Bowl . Eight teams have appeared in Super Bowl games without a win . The Minnesota Vikings
+were the first team to have appeared a record four times without a win . The Buffalo Bills played in
+a record four Super Bowls in a row and lost every one . Four teams ( the Cleveland Browns , Detroit
+Lions , Jacksonville Jaguars , and Houston Texans ) have never appeared in a Super Bowl . The Browns
+and Lions both won NFL Championships prior to the creation of the Super Bowl , while the Jaguars (
+1995 ) and Texans ( 2002 ) are both recent NFL expansion teams . ( Detroit , Houston , and
+Jacksonville , however , have hosted a Super Bowl , leaving the Browns the only team to date who has
+neither played in nor whose city has hosted the game . ) The Minnesota Vikings won the last NFL
+Championship before the merger but lost to the AFL champion Kansas City Chiefs in Super Bowl IV .
+```
+
+</details>
+
+- **question 5** · tokens 6911-6923 (12) · chunks 26-27
+
+```text
+User: Which team has won the most Super Bowls?
+```
+
+- `Assistant:` · tokens 6923-6925 (2) · chunk 27
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 822086267_6698 | 28-165 | 137 | 0 |  |
+| doc 822086267_7384 | 165-576 | 411 | 0-2 |  |
+| doc 822086267_6171 | 576-723 | 147 | 2 |  |
+| doc 822086267_3295 | 723-802 | 79 | 2-3 |  |
+| question 0 | 802-815 | 13 | 3 |  |
+| `assistant:` 0 | 815-817 | 2 | 3 |  |
+| answer 0 | 817-945 | 128 | 3 |  |
+| newline 0 | 945-946 | 1 | 3 |  |
+| doc 822086267_3295 | 946-1025 | 79 | 3-4 |  |
+| doc 822086267_3634 | 1025-1105 | 80 | 4 |  |
+| doc 822086267_7384 | 1105-1516 | 411 | 4-5 |  |
+| doc 822086267_6698 | 1516-1653 | 137 | 5-6 |  |
+| doc 822086267_453- | 1653-1786 | 133 | 6 |  |
+| question 1 | 1786-1797 | 11 | 6-7 |  |
+| `assistant:` 1 | 1797-1799 | 2 | 7 |  |
+| answer 1 | 1799-1927 | 128 | 7 |  |
+| newline 1 | 1927-1928 | 1 | 7 |  |
+| doc 822086267_6698 | 1928-2065 | 137 | 7-8 |  |
+| doc 822086267_7384 | 2065-2476 | 411 | 8-9 |  |
+| doc 822086267_453- | 2476-2609 | 133 | 9-10 |  |
+| doc 866343245_6575 | 2609-2714 | 105 | 10 |  |
+| doc 837407666_8367 | 2714-2903 | 189 | 10-11 |  |
+| doc 836236385_7052 | 2903-3311 | 408 | 11-12 |  |
+| doc 837407666_122- | 3311-3478 | 167 | 12-13 |  |
+| question 2 | 3478-3492 | 14 | 13 |  |
+| `assistant:` 2 | 3492-3494 | 2 | 13 |  |
+| answer 2 | 3494-3622 | 128 | 13-14 |  |
+| newline 2 | 3622-3623 | 1 | 14 |  |
+| doc 822086267_6698 | 3623-3760 | 137 | 14 |  |
+| doc 822086267_7384 | 3760-4171 | 411 | 14-16 |  |
+| doc 822086267_453- | 4171-4304 | 133 | 16 |  |
+| doc 832860310_2886 | 4304-4401 | 97 | 16-17 |  |
+| doc 837407666_1762 | 4401-4549 | 148 | 17 |  |
+| question 3 | 4549-4559 | 10 | 17 |  |
+| `assistant:` 3 | 4559-4561 | 2 | 17 |  |
+| answer 3 | 4561-4689 | 128 | 17-18 |  |
+| newline 3 | 4689-4690 | 1 | 18 |  |
+| doc 822086267_6698 | 4690-4827 | 137 | 18 |  |
+| doc 822086267_7384 | 4827-5238 | 411 | 18-20 |  |
+| doc 822086267_453- | 5238-5371 | 133 | 20 |  |
+| doc 832860310_2886 | 5371-5468 | 97 | 20-21 |  |
+| doc 832860310_2802 | 5468-5634 | 166 | 21-22 |  |
+| doc 832860310_2539 | 5634-5800 | 166 | 22 |  |
+| question 4 | 5800-5811 | 11 | 22 |  |
+| `assistant:` 4 | 5811-5813 | 2 | 22 |  |
+| answer 4 | 5813-5941 | 128 | 22-23 | new this turn |
+| newline 4 | 5941-5942 | 1 | 23 | new this turn |
+| doc 822086267_6698 | 5942-6079 | 137 | 23 | new this turn |
+| doc 822086267_7384 | 6079-6490 | 411 | 23-25 | new this turn |
+| doc 822086267_453- | 6490-6623 | 133 | 25 | new this turn |
+| doc 826807874_2330 | 6623-6665 | 42 | 25-26 | new this turn |
+| doc 826807874_1205 | 6665-6911 | 246 | 26 | new this turn |
+| question 5 | 6911-6923 | 12 | 26-27 | new this turn |
+| `assistant:` 5 | 6923-6925 | 2 | 27 | new this turn |
 
 ```
 P  ======================#####+
@@ -426,74 +848,130 @@ D  =======================MMMM+
 
 8,025 prompt tokens: 31 whole chunks and 89 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 6,912 tokens on its GPU, computed 1,113 and stored 4 new chunks; D1 held 7,040, loaded 896 from LMCache and computed 89.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 822086267_6698 | 28-165 | 137 |  |
-| doc 822086267_7384 | 165-576 | 411 |  |
-| doc 822086267_6171 | 576-723 | 147 |  |
-| doc 822086267_3295 | 723-802 | 79 |  |
-| question 0 | 802-815 | 13 |  |
-| `assistant:` 0 | 815-817 | 2 |  |
-| answer 0 | 817-945 | 128 |  |
-| newline 0 | 945-946 | 1 |  |
-| doc 822086267_3295 | 946-1025 | 79 |  |
-| doc 822086267_3634 | 1025-1105 | 80 |  |
-| doc 822086267_7384 | 1105-1516 | 411 |  |
-| doc 822086267_6698 | 1516-1653 | 137 |  |
-| doc 822086267_453- | 1653-1786 | 133 |  |
-| question 1 | 1786-1797 | 11 |  |
-| `assistant:` 1 | 1797-1799 | 2 |  |
-| answer 1 | 1799-1927 | 128 |  |
-| newline 1 | 1927-1928 | 1 |  |
-| doc 822086267_6698 | 1928-2065 | 137 |  |
-| doc 822086267_7384 | 2065-2476 | 411 |  |
-| doc 822086267_453- | 2476-2609 | 133 |  |
-| doc 866343245_6575 | 2609-2714 | 105 |  |
-| doc 837407666_8367 | 2714-2903 | 189 |  |
-| doc 836236385_7052 | 2903-3311 | 408 |  |
-| doc 837407666_122- | 3311-3478 | 167 |  |
-| question 2 | 3478-3492 | 14 |  |
-| `assistant:` 2 | 3492-3494 | 2 |  |
-| answer 2 | 3494-3622 | 128 |  |
-| newline 2 | 3622-3623 | 1 |  |
-| doc 822086267_6698 | 3623-3760 | 137 |  |
-| doc 822086267_7384 | 3760-4171 | 411 |  |
-| doc 822086267_453- | 4171-4304 | 133 |  |
-| doc 832860310_2886 | 4304-4401 | 97 |  |
-| doc 837407666_1762 | 4401-4549 | 148 |  |
-| question 3 | 4549-4559 | 10 |  |
-| `assistant:` 3 | 4559-4561 | 2 |  |
-| answer 3 | 4561-4689 | 128 |  |
-| newline 3 | 4689-4690 | 1 |  |
-| doc 822086267_6698 | 4690-4827 | 137 |  |
-| doc 822086267_7384 | 4827-5238 | 411 |  |
-| doc 822086267_453- | 5238-5371 | 133 |  |
-| doc 832860310_2886 | 5371-5468 | 97 |  |
-| doc 832860310_2802 | 5468-5634 | 166 |  |
-| doc 832860310_2539 | 5634-5800 | 166 |  |
-| question 4 | 5800-5811 | 11 |  |
-| `assistant:` 4 | 5811-5813 | 2 |  |
-| answer 4 | 5813-5941 | 128 |  |
-| newline 4 | 5941-5942 | 1 |  |
-| doc 822086267_6698 | 5942-6079 | 137 |  |
-| doc 822086267_7384 | 6079-6490 | 411 |  |
-| doc 822086267_453- | 6490-6623 | 133 |  |
-| doc 826807874_2330 | 6623-6665 | 42 |  |
-| doc 826807874_1205 | 6665-6911 | 246 |  |
-| question 5 | 6911-6923 | 12 |  |
-| `assistant:` 5 | 6923-6925 | 2 |  |
-| answer 5 | 6925-7053 | 128 | new this turn |
-| newline 5 | 7053-7054 | 1 | new this turn |
-| doc 822086267_6698 | 7054-7191 | 137 | new this turn |
-| doc 822086267_7384 | 7191-7602 | 411 | new this turn |
-| doc 822086267_453- | 7602-7735 | 133 | new this turn |
-| doc 826807874_2550 | 7735-7822 | 87 | new this turn |
-| doc 826807874_1485 | 7822-8008 | 186 | new this turn |
-| question 6 | 8008-8023 | 15 | new this turn |
-| `assistant:` 6 | 8023-8025 | 2 | new this turn |
+Tokens 0-6,925: [turn 5](#turn-5)'s prompt, unchanged (checked: its first 6,925 token ids are the previous prompt's), so chunks 0-26 are the same chunks; chunk 27 (partial then, 13 tokens) fills now. New from token 6,925:
+
+- **D's answer to turn 5** · tokens 6925-7053 (128) · chunk 27
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 7053-7054 (1) · chunk 27
+
+- document `822086267_6698-7277-0-579` · tokens 7054-7191 (137) · chunks 27-28 · **again**: sent on [turn 0](#turn-0) already (the same 137 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_7384-8758-0-1374` · tokens 7191-7602 (411) · chunks 28-29 · **again**: sent on [turn 0](#turn-0) already (the same 411 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_453-961-0-508` · tokens 7602-7735 (133) · chunks 29-30 · **again**: sent on [turn 1](#turn-1) already (the same 133 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+<details><summary>document <code>826807874_25506-25892-0-386</code> · tokens 7735-7822 (87) · chunk 30</summary>
+
+```text
+Document: Super Bowl
+Super Bowl
+In Super Bowl LII , the Philadelphia Eagles defeated the New England Patriots , 41 -- 33 . It was
+the Eagles ' third Super Bowl appearance , and their first win in franchise history . It was the
+Patriots ' tenth Super Bowl appearance , and their fourth appearance in ten years ; had the Patriots
+won , they would have tied the Pittsburgh Steelers with the most Super Bowl wins ( six ) .
+```
+
+</details>
+
+<details><summary>document <code>826807874_1485-2382-0-897</code> · tokens 7822-8008 (186) · chunks 30-31</summary>
+
+```text
+Document: Super Bowl
+Super Bowl
+The game was created as part of a merger agreement between the NFL and its then - rival league , the
+American Football League ( AFL ) . It was agreed that the two leagues ' champion teams would play in
+the AFL -- NFL World Championship Game until the merger was to officially begin in 1970 . After the
+merger , each league was redesignated as a `` conference '' , and the game has since been played
+between the conference champions to determine the NFL 's league champion . Currently , the National
+Football Conference ( NFC ) leads the league with 27 wins to 25 wins for the American Football
+Conference ( AFC ) . The Pittsburgh Steelers have the most Super Bowl championship titles , with six
+. The New England Patriots have the most Super Bowl appearances , with ten . Charles Haley and Tom
+Brady both have five Super Bowl rings , which is the record for the most rings won by a single
+player .
+```
+
+</details>
+
+- **question 6** · tokens 8008-8023 (15) · chunk 31
+
+```text
+User: How many times have the New England Patriots played the super bowl?
+```
+
+- `Assistant:` · tokens 8023-8025 (2) · chunk 31
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 822086267_6698 | 28-165 | 137 | 0 |  |
+| doc 822086267_7384 | 165-576 | 411 | 0-2 |  |
+| doc 822086267_6171 | 576-723 | 147 | 2 |  |
+| doc 822086267_3295 | 723-802 | 79 | 2-3 |  |
+| question 0 | 802-815 | 13 | 3 |  |
+| `assistant:` 0 | 815-817 | 2 | 3 |  |
+| answer 0 | 817-945 | 128 | 3 |  |
+| newline 0 | 945-946 | 1 | 3 |  |
+| doc 822086267_3295 | 946-1025 | 79 | 3-4 |  |
+| doc 822086267_3634 | 1025-1105 | 80 | 4 |  |
+| doc 822086267_7384 | 1105-1516 | 411 | 4-5 |  |
+| doc 822086267_6698 | 1516-1653 | 137 | 5-6 |  |
+| doc 822086267_453- | 1653-1786 | 133 | 6 |  |
+| question 1 | 1786-1797 | 11 | 6-7 |  |
+| `assistant:` 1 | 1797-1799 | 2 | 7 |  |
+| answer 1 | 1799-1927 | 128 | 7 |  |
+| newline 1 | 1927-1928 | 1 | 7 |  |
+| doc 822086267_6698 | 1928-2065 | 137 | 7-8 |  |
+| doc 822086267_7384 | 2065-2476 | 411 | 8-9 |  |
+| doc 822086267_453- | 2476-2609 | 133 | 9-10 |  |
+| doc 866343245_6575 | 2609-2714 | 105 | 10 |  |
+| doc 837407666_8367 | 2714-2903 | 189 | 10-11 |  |
+| doc 836236385_7052 | 2903-3311 | 408 | 11-12 |  |
+| doc 837407666_122- | 3311-3478 | 167 | 12-13 |  |
+| question 2 | 3478-3492 | 14 | 13 |  |
+| `assistant:` 2 | 3492-3494 | 2 | 13 |  |
+| answer 2 | 3494-3622 | 128 | 13-14 |  |
+| newline 2 | 3622-3623 | 1 | 14 |  |
+| doc 822086267_6698 | 3623-3760 | 137 | 14 |  |
+| doc 822086267_7384 | 3760-4171 | 411 | 14-16 |  |
+| doc 822086267_453- | 4171-4304 | 133 | 16 |  |
+| doc 832860310_2886 | 4304-4401 | 97 | 16-17 |  |
+| doc 837407666_1762 | 4401-4549 | 148 | 17 |  |
+| question 3 | 4549-4559 | 10 | 17 |  |
+| `assistant:` 3 | 4559-4561 | 2 | 17 |  |
+| answer 3 | 4561-4689 | 128 | 17-18 |  |
+| newline 3 | 4689-4690 | 1 | 18 |  |
+| doc 822086267_6698 | 4690-4827 | 137 | 18 |  |
+| doc 822086267_7384 | 4827-5238 | 411 | 18-20 |  |
+| doc 822086267_453- | 5238-5371 | 133 | 20 |  |
+| doc 832860310_2886 | 5371-5468 | 97 | 20-21 |  |
+| doc 832860310_2802 | 5468-5634 | 166 | 21-22 |  |
+| doc 832860310_2539 | 5634-5800 | 166 | 22 |  |
+| question 4 | 5800-5811 | 11 | 22 |  |
+| `assistant:` 4 | 5811-5813 | 2 | 22 |  |
+| answer 4 | 5813-5941 | 128 | 22-23 |  |
+| newline 4 | 5941-5942 | 1 | 23 |  |
+| doc 822086267_6698 | 5942-6079 | 137 | 23 |  |
+| doc 822086267_7384 | 6079-6490 | 411 | 23-25 |  |
+| doc 822086267_453- | 6490-6623 | 133 | 25 |  |
+| doc 826807874_2330 | 6623-6665 | 42 | 25-26 |  |
+| doc 826807874_1205 | 6665-6911 | 246 | 26 |  |
+| question 5 | 6911-6923 | 12 | 26-27 |  |
+| `assistant:` 5 | 6923-6925 | 2 | 27 |  |
+| answer 5 | 6925-7053 | 128 | 27 | new this turn |
+| newline 5 | 7053-7054 | 1 | 27 | new this turn |
+| doc 822086267_6698 | 7054-7191 | 137 | 27-28 | new this turn |
+| doc 822086267_7384 | 7191-7602 | 411 | 28-29 | new this turn |
+| doc 822086267_453- | 7602-7735 | 133 | 29-30 | new this turn |
+| doc 826807874_2550 | 7735-7822 | 87 | 30 | new this turn |
+| doc 826807874_1485 | 7822-8008 | 186 | 30-31 | new this turn |
+| question 6 | 8008-8023 | 15 | 31 | new this turn |
+| `assistant:` 6 | 8023-8025 | 2 | 31 | new this turn |
 
 ```
 P  ===========================####+
@@ -539,83 +1017,136 @@ D  ===========================MMMM+
 
 9,097 prompt tokens: 35 whole chunks and 137 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 8,016 tokens on its GPU, computed 1,081 and stored 4 new chunks; D1 held 8,144, loaded 816 from LMCache and computed 137.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 822086267_6698 | 28-165 | 137 |  |
-| doc 822086267_7384 | 165-576 | 411 |  |
-| doc 822086267_6171 | 576-723 | 147 |  |
-| doc 822086267_3295 | 723-802 | 79 |  |
-| question 0 | 802-815 | 13 |  |
-| `assistant:` 0 | 815-817 | 2 |  |
-| answer 0 | 817-945 | 128 |  |
-| newline 0 | 945-946 | 1 |  |
-| doc 822086267_3295 | 946-1025 | 79 |  |
-| doc 822086267_3634 | 1025-1105 | 80 |  |
-| doc 822086267_7384 | 1105-1516 | 411 |  |
-| doc 822086267_6698 | 1516-1653 | 137 |  |
-| doc 822086267_453- | 1653-1786 | 133 |  |
-| question 1 | 1786-1797 | 11 |  |
-| `assistant:` 1 | 1797-1799 | 2 |  |
-| answer 1 | 1799-1927 | 128 |  |
-| newline 1 | 1927-1928 | 1 |  |
-| doc 822086267_6698 | 1928-2065 | 137 |  |
-| doc 822086267_7384 | 2065-2476 | 411 |  |
-| doc 822086267_453- | 2476-2609 | 133 |  |
-| doc 866343245_6575 | 2609-2714 | 105 |  |
-| doc 837407666_8367 | 2714-2903 | 189 |  |
-| doc 836236385_7052 | 2903-3311 | 408 |  |
-| doc 837407666_122- | 3311-3478 | 167 |  |
-| question 2 | 3478-3492 | 14 |  |
-| `assistant:` 2 | 3492-3494 | 2 |  |
-| answer 2 | 3494-3622 | 128 |  |
-| newline 2 | 3622-3623 | 1 |  |
-| doc 822086267_6698 | 3623-3760 | 137 |  |
-| doc 822086267_7384 | 3760-4171 | 411 |  |
-| doc 822086267_453- | 4171-4304 | 133 |  |
-| doc 832860310_2886 | 4304-4401 | 97 |  |
-| doc 837407666_1762 | 4401-4549 | 148 |  |
-| question 3 | 4549-4559 | 10 |  |
-| `assistant:` 3 | 4559-4561 | 2 |  |
-| answer 3 | 4561-4689 | 128 |  |
-| newline 3 | 4689-4690 | 1 |  |
-| doc 822086267_6698 | 4690-4827 | 137 |  |
-| doc 822086267_7384 | 4827-5238 | 411 |  |
-| doc 822086267_453- | 5238-5371 | 133 |  |
-| doc 832860310_2886 | 5371-5468 | 97 |  |
-| doc 832860310_2802 | 5468-5634 | 166 |  |
-| doc 832860310_2539 | 5634-5800 | 166 |  |
-| question 4 | 5800-5811 | 11 |  |
-| `assistant:` 4 | 5811-5813 | 2 |  |
-| answer 4 | 5813-5941 | 128 |  |
-| newline 4 | 5941-5942 | 1 |  |
-| doc 822086267_6698 | 5942-6079 | 137 |  |
-| doc 822086267_7384 | 6079-6490 | 411 |  |
-| doc 822086267_453- | 6490-6623 | 133 |  |
-| doc 826807874_2330 | 6623-6665 | 42 |  |
-| doc 826807874_1205 | 6665-6911 | 246 |  |
-| question 5 | 6911-6923 | 12 |  |
-| `assistant:` 5 | 6923-6925 | 2 |  |
-| answer 5 | 6925-7053 | 128 |  |
-| newline 5 | 7053-7054 | 1 |  |
-| doc 822086267_6698 | 7054-7191 | 137 |  |
-| doc 822086267_7384 | 7191-7602 | 411 |  |
-| doc 822086267_453- | 7602-7735 | 133 |  |
-| doc 826807874_2550 | 7735-7822 | 87 |  |
-| doc 826807874_1485 | 7822-8008 | 186 |  |
-| question 6 | 8008-8023 | 15 |  |
-| `assistant:` 6 | 8023-8025 | 2 |  |
-| answer 6 | 8025-8153 | 128 | new this turn |
-| newline 6 | 8153-8154 | 1 | new this turn |
-| doc 822086267_6698 | 8154-8291 | 137 | new this turn |
-| doc 822086267_453- | 8291-8424 | 133 | new this turn |
-| doc 822086267_7384 | 8424-8835 | 411 | new this turn |
-| doc 836318260_1173 | 8835-8930 | 95 | new this turn |
-| doc 821803535_1441 | 8930-9086 | 156 | new this turn |
-| question 7 | 9086-9095 | 9 | new this turn |
-| `assistant:` 7 | 9095-9097 | 2 | new this turn |
+Tokens 0-8,025: [turn 6](#turn-6)'s prompt, unchanged (checked: its first 8,025 token ids are the previous prompt's), so chunks 0-30 are the same chunks; chunk 31 (partial then, 89 tokens) fills now. New from token 8,025:
+
+- **D's answer to turn 6** · tokens 8025-8153 (128) · chunk 31
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 8153-8154 (1) · chunk 31
+
+- document `822086267_6698-7277-0-579` · tokens 8154-8291 (137) · chunks 31-32 · **again**: sent on [turn 0](#turn-0) already (the same 137 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_453-961-0-508` · tokens 8291-8424 (133) · chunk 32 · **again**: sent on [turn 1](#turn-1) already (the same 133 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+- document `822086267_7384-8758-0-1374` · tokens 8424-8835 (411) · chunks 32-34 · **again**: sent on [turn 0](#turn-0) already (the same 411 tokens), here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it
+
+<details><summary>document <code>836318260_11736-12054-0-318</code> · tokens 8835-8930 (95) · chunk 34</summary>
+
+```text
+Document: New England Patriots
+New England Patriots
+Bill Belichick achieved his 200th career head coaching win ( regular season and playoffs ) on
+November 22 , 2012 , defeating the Jets 49 -- 19 ; it was his 163rd such win as Patriots coach . The
+Patriots defeated the Jets in Week seven of the 2015 season by a score of 30 -- 23 , to give them a
+6 -- 0 record to date .
+```
+
+</details>
+
+<details><summary>document <code>821803535_1441-2074-0-633</code> · tokens 8930-9086 (156) · chunks 34-35</summary>
+
+```text
+Document: List of New England Patriots seasons
+List of New England Patriots seasons
+Since Bill Belichick was hired as the team 's head coach in 2000 , the Patriots have finished first
+or second in the AFC East every year except Belichick 's first season , with both second - place
+finishes caused by tiebreakers . Over that time , they have won five Super Bowls , seven AFC
+Championship Games , and fourteen AFC East titles , while amassing a regular season record of 201 --
+71 . The team 's quarterback over that same period , Tom Brady , has been awarded the NFL Most
+Valuable Player ( MVP ) twice and the Super Bowl Most Valuable Player four times ; he is one of only
+five men named Super Bowl MVP more than once .
+```
+
+</details>
+
+- **question 7** · tokens 9086-9095 (9) · chunk 35
+
+```text
+User: Who is the Patriot's coach?
+```
+
+- `Assistant:` · tokens 9095-9097 (2) · chunk 35
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 822086267_6698 | 28-165 | 137 | 0 |  |
+| doc 822086267_7384 | 165-576 | 411 | 0-2 |  |
+| doc 822086267_6171 | 576-723 | 147 | 2 |  |
+| doc 822086267_3295 | 723-802 | 79 | 2-3 |  |
+| question 0 | 802-815 | 13 | 3 |  |
+| `assistant:` 0 | 815-817 | 2 | 3 |  |
+| answer 0 | 817-945 | 128 | 3 |  |
+| newline 0 | 945-946 | 1 | 3 |  |
+| doc 822086267_3295 | 946-1025 | 79 | 3-4 |  |
+| doc 822086267_3634 | 1025-1105 | 80 | 4 |  |
+| doc 822086267_7384 | 1105-1516 | 411 | 4-5 |  |
+| doc 822086267_6698 | 1516-1653 | 137 | 5-6 |  |
+| doc 822086267_453- | 1653-1786 | 133 | 6 |  |
+| question 1 | 1786-1797 | 11 | 6-7 |  |
+| `assistant:` 1 | 1797-1799 | 2 | 7 |  |
+| answer 1 | 1799-1927 | 128 | 7 |  |
+| newline 1 | 1927-1928 | 1 | 7 |  |
+| doc 822086267_6698 | 1928-2065 | 137 | 7-8 |  |
+| doc 822086267_7384 | 2065-2476 | 411 | 8-9 |  |
+| doc 822086267_453- | 2476-2609 | 133 | 9-10 |  |
+| doc 866343245_6575 | 2609-2714 | 105 | 10 |  |
+| doc 837407666_8367 | 2714-2903 | 189 | 10-11 |  |
+| doc 836236385_7052 | 2903-3311 | 408 | 11-12 |  |
+| doc 837407666_122- | 3311-3478 | 167 | 12-13 |  |
+| question 2 | 3478-3492 | 14 | 13 |  |
+| `assistant:` 2 | 3492-3494 | 2 | 13 |  |
+| answer 2 | 3494-3622 | 128 | 13-14 |  |
+| newline 2 | 3622-3623 | 1 | 14 |  |
+| doc 822086267_6698 | 3623-3760 | 137 | 14 |  |
+| doc 822086267_7384 | 3760-4171 | 411 | 14-16 |  |
+| doc 822086267_453- | 4171-4304 | 133 | 16 |  |
+| doc 832860310_2886 | 4304-4401 | 97 | 16-17 |  |
+| doc 837407666_1762 | 4401-4549 | 148 | 17 |  |
+| question 3 | 4549-4559 | 10 | 17 |  |
+| `assistant:` 3 | 4559-4561 | 2 | 17 |  |
+| answer 3 | 4561-4689 | 128 | 17-18 |  |
+| newline 3 | 4689-4690 | 1 | 18 |  |
+| doc 822086267_6698 | 4690-4827 | 137 | 18 |  |
+| doc 822086267_7384 | 4827-5238 | 411 | 18-20 |  |
+| doc 822086267_453- | 5238-5371 | 133 | 20 |  |
+| doc 832860310_2886 | 5371-5468 | 97 | 20-21 |  |
+| doc 832860310_2802 | 5468-5634 | 166 | 21-22 |  |
+| doc 832860310_2539 | 5634-5800 | 166 | 22 |  |
+| question 4 | 5800-5811 | 11 | 22 |  |
+| `assistant:` 4 | 5811-5813 | 2 | 22 |  |
+| answer 4 | 5813-5941 | 128 | 22-23 |  |
+| newline 4 | 5941-5942 | 1 | 23 |  |
+| doc 822086267_6698 | 5942-6079 | 137 | 23 |  |
+| doc 822086267_7384 | 6079-6490 | 411 | 23-25 |  |
+| doc 822086267_453- | 6490-6623 | 133 | 25 |  |
+| doc 826807874_2330 | 6623-6665 | 42 | 25-26 |  |
+| doc 826807874_1205 | 6665-6911 | 246 | 26 |  |
+| question 5 | 6911-6923 | 12 | 26-27 |  |
+| `assistant:` 5 | 6923-6925 | 2 | 27 |  |
+| answer 5 | 6925-7053 | 128 | 27 |  |
+| newline 5 | 7053-7054 | 1 | 27 |  |
+| doc 822086267_6698 | 7054-7191 | 137 | 27-28 |  |
+| doc 822086267_7384 | 7191-7602 | 411 | 28-29 |  |
+| doc 822086267_453- | 7602-7735 | 133 | 29-30 |  |
+| doc 826807874_2550 | 7735-7822 | 87 | 30 |  |
+| doc 826807874_1485 | 7822-8008 | 186 | 30-31 |  |
+| question 6 | 8008-8023 | 15 | 31 |  |
+| `assistant:` 6 | 8023-8025 | 2 | 31 |  |
+| answer 6 | 8025-8153 | 128 | 31 | new this turn |
+| newline 6 | 8153-8154 | 1 | 31 | new this turn |
+| doc 822086267_6698 | 8154-8291 | 137 | 31-32 | new this turn |
+| doc 822086267_453- | 8291-8424 | 133 | 32 | new this turn |
+| doc 822086267_7384 | 8424-8835 | 411 | 32-34 | new this turn |
+| doc 836318260_1173 | 8835-8930 | 95 | 34 | new this turn |
+| doc 821803535_1441 | 8930-9086 | 156 | 34-35 | new this turn |
+| question 7 | 9086-9095 | 9 | 35 | new this turn |
+| `assistant:` 7 | 9095-9097 | 2 | 35 | new this turn |
 
 ```
 P  ===============================####+

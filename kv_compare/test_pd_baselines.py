@@ -1976,8 +1976,17 @@ class MtragDriverTests(unittest.TestCase):
                 for x, y in zip(a, a[1:]):
                     self.assertEqual(y["ids"][:len(x["ids"])], x["ids"])
                 self.assertEqual(a[0]["ids"], by_body[a[0]["tag"]]["prompt"])
+                for r in a:                       # each piece's text, as sent: it tokenizes to the piece's ids
+                    b = by_body[r["tag"]]
+                    self.assertEqual(len(r["texts"]), len(r["pieces"]))
+                    for (k, ref, s, e), tx in zip(r["pieces"], r["texts"]):
+                        if k == "answer":
+                            self.assertEqual(tx, "abc")              # the engine's text of that answer
+                        else:
+                            self.assertEqual(b["prompt"][s:e], ([1] if k == "system" else []) + tok(tx))
             else:
                 self.assertNotIn("ids", a[0])
+                self.assertNotIn("texts", a[0])
 
     def test_answer_text_is_tokenized_again_without_engine_ids(self):
         eng, recs, summ = self.run_driver("docs_first", token_ids=False)

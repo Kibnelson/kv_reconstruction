@@ -397,6 +397,77 @@ class LifecycleReportTests(unittest.TestCase):
         self.assertIn("| 0 | 0-32 | system: 10; doc d1: 22 | 0-1 | P 10-11; D 20-21; 2/2 hashes = P's |", page)
         self.assertIn("One chunk, block by block", page)
 
+    CONV = [{"domain": "dom", "messages": [
+        {"speaker": "user", "text": "Q zero?"},
+        {"speaker": "agent", "contexts": [{"document_id": "d1", "title": "T1", "text": "doc one"}]},
+        {"speaker": "user", "text": "Q one?"},
+        {"speaker": "agent", "contexts": [{"document_id": "d1", "title": "T1", "text": "doc one"},
+                                          {"document_id": "d2", "title": "", "text": "has ```` in it"}]}]}]
+
+    def two_turns(self, run, texts=False):
+        """simulate()'s run with the driver's records of a two-turn interleaved conversation in place of its one
+        (turn 0 the run's traced turn; turn 1 never sent)."""
+        p0 = [["system", None, 0, 10], ["doc", "d1", 10, 60], ["user", 0, 60, 67], ["assistant", 0, 67, 69]]
+        p1 = p0 + [["answer", 0, 69, 80], ["newline", 0, 80, 81], ["doc", "d1", 81, 131], ["doc", "d2", 131, 150],
+                   ["user", 1, 150, 158], ["assistant", 1, 158, 160]]
+        ids0 = list(range(1000, 1069))
+        recs = []
+        for t, (pcs, ids) in enumerate(((p0, ids0), (p1, ids0 + list(range(2000, 2091))))):
+            r = {"tag": f"lmc_disk|0|{t}", "conv": 0, "conv_id": "0", "domain": "dom", "turn": t, "turns": 2,
+                 "layout": "interleaved", "prompt_tokens": len(ids), "pieces": pcs, "ids": ids}
+            if texts:
+                r["texts"] = [f"text {k} {i}" for i, (k, *_x) in enumerate(pcs)]
+            recs.append(r)
+        (run / "mtrag.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+        conv = run / "conversations.json"
+        conv.write_text(json.dumps(self.CONV))
+        return conv
+
+    def pages(self, texts=False, conv_edit=None):
+        run, out = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate(run, mode="disk")
+        conv = self.two_turns(run, texts)
+        if conv_edit:
+            data = json.loads(conv.read_text())
+            conv_edit(data)
+            conv.write_text(json.dumps(data))
+        lmc_lifecycle.main(["conversations", "--run", str(run), "--conversations", str(conv), "--output", str(out)])
+        return (out / "conversation_0.md").read_text(), (out / "index.md").read_text()
+
+    def test_the_prompts_text_rebuilt_from_mtrag(self):
+        """A run whose driver kept no text: each piece's text rebuilt by the driver's own build() from the MTRAG file
+        (the answers not: only the engine had them); turn 1 shows only what is new after turn 0's prompt."""
+        page, index = self.pages()
+        self.assertIn("rebuilt from the MTRAG file", page)
+        self.assertIn("| 0 | dom | Q zero? | 2 |", index)                    # the first question
+        self.assertIn("```text\nYou are a helpful assistant.", page)          # the system prompt, as sent
+        self.assertIn("```text\nDocument: T1\ndoc one\n```", page)
+        self.assertIn("```text\nUser: Q zero?\n```", page)
+        self.assertIn("`````text\nDocument:\nhas ```` in it\n`````", page)    # a fence its text cannot close
+        self.assertIn("Tokens 0-69: [turn 0](#turn-0)'s prompt, unchanged (checked: its first 69 token ids are the "
+                      "previous prompt's), so chunks 0-1 are the same chunks; chunk 2 (partial then, 5 tokens) fills now. "
+                      "New from token 69:", page)
+        self.assertIn("**D's answer to turn 0** · tokens 69-80 (11) · chunk 2", page)
+        self.assertIn("its text was not kept by this run", page)
+        self.assertIn("document `d1` · tokens 81-131 (50) · chunks 2-4 · **again**: sent on [turn 0](#turn-0) already "
+                      "(the same 50 tokens)", page)
+        turn1 = page.split("## Turn 1")[1].split("### Pieces")[0]
+        self.assertNotIn("Q zero?", turn1)                                    # the carried prefix is not repeated
+        self.assertEqual(turn1.count("Document: T1"), 0)
+        # how it grows: 91 new tokens = the answer 11 + documents 69 (50 of them sent before) + question 8 + framing 3
+        self.assertIn("| 1 | 160 | +91 | 11 | 2 docs, 69 (1 sent before: 50) | 8: Q one? | 3 | 5 (+3) |", page)
+        self.assertIn("| 0 | 69 | +69 | – | 1 doc, 50 | 7: Q zero? | 12 | 2 (+2) |", page)
+
+    def test_the_drivers_own_text_first_and_no_text_for_another_conversation(self):
+        page, _ = self.pages(texts=True)
+        self.assertIn("the driver's own record of what it sent", page)
+        self.assertIn("```text\ntext answer 4\n```", page)                    # an answer's text, when kept
+        self.assertIn("```text\ntext user 2\n```", page)
+        # a file whose conversation is not the run's (another document): no text rather than a wrong one
+        page, _ = self.pages(conv_edit=lambda c: c[0]["messages"][1]["contexts"][0].update(document_id="zz"))
+        self.assertIn("This run kept no prompt text", page)
+        self.assertIn("(text not available)", page)
+
     def test_compare(self):
         a, b = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
         for d, mode in ((a, "memory"), (b, "disk")):

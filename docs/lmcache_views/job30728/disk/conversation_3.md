@@ -4,6 +4,8 @@
 
 Legend for the strips (one character a chunk): P: `=` on P's GPU from an earlier turn, `#` computed and stored now, `+` computed, not stored (a partial chunk). D: `=` on D's GPU from an earlier turn, `M` pulled from memory, `S` pulled from disk, `+` computed by D (a partial chunk), `?` missed.
 
+The prompts' text is rebuilt from the MTRAG file the run read, by the driver's own code (scripts/pd_mtrag.py build()), and matches the run's record piece for piece; token counts and places are the run's. D's answers were not kept by this run's driver, only their token ids. Lines over 100 characters are wrapped here for reading.
+
 | turn | prompt | chunks + tail | P: own GPU / computed / stored | D: own GPU / loaded / computed | pulled | pull ms | D first token ms |
 | ---: | ---: | --- | --- | --- | --- | ---: | ---: |
 | [0](#turn-0) | 337 | 1 + 81 | 16 / 321 / 1 chunk | 0 / 256 / 81 | 1 chunks (disk 1) | 18.3 | 46.9 |
@@ -13,6 +15,20 @@ Legend for the strips (one character a chunk): P: `=` on P's GPU from an earlier
 | [4](#turn-4) | 2,336 | 9 + 32 | 1,632 / 704 / 3 chunks | 1,760 / 544 / 32 | 3 chunks (disk 3) | 31.9 | 58.2 |
 | [5](#turn-5) | 2,718 | 10 + 158 | 2,336 / 382 / 1 chunk | 2,448 / 112 / 158 | 1 chunks (disk 1) | 16.8 | 51.2 |
 | [6](#turn-6) | 3,102 | 12 + 30 | 2,704 / 398 / 2 chunks | 2,832 / 240 / 30 | 1 chunks (disk 1) | 21.4 | 49.1 |
+
+## How the prompt grows
+
+Each turn's prompt is the previous one, token for token, and then: D's answer to the previous turn, this turn's documents, its question and the framing (the system prompt on turn 0, `Assistant:` and newlines). Only the new tokens can make new chunks: the previous prompt's partial chunk fills first. A document sent before comes again at another place, so in other chunks.
+
+| turn | prompt | new | previous answer | documents | question | framing | whole chunks |
+| ---: | ---: | ---: | ---: | --- | --- | ---: | --- |
+| 0 | 337 | +337 | – | 2 docs, 294 | 13: What's the difference between Market Cap and NAV? | 30 | 1 (+1) |
+| 1 | 846 | +509 | 128 | 2 docs, 371 | 7: Which is more important? | 3 | 3 (+2) |
+| 2 | 1,226 | +380 | 128 | 2 docs, 244 | 5: enterprise value | 3 | 4 (+1) |
+| 3 | 1,639 | +413 | 128 | 2 docs, 275 | 7: How is it calculated? | 3 | 6 (+2) |
+| 4 | 2,336 | +697 | 128 | 2 docs, 559 | 7: What is WACC? | 3 | 9 (+3) |
+| 5 | 2,718 | +382 | 128 | 2 docs, 241 | 10: Is the WACC formula highly reliable? | 3 | 10 (+1) |
+| 6 | 3,102 | +384 | 128 | 2 docs, 241 | 12: What is the ideal formula to evaluate a company? | 3 | 12 (+2) |
 
 ### One chunk, block by block: chunk 0 of turn 0 (`47dc4d47ce072861`)
 
@@ -41,15 +57,66 @@ Tokens 0-256 (system: 28; doc 471123-0-798: 176; doc 414940-0-474: 52). P comput
 
 337 prompt tokens: 1 whole chunk and 81 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 16 tokens on its GPU, computed 321 and stored 1 new chunk; D3 held 0, loaded 256 from LMCache and computed 81.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 471123-0-798 | 28-204 | 176 |  |
-| doc 414940-0-474 | 204-322 | 118 |  |
-| question 0 | 322-335 | 13 |  |
-| `assistant:` 0 | 335-337 | 2 |  |
+The whole prompt, piece by piece:
+
+- **system prompt** · tokens 0-28 (28) · chunk 0
+
+```text
+You are a helpful assistant. Answer the user's last question from the documents. If they do not hold
+the answer, say so.
+```
+
+<details><summary>document <code>471123-0-798</code> · tokens 28-204 (176) · chunk 0</summary>
+
+```text
+Document:
+
+"Market caps is just the share price, multiplied by the number of shares. It doesn't represent any
+value (if people decide to pay more or less for the shares, the market cap goes up or down). It does
+represent what people think the company is worth.  NAV sounds very much like book value. It
+basically says ""how much cash would we end up with if we sold everything the company owns, paid
+back all the debt, and closed down the business? "" Since closing down the business is rarely a good
+idea, this underestimates the value of the business enormously. Take a hairdresser who owns nothing
+but a pair of scissors, but has a huge number of repeat customers, charges $200 for a haircut, and
+makes tons of money every year. The business has a huge value, but NAV = price of one pair of used
+scissors."
+```
+
+</details>
+
+<details><summary>document <code>414940-0-474</code> · tokens 204-322 (118) · chunks 0-1</summary>
+
+```text
+Document:
+
+NAV is  how much is the stuff of the company worth divided by the number of shares. This total is
+also called book value. The market cap is share price times number of shares. For Amazon  today
+people are willing to pay 290 a share for a company with a NAV of 22 a share. If of nav and price
+were equal the P/B (price to book ratio) would be 1, but for Amazon it is 13.  Why? Because
+investors believe Amazon is worth a lot more than a money losing company with a NAV of 22.
+```
+
+</details>
+
+- **question 0** · tokens 322-335 (13) · chunk 1
+
+```text
+User:  What's the difference between Market Cap and NAV?
+```
+
+- `Assistant:` · tokens 335-337 (2) · chunk 1
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 471123-0-798 | 28-204 | 176 | 0 |  |
+| doc 414940-0-474 | 204-322 | 118 | 0-1 |  |
+| question 0 | 322-335 | 13 | 1 |  |
+| `assistant:` 0 | 335-337 | 2 | 1 |  |
 
 ```
 P  #+
@@ -65,21 +132,74 @@ D  S+
 
 846 prompt tokens: 3 whole chunks and 78 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 336 tokens on its GPU, computed 510 and stored 2 new chunks; D3 held 464, loaded 304 from LMCache and computed 78.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 471123-0-798 | 28-204 | 176 |  |
-| doc 414940-0-474 | 204-322 | 118 |  |
-| question 0 | 322-335 | 13 |  |
-| `assistant:` 0 | 335-337 | 2 |  |
-| answer 0 | 337-465 | 128 | new this turn |
-| newline 0 | 465-466 | 1 | new this turn |
-| doc 416727-0-1356 | 466-775 | 309 | new this turn |
-| doc 418610-0-264 | 775-837 | 62 | new this turn |
-| question 1 | 837-844 | 7 | new this turn |
-| `assistant:` 1 | 844-846 | 2 | new this turn |
+Tokens 0-337: [turn 0](#turn-0)'s prompt, unchanged (checked: its first 337 token ids are the previous prompt's), so chunk 0 is the same chunk; chunk 1 (partial then, 81 tokens) fills now. New from token 337:
+
+- **D's answer to turn 0** · tokens 337-465 (128) · chunk 1
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 465-466 (1) · chunk 1
+
+<details><summary>document <code>416727-0-1356</code> · tokens 466-775 (309) · chunks 1-3</summary>
+
+```text
+Document:
+
+"I think the key concept here is future value.  The NAV is essentially a book-keeping exercise- you
+add up all the assets and remove all the liabilities.  For a public company this is spelled out in
+the balance sheet, and is generally listed at the bottom.  I pulled a recent one from Cisco Systems
+(because I used to work there and know the numbers  ;-) and you can see it here: roughly $56
+billion... https://finance.yahoo.com/q/bs?s=CSCO+Balance+Sheet&annual  Another way to think about
+it: In theory (and we know about this, right?) the NAV is what you would get if you liquidated the
+company instantaneously.  A definition I like to use for market cap is ""the current assets, plus
+the perceived present value of all future earnings for the company""... so let's dissect that a
+little.  The term ""present value"" is really important, because a million dollars today is worth
+more than a million dollars next year.  A company expected to make a lot of money soon will be worth
+more (i.e. a higher market cap) than a company expected to make the same amount of money, but later.
+The ""all future earnings"" part is exactly what it sounds like.  So again, following our cisco
+example, the current market cap is ~142 billion, which means that ""the market"" thinks they will
+earn about $85 billion over the life of the company (in present day dollars)."
+```
+
+</details>
+
+<details><summary>document <code>418610-0-264</code> · tokens 775-837 (62) · chunk 3</summary>
+
+```text
+Document:
+
+Market cap is basically the amount of money that it would cost to buy all of the shares of public
+stock in a company.  Or  share cost * number of outstanding shares. It is a measure of how much a
+company is worth. http://en.wikipedia.org/wiki/Market_capitalization
+```
+
+</details>
+
+- **question 1** · tokens 837-844 (7) · chunk 3
+
+```text
+User: Which is more important?
+```
+
+- `Assistant:` · tokens 844-846 (2) · chunk 3
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 471123-0-798 | 28-204 | 176 | 0 |  |
+| doc 414940-0-474 | 204-322 | 118 | 0-1 |  |
+| question 0 | 322-335 | 13 | 1 |  |
+| `assistant:` 0 | 335-337 | 2 | 1 |  |
+| answer 0 | 337-465 | 128 | 1 | new this turn |
+| newline 0 | 465-466 | 1 | 1 | new this turn |
+| doc 416727-0-1356 | 466-775 | 309 | 1-3 | new this turn |
+| doc 418610-0-264 | 775-837 | 62 | 3 | new this turn |
+| question 1 | 837-844 | 7 | 3 | new this turn |
+| `assistant:` 1 | 844-846 | 2 | 3 | new this turn |
 
 ```
 P  =##+
@@ -97,27 +217,76 @@ D  =SS+
 
 1,226 prompt tokens: 4 whole chunks and 202 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 832 tokens on its GPU, computed 394 and stored 1 new chunk; D3 held 960, loaded 64 from LMCache and computed 202.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 471123-0-798 | 28-204 | 176 |  |
-| doc 414940-0-474 | 204-322 | 118 |  |
-| question 0 | 322-335 | 13 |  |
-| `assistant:` 0 | 335-337 | 2 |  |
-| answer 0 | 337-465 | 128 |  |
-| newline 0 | 465-466 | 1 |  |
-| doc 416727-0-1356 | 466-775 | 309 |  |
-| doc 418610-0-264 | 775-837 | 62 |  |
-| question 1 | 837-844 | 7 |  |
-| `assistant:` 1 | 844-846 | 2 |  |
-| answer 1 | 846-974 | 128 | new this turn |
-| newline 1 | 974-975 | 1 | new this turn |
-| doc 346760-0-445 | 975-1072 | 97 | new this turn |
-| doc 192515-0-701 | 1072-1219 | 147 | new this turn |
-| question 2 | 1219-1224 | 5 | new this turn |
-| `assistant:` 2 | 1224-1226 | 2 | new this turn |
+Tokens 0-846: [turn 1](#turn-1)'s prompt, unchanged (checked: its first 846 token ids are the previous prompt's), so chunks 0-2 are the same chunks; chunk 3 (partial then, 78 tokens) fills now. New from token 846:
+
+- **D's answer to turn 1** · tokens 846-974 (128) · chunk 3
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 974-975 (1) · chunk 3
+
+<details><summary>document <code>346760-0-445</code> · tokens 975-1072 (97) · chunks 3-4</summary>
+
+```text
+Document:
+
+"Read again what I said in my original post.  ""Enterprise Value is the sort of ""bare bones"" total
+firm value. It doesn't include any cash because you'd basically be paying cash for cash. Also, this
+makes analysis of transaction multiples more streamlined, as some firms may have a ton of excess
+cash on their balance sheet, skewing multiples.""  I said that that is WHY we use enterprise value.
+Because if you didn't it would skew multiples."
+```
+
+</details>
+
+<details><summary>document <code>192515-0-701</code> · tokens 1072-1219 (147) · chunk 4</summary>
+
+```text
+Document:
+
+Enterprise Value is supposed to be the price you would be willing to pay to acquire the company.
+Typically, companies are delivered debt-free and cash-free, so the cash on the balance sheet at the
+time of the transaction is distributed to the original owners. So, for instance, a company like
+Apple would have a lower EV than Market Value because the cash on the balance sheet is not going to
+be included in an acquisition.  And you are right, there are plenty of instances where you see
+Enterprise Value lower than Market Value (Cap).   If you are solely looking at equity valuation
+(equity investing), then use market cap. If you are looking at firm valuation for M&amp;A, then EV
+is more important.
+```
+
+</details>
+
+- **question 2** · tokens 1219-1224 (5) · chunk 4
+
+```text
+User: enterprise value
+```
+
+- `Assistant:` · tokens 1224-1226 (2) · chunk 4
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 471123-0-798 | 28-204 | 176 | 0 |  |
+| doc 414940-0-474 | 204-322 | 118 | 0-1 |  |
+| question 0 | 322-335 | 13 | 1 |  |
+| `assistant:` 0 | 335-337 | 2 | 1 |  |
+| answer 0 | 337-465 | 128 | 1 |  |
+| newline 0 | 465-466 | 1 | 1 |  |
+| doc 416727-0-1356 | 466-775 | 309 | 1-3 |  |
+| doc 418610-0-264 | 775-837 | 62 | 3 |  |
+| question 1 | 837-844 | 7 | 3 |  |
+| `assistant:` 1 | 844-846 | 2 | 3 |  |
+| answer 1 | 846-974 | 128 | 3 | new this turn |
+| newline 1 | 974-975 | 1 | 3 | new this turn |
+| doc 346760-0-445 | 975-1072 | 97 | 3-4 | new this turn |
+| doc 192515-0-701 | 1072-1219 | 147 | 4 | new this turn |
+| question 2 | 1219-1224 | 5 | 4 | new this turn |
+| `assistant:` 2 | 1224-1226 | 2 | 4 | new this turn |
 
 ```
 P  ===#+
@@ -136,33 +305,83 @@ D  ===S+
 
 1,639 prompt tokens: 6 whole chunks and 103 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 1,216 tokens on its GPU, computed 423 and stored 2 new chunks; D3 held 1,344, loaded 192 from LMCache and computed 103.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 471123-0-798 | 28-204 | 176 |  |
-| doc 414940-0-474 | 204-322 | 118 |  |
-| question 0 | 322-335 | 13 |  |
-| `assistant:` 0 | 335-337 | 2 |  |
-| answer 0 | 337-465 | 128 |  |
-| newline 0 | 465-466 | 1 |  |
-| doc 416727-0-1356 | 466-775 | 309 |  |
-| doc 418610-0-264 | 775-837 | 62 |  |
-| question 1 | 837-844 | 7 |  |
-| `assistant:` 1 | 844-846 | 2 |  |
-| answer 1 | 846-974 | 128 |  |
-| newline 1 | 974-975 | 1 |  |
-| doc 346760-0-445 | 975-1072 | 97 |  |
-| doc 192515-0-701 | 1072-1219 | 147 |  |
-| question 2 | 1219-1224 | 5 |  |
-| `assistant:` 2 | 1224-1226 | 2 |  |
-| answer 2 | 1226-1354 | 128 | new this turn |
-| newline 2 | 1354-1355 | 1 | new this turn |
-| doc 587508-0-651 | 1355-1492 | 137 | new this turn |
-| doc 366249-0-656 | 1492-1630 | 138 | new this turn |
-| question 3 | 1630-1637 | 7 | new this turn |
-| `assistant:` 3 | 1637-1639 | 2 | new this turn |
+Tokens 0-1,226: [turn 2](#turn-2)'s prompt, unchanged (checked: its first 1,226 token ids are the previous prompt's), so chunks 0-3 are the same chunks; chunk 4 (partial then, 202 tokens) fills now. New from token 1,226:
+
+- **D's answer to turn 2** · tokens 1226-1354 (128) · chunks 4-5
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 1354-1355 (1) · chunk 5
+
+<details><summary>document <code>587508-0-651</code> · tokens 1355-1492 (137) · chunk 5</summary>
+
+```text
+Document:
+
+Right, I understand minority interest but it is typically reported as a positive under liabilities
+instead of a negative. For example, when you are calculating the enterprise value of a company, you
+add back in the minority interest.    Enterprise Value= Market Share +Pref Equity + Min Interest+
+Total Debt - Cash and ST Equivalents.    EV is used to quantify the total price of a company's
+worth. If you have negative Min Interest on your books, that will make your EV less than it should
+be, creating an incorrect valuation.   This just doesn't make any sense to me. Does it mean that the
+subsidiary that they had a stake in had a negative earning?
+```
+
+</details>
+
+<details><summary>document <code>366249-0-656</code> · tokens 1492-1630 (138) · chunks 5-6</summary>
+
+```text
+Document:
+
+You wouldn't know it's value (Enterprise Value) without knowing its cash balance.  The equation:
+EV = Market Cap + Minority Interest + Preferred Stock + Debt - Cash  Enterprise Value is the value
+of the company to ALL shareholders (creditors, preferred stock holders, common stock holders).  So,
+taking on debt could either increase or decrease the EV depending on the cash balance of the
+company.  This will have no effect, directly, on the market cap. It will, however effect the present
+value of its future cash flows as the WACC will increase due to the new cost of debt (interest
+payments, higher risk of bankruptcy, less flexibility by management).
+```
+
+</details>
+
+- **question 3** · tokens 1630-1637 (7) · chunk 6
+
+```text
+User: How is it calculated?
+```
+
+- `Assistant:` · tokens 1637-1639 (2) · chunk 6
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 471123-0-798 | 28-204 | 176 | 0 |  |
+| doc 414940-0-474 | 204-322 | 118 | 0-1 |  |
+| question 0 | 322-335 | 13 | 1 |  |
+| `assistant:` 0 | 335-337 | 2 | 1 |  |
+| answer 0 | 337-465 | 128 | 1 |  |
+| newline 0 | 465-466 | 1 | 1 |  |
+| doc 416727-0-1356 | 466-775 | 309 | 1-3 |  |
+| doc 418610-0-264 | 775-837 | 62 | 3 |  |
+| question 1 | 837-844 | 7 | 3 |  |
+| `assistant:` 1 | 844-846 | 2 | 3 |  |
+| answer 1 | 846-974 | 128 | 3 |  |
+| newline 1 | 974-975 | 1 | 3 |  |
+| doc 346760-0-445 | 975-1072 | 97 | 3-4 |  |
+| doc 192515-0-701 | 1072-1219 | 147 | 4 |  |
+| question 2 | 1219-1224 | 5 | 4 |  |
+| `assistant:` 2 | 1224-1226 | 2 | 4 |  |
+| answer 2 | 1226-1354 | 128 | 4-5 | new this turn |
+| newline 2 | 1354-1355 | 1 | 5 | new this turn |
+| doc 587508-0-651 | 1355-1492 | 137 | 5 | new this turn |
+| doc 366249-0-656 | 1492-1630 | 138 | 5-6 | new this turn |
+| question 3 | 1630-1637 | 7 | 6 | new this turn |
+| `assistant:` 3 | 1637-1639 | 2 | 6 | new this turn |
 
 ```
 P  ====##+
@@ -183,39 +402,103 @@ D  =====S+
 
 2,336 prompt tokens: 9 whole chunks and 32 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 1,632 tokens on its GPU, computed 704 and stored 3 new chunks; D3 held 1,760, loaded 544 from LMCache and computed 32.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 471123-0-798 | 28-204 | 176 |  |
-| doc 414940-0-474 | 204-322 | 118 |  |
-| question 0 | 322-335 | 13 |  |
-| `assistant:` 0 | 335-337 | 2 |  |
-| answer 0 | 337-465 | 128 |  |
-| newline 0 | 465-466 | 1 |  |
-| doc 416727-0-1356 | 466-775 | 309 |  |
-| doc 418610-0-264 | 775-837 | 62 |  |
-| question 1 | 837-844 | 7 |  |
-| `assistant:` 1 | 844-846 | 2 |  |
-| answer 1 | 846-974 | 128 |  |
-| newline 1 | 974-975 | 1 |  |
-| doc 346760-0-445 | 975-1072 | 97 |  |
-| doc 192515-0-701 | 1072-1219 | 147 |  |
-| question 2 | 1219-1224 | 5 |  |
-| `assistant:` 2 | 1224-1226 | 2 |  |
-| answer 2 | 1226-1354 | 128 |  |
-| newline 2 | 1354-1355 | 1 |  |
-| doc 587508-0-651 | 1355-1492 | 137 |  |
-| doc 366249-0-656 | 1492-1630 | 138 |  |
-| question 3 | 1630-1637 | 7 |  |
-| `assistant:` 3 | 1637-1639 | 2 |  |
-| answer 3 | 1639-1767 | 128 | new this turn |
-| newline 3 | 1767-1768 | 1 | new this turn |
-| doc 554465-0-780 | 1768-1942 | 174 | new this turn |
-| doc 477310-0-1809 | 1942-2327 | 385 | new this turn |
-| question 4 | 2327-2334 | 7 | new this turn |
-| `assistant:` 4 | 2334-2336 | 2 | new this turn |
+Tokens 0-1,639: [turn 3](#turn-3)'s prompt, unchanged (checked: its first 1,639 token ids are the previous prompt's), so chunks 0-5 are the same chunks; chunk 6 (partial then, 103 tokens) fills now. New from token 1,639:
+
+- **D's answer to turn 3** · tokens 1639-1767 (128) · chunk 6
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 1767-1768 (1) · chunk 6
+
+<details><summary>document <code>554465-0-780</code> · tokens 1768-1942 (174) · chunks 6-7</summary>
+
+```text
+Document:
+
+If you want to see a more academic version of this look up Weighted Average Cost of Capital (WACC).
+It's a formula that tells you how much it costs for a company to raise $1 of capital whether it be
+through issuing bonds or stocks.   One thing you learn is that there are times that if you take on
+loans (even if you don't need it) you can raise shareholder value and therefore the total company
+netvalue. The thought process is (as it states in the article above) that a company can issue debt
+for cheaper than issue shares and it will have extra cash which it can use to get a better return
+than its net effective interest rate.   I tried to give an example but I only ended up rehashing
+what it says in the article. Anyhow look up WACC and you'll understand the fundamentals.
+```
+
+</details>
+
+<details><summary>document <code>477310-0-1809</code> · tokens 1942-2327 (385) · chunks 7-9</summary>
+
+```text
+Document:
+
+"No, I understood your question perfectly. I'm just saying that sort of situation is generally rare.
+A quick Google search yields [this article]
+(http://www.investopedia.com/financial-edge/1112/small-business-financing-debt-or-equity.aspx) which
+responds to the question - Which funding method should I choose? with the answer ""Often you will
+not have a choice"". That is exactly what I'm saying. The status and stage of your business dictates
+what sort of financing is even available to you. Most often you don't even have a choice between one
+or the other. If you want a formula, the other people responding mentioned [WACC]
+(http://www.investopedia.com/terms/w/wacc.asp) which is the ""standard"" that finance professionals
+typically use. You generally will want a WACC that is similar to other successful companies of your
+similar size and industry. The actual mechanics of adjusting your WACC will involve either issuing
+(or repurchasing) equity or debt. Regardless, what you are asking is not generally practical nor
+does it come into practice in 99 out of 100 financing situations. WACC is important to understand
+and consider but people don't issue equity or debt just to balance their WACC. Think about this
+another way... how easy is it to raise debt? Probably fairly easy as usually you can go to
+commercial banks or go to an investment bank if you're raising enough debt. Companies borrow all of
+the time, they're constantly paying off loans or taking new ones with different interest rates.
+There are revolving lines of credit, secured loans, factoring (borrowing against receivables),
+EETCs, fixed interest debt, variable interest debt, mezzanine debt, etc etc. How easy is it to issue
+equity? Pretty amazingly difficult... sure you have your IPOs but that happens once in a company's
+lifetime.
+```
+
+</details>
+
+- **question 4** · tokens 2327-2334 (7) · chunk 9
+
+```text
+User: What is WACC?
+```
+
+- `Assistant:` · tokens 2334-2336 (2) · chunk 9
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 471123-0-798 | 28-204 | 176 | 0 |  |
+| doc 414940-0-474 | 204-322 | 118 | 0-1 |  |
+| question 0 | 322-335 | 13 | 1 |  |
+| `assistant:` 0 | 335-337 | 2 | 1 |  |
+| answer 0 | 337-465 | 128 | 1 |  |
+| newline 0 | 465-466 | 1 | 1 |  |
+| doc 416727-0-1356 | 466-775 | 309 | 1-3 |  |
+| doc 418610-0-264 | 775-837 | 62 | 3 |  |
+| question 1 | 837-844 | 7 | 3 |  |
+| `assistant:` 1 | 844-846 | 2 | 3 |  |
+| answer 1 | 846-974 | 128 | 3 |  |
+| newline 1 | 974-975 | 1 | 3 |  |
+| doc 346760-0-445 | 975-1072 | 97 | 3-4 |  |
+| doc 192515-0-701 | 1072-1219 | 147 | 4 |  |
+| question 2 | 1219-1224 | 5 | 4 |  |
+| `assistant:` 2 | 1224-1226 | 2 | 4 |  |
+| answer 2 | 1226-1354 | 128 | 4-5 |  |
+| newline 2 | 1354-1355 | 1 | 5 |  |
+| doc 587508-0-651 | 1355-1492 | 137 | 5 |  |
+| doc 366249-0-656 | 1492-1630 | 138 | 5-6 |  |
+| question 3 | 1630-1637 | 7 | 6 |  |
+| `assistant:` 3 | 1637-1639 | 2 | 6 |  |
+| answer 3 | 1639-1767 | 128 | 6 | new this turn |
+| newline 3 | 1767-1768 | 1 | 6 | new this turn |
+| doc 554465-0-780 | 1768-1942 | 174 | 6-7 | new this turn |
+| doc 477310-0-1809 | 1942-2327 | 385 | 7-9 | new this turn |
+| question 4 | 2327-2334 | 7 | 9 | new this turn |
+| `assistant:` 4 | 2334-2336 | 2 | 9 | new this turn |
 
 ```
 P  ======###+
@@ -239,45 +522,93 @@ D  ======SSS+
 
 2,718 prompt tokens: 10 whole chunks and 158 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 2,336 tokens on its GPU, computed 382 and stored 1 new chunk; D3 held 2,448, loaded 112 from LMCache and computed 158.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 471123-0-798 | 28-204 | 176 |  |
-| doc 414940-0-474 | 204-322 | 118 |  |
-| question 0 | 322-335 | 13 |  |
-| `assistant:` 0 | 335-337 | 2 |  |
-| answer 0 | 337-465 | 128 |  |
-| newline 0 | 465-466 | 1 |  |
-| doc 416727-0-1356 | 466-775 | 309 |  |
-| doc 418610-0-264 | 775-837 | 62 |  |
-| question 1 | 837-844 | 7 |  |
-| `assistant:` 1 | 844-846 | 2 |  |
-| answer 1 | 846-974 | 128 |  |
-| newline 1 | 974-975 | 1 |  |
-| doc 346760-0-445 | 975-1072 | 97 |  |
-| doc 192515-0-701 | 1072-1219 | 147 |  |
-| question 2 | 1219-1224 | 5 |  |
-| `assistant:` 2 | 1224-1226 | 2 |  |
-| answer 2 | 1226-1354 | 128 |  |
-| newline 2 | 1354-1355 | 1 |  |
-| doc 587508-0-651 | 1355-1492 | 137 |  |
-| doc 366249-0-656 | 1492-1630 | 138 |  |
-| question 3 | 1630-1637 | 7 |  |
-| `assistant:` 3 | 1637-1639 | 2 |  |
-| answer 3 | 1639-1767 | 128 |  |
-| newline 3 | 1767-1768 | 1 |  |
-| doc 554465-0-780 | 1768-1942 | 174 |  |
-| doc 477310-0-1809 | 1942-2327 | 385 |  |
-| question 4 | 2327-2334 | 7 |  |
-| `assistant:` 4 | 2334-2336 | 2 |  |
-| answer 4 | 2336-2464 | 128 | new this turn |
-| newline 4 | 2464-2465 | 1 | new this turn |
-| doc 597850-0-335 | 2465-2545 | 80 | new this turn |
-| doc 467535-0-727 | 2545-2706 | 161 | new this turn |
-| question 5 | 2706-2716 | 10 | new this turn |
-| `assistant:` 5 | 2716-2718 | 2 | new this turn |
+Tokens 0-2,336: [turn 4](#turn-4)'s prompt, unchanged (checked: its first 2,336 token ids are the previous prompt's), so chunks 0-8 are the same chunks; chunk 9 (partial then, 32 tokens) fills now. New from token 2,336:
+
+- **D's answer to turn 4** · tokens 2336-2464 (128) · chunk 9
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 2464-2465 (1) · chunk 9
+
+<details><summary>document <code>597850-0-335</code> · tokens 2465-2545 (80) · chunk 9</summary>
+
+```text
+Document:
+
+CAPM is a pricing model.  Not a risk model.  &gt; If you're talking about corporate finance where a
+firm is considering an investment such as a new project, then a determining a WACC and using it as a
+discount rate for your cash flow is a basic strategy.  Once again... WACC is a pricing model and has
+nothing to do with risk modeling.
+```
+
+</details>
+
+<details><summary>document <code>467535-0-727</code> · tokens 2545-2706 (161) · chunks 9-10</summary>
+
+```text
+Document:
+
+Each situation is different, but it has to do with assessing what the Company is trying to do.
+People always talk about WACC, but in reality, WACC is less important than figuring how how much
+debt a Company can support (determined by leverage and solvency statistics).  Here are a few things
+to think about:  -How stable are the Company's cash flows? (big difference between a Company that
+has multi-year contracts locked in place vs. variable/cyclical revenue streams; what type of Capex
+requirement is there?)  -What is the purpose of raising the capital? (growth vs. recapitalization;
+where are the proceeds going?)  -What collateral is available for creditors?  -What does working
+capital look like? (is there seasonality?)
+```
+
+</details>
+
+- **question 5** · tokens 2706-2716 (10) · chunk 10
+
+```text
+User: Is the WACC formula highly reliable?
+```
+
+- `Assistant:` · tokens 2716-2718 (2) · chunk 10
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 471123-0-798 | 28-204 | 176 | 0 |  |
+| doc 414940-0-474 | 204-322 | 118 | 0-1 |  |
+| question 0 | 322-335 | 13 | 1 |  |
+| `assistant:` 0 | 335-337 | 2 | 1 |  |
+| answer 0 | 337-465 | 128 | 1 |  |
+| newline 0 | 465-466 | 1 | 1 |  |
+| doc 416727-0-1356 | 466-775 | 309 | 1-3 |  |
+| doc 418610-0-264 | 775-837 | 62 | 3 |  |
+| question 1 | 837-844 | 7 | 3 |  |
+| `assistant:` 1 | 844-846 | 2 | 3 |  |
+| answer 1 | 846-974 | 128 | 3 |  |
+| newline 1 | 974-975 | 1 | 3 |  |
+| doc 346760-0-445 | 975-1072 | 97 | 3-4 |  |
+| doc 192515-0-701 | 1072-1219 | 147 | 4 |  |
+| question 2 | 1219-1224 | 5 | 4 |  |
+| `assistant:` 2 | 1224-1226 | 2 | 4 |  |
+| answer 2 | 1226-1354 | 128 | 4-5 |  |
+| newline 2 | 1354-1355 | 1 | 5 |  |
+| doc 587508-0-651 | 1355-1492 | 137 | 5 |  |
+| doc 366249-0-656 | 1492-1630 | 138 | 5-6 |  |
+| question 3 | 1630-1637 | 7 | 6 |  |
+| `assistant:` 3 | 1637-1639 | 2 | 6 |  |
+| answer 3 | 1639-1767 | 128 | 6 |  |
+| newline 3 | 1767-1768 | 1 | 6 |  |
+| doc 554465-0-780 | 1768-1942 | 174 | 6-7 |  |
+| doc 477310-0-1809 | 1942-2327 | 385 | 7-9 |  |
+| question 4 | 2327-2334 | 7 | 9 |  |
+| `assistant:` 4 | 2334-2336 | 2 | 9 |  |
+| answer 4 | 2336-2464 | 128 | 9 | new this turn |
+| newline 4 | 2464-2465 | 1 | 9 | new this turn |
+| doc 597850-0-335 | 2465-2545 | 80 | 9 | new this turn |
+| doc 467535-0-727 | 2545-2706 | 161 | 9-10 | new this turn |
+| question 5 | 2706-2716 | 10 | 10 | new this turn |
+| `assistant:` 5 | 2716-2718 | 2 | 10 | new this turn |
 
 ```
 P  =========#+
@@ -302,51 +633,99 @@ D  =========S+
 
 3,102 prompt tokens: 12 whole chunks and 30 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 2,704 tokens on its GPU, computed 398 and stored 2 new chunks; D3 held 2,832, loaded 240 from LMCache and computed 30.
 
-Pieces:
+### The prompt
 
-| piece | tokens | length | |
-| --- | --- | ---: | --- |
-| system | 0-28 | 28 |  |
-| doc 471123-0-798 | 28-204 | 176 |  |
-| doc 414940-0-474 | 204-322 | 118 |  |
-| question 0 | 322-335 | 13 |  |
-| `assistant:` 0 | 335-337 | 2 |  |
-| answer 0 | 337-465 | 128 |  |
-| newline 0 | 465-466 | 1 |  |
-| doc 416727-0-1356 | 466-775 | 309 |  |
-| doc 418610-0-264 | 775-837 | 62 |  |
-| question 1 | 837-844 | 7 |  |
-| `assistant:` 1 | 844-846 | 2 |  |
-| answer 1 | 846-974 | 128 |  |
-| newline 1 | 974-975 | 1 |  |
-| doc 346760-0-445 | 975-1072 | 97 |  |
-| doc 192515-0-701 | 1072-1219 | 147 |  |
-| question 2 | 1219-1224 | 5 |  |
-| `assistant:` 2 | 1224-1226 | 2 |  |
-| answer 2 | 1226-1354 | 128 |  |
-| newline 2 | 1354-1355 | 1 |  |
-| doc 587508-0-651 | 1355-1492 | 137 |  |
-| doc 366249-0-656 | 1492-1630 | 138 |  |
-| question 3 | 1630-1637 | 7 |  |
-| `assistant:` 3 | 1637-1639 | 2 |  |
-| answer 3 | 1639-1767 | 128 |  |
-| newline 3 | 1767-1768 | 1 |  |
-| doc 554465-0-780 | 1768-1942 | 174 |  |
-| doc 477310-0-1809 | 1942-2327 | 385 |  |
-| question 4 | 2327-2334 | 7 |  |
-| `assistant:` 4 | 2334-2336 | 2 |  |
-| answer 4 | 2336-2464 | 128 |  |
-| newline 4 | 2464-2465 | 1 |  |
-| doc 597850-0-335 | 2465-2545 | 80 |  |
-| doc 467535-0-727 | 2545-2706 | 161 |  |
-| question 5 | 2706-2716 | 10 |  |
-| `assistant:` 5 | 2716-2718 | 2 |  |
-| answer 5 | 2718-2846 | 128 | new this turn |
-| newline 5 | 2846-2847 | 1 | new this turn |
-| doc 241308-0-414 | 2847-2942 | 95 | new this turn |
-| doc 558617-0-616 | 2942-3088 | 146 | new this turn |
-| question 6 | 3088-3100 | 12 | new this turn |
-| `assistant:` 6 | 3100-3102 | 2 | new this turn |
+Tokens 0-2,718: [turn 5](#turn-5)'s prompt, unchanged (checked: its first 2,718 token ids are the previous prompt's), so chunks 0-9 are the same chunks; chunk 10 (partial then, 158 tokens) fills now. New from token 2,718:
+
+- **D's answer to turn 5** · tokens 2718-2846 (128) · chunks 10-11
+
+  its text was not kept by this run: its driver kept only the token ids (later runs keep it: scripts/pd_mtrag.py --trace)
+
+- `\n` · tokens 2846-2847 (1) · chunk 11
+
+<details><summary>document <code>241308-0-414</code> · tokens 2847-2942 (95) · chunk 11</summary>
+
+```text
+Document:
+
+The three places you want to focus on are the income statement, the balance sheet, and cash flow
+statement. The standard measure for multiple of income is the P/E or price earnings ratio  For the
+balance sheet, the debt to equity or debt to capital (debt+equity) ratio. For cash generation, price
+to cash flow, or price to free cash flow. (The lower the better, all other things being equal, for
+all three ratios.)
+```
+
+</details>
+
+<details><summary>document <code>558617-0-616</code> · tokens 2942-3088 (146) · chunks 11-12</summary>
+
+```text
+Document:
+
+Note that the formula for Price to Book ratio is:  Stock Price / {[Total Assets - (Intangible Assets
++ Liabilities)] / Stock Outstanding}  http://www.investopedia.com/terms/p/price-to-bookratio.asp
+http://www.investopedia.com/articles/fundamental/03/112603.asp  There's a number of factors that
+could lead to a lower than 1. The primary reason, imho, could be the company is in a state of
+retiring stock with debt. The company is selling penny stocks (only to get people more interested in
+it's later development) which are inherently undervalued. There may be other reasons, but definitely
+check out both articles.
+```
+
+</details>
+
+- **question 6** · tokens 3088-3100 (12) · chunk 12
+
+```text
+User: What is the ideal formula to evaluate a company?
+```
+
+- `Assistant:` · tokens 3100-3102 (2) · chunk 12
+
+### Pieces, chunks and blocks
+
+| piece | tokens | length | chunks | |
+| --- | --- | ---: | --- | --- |
+| system | 0-28 | 28 | 0 |  |
+| doc 471123-0-798 | 28-204 | 176 | 0 |  |
+| doc 414940-0-474 | 204-322 | 118 | 0-1 |  |
+| question 0 | 322-335 | 13 | 1 |  |
+| `assistant:` 0 | 335-337 | 2 | 1 |  |
+| answer 0 | 337-465 | 128 | 1 |  |
+| newline 0 | 465-466 | 1 | 1 |  |
+| doc 416727-0-1356 | 466-775 | 309 | 1-3 |  |
+| doc 418610-0-264 | 775-837 | 62 | 3 |  |
+| question 1 | 837-844 | 7 | 3 |  |
+| `assistant:` 1 | 844-846 | 2 | 3 |  |
+| answer 1 | 846-974 | 128 | 3 |  |
+| newline 1 | 974-975 | 1 | 3 |  |
+| doc 346760-0-445 | 975-1072 | 97 | 3-4 |  |
+| doc 192515-0-701 | 1072-1219 | 147 | 4 |  |
+| question 2 | 1219-1224 | 5 | 4 |  |
+| `assistant:` 2 | 1224-1226 | 2 | 4 |  |
+| answer 2 | 1226-1354 | 128 | 4-5 |  |
+| newline 2 | 1354-1355 | 1 | 5 |  |
+| doc 587508-0-651 | 1355-1492 | 137 | 5 |  |
+| doc 366249-0-656 | 1492-1630 | 138 | 5-6 |  |
+| question 3 | 1630-1637 | 7 | 6 |  |
+| `assistant:` 3 | 1637-1639 | 2 | 6 |  |
+| answer 3 | 1639-1767 | 128 | 6 |  |
+| newline 3 | 1767-1768 | 1 | 6 |  |
+| doc 554465-0-780 | 1768-1942 | 174 | 6-7 |  |
+| doc 477310-0-1809 | 1942-2327 | 385 | 7-9 |  |
+| question 4 | 2327-2334 | 7 | 9 |  |
+| `assistant:` 4 | 2334-2336 | 2 | 9 |  |
+| answer 4 | 2336-2464 | 128 | 9 |  |
+| newline 4 | 2464-2465 | 1 | 9 |  |
+| doc 597850-0-335 | 2465-2545 | 80 | 9 |  |
+| doc 467535-0-727 | 2545-2706 | 161 | 9-10 |  |
+| question 5 | 2706-2716 | 10 | 10 |  |
+| `assistant:` 5 | 2716-2718 | 2 | 10 |  |
+| answer 5 | 2718-2846 | 128 | 10-11 | new this turn |
+| newline 5 | 2846-2847 | 1 | 11 | new this turn |
+| doc 241308-0-414 | 2847-2942 | 95 | 11 | new this turn |
+| doc 558617-0-616 | 2942-3088 | 146 | 11-12 | new this turn |
+| question 6 | 3088-3100 | 12 | 12 | new this turn |
+| `assistant:` 6 | 3100-3102 | 2 | 12 | new this turn |
 
 ```
 P  ==========##+

@@ -20,7 +20,8 @@ Layouts (where a turn's passages go):
 
 Prompts go as token ids, built from separately tokenized pieces (the engine's /tokenize), so a passage has the same
 tokens wherever it appears and the driver knows every piece's place: each record lists them (system, doc <id>,
-user <turn>, answer <turn>, ...). A generated answer goes into the history as the engine's own token ids
+user <turn>, answer <turn>, ...), and with --trace also the prompt's ids and each piece's text (texts, parallel to
+pieces; an answer's is the engine's text of it). A generated answer goes into the history as the engine's own token ids
 (return_token_ids), or else its text tokenized again (the record says which). Conversations run `--concurrency` at
 a time, each one turn after another; a turn waits for its whole answer.
 Standard library and aiohttp only (the vLLM environment), so it runs with python -I.
@@ -69,27 +70,33 @@ class Tok:
         return self.cache[k]
 
 
-async def build(tok, layout, turns, t, answers):
+async def build(tok, layout, turns, t, answers, texts=None, answer_texts=None):
     """(token ids, pieces [(kind, ref, start, end)]) of the prompt for turn t (0-based); answers[i]: the token ids
-    of the answer to turn i."""
+    of the answer to turn i. texts (a list): each piece's text is appended to it, parallel to pieces (an answer's
+    from answer_texts[i], the engine's text of it)."""
     ids, pieces = [], []
 
-    async def add(kind, ref, toks):
+    async def add(kind, ref, toks, text=None):
         pieces.append((kind, ref, len(ids), len(ids) + len(toks)))
         ids.extend(toks)
+        if texts is not None:
+            texts.append(text)
+
+    async def piece(kind, ref, text, special=False):
+        await add(kind, ref, await tok(text, special=special), text)
 
     async def docs(i):
         for doc_id, title, text in turns[i][1]:
-            await add("doc", doc_id, await tok(f"Document: {title}\n{text}\n\n" if title else f"Document:\n{text}\n\n"))
+            await piece("doc", doc_id, f"Document: {title}\n{text}\n\n" if title else f"Document:\n{text}\n\n")
 
     async def user(i):
-        await add("user", i, await tok(f"User: {turns[i][0]}\n"))
+        await piece("user", i, f"User: {turns[i][0]}\n")
 
     async def answer(i):
-        await add("assistant", i, await tok("Assistant:"))
-        await add("answer", i, answers[i])
-        await add("newline", i, await tok("\n"))
-    await add("system", None, await tok(SYSTEM, special=True))
+        await piece("assistant", i, "Assistant:")
+        await add("answer", i, answers[i], answer_texts[i] if answer_texts and i < len(answer_texts) else None)
+        await piece("newline", i, "\n")
+    await piece("system", None, SYSTEM, special=True)
     if layout == "docs_first":
         await docs(t)
         for i in range(t):
@@ -111,7 +118,7 @@ async def build(tok, layout, turns, t, answers):
         await user(t)
     else:
         raise ValueError(f"layout {layout}")
-    await add("assistant", t, await tok("Assistant:"))
+    await piece("assistant", t, "Assistant:")
     return ids, pieces
 
 
@@ -154,9 +161,10 @@ async def ask(session, a, ids, conv, tag, trace, pieces=None, capture=False):
 async def conversation(session, tok, a, k, conv, out, trace):
     turns = turns_of(conv)
     cid = str(conv.get("conversation_id") or conv.get("id") or k)
-    answers = []
+    answers, answer_texts = [], []
     for t in range(len(turns)):
-        ids, pieces = await build(tok, a.layout, turns, t, answers)
+        texts = [] if trace else None              # with --trace each piece's text is kept (the answers' too)
+        ids, pieces = await build(tok, a.layout, turns, t, answers, texts, answer_texts)
         rec = {"tag": f"{run_of(a)}|{k}|{t}", "run": run_of(a), "layout": a.layout, "policy": a.policy, "conv": k,
                "conv_id": cid, "domain": conv.get("domain"), "turn": t, "turns": len(turns),
                "prompt_tokens": len(ids), "pieces": pieces, "trace": trace}
@@ -165,6 +173,7 @@ async def conversation(session, tok, a, k, conv, out, trace):
             break
         if trace:
             rec["ids"] = ids
+            rec["texts"] = texts
         try:
             capture = trace and k < a.capture_convs
             rec["capture"] = capture
@@ -173,6 +182,7 @@ async def conversation(session, tok, a, k, conv, out, trace):
             if got is None:
                 got, src = await tok(text), "retokenized"
             answers.append(got)
+            answer_texts.append(text)
             out.append(dict(rec, answer_tokens=len(got), answer_ids_from=src, ttft=ttft, latency=lat, t_done=time.time()))
         except Exception as exc:
             out.append(dict(rec, error=repr(exc)[:300]))

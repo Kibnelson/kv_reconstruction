@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The lives of KV blocks and LMCache chunks in one LMCache lifecycle run (scripts/lmc_run.sh), from its trace.
 
-  python3 -I scripts/lmc_lifecycle.py report --run RUN_DIR --output RESULTS_DIR
+  python3 -I scripts/lmc_lifecycle.py report --run RUN_DIR --output RESULTS_DIR [--conversations MTRAG_FILE]
+  python3 -I scripts/lmc_lifecycle.py conversations --run RUN_DIR|--results DIR --output DIR [--conversations FILE]
   python3 -I scripts/lmc_lifecycle.py compare --dirs DIR,DIR,... --output DIR
 
 report reads RUN_DIR/kvtrace/*.jsonl (every process's hook records, docs/lmcache_lifecycle.md), the proxy's log
@@ -20,7 +21,9 @@ prompt pieces and token ids) and env.json, and follows:
 and writes to RESULTS_DIR: summary.md (what happened, the numbers, one chunk's and one request's whole story),
 results.json (the numbers), chunks.jsonl.gz (one row per chunk, every time of its life), blocks.jsonl.gz (one row
 per engine, request and block of its prompt: where the block came from and its GPU block), requests.jsonl.gz (one
-row per engine request: hits, loads, stores and their times).
+row per engine request: hits, loads, stores and their times), conversations/ (a page per conversation: each turn's
+prompt as text, how it grows, its chunks and blocks; the text from mtrag.jsonl, or for a run whose driver kept none,
+rebuilt from MTRAG_FILE).
 
 compare reads several results folders' results.json (one per mode) and writes compare.md and compare.json.
 Standard library only (python -I).
@@ -728,7 +731,7 @@ def health(run, t0):
     return out
 
 
-def write_report(run, out):
+def write_report(run, out, conversations=None):
     out = pathlib.Path(out)
     out.mkdir(parents=True, exist_ok=True)
     R = Run(run)
@@ -846,7 +849,7 @@ def write_report(run, out):
            "docs/lmcache_lifecycle.md says what each field is), results.json, kvtrace.tar.gz (the raw records).", ""]
     md += ["One page per conversation, from its prompt's pieces to its chunks and blocks: conversations/index.md.", ""]
     (out / "summary.md").write_text("\n".join(md))
-    conversation_views(R, out / "conversations")
+    conversation_views(R, out / "conversations", conversations)
     print(f"lifecycle {R.mode}: {nums['requests']} requests, {ck['stored']} chunks stored, {ck['pulled']} pulls "
           f"({ck['pulled_from']}), checks {nums['checks']} -> {out}")
     return nums
@@ -891,12 +894,155 @@ def _n(k, word):
     return f"{k} {word}" + ("" if k == 1 else "s")
 
 
-def conversation_views(R, out):
-    """One page per conversation (and an index): each turn's prompt pieces, its 256-token chunks and their 16-token
-    blocks, and what happened to each chunk on P, in LMCache and on D that turn."""
+def _driver():
+    """scripts/pd_mtrag.py, loaded from beside this script: a prompt's text is rebuilt by the code that built it."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("pd_mtrag_texts", pathlib.Path(__file__).resolve().parent / "pd_mtrag.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def prompt_texts(R, conversations=None):
+    """tag -> (each piece's text, parallel to the turn's pieces; where they came from). The driver's own (its --trace
+    records keep them, the answers' too), else rebuilt by the driver's build() from the MTRAG file the run read
+    (conversations: the same pinned file, SHA-256 checked by scripts/lmc_setup.sh): every piece but the answers,
+    which only the engine had. A turn whose rebuilt pieces are not the run's, kind for kind and id for id, gets none."""
+    out, need = {}, []
+    for tag, t in R.turns.items():
+        tx = t.get("texts")
+        if tx and len(tx) == len(t.get("pieces") or []):
+            out[tag] = (tx, "driver")
+        else:
+            need.append((tag, t))
+    if not need or not conversations:
+        return out
+    import asyncio
+    drv = _driver()
+    convs = json.loads(pathlib.Path(conversations).read_text())
+
+    async def tok(text, special=False):              # one placeholder token a piece: only the order and text matter
+        return [0]
+    for tag, t in need:
+        k, turn = t.get("conv"), t.get("turn")
+        if not isinstance(k, int) or not 0 <= k < len(convs) or not isinstance(turn, int) or not t.get("pieces"):
+            continue
+        conv = convs[k]
+        if str(conv.get("conversation_id") or conv.get("id") or k) != str(t.get("conv_id")) or \
+                conv.get("domain") != t.get("domain"):
+            continue
+        texts = []
+        try:
+            _ids, pieces = asyncio.run(drv.build(tok, t.get("layout"), drv.turns_of(conv), turn, [[0]] * turn, texts))
+        except (ValueError, IndexError, KeyError):
+            continue
+        if [(p[0], p[1]) for p in pieces] == [(p[0], p[1]) for p in t["pieces"]]:
+            out[tag] = (texts, "rebuilt")
+    return out
+
+
+WRAP = 100
+
+
+def _fenced(text):
+    """A text as sent, in a code block whose fence no run of backticks in it can close; lines over WRAP characters
+    wrapped for reading (the text as sent has no such breaks)."""
+    import textwrap
+    run = max((len(m) for m in re.findall(r"`+", text)), default=0)
+    fence = "`" * max(3, run + 1)
+    lines = []
+    for ln in text.rstrip("\n").split("\n"):
+        lines += textwrap.wrap(ln, WRAP, break_on_hyphens=False, replace_whitespace=False) if len(ln) > WRAP else [ln]
+    return [fence + "text"] + lines + [fence]
+
+
+def _cell(text, n=70):
+    s = " ".join(str(text).split()).replace("|", "\\|")
+    return s if len(s) <= n else s[:n - 1] + "…"
+
+
+def _chunk_span(s, e, ch):
+    a, b = s // ch, (e - 1) // ch
+    return f"chunk {a}" if a == b else f"chunks {a}-{b}"
+
+
+def prompt_lines(pieces, texts, new_from, ch, seen_docs, turn):
+    """The prompt's pieces from token new_from on, each with its tokens, chunks and text."""
+    md = []
+    for i, p in enumerate(pieces):
+        kind, ref, s, e = p[0], p[1], p[2], p[3]
+        if s < new_from:
+            continue
+        text = texts[i] if texts is not None else None
+        where = f"tokens {s}-{e} ({e - s}) · {_chunk_span(s, e, ch)}" if e > s else f"tokens {s}-{e} (0)"
+        if kind in ("assistant", "newline"):
+            shown = "\\n" if kind == "newline" else (text if text is not None else "Assistant:")
+            md += [f"- `{shown}` · {where}", ""]
+        elif kind == "doc":
+            if ref in seen_docs and seen_docs[ref][0] != turn:
+                t0, n0 = seen_docs[ref]
+                same = f"the same {n0} tokens" if n0 == e - s else f"NOT the same length ({n0} tokens then)"
+                md += [f"- document `{ref}` · {where} · **again**: sent on [turn {t0}](#turn-{t0}) already ({same}), "
+                       "here at another place in the prompt, so in other chunks: a prefix cache cannot reuse it", ""]
+                continue
+            seen_docs.setdefault(ref, (turn, e - s))
+            md += [f"<details><summary>document <code>{ref}</code> · {where}</summary>", ""]
+            md += (_fenced(text) if text is not None else ["(text not available)"]) + ["", "</details>", ""]
+        elif kind == "answer":
+            md.append(f"- **D's answer to turn {ref}** · {where}")
+            md += [""] + (_fenced(text) if text is not None else
+                          ["  its text was not kept by this run: its driver kept only the token ids (later runs keep "
+                           "it: scripts/pd_mtrag.py --trace)"]) + [""]
+        else:
+            label = {"system": "system prompt", "user": f"question {ref}"}.get(kind, f"{kind} {ref}")
+            md.append(f"- **{label}** · {where}")
+            md += [""] + (_fenced(text) if text is not None else ["  (text not available)"]) + [""]
+    return md
+
+
+def growth_row(t, pieces, texts, prev_len, ch):
+    """One row of how the prompt grows: its new tokens by what they are."""
+    n = t["prompt_tokens"]
+    parts = collections.Counter()
+    ndocs, again, again_tok, question = 0, 0, 0, ""
+    before = {p[1] for p in pieces if p[0] == "doc" and p[2] < prev_len}
+    for i, p in enumerate(pieces):
+        if p[2] < prev_len:
+            continue
+        k = p[0]
+        parts[{"answer": "answer", "doc": "docs", "user": "question"}.get(k, "framing")] += p[3] - p[2]
+        if k == "doc":
+            ndocs += 1
+            again += p[1] in before
+            again_tok += (p[3] - p[2]) if p[1] in before else 0
+        if k == "user" and texts is not None and texts[i]:
+            question = texts[i][len("User: "):] if texts[i].startswith("User: ") else texts[i]
+    q_txt = f"{parts['question']}" + (f": {_cell(question)}" if question else "")
+    return (f"| {t.get('turn')} | {n:,} | +{n - prev_len:,} | {parts['answer'] or '–'} | "
+            f"{_n(ndocs, 'doc')}, {parts['docs']:,}{f' ({again} sent before: {again_tok:,})' if again else ''} | {q_txt} | "
+            f"{parts['framing']} | {n // ch} (+{n // ch - prev_len // ch}) |"), question
+
+
+def conversation_views(R, out, conversations=None):
+    """One page per conversation (and an index): each turn's prompt, piece by piece with its text (the new pieces:
+    the rest is the previous turn's prompt), how it grew, its 256-token chunks and their 16-token blocks, and what
+    happened to each chunk on P, in LMCache and on D that turn. conversations: the MTRAG file, for a run whose
+    driver kept no texts (prompt_texts)."""
     out = pathlib.Path(out)
     out.mkdir(parents=True, exist_ok=True)
     ch = R.chunk
+    texts_of = prompt_texts(R, conversations)
+    srcs = collections.Counter(src for _tx, src in texts_of.values())
+    if srcs.get("driver"):
+        src_txt = ("The prompts' text is the driver's own record of what it sent (answers included); lines over "
+                   f"{WRAP} characters are wrapped here for reading.")
+    elif srcs.get("rebuilt"):
+        src_txt = ("The prompts' text is rebuilt from the MTRAG file the run read, by the driver's own code "
+                   "(scripts/pd_mtrag.py build()), and matches the run's record piece for piece; token counts and "
+                   "places are the run's. D's answers were not kept by this run's driver, only their token ids. "
+                   f"Lines over {WRAP} characters are wrapped here for reading.")
+    else:
+        src_txt = ("This run kept no prompt text: pass the MTRAG file (--conversations) to rebuild it.")
     by_key = collections.defaultdict(dict)
     for (role, _rid), q in R.reqs.items():
         if q["key"]:
@@ -909,9 +1055,10 @@ def conversation_views(R, out):
     index = [f"# The conversations, one by one: {mode} mode", "",
              "Each page follows one MTRAG conversation turn by turn: the prompt's pieces, the 256-token chunks LMCache "
              "keeps them in, each chunk's 16 vLLM blocks, and what happened to every chunk on P, in LMCache and on the "
-             "conversation's D engine. Built by scripts/lmc_lifecycle.py from the run's trace.", "",
-             "| conversation | domain | turns | last prompt | D engine | chunks stored | pulled | held by D | page |",
-             "| ---: | --- | ---: | ---: | --- | ---: | ---: | ---: | --- |"]
+             "conversation's D engine. Built by scripts/lmc_lifecycle.py from the run's trace. " + src_txt, "",
+             "| conversation | domain | first question | turns | last prompt | D engine | chunks stored | pulled | "
+             "held by D | page |",
+             "| ---: | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- |"]
     for conv in sorted(convs, key=lambda c: (c is None, c)):
         turns = sorted(convs[conv], key=lambda x: x[0].get("turn", 0))
         head = turns[0][0]
@@ -925,16 +1072,28 @@ def conversation_views(R, out):
               "Legend for the strips (one character a chunk): P: `=` on P's GPU from an earlier turn, `#` computed "
               "and stored now, `+` computed, not stored (a partial chunk). D: `=` on D's GPU from an earlier turn, "
               "`M` pulled from memory, `S` pulled from disk, `+` computed by D (a partial chunk), `?` missed.", "",
+              src_txt, "",
               "| turn | prompt | chunks + tail | P: own GPU / computed / stored | D: own GPU / loaded / computed | "
               "pulled | pull ms | D first token ms |",
               "| ---: | ---: | --- | --- | --- | --- | ---: | ---: |"]
+        growth = ["## How the prompt grows", "",
+                  "Each turn's prompt is the previous one, token for token, and then: D's answer to the previous turn, "
+                  "this turn's documents, its question and the framing (the system prompt on turn 0, `Assistant:` "
+                  "and newlines). Only the new tokens can make new chunks: the previous prompt's partial chunk fills "
+                  "first. A document sent before comes again at another place, so in other chunks.", "",
+                  "| turn | prompt | new | previous answer | documents | question | framing | whole chunks |",
+                  "| ---: | ---: | ---: | ---: | --- | --- | ---: | --- |"]
         totals = collections.Counter()
         detail = []
         prev_len = 0
+        prev_ids = None
+        seen_docs = {}
+        first_q = ""
         lineage_done = False
         for t, rq, key in turns:
             n = t["prompt_tokens"]
             pieces = t.get("pieces") or []
+            texts = (texts_of.get(t.get("tag")) or (None,))[0]
             P, D = rq.get("P"), rq.get("D")
             nfull, tail = n // ch, n % ch
             # the chunks' names: the server's lookups of this prompt (D's, else P's)
@@ -1061,23 +1220,48 @@ def conversation_views(R, out):
                       f"{' (' + ', '.join(('disk' if k == 'L2' else 'memory') + f' {v}' for k, v in tiers.items()) + ')' if tiers else ''}"
                       f" | {fmt(pull_ms, 1)} | {fmt(ft, 1)} |")
             totals.update(stored=stored_now, pulled=pulled, held=held)
+            g_row, question = growth_row(t, pieces, texts, prev_len, ch)
+            growth.append(g_row)
+            if not t.get("turn"):
+                first_q = question
+            if t.get("turn") and prev_len:
+                ids = t.get("ids")
+                same = ("checked: its first {:,} token ids are the previous prompt's".format(prev_len)
+                        if ids is not None and prev_ids is not None and ids[:prev_len] == prev_ids else
+                        "NOT the previous prompt's ids" if ids is not None and prev_ids is not None else
+                        "not checked: the run kept no ids")
+                whole = prev_len // ch
+                kept = ("no whole chunk yet" if not whole else "chunk 0 is the same chunk" if whole == 1 else
+                        f"chunks 0-{whole - 1} are the same chunks")
+                carried = [f"Tokens 0-{prev_len:,}: [turn {t.get('turn') - 1}](#turn-{t.get('turn') - 1})'s prompt, "
+                           f"unchanged ({same}), so {kept}"
+                           + (f"; chunk {whole} (partial then, {prev_len % ch} tokens) fills now" if prev_len % ch
+                              else "") + ". New from token {:,}:".format(prev_len), ""]
+            else:
+                carried = ["The whole prompt, piece by piece:", ""]
+            prompt_md = ["### The prompt", ""] + carried + prompt_lines(pieces, texts, prev_len if t.get("turn") else 0,
+                                                                        ch, seen_docs, t.get("turn"))
             detail += [f"## Turn {t.get('turn')}", "",
                        f"{n:,} prompt tokens: {_n(nfull, 'whole chunk')} and {tail} tokens over (the partial chunk, computed "
                        "by both engines and stored only when a later turn completes it). "
                        f"P held {p_hit:,} tokens on its GPU, computed {p_comp:,} and stored {_n(stored_now, 'new chunk')}; "
                        f"{(D or {}).get('role', 'D')} held {d_hit:,}, loaded {d_load:,} from LMCache and computed {d_comp:,}.",
-                       "", "Pieces:", "", "| piece | tokens | length | |", "| --- | --- | ---: | --- |"]
+                       ""] + prompt_md + ["### Pieces, chunks and blocks", "",
+                                          "| piece | tokens | length | chunks | |", "| --- | --- | ---: | --- | --- |"]
             for p in pieces:
                 detail.append(f"| {_piece(p)} | {p[2]}-{p[3]} | {p[3] - p[2]} | "
+                              f"{_chunk_span(p[2], p[3], ch).split(' ', 1)[1] if p[3] > p[2] else '–'} | "
                               f"{'new this turn' if p[2] >= prev_len and t.get('turn') else ''} |")
             detail += ["", "```", f"P  {''.join(p_strip)}", f"D  {''.join(d_strip)}", "```", "",
                        "| chunk | tokens | pieces in it (tokens) | vLLM blocks | GPU blocks | in LMCache | P this turn | "
                        "D this turn |", "| ---: | --- | --- | --- | --- | --- | --- | --- |"] + rows + [""]
             prev_len = n
-        md += [""] + (lineage if lineage_done else []) + detail
+            prev_ids = t.get("ids")
+        md += [""] + growth + [""] + (lineage if lineage_done else []) + detail
         name = f"conversation_{conv}.md"
         (out / name).write_text("\n".join(md))
-        index.append(f"| {conv} | {head.get('domain')} | {len(turns)} | {turns[-1][0]['prompt_tokens']:,} | "
+        index.append(f"| {conv} | {head.get('domain')} | {_cell(first_q, 50) or '–'} | {len(turns)} | "
+                     f"{turns[-1][0]['prompt_tokens']:,} | "
                      f"{', '.join(d_roles)} | {totals['stored']} | {totals['pulled']} | {totals['held']} | [{name}]({name}) |")
     (out / "index.md").write_text("\n".join(index + [""]))
     return sorted(c for c in convs if c is not None)
@@ -1165,11 +1349,13 @@ def main(argv=None):
     r.add_argument("--results", help="or a published results folder, unpacked into --unpack-to first")
     r.add_argument("--unpack-to", help="where to unpack --results (default: OUTPUT/run)")
     r.add_argument("--output", required=True)
+    r.add_argument("--conversations", help="the MTRAG file the run read: the prompts' text for a run that kept none")
     v = sub.add_parser("conversations", help="only the per-conversation pages")
     v.add_argument("--run")
     v.add_argument("--results")
     v.add_argument("--unpack-to")
     v.add_argument("--output", required=True)
+    v.add_argument("--conversations", help="the MTRAG file the run read: the prompts' text for a run that kept none")
     c = sub.add_parser("compare")
     c.add_argument("--dirs", required=True, help="results folders, by commas")
     c.add_argument("--output", required=True)
@@ -1180,12 +1366,12 @@ def main(argv=None):
             if not a.results:
                 ap.error("report needs --run or --results")
             run = unpack(a.results, a.unpack_to or pathlib.Path(a.output) / "run")
-        write_report(pathlib.Path(run), a.output)
+        write_report(pathlib.Path(run), a.output, a.conversations)
     elif a.cmd == "conversations":
         run = a.run or unpack(a.results, a.unpack_to or pathlib.Path(a.output) / "run")
         R = Run(run)
         R.analyse()
-        print("conversations:", conversation_views(R, a.output), "->", a.output)
+        print("conversations:", conversation_views(R, a.output, a.conversations), "->", a.output)
     else:
         compare([d for d in a.dirs.split(",") if d], a.output)
     return 0
