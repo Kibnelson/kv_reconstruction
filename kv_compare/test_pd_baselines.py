@@ -2367,6 +2367,10 @@ for c in range(4):
         if t == 2:                                  # D's copy is the same: free
             held.append({"event": "held", "key": key, "t0": zb * bs, "tokens": bs, "bs": bs, "layers": L,
                          "equal": tr.pack_bits(np.ones((L, 1), bool)), "pages": L})
+            # and the system block, first stored in turn 0, held again here with P's bytes: not a twin (D held
+            # it only after P sent it)
+            held.append({"event": "held", "key": key, "t0": 0, "tokens": bs, "bs": bs, "layers": L,
+                         "equal": tr.pack_bits(np.ones((L, 1), bool)), "pages": L})
         recs.append({"tag": f"{nm}|{c}|{t}", "run": nm, "layout": "interleaved", "policy": "conversation", "conv": c,
                      "turn": t, "prompt_tokens": len(ids), "ids": ids,
                      "pieces": [["system", None, 0, bs], ["doc", "D", p0, p0 + 2 * bs], ["answer", 0, zb * bs, len(ids)]]})
@@ -2495,6 +2499,28 @@ class DiffEdgeTests(unittest.TestCase):
         q.add([a, b], 0.7 * a + 0.4 * b, cls)
         mu = de.predict("second_order", q.solve(), X, cls, C)
         self.assertLess(float((mu - (0.7 * X["latest"] + 0.4 * X["drift"])).abs().max()), 0.02)   # pulled a little
+
+    def test_thin_classes_take_the_nearest_and_the_turn_matches_the_diffgraph_one(self):
+        import torch
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_diffedge as de
+        import pd_diffgraph as dg
+        nb = 5
+        counts = {c: 0 for c in range(2 * nb)}
+        counts.update({1: 500, 2 + nb: 500, 4: 10})
+        m = de.class_map(counts, nb, 64)
+        # bucket 1, one version, has its tokens; bucket 1 with more takes it (same bucket first); bucket 2 with one
+        # takes bucket 2 with more; bucket 0 takes bucket 1 (nearest), the thin bucket 4 takes bucket 2 with more
+        self.assertEqual((m[1], m[1 + nb], m[2], m[2 + nb], m[0], m[4]), (1, 1, 2 + nb, 2 + nb, 1, 2 + nb))
+        self.assertEqual(de.class_map({c: 0 for c in range(2 * nb)}, nb, 64), list(range(2 * nb)))
+        g = torch.Generator().manual_seed(3)
+        L, n, heads, hd = 3, 16, 2, 8
+        C = heads * hd
+        B = torch.randn(L, n, 2 * C, generator=g).to(torch.bfloat16).view(torch.int16)
+        inv = [1.0 / (10000 ** (2 * i / hd)) for i in range(hd // 2)]
+        for shift in (0, 37):
+            want = dg.prediction(torch.cat([B[:1], B], 0), shift, inv, heads, hd, C)
+            self.assertTrue(torch.equal(de.turn_page(B, shift, inv, heads, hd, C), want), shift)
 
     def test_the_stage_on_a_stand_in_capture(self):
         """Four conversations of three turns: a passage seen every turn after another prefix, drifting by the same

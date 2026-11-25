@@ -81,6 +81,7 @@ T_EDGES = ("t", "t_fit", "t_blend")
 MULTS = (0.35, 0.5, 0.7, 1.0, 1.4, 2.0)      # spread multipliers tried per edge and bucket
 BATCH = 32
 MIN_FIT = 16                                  # samples a weight group needs (else the plain latest)
+MIN_CLASS = 64                                # training tokens a class needs (else the nearest class's fit)
 PRIOR = 1.0                                   # the pull toward the plain latest: as many samples of it
 SAMPLE_LAYERS = (0, 1, 3, 4, 12, 13, 26, 27)
 SAMPLE_MOVED, SAMPLE_TWINS = 96, 64
@@ -146,8 +147,10 @@ def versions(run, req, bs):
 
 
 def twins(stores, bs):
-    """(P pid, P row) -> (D pid, D row): D's own copy of a block P computed again (same tokens, same prefix), from
-    D's capture; and how many such blocks D's capture had no room for."""
+    """(request key, block) -> (D pid, D row): D's own copy of a block of that request it held with other bytes
+    (same tokens, same prefix), from D's capture; and how many such blocks D's capture had no room for. Keyed by
+    the request, not by P's row: D holds a page P stored in an earlier request and compares it again in every
+    later one, and only the request that first stored a page makes it a twin."""
     pkey = {}
     for s in stores["P"]:
         for r in s.records:
@@ -166,12 +169,13 @@ def twins(stores, bs):
                 if drow < 0:
                     missing += 1
                     continue
-                out.setdefault((ppid, int(prow[jb])), (s.pid, int(drow)))
+                out.setdefault((r["key"], jb), (s.pid, int(drow)))
     return out, missing
 
 
 def held_equal(stores, run_dir, bs):
-    """P's pages D held with the same bytes (D's trace "held" records: every layer equal): free in the graph."""
+    """(request key, block) of the blocks D held with the same bytes (D's trace "held" records: every layer equal);
+    free in the graph where that request first stored the page (as twins)."""
     from kv_compare.pd.trace import unpack_bits
     pkey = {}
     for s in stores["P"]:
@@ -189,7 +193,7 @@ def held_equal(stores, run_dir, bs):
             for j in range(n):
                 jb = int(r["t0"]) // bs + j
                 if m[:, j].all() and jb < len(prow) and prow[jb] >= 0 and (jb + 1) * bs <= T:
-                    out.add((ppid, int(prow[jb])))
+                    out.add((r["key"], jb))
     return out
 
 
@@ -270,6 +274,34 @@ class Spread:
                           torch.ones_like(self.bsum))
         f = (fac * self.mult)[:, :, bk].permute(0, 2, 1)                  # [L, n, 2]
         return (scale[:, None] * f[..., None]).reshape(self.L, len(bk), 2 * self.C).float().clamp_min(floor)
+
+
+def turn_page(B, shift, inv, heads, hd, C):
+    """[L, 16, W] float32 from a version's words B [L, 16, W]: values as they are, keys turned on by `shift`
+    positions (all layers at once; the arithmetic of pd_diffgraph.rotate_f32)."""
+    import torch
+    mu = B.view(torch.bfloat16).to(torch.float32)
+    if inv is None or not shift:
+        return mu.clone()
+    L, n, _W = B.shape
+    x = mu[:, :, :C].reshape(L, n, heads, hd)
+    ang = (float(shift) * torch.as_tensor(inv, dtype=torch.float64)).to(torch.float32).to(B.device)
+    c, s = torch.cos(ang), torch.sin(ang)
+    x1, x2 = x[..., :hd // 2], x[..., hd // 2:]
+    return torch.cat([torch.cat([x1 * c - x2 * s, x2 * c + x1 * s], -1).reshape(L, n, C), mu[:, :, C:]], 2)
+
+
+def class_map(counts, nb, need):
+    """Classes (agreement bucket + nb x more than one version) with fewer than `need` training tokens take the
+    nearest class that has them: the same bucket's other version count first, then the nearest bucket."""
+    ok = [counts[c] >= need for c in range(2 * nb)]
+    out = list(range(2 * nb))
+    for c in range(2 * nb):
+        if not ok[c]:
+            q, v = c % nb, c // nb
+            cands = [(2 * abs(q2 - q) + (v2 != v), q2 + nb * v2) for q2 in range(nb) for v2 in (0, 1) if ok[q2 + nb * v2]]
+            out[c] = min(cands)[1] if cands else c
+    return out
 
 
 def kv4(x, C):
@@ -377,8 +409,9 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
         convs = sorted({p["conv"] for p in pages})
         train = {c for k, c in enumerate(convs) if k % 2 == 0}
         kind = {}
+        tkey = lambda i: (reqs[pages[i]["r"]][2], pages[i]["block"])      # the request that first stored it
         for i, p in enumerate(pages):
-            pk = tuple(p["page"])
+            pk = tkey(i)
             kind[i] = ("twin_equal" if pk in eq_all else "twin" if pk in tw_all and dw is not None
                        else "moved" if i in vs else "new")
         twin_i = [i for i in range(len(pages)) if kind[i] == "twin"]
@@ -419,13 +452,14 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
                     ag[k].append(agreement(i, ver))
             with timer("turn versions"):                 # RoPE to the page's place: the versions' keys turned
                 for k, xs in R.items():
-                    X[k] = torch.cat([dg.prediction(torch.cat([B[:1], B], 0), sh, inv, heads, hd, C) for B, sh in xs], 1)
+                    X[k] = torch.cat([turn_page(B, sh, inv, heads, hd, C) for B, sh in xs], 1)
                 X["drift"] = X["latest"] - X["previous"]
             pages_for["turn versions"] += 3 * len(bt)
             R = {k: torch.cat([B for B, _sh in xs], 1) for k, xs in R.items()}
             ag = {k: np.concatenate(x) for k, x in ag.items()}
             multi = torch.as_tensor([len(vs[i]) >= 2 for i in bt], dtype=torch.long).repeat_interleave(bs)
             cls = torch.as_tensor(bucket_of(ag["latest"]), dtype=torch.long) + nb * multi    # what the decoder knows
+            cls = cmap[cls]
             tp = tp or tpred[0]
             if tp is not None:                          # T from the page's own words at its own places
                 pos = torch.cat([torch.arange(pages[i]["block"] * bs, (pages[i]["block"] + 1) * bs) for i in bt])
@@ -436,7 +470,7 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
 
         def twin_batch(bt):
             tgt_w = torch.cat([fetch(pw, pages[i]["loc"]) for i in bt], 1)
-            twin_w = torch.cat([fetch(dw, [(*tw_all[tuple(pages[i]["page"])], o) for o in range(bs)]) for i in bt], 1)
+            twin_w = torch.cat([fetch(dw, [(*tw_all[tkey(i)], o) for o in range(bs)]) for i in bt], 1)
             X = {"twin": twin_w.view(torch.bfloat16).to(torch.float32)}
             bk = torch.full((tgt_w.shape[1],), nb - 1, dtype=torch.long, device=dev)
             return tgt_w, tgt_w.view(torch.bfloat16).to(torch.float32), X, bk, twin_w
@@ -449,6 +483,16 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
                 yield xs[k:k + batch]
 
         is_train = lambda c: c in train
+        # classes with too few training tokens to fit take the nearest that has them
+        cmap = torch.arange(NC)
+        counts = collections.Counter()
+        for i in moved_i:
+            if pages[i]["conv"] in train:
+                q = bucket_of(agreement(i, vs[i][-1])) + nb * (len(vs[i]) >= 2)
+                counts.update(int(x) for x in q)
+        cmap = torch.as_tensor(class_map(counts, nb, MIN_CLASS), dtype=torch.long)
+        res["class_tokens"] = [counts[c] for c in range(NC)]
+        res["class_map"] = cmap.tolist()
         # T's set: the one coding the first training batches smallest with its own spread (layers 1..)
         if t_sets:
             first = list(chunks(moved_i, is_train, limit=2))
@@ -573,9 +617,14 @@ def analyse(cap, run_dir, model_dir, out_dir, device="cuda", batch=BATCH, stream
                 rows.append(by)
             return rows
 
+        warm = set()
+
         def time_batch(tgt_w, mus, edges, n):
             for v in edges:
                 mu, s = mus[v]
+                if v not in warm:                       # the kernels' first call compiles them: not timed
+                    code(coder, tgt_w.reshape(-1).contiguous(), mu.reshape(-1).contiguous(), s.reshape(-1).contiguous())
+                    warm.add(v)
                 _n, ok = code(coder, tgt_w.reshape(-1).contiguous(), mu.reshape(-1).contiguous(),
                               s.reshape(-1).contiguous(), timer, f"batch {v}")
                 exact[v] += ok
@@ -769,6 +818,7 @@ def summarise(out, rows):
                                      for k, sl in enumerate(m["slices"])},
                            "equal_words": float(np.mean([r["equal"] for r in T])) if T else None}
             t[part] = {"edges": row, "moved_pages": len(P), "twin_pages": len(T),
+                       "twin_by_kind": dict(collections.Counter(r["kind"] for r in T)),
                        "moved_by_bucket": [sum(r["bucket"] == q for r in P) for q in range(nb)],
                        "moved_by_versions": [sum(min(r["versions"], 3) == n for r in P) for n in (1, 2, 3)],
                        "moved_by_kind": dict(collections.Counter(r["kind"] for r in P)),
@@ -928,8 +978,10 @@ def markdown(res):
                 if x["twin_pages"]:
                     out.append(f"| {LABEL['twin']} | " + " | ".join(f2(e["twin"]["slice"][s]) for s in sls) + " |")
             if x["twin_pages"]:
-                out += ["", f"{title}: {x['twin_pages']:,} twins: {f2(e['twin']['all'])} bits per value; "
-                        f"{100 * (e['twin']['equal_words'] or 0):.1f}% of their words equal to D's."]
+                out += ["", f"{title}: {x['twin_pages']:,} twins (" + ", ".join(
+                    f"{kk} {n:,}" for kk, n in sorted(x.get("twin_by_kind", {}).items(), key=lambda z: -z[1])) +
+                    f"): {f2(e['twin']['all'])} bits per value; "
+                    f"{100 * (e['twin']['equal_words'] or 0):.1f}% of their words equal to D's."]
         gr = r.get("graph") or {}
         if gr:
             parts = [p for p in ("heldout", "train", "all") if gr.get(p, {}).get("distinct")]
@@ -998,6 +1050,11 @@ def markdown(res):
                         + "."]
         elif m.get("t", {}).get("error"):
             out += ["", f"T's edges left out: {m['t']['error']}"]
+        cm = r.get("class_map")
+        if cm and cm != list(range(len(cm))):
+            lab = lambda c: f"{BLABEL[c % nbk]} {'2+' if c >= nbk else '1'}"
+            out += ["", "Classes with fewer than " + f"{MIN_CLASS} training tokens fitted as the nearest: " + ", ".join(
+                f"{lab(c)} as {lab(d)}" for c, d in enumerate(cm) if c != d) + "."]
         if r.get("spread_mult"):
             out += ["", "Spread multipliers chosen (by class: buckets with one version, then two or more): " + "; ".join(
                 f"{v} " + "/".join(f"{x:g}" for x in xs) for v, xs in r["spread_mult"].items()) + "."]

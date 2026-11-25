@@ -344,6 +344,11 @@ a kept one (`MATRIX=diffedge`).
 | --- | --- | --- |
 | Twin, equal | D held the same tokens after the same prefix, with the same bytes (D's trace) | free: D's page |
 | Twin | the same, other bytes (D's decode, or a prefill in another batch) | a diff against D's copy |
+
+A twin is decided in the request that first stored the page. D holds every earlier turn's prompt and compares it
+again in each later request; a page P stored in an earlier turn and sent to D then is held "equal" later only because
+D got it from P. Job 30663's first report counted those as free twins (1,440 of 1,835 pages, and moved pages hidden
+among them); the stage now keys twins by the request and block.
 | Moved | the same 16 tokens earlier in the conversation, after another prefix | a diff against its earlier versions |
 | New | none of these | raw |
 
@@ -378,7 +383,8 @@ page start and then within the page. Buckets: 0–15, 16–63, 64–255, 256–1
 **Coding:** every value is coded with the value-slice coder (exact mode) against the edge's prediction and a fitted
 spread, then decoded and checked. The spread is a scale per layer, K or V, and channel, times a factor and a
 multiplier per class (the multiplier chosen by the coder's ideal size on training pages). Weights and spreads are fitted
-on the even conversations; tables give the odd ones (held out) and the training ones apart. Each page is coded alone,
+on the even conversations; tables give the odd ones (held out) and the training ones apart. A class with fewer
+than 64 training tokens is fitted as the nearest class that has them (the same bucket's other version count first). Each page is coded alone,
 per layer group (0, 1–4, 5–13, 14–27) and K or V, so sizes break down any way. Batches of 32 pages are also coded whole,
 to time rebuilding, and their size shows what coding a page at a time costs in streams. Layer 0 is a slice of its own (T2 recomputes it).
 
