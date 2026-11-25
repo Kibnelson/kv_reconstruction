@@ -361,7 +361,8 @@ class OverlayTests(unittest.TestCase):
             (root / "third_party" / f"{copy}.sha256").write_text("\n".join(man) + "\n")
         (site / "vllm" / "_C.so").write_bytes(b"\x7fELF")
         (root / "kvtrace").mkdir()
-        (root / "kvtrace" / "__init__.py").write_text("ON = False\n")
+        for f in (ROOT / "kvtrace").glob("*.py"):                           # the real module
+            (root / "kvtrace" / f.name).write_text(f.read_text())
         core = root / "third_party/vllm/vllm/core.py"
         core.write_text("import kvtrace  # KVTRACE\ndef f():\n    if kvtrace.ON: kvtrace.hook(\"x\")  # KVTRACE\n"
                         "    return 1\n")
@@ -377,6 +378,34 @@ class OverlayTests(unittest.TestCase):
         self.assertNotIn("KVTRACE", (site / "vllm/core.py").read_text())        # the environment untouched
         self.assertEqual(os.stat(out / "vllm/_C.so").st_ino, os.stat(site / "vllm/_C.so").st_ino)
         self.assertTrue((out / "kvtrace/__init__.py").is_file())
+
+    def test_verify_sees_what_an_engine_imports(self):
+        """Run as the setup runs it: -P from a folder of its own; and from the checkout (which has its own kvtrace/),
+        where a plain `python -` put the checkout's kvtrace first (job 30688): -P keeps the overlay's."""
+        root, site = self.tree()
+        out = Path(tempfile.mkdtemp()) / "overlay"
+        lmc_overlay.build(site, out, root, log=lambda m: None)
+        for cwd in (Path(tempfile.mkdtemp()), ROOT):
+            trace = Path(tempfile.mkdtemp())
+            env = dict(os.environ, PYTHONPATH=str(out), KVTRACE_DIR=str(trace), KVTRACE_ROLE="check")
+            r = subprocess.run([sys.executable, "-P", str(ROOT / "scripts" / "lmc_overlay.py"), "verify", "--out",
+                                str(out)], cwd=cwd, env=env, capture_output=True, text=True, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            v = json.loads((out / "VERIFY.json").read_text())
+            self.assertTrue(v["ok"], v)
+            self.assertIn("does not load", v["lmcache_cuda_ops"])          # no compiled ops in the stand-in
+        # the old way, from the checkout: the checkout's kvtrace shadows the overlay's
+        r = subprocess.run([sys.executable, "-", str(out)], cwd=ROOT, input="import kvtrace; print(kvtrace.__file__)",
+                           env=dict(os.environ, PYTHONPATH=str(out)), capture_output=True, text=True, timeout=60)
+        self.assertNotIn(str(out), r.stdout)
+        # a hooked module missing from the overlay is a problem
+        (out / "vllm" / "core.py").write_text("def f():\n    return 1\n")
+        r = subprocess.run([sys.executable, "-P", str(ROOT / "scripts" / "lmc_overlay.py"), "verify", "--out",
+                            str(out)], cwd=ROOT, env=dict(os.environ, PYTHONPATH=str(out),
+                                                          KVTRACE_DIR=tempfile.mkdtemp()),
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("0 hook lines", r.stdout)
 
     def test_a_change_beyond_the_hooks_or_a_different_wheel_stops_it(self):
         root, site = self.tree()

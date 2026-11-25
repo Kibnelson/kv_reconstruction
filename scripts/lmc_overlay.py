@@ -5,6 +5,8 @@
   python3 scripts/lmc_overlay.py hooks [--markdown]       every hook line: file, line, event
   python3 scripts/lmc_overlay.py build --site SITE --out DIR
                                                           a per-job tree: the wheels' packages with our Python
+  PYTHONPATH=DIR KVTRACE_DIR=TMP python -P scripts/lmc_overlay.py verify --out DIR
+                                                          in the environment the engines use: what they import
 
 check: every file of each copy is listed in third_party/<copy>.sha256 (no file added), and removing every line ending
 in "# KVTRACE" gives back the imported file exactly (its hash); every line that mentions kvtrace is such a line.
@@ -14,6 +16,11 @@ First, every Python file of our copies must be byte-identical, as imported, to t
 release. Then DIR/<package> is the wheel's package hard-linked file by file (its compiled .so, generated files and
 everything else), with our hooked files written over (a new file each, so the environment stays untouched), and
 DIR/kvtrace our trace module. PYTHONPATH=DIR runs the wheels with our hooks; DIR/OVERLAY.json says what was done.
+
+verify imports kvtrace, vllm, lmcache and every hooked module as an engine would, and stops unless each comes from
+DIR (with its hooks) and kvtrace writes a record. Run it with python -P (no script folder or current folder first
+on the path: the repository's own kvtrace/ would shadow DIR's) and from a folder that holds no package. It also
+says whether LMCache's compiled CUDA ops load (without them LMCache uses its torch baseline).
 """
 from __future__ import annotations
 
@@ -152,6 +159,65 @@ def build(site, out, root=ROOT, log=print):
     return info
 
 
+def verify(out, log=print):
+    """What the engines will import, checked in this process (PYTHONPATH=out, KVTRACE_DIR set)."""
+    import importlib
+    out = pathlib.Path(out).resolve()
+    info = json.loads((out / "OVERLAY.json").read_text())
+    bad = []
+
+    def where(mod):
+        f = pathlib.Path(mod.__file__).resolve()
+        return f, out in f.parents
+
+    import kvtrace
+    f, ok = where(kvtrace)
+    if not ok:
+        bad.append(f"kvtrace imports from {f}, not {out}")
+    if not kvtrace.ON:
+        bad.append("kvtrace is off (KVTRACE_DIR is not set)")
+    for rel in info["hooked_files"]:
+        mod = importlib.import_module(rel[:-3].replace("/", "."))
+        f, ok = where(mod)
+        n = sum(1 for ln in f.read_text().splitlines() if ln.rstrip().endswith(MARK))
+        if not ok or n == 0:
+            bad.append(f"{mod.__name__} imports from {f} ({n} hook lines), not {out}")
+        else:
+            log(f"   {mod.__name__}: {n} hook lines, from the overlay")
+    vers = {}
+    for name in COPIES.values():
+        mod = importlib.import_module(name)
+        f, ok = where(mod)
+        vers[name] = getattr(mod, "__version__", "?")
+        if not ok:
+            bad.append(f"{name} imports from {f}, not {out}")
+    if not bad:
+        kvtrace.hook("kvtrace.check", value=1)
+        kvtrace.flush()
+        d = pathlib.Path(os.environ["KVTRACE_DIR"])
+        recs = [json.loads(ln) for p in d.glob("*.jsonl") for ln in p.read_text().splitlines() if ln.strip()]
+        if not any(r.get("ev") == "kvtrace.check" and r.get("value") == 1 for r in recs):
+            bad.append(f"kvtrace wrote no record to {d}")
+    native = None
+    try:
+        importlib.import_module("lmcache.cuda_ops")
+        native = "loads"
+    except Exception as exc:                      # LMCache falls back to its torch baseline; worth knowing
+        native = f"does not load ({type(exc).__name__}: {str(exc)[:300]})"
+    except BaseException:
+        native = "does not load"
+    res = {"ok": not bad, "problems": bad, "versions": vers, "lmcache_cuda_ops": native}
+    try:
+        (out / "VERIFY.json").write_text(json.dumps(res, indent=1))
+    except OSError:
+        pass
+    for b in bad:
+        log("PROBLEM: " + b)
+    log(f"   {'OK' if not bad else 'NOT OK'}: " + ", ".join(f"{k} {v}" for k, v in vers.items()) +
+        f" from the overlay; kvtrace writes; LMCache's compiled CUDA ops {native}")
+    return res
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -161,6 +227,8 @@ def main(argv=None):
     b = sub.add_parser("build")
     b.add_argument("--site", required=True)
     b.add_argument("--out", required=True)
+    v = sub.add_parser("verify")
+    v.add_argument("--out", required=True)
     for p in (ap,):
         p.add_argument("--root", default=str(ROOT))
     a = ap.parse_args(argv)
@@ -183,6 +251,8 @@ def main(argv=None):
             for f, n, ev, t in rows:
                 print(f"{f}:{n}: {ev}: {t}")
         return 0
+    if a.cmd == "verify":
+        return 0 if verify(a.out)["ok"] else 1
     info = build(a.site, a.out, root)
     if "error" in info:
         print("STOP:", json.dumps(info, indent=1))

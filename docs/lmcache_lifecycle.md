@@ -265,4 +265,11 @@ objects and metrics, `logs/` with each process's log tail) and `pd_matrix_lmctra
 - **Only whole chunks are stored.** The prompt's last partial chunk is computed by D; it is stored by P on the
   next turn, when the prompt has grown past it.
 - **One clock.** Times compare across processes because they are all `time.time()` on one node.
+- **LMCache's compiled CUDA ops.** The release wheel's `lmcache.cuda_ops` may not load beside vLLM 0.32's torch
+  2.13 (job 30688's setup logged "compiled extension not found"). LMCache then runs on its torch baseline, and its
+  stream events (the store's and retrieve's start and end) are timed when queued, not when the GPU reached them.
+  The setup records which it is (`lmc_verify.json`, with the import error), and each run keeps a copy in `server/`.
+- **The setup's import check** runs with `python -P` from a folder of its own: run from the checkout, the
+  checkout's own `kvtrace/` came first on the path and the check stopped (job 30688). The engines and the server
+  run in the run's folder for the same reason.
 - **Hashes are cut to 8 bytes** in the records; for a few thousand chunks a clash is not a concern.

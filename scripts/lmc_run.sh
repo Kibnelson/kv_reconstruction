@@ -169,11 +169,12 @@ if [ "$MODE" != memory ]; then
     mkdir -p "$L2DIR"
     L2ARGS=(--l2-adapter "{\"type\":\"fs\",\"base_path\":\"$L2DIR\",\"use_odirect\":$ODIRECT}" --l2-store-policy "$STORE_POLICY")
 fi
-env CUDA_VISIBLE_DEVICES="$ALL_GPUS" "${TRACE_ENV[@]}" KVTRACE_ROLE=LMC \
+# the server and the engines run in the run's folder: nothing there can shadow the overlay on their path
+( cd "$OUT" && exec env CUDA_VISIBLE_DEVICES="$ALL_GPUS" "${TRACE_ENV[@]}" KVTRACE_ROLE=LMC \
     nohup "$ENV_DIR/bin/lmcache" server --host 127.0.0.1 --port "$LMC_PORT" --chunk-size "$CHUNK" \
     --http-host 127.0.0.1 --http-port "$LMC_HTTP" --prometheus-port "$LMC_PROM" --l1-size-gb "$L1_GB" \
     --l1-init-size-gb "$L1_GB" --eviction-policy "$EVICT" --max-workers "${LMC_WORKERS:-4}" "${L2ARGS[@]}" \
-    > "$OUT/lmcache_server.log" 2>&1 &
+    > "$OUT/lmcache_server.log" 2>&1 ) &
 PIDS+=($!)
 for _ in $(seq 1 120); do
     curl -sf "http://127.0.0.1:$LMC_HTTP/healthcheck" >/dev/null && break
@@ -192,11 +193,11 @@ serve() {   # role gpu port kv_role [extra engine args...]
     shift 4
     local cfg="{\"kv_connector\":\"LMCacheMPConnector\",\"kv_connector_module_path\":\"lmcache.integration.vllm.lmcache_mp_connector\",\"kv_role\":\"$kv_role\",\"kv_connector_extra_config\":{\"lmcache.mp.host\":\"tcp://127.0.0.1\",\"lmcache.mp.port\":$LMC_PORT,\"lmcache.mp.save_decode_cache\":$SAVE_DECODE}}"
     # VLLM_USE_FLASHINFER_SAMPLER=0: no sampler kernels compiled at start (scripts/run_pd_vllm.sh)
-    env CUDA_VISIBLE_DEVICES="$gpu" "${TRACE_ENV[@]}" KVTRACE_ROLE="$role" VLLM_SERVER_DEV_MODE=1 \
+    ( cd "$OUT" && exec env CUDA_VISIBLE_DEVICES="$gpu" "${TRACE_ENV[@]}" KVTRACE_ROLE="$role" VLLM_SERVER_DEV_MODE=1 \
         VLLM_USE_FLASHINFER_SAMPLER=0 \
         nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama \
         --block-size 16 --gpu-memory-utilization "$GPU_MEM" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" \
-        --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" "$@" > "$OUT/engine_$role.log" 2>&1 &
+        --kv-transfer-config "$cfg" "${ENGINE_ARGS[@]}" "$@" > "$OUT/engine_$role.log" 2>&1 ) &
     PIDS+=($!)
     echo "   $role on GPU $gpu, port $port, $kv_role (log $OUT/engine_$role.log)"
 }
@@ -250,6 +251,7 @@ fi
 stop_all
 trap - EXIT
 
+cp "$KV_HOME/lmc_verify.json" "$OUT/server/lmc_verify.json" 2>/dev/null || true
 "$LPY" -I - "$OUT/env.json" "$MODE" "$L1_GB" "$EVICT" "$STORE_POLICY" "$CHUNK" "$ODIRECT" "$SAVE_DECODE" "$D_ROLE" \
     "$LIMIT" "$LAYOUT" "$CONC" "$MAX_TOKENS" "$STORE_WAIT_MS" "$GPU_MEM" "${GPU_BLOCKS:-}" "${D_PREFIX_CACHE:-1}" \
     "$OVERLAY/OVERLAY.json" "$ALL_GPUS" "$(git rev-parse HEAD 2>/dev/null || echo '?')" <<'EOF'

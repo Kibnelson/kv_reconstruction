@@ -44,29 +44,12 @@ pip_freeze "$LPY" > "$KV_HOME/pip_freeze_lmcache.txt" || true
 echo "== overlay $KV_HOME/lmc_overlay: the wheels' packages, our hooked Python over them"
 SITE=$("$LPY" -I -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
 "$LPY" -I scripts/lmc_overlay.py build --site "$SITE" --out "$KV_HOME/lmc_overlay"
+# what the engines will import, checked as they import it: -P and a folder of its own, so neither the script's
+# folder nor the checkout (which has its own kvtrace/) comes before the overlay on the path (job 30688 stopped here)
 CHECK_DIR=$(mktemp -d "$TMPDIR/kvtrace_check.XXXXXX")
-PYTHONPATH="$KV_HOME/lmc_overlay" KVTRACE_DIR="$CHECK_DIR" KVTRACE_ROLE=check "$LPY" - "$KV_HOME/lmc_overlay" <<'EOF'
-import importlib, json, os, pathlib, sys
-overlay = pathlib.Path(sys.argv[1]).resolve()
-info = json.loads((overlay / "OVERLAY.json").read_text())
-import kvtrace
-assert kvtrace.ON and pathlib.Path(kvtrace.__file__).resolve().is_relative_to(overlay), kvtrace.__file__
-for rel in info["hooked_files"]:
-    mod = importlib.import_module(rel[:-3].replace("/", "."))
-    f = pathlib.Path(mod.__file__).resolve()
-    assert f.is_relative_to(overlay), f"{mod.__name__} imports from {f}, not the overlay"
-    n = sum(1 for ln in f.read_text().splitlines() if ln.rstrip().endswith("# KVTRACE"))
-    assert n > 0, f"{f}: no hooks"
-    print(f"   {mod.__name__}: {n} hook lines, from the overlay")
-import vllm, lmcache
-for m in (vllm, lmcache):
-    assert pathlib.Path(m.__file__).resolve().is_relative_to(overlay), m.__file__
-kvtrace.hook("kvtrace.check", value=1)
-kvtrace.flush()
-recs = [json.loads(ln) for p in pathlib.Path(os.environ["KVTRACE_DIR"]).glob("*.jsonl") for ln in p.read_text().splitlines()]
-assert any(r.get("ev") == "kvtrace.check" and r.get("value") == 1 for r in recs), recs
-print(f"   kvtrace writes ({len(recs)} record): vllm {vllm.__version__}, lmcache {lmcache.__version__} from the overlay")
-EOF
+( cd "$CHECK_DIR" && PYTHONPATH="$KV_HOME/lmc_overlay" KVTRACE_DIR="$CHECK_DIR/trace" KVTRACE_ROLE=check \
+    "$LPY" -P "$REPO/scripts/lmc_overlay.py" verify --out "$KV_HOME/lmc_overlay" )
+cp "$KV_HOME/lmc_overlay/VERIFY.json" "$KV_HOME/lmc_verify.json" 2>/dev/null || true
 rm -rf -- "$CHECK_DIR"
 
 # IBM's MTRAG (github.com/IBM/mt-rag-benchmark, Apache-2.0): 110 human multi-turn RAG conversations; one file at a
