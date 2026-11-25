@@ -152,6 +152,7 @@ The ones the report reads:
 | `lmc.mp.retrieve.submitted`, `.start`, `.end` | the copy to the engine's GPU | `session`; `transfer_key`; at the end `retrieved_count`, `total_bytes`, `num_tokens` |
 | `lmc.l1.keys.accessed` | chunks touched in memory (LRU) | `keys` |
 | `lmc.mp.request.start`, `.end`, `lmc.mp.vllm.end_session` | the server's view of a request's life | `session` |
+| `lmc.mp.vllm.block_allocation` | an engine's connector told the server of vLLM's new blocks (LMCache's own view, a cross-check of `vllm.gpu.allocated`) | `instance_id`; `records`: per request `req`, `blocks`, `n_tokens` |
 
 ## How the report joins them (`scripts/lmc_lifecycle.py`)
 

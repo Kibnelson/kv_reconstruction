@@ -217,6 +217,9 @@ def lmc_event(event, via=None):
         md["chunk_crc"] = [crc(c) for c in tc]
     if "token_ids" in md:
         md["n_token_ids"] = len(md.pop("token_ids"))
+    if isinstance(md.get("records"), (list, tuple)):  # mp.vllm.block_allocation: vLLM's new blocks per request
+        md["records"] = [{"req": getattr(x, "req_id", None), "blocks": list(getattr(x, "new_block_ids", []) or []),
+                          "n_tokens": len(getattr(x, "new_token_ids", []) or [])} for x in md["records"][:KEYS_MAX]]
     if isinstance(md.get("meta"), (list, tuple)):    # L1 objects' metadata: their sizes, parallel to the keys
         md["sizes"] = [getattr(m, "size_bytes", None) for m in md.pop("meta")][:KEYS_MAX]
     for k in ("dtypes", "shapes", "stacktrace"):
