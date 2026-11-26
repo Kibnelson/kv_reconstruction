@@ -1,0 +1,117 @@
+0, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+1, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+2, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+3, NVIDIA RTX A5000, 24564 MiB, 595.71.05
+== our copies: only the trace hooks differ from the import
+OK: 10 hooked files, 41 hook lines; every other file as imported
+== LMCache environment /tmp/nbore/kvpd/30774/home/venv_lmcache (the release wheels)
+[32;20m[2026-11-26 18:33:07,558] LMCache INFO:[0m torch_dev=<module 'torch.cuda' from '/tmp/nbore/kvpd/30774/home/venv_lmcache/lib/python3.12/site-packages/torch/cuda/__init__.py'>, torch_device_type=cuda [3m(_device_detect.py:311:lmcache.v1.platform._device_detect)[0m
+[32;20m[2026-11-26 18:33:07,559] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+[33;20m[2026-11-26 18:33:07,560] LMCache WARNING:[0m lmcache.cuda_ops compiled extension not found; CudaDeviceOps stays on the torch baseline for all ops. [3m(device_ops.py:128:lmcache.v1.platform.devices.cuda.device_ops)[0m
+   vllm 0.32.0, lmcache 0.5.7.post1, torch 2.13.0+cu130 (CUDA 13.0)
+   NIXL 1.5.2 (nixl_cu13)
+== LMCache's compiled modules, built from our copy (third_party/lmcache/csrc)
+   the CUDA 13.0 compiler (pip, 271M) for the environment's CUDA 13.0 headers (nvidia-cuda-runtime 13.0.96)
+   CUDA 13 toolkit: compiler CUDA 13.0 (/tmp/nbore/kvpd/30774/home/build/cu13_compiler/nvidia/cu13: Build cuda_13.0.r13.0/compiler.36424714_0), runtime headers CUDA 13.0 (/tmp/nbore/kvpd/30774/home/venv_lmcache/lib/python3.12/site-packages/nvidia/cu13), as /tmp/nbore/kvpd/30774/home/build/cuda13_home
+   building lmcache.lmcache_native, lmcache.lmcache_redis, lmcache.lmcache_fs, lmcache.cuda_ops from 23 sources: torch 2.13.0+cu130 (CUDA 13.0), Build cuda_13.0.r13.0/compiler.36424714_0, arch 8.6, 8 jobs
+   built /tmp/nbore/kvpd/30774/home/build/lmc_ops/out/lmcache/lmcache_native.cpython-312-x86_64-linux-gnu.so (8.4 MB)
+   built /tmp/nbore/kvpd/30774/home/build/lmc_ops/out/lmcache/lmcache_redis.cpython-312-x86_64-linux-gnu.so (7.0 MB)
+   built /tmp/nbore/kvpd/30774/home/build/lmc_ops/out/lmcache/lmcache_fs.cpython-312-x86_64-linux-gnu.so (7.2 MB)
+   built /tmp/nbore/kvpd/30774/home/build/lmc_ops/out/lmcache/cuda_ops.cpython-312-x86_64-linux-gnu.so (22.8 MB)
+== overlay /tmp/nbore/kvpd/30774/home/lmc_overlay: the wheels' packages, our hooked Python over them
+overlay /tmp/nbore/kvpd/30774/home/lmc_overlay: 3544 Python files equal to the wheels'; 10 hooked files over them (41 hook lines); 6415 files linked, 0 copied; built from third_party/lmcache/csrc (torch 2.13.0+cu130, Build cuda_13.0.r13.0/compiler.36424714_0): lmcache.lmcache_native, lmcache.lmcache_redis, lmcache.lmcache_fs, lmcache.cuda_ops
+[32;20m[2026-11-26 18:34:32,302] LMCache INFO:[0m torch_dev=<module 'torch.cuda' from '/tmp/nbore/kvpd/30774/home/venv_lmcache/lib/python3.12/site-packages/torch/cuda/__init__.py'>, torch_device_type=cuda [3m(_device_detect.py:311:lmcache.v1.platform._device_detect)[0m
+[32;20m[2026-11-26 18:34:32,303] LMCache INFO:[0m Auto-selected backend [cuda] for accelerator 'cuda' from candidate backends [cuda, rocm]. [3m(__init__.py:154:lmcache.v1.platform)[0m
+FlashInfer kernels are disabled: flashinfer-cubin is not installed and nvcc (CUDA_HOME, CUDA_PATH, PATH or /usr/local/cuda) or ninja (PATH) is missing. Set CUDA_HOME to a CUDA toolkit and put ninja on PATH, or run `vllm download-kernels`.
+   lmcache.integration.vllm.lmcache_mp_connector: 11 hook lines, from the overlay
+   lmcache.v1.distributed.l2_adapters.fs_l2_adapter: 2 hook lines, from the overlay
+   lmcache.v1.distributed.storage_manager: 2 hook lines, from the overlay
+   lmcache.v1.mp_observability.event_bus: 5 hook lines, from the overlay
+   vllm.distributed.kv_transfer.kv_connector.v1.nixl.base_worker: 4 hook lines, from the overlay
+   vllm.distributed.kv_transfer.kv_connector.v1.nixl.pull_scheduler: 4 hook lines, from the overlay
+   vllm.distributed.kv_transfer.kv_connector.v1.nixl.pull_worker: 2 hook lines, from the overlay
+   vllm.v1.core.block_pool: 4 hook lines, from the overlay
+   vllm.v1.core.kv_cache_manager: 4 hook lines, from the overlay
+   vllm.v1.core.sched.scheduler: 3 hook lines, from the overlay
+   OK: vllm 0.32.0, lmcache 0.5.7.post1 from the overlay; kvtrace writes; LMCache's compiled CUDA ops loads from cuda_ops.cpython-312-x86_64-linux-gnu.so (ours, built from third_party/lmcache/csrc); takes lmcache_native's types
+== MTRAG
+MTRAG: /tmp/nbore/kvpd/30774/runs/mtrag/conversations.json (commit e0970de1b120, SHA-256 checked)
+MTRAG: /tmp/nbore/kvpd/30774/runs/mtrag/RAG.jsonl (commit e0970de1b120, SHA-256 checked)
+MTRAG: /tmp/nbore/kvpd/30774/runs/mtrag/reference.jsonl (commit e0970de1b120, SHA-256 checked)
+== the model
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3397.85it/s]
+   /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+LMC SETUP DONE
+== system
+== bandwidth: no python with torch (KV_HOME/venv, KV_HOME/venv_vllm, ~/venvs/vllm-stock): run scripts/a5000_setup.sh first, or pass --python
+wrote /tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/node_specs/specs.json and summary.md
+
+==== run 1 of 2: RUNNER=lmc_run.sh LMC_MODE=memory LMC_TRANSFER=nixl LMC_SERVERS=shared MTRAG_LIMIT=1 STORE_WAIT_MS=500 MTRAG_LAYOUT=interleaved MTRAG_DOCS=all LMC_DISK_READS=retain MTRAG_CONV_IDS=1534a095279f2cb888fb0bea17bd70da,0208bf26ec357a803445290fa88a2e9e,a2698b2973ea7db1ee5adb5e70ec02e4,c1e53df98a28f19448f4af244304b89a,cfbcfa3e382f12aed450b10f87a72aeb,3f5fa378239f7475baac89fa40288aaa,5c13daa9432149f6243aa1115629cd1a,694e275f1a01ad0e8ac448ad809f7930,aea2634b0e5f1c2444550d31c41adc94,79f0d0539d9ec0acbf90cb3388b30c17 MTRAG_CONCURRENCY=1 LMC_L1_GB=8 NIXL_UCX_LOG=debug
+== LMCache lifecycle run /tmp/nbore/kvpd/30774/runs/lmc/20261126_183446_memory_nixl_shared_carry_all: mode memory (L1 8 GB, eviction LRU, store policy default), chunk 256, transfer nixl, servers shared, P on GPU 0, D1-D3 on 1 2 3; MTRAG 1 conversations interleaved, passages all (by id), disk reads retain; commit 99536dc lmc runs: NIXL's transport in the report, a NIXL check preset; the disk plan from job 30763
+   host memory: 389 GB free, 1 server(s) x 8 GB + 16 GB needed
+   ports 47000-47453 free
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 3619.21it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+== LMCache server LMC: zmq 47050, HTTP 47051, GPU(s) 0,1,2,3
+== engines
+   P on GPU 0, port 47101, LMCache server LMC: {"kv_connector":"MultiConnector","kv_role":"kv_producer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_producer","kv_load_failure_policy":"fail"},{"kv_connector":"LMCacheMPConnector","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":47050,"lmcache.mp.save_decode_cache":false}}]}}
+   D1 on GPU 1, port 47201, LMCache server LMC: {"kv_connector":"MultiConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_load_failure_policy":"fail"},{"kv_connector":"LMCacheMPConnector","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":47050,"lmcache.mp.save_decode_cache":false}}]}}
+   D2 on GPU 2, port 47202, LMCache server LMC: {"kv_connector":"MultiConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_load_failure_policy":"fail"},{"kv_connector":"LMCacheMPConnector","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":47050,"lmcache.mp.save_decode_cache":false}}]}}
+   D3 on GPU 3, port 47203, LMCache server LMC: {"kv_connector":"MultiConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_load_failure_policy":"fail"},{"kv_connector":"LMCacheMPConnector","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":47050,"lmcache.mp.save_decode_cache":false}}]}}
+   (EngineCore pid=764081) INFO 11-26 18:35:50 [kv_cache_utils.py:2327] GPU KV cache size: 106,800 tokens, Maximum concurrency for 32,768 tokens per request: 3.26x
+   [32;20m[2026-11-26 18:35:51,748] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   [32;20m[2026-11-26 18:36:11,274] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   (EngineCore pid=764074) INFO 11-26 18:35:50 [kv_cache_utils.py:2327] GPU KV cache size: 106,800 tokens, Maximum concurrency for 32,768 tokens per request: 3.26x
+   [32;20m[2026-11-26 18:35:51,788] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   [32;20m[2026-11-26 18:36:11,293] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   (EngineCore pid=764060) INFO 11-26 18:35:50 [kv_cache_utils.py:2327] GPU KV cache size: 106,800 tokens, Maximum concurrency for 32,768 tokens per request: 3.26x
+   [32;20m[2026-11-26 18:35:51,705] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   [32;20m[2026-11-26 18:36:11,272] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   (EngineCore pid=764067) INFO 11-26 18:35:50 [kv_cache_utils.py:2327] GPU KV cache size: 106,800 tokens, Maximum concurrency for 32,768 tokens per request: 3.26x
+   [32;20m[2026-11-26 18:35:51,801] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   [32;20m[2026-11-26 18:36:11,305] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+== proxy (NIXL mode, as vllm-router: D engines round-robin, no wait) and MTRAG
+{"run": "lmc_memory_nixl_shared_carry_all", "layout": "interleaved", "policy": "conversation", "conversations": 1, "requests": 5, "errors": 0, "duration_s": 9.517212629318237, "ttft_p50_ms": 488.31892013549805, "latency_p50_s": 1.9172024726867676, "prompt_tokens_mean": 1845.8, "prompt_tokens_max": 3205, "answer_tokens_mean": 128, "answer_ids_from": {"engine": 5, "retokenized": 0}, "first_errors": []}
+== lifecycle report
+lifecycle memory mode, NIXL, shared servers, carry-forward, all passages: {'P': 5, 'D': 5, 'turns': 5} requests, 12 chunks stored, 0 pulls ({}), checks {'chunk_tokens_match_prompt': '12 of 12', 'pulled_blocks_same_hash_as_p': '0 of 0', 'chunks_with_full_chain': '12 of 12'} -> /tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/matrix/llama32_3b_lmc_memory_nixl_shared_carry_all_rtxa5000_20261126_183446
+   results 728K	/tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/matrix/llama32_3b_lmc_memory_nixl_shared_carry_all_rtxa5000_20261126_183446
+LMC RUN lmc_memory_nixl_shared_carry_all DONE: /tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/matrix/llama32_3b_lmc_memory_nixl_shared_carry_all_rtxa5000_20261126_183446
+
+==== run 2 of 2: RUNNER=lmc_run.sh LMC_MODE=memory LMC_TRANSFER=nixl LMC_SERVERS=shared MTRAG_LIMIT=1 STORE_WAIT_MS=500 MTRAG_LAYOUT=interleaved MTRAG_DOCS=all LMC_DISK_READS=retain MTRAG_CONV_IDS=1534a095279f2cb888fb0bea17bd70da,0208bf26ec357a803445290fa88a2e9e,a2698b2973ea7db1ee5adb5e70ec02e4,c1e53df98a28f19448f4af244304b89a,cfbcfa3e382f12aed450b10f87a72aeb,3f5fa378239f7475baac89fa40288aaa,5c13daa9432149f6243aa1115629cd1a,694e275f1a01ad0e8ac448ad809f7930,aea2634b0e5f1c2444550d31c41adc94,79f0d0539d9ec0acbf90cb3388b30c17 MTRAG_CONCURRENCY=1 LMC_L1_GB=8 NIXL_ALL_GPUS=1 NIXL_UCX_LOG=debug
+== LMCache lifecycle run /tmp/nbore/kvpd/30774/runs/lmc/20261126_183639_memory_nixl_shared_carry_all_allgpus: mode memory (L1 8 GB, eviction LRU, store policy default), chunk 256, transfer nixl, servers shared, P on GPU 0, D1-D3 on 1 2 3; MTRAG 1 conversations interleaved, passages all (by id), disk reads retain; commit 99536dc lmc runs: NIXL's transport in the report, a NIXL check preset; the disk plan from job 30763
+   host memory: 390 GB free, 1 server(s) x 8 GB + 16 GB needed
+   ports 47000-47453 free
+
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]
+Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4194.72it/s]
+   model folder /tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331
+== LMCache server LMC: zmq 47050, HTTP 47051, GPU(s) 0,1,2,3
+== engines
+   P on GPU 0, port 47101, LMCache server LMC: {"kv_connector":"MultiConnector","kv_role":"kv_producer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_producer","kv_load_failure_policy":"fail"},{"kv_connector":"LMCacheMPConnector","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":47050,"lmcache.mp.save_decode_cache":false}}]}}
+   D1 on GPU 1, port 47201, LMCache server LMC: {"kv_connector":"MultiConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_load_failure_policy":"fail"},{"kv_connector":"LMCacheMPConnector","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":47050,"lmcache.mp.save_decode_cache":false}}]}}
+   D2 on GPU 2, port 47202, LMCache server LMC: {"kv_connector":"MultiConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_load_failure_policy":"fail"},{"kv_connector":"LMCacheMPConnector","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":47050,"lmcache.mp.save_decode_cache":false}}]}}
+   D3 on GPU 3, port 47203, LMCache server LMC: {"kv_connector":"MultiConnector","kv_role":"kv_consumer","kv_connector_extra_config":{"connectors":[{"kv_connector":"NixlConnector","kv_role":"kv_consumer","kv_load_failure_policy":"fail"},{"kv_connector":"LMCacheMPConnector","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":47050,"lmcache.mp.save_decode_cache":false}}]}}
+   (EngineCore pid=765634) INFO 11-26 18:37:18 [kv_cache_utils.py:2327] GPU KV cache size: 109,648 tokens, Maximum concurrency for 32,768 tokens per request: 3.35x
+   [32;20m[2026-11-26 18:37:19,162] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   [32;20m[2026-11-26 18:37:27,208] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   (EngineCore pid=765641) INFO 11-26 18:37:18 [kv_cache_utils.py:2327] GPU KV cache size: 109,648 tokens, Maximum concurrency for 32,768 tokens per request: 3.35x
+   [32;20m[2026-11-26 18:37:19,072] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   [32;20m[2026-11-26 18:37:26,688] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   (EngineCore pid=765627) INFO 11-26 18:37:18 [kv_cache_utils.py:2327] GPU KV cache size: 109,648 tokens, Maximum concurrency for 32,768 tokens per request: 3.35x
+   [32;20m[2026-11-26 18:37:19,082] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   [32;20m[2026-11-26 18:37:27,004] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   (EngineCore pid=765648) INFO 11-26 18:37:18 [kv_cache_utils.py:2327] GPU KV cache size: 109,648 tokens, Maximum concurrency for 32,768 tokens per request: 3.35x
+   [32;20m[2026-11-26 18:37:19,031] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+   [32;20m[2026-11-26 18:37:26,400] LMCache INFO:[0m Resolved LMCache MP geometry: group_tokens_per_block=[16], scheduler_block_size=16, cache_model_name=/tmp/nbore/kvpd-cache/hf/hub/models--unsloth--Llama-3.2-3B/snapshots/d4446454d87d51aa42e1fb174f25acc5f8762331 [3m(lmcache_mp_connector.py:690:lmcache.integration.vllm.lmcache_mp_connector)[0m
+== proxy (NIXL mode, as vllm-router: D engines round-robin, no wait) and MTRAG
+{"run": "lmc_memory_nixl_shared_carry_all_allgpus", "layout": "interleaved", "policy": "conversation", "conversations": 1, "requests": 5, "errors": 0, "duration_s": 9.49764108657837, "ttft_p50_ms": 481.13179206848145, "latency_p50_s": 1.896181583404541, "prompt_tokens_mean": 1845.8, "prompt_tokens_max": 3205, "answer_tokens_mean": 128, "answer_ids_from": {"engine": 5, "retokenized": 0}, "first_errors": []}
+== lifecycle report
+lifecycle memory mode, NIXL, shared servers, carry-forward, all passages: {'P': 5, 'D': 5, 'turns': 5} requests, 12 chunks stored, 0 pulls ({}), checks {'chunk_tokens_match_prompt': '12 of 12', 'pulled_blocks_same_hash_as_p': '0 of 0', 'chunks_with_full_chain': '12 of 12'} -> /tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/matrix/llama32_3b_lmc_memory_nixl_shared_carry_all_allgpus_rtxa5000_20261126_183639
+   results 724K	/tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/matrix/llama32_3b_lmc_memory_nixl_shared_carry_all_allgpus_rtxa5000_20261126_183639
+LMC RUN lmc_memory_nixl_shared_carry_all_allgpus DONE: /tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/matrix/llama32_3b_lmc_memory_nixl_shared_carry_all_allgpus_rtxa5000_20261126_183639
+compared 2 runs -> /tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/matrix/pd_matrix_lmctrace_rtxa5000_20261126_1834/compare.md
+PD MATRIX lmctrace: 2 runs (0 not finished); results in /tmp/nbore/kvpd-evidence/pd_lmctrace_20261126T233248Z/repo/benchmark_results/pd_card/pd_lmctrace_20261126T233248Z/matrix
