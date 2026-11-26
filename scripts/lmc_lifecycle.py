@@ -1068,6 +1068,117 @@ def _f(x):
     return "–" if x is None else f"{x:,.0f}"
 
 
+def turn_events(R, P, D, px, wait_ms):
+    """Every step of one turn's KV, in time order, in ms from the proxy sending the turn to P: P's GPU memory, the
+    copy into LMCache (LMCache's server reads P's GPU slots itself, through CUDA IPC handles P registered: no NIXL
+    here), LMCache's memory and disk, D's lookup and read, the copy into D's GPU slots, and the answer."""
+    T = px.get("t_in")
+    if T is None or P is None:
+        return []
+    ch = R.chunk
+    ev = []
+
+    def add(t, where, what):
+        if t is not None:
+            ev.append((t, where, what))
+
+    def gpu_side(q, name):
+        conn = (q["lookups"] or [None])[-1] or {}
+        vh = conn.get("vllm_hit", q.get("local_hit")) or 0
+        held = [q["cached"][i][0] for i in sorted(q["cached"]) if i < vh // BLOCK] if vh else []
+        r = _ranges(held or q.get("prefix_blocks") or [])
+        add(q.get("t_prefix"), f"{name} GPU", f"its prefix cache holds {vh:,} of the prompt's tokens"
+            + ((f": {_n(vh // BLOCK, 'block')} in slots {r}" if "(" not in r else f": slots {r}") if vh else ""))
+        return conn, vh
+
+    def mb(b):
+        return f"{(b or 0) / 1e6:,.0f} MB"
+    n = P.get("n_prompt") or 0
+    add(T, "proxy → P", f"sends the turn ({n:,} prompt tokens; P is asked for one token: prefill only)")
+    add(P.get("t_added"), "P", "the request arrives")
+    conn, vh = gpu_side(P, "P")
+    if conn:
+        add(conn.get("t"), "P ↔ LMCache", f"LMCache has {conn.get('lmc_hit') or 0:,} of its tokens; P loads "
+            f"{conn.get('load') or 0:,} and computes the rest")
+    for a in P["allocs"]:
+        if a.get("blocks"):
+            add(a["t"], "P GPU", f"{_n(len(a['blocks']), 'new slot')} for the {a.get('new', 0):,} tokens it computes: "
+                f"{_ranges(a['blocks'])}; the prefill runs")
+    srv = P.get("server") or {}
+    s0 = (P["stores"] or [None])[0]
+    if s0:
+        add(s0["t"], "P → LMCache", f"store planned: tokens {s0['start']:,}-{s0['end']:,}, chunks "
+            f"{s0['start'] // ch}-{(s0['end'] - 1) // ch} ({s0.get('n_blocks')} blocks)")
+    add(first([x["t"] for x in srv.get("mp.store.submitted") or []]), "LMCache",
+        "the store request is in; it waits for P's forward pass to finish (a CUDA event)")
+    chunks = [c for c in R.chunks.values() if c.get("key") == P["key"] and c.get("store_role") == "P"]
+    res = [c["t_l1_reserved"] for c in chunks if c.get("t_l1_reserved")]
+    add(min(res) if res else None, "LMCache memory", f"space reserved for {_n(len(chunks), 'chunk')} "
+        f"({mb(sum(c.get('bytes') or 0 for c in chunks))})")
+    st0, st1 = first(srv.get("mp.store.start") or []), (srv.get("mp.store.end") or [None])[-1]
+    if st0:
+        add(st0["t"], "P GPU → LMCache memory", "the copy starts: LMCache reads P's GPU slots (CUDA IPC)")
+    if st1:
+        add(st1["t"], "P GPU → LMCache memory", f"copy done: {_n(st1.get('stored_count') or 0, 'chunk')}, "
+            f"{mb(st1.get('total_bytes'))}" + (f" in {(st1['t'] - st0['t']) * 1000:.1f} ms" if st0 else ""))
+    wr = [c["t_l1_written"] for c in chunks if c.get("t_l1_written")]
+    add(max(wr) if wr else None, "LMCache memory", f"{_n(len(wr), 'chunk')} in memory, ready for D; P keeps its copy "
+        "in its GPU slots")
+    add(px.get("t_prefill_done"), "P → proxy", "P answers its one token: the prefill is done")
+    disk = [c["t_l2_stored"] for c in chunks if c.get("t_l2_stored")]
+    add(max(disk) if disk else None, "LMCache disk", f"{_n(len(disk), 'chunk')} written to disk (one file each)")
+    gone = [c["t_l1_removed"][0] for c in chunks if c.get("t_l1_removed") and c.get("t_l2_stored") and
+            c["t_l1_removed"][0] >= c["t_l2_stored"]]
+    add(max(gone) if gone else None, "LMCache memory",
+        f"{len(gone)} memory cop{'y' if len(gone) == 1 else 'ies'} dropped: on disk only now")
+    if D is not None:
+        role = D["role"]
+        add(D.get("t_added"), f"proxy → {role}", f"after the {wait_ms:,.0f} ms store wait, sends the turn to {role}")
+        dconn, dvh = gpu_side(D, role)
+        dsrv = D.get("server") or {}
+        add(first([x["t"] for x in dsrv.get("mp.lookup") or []]), f"{role} ↔ LMCache",
+            "asks LMCache for the prompt's chunks")
+        pe = first(dsrv.get("mp.lookup_prefetch.end") or [])
+        if pe:
+            l2 = pe.get("l2_hit_keys") or 0
+            add(pe["t"], "LMCache disk → memory" if l2 else "LMCache memory",
+                f"found {pe.get('hit_tokens') or 0:,} tokens it lacks"
+                + (f": {_n(l2, 'chunk')} read from disk into a memory buffer" if l2 else
+                   (f": {_n(pe.get('l1_hit_keys') or 0, 'chunk')} in memory" if pe.get("l1_hit_keys") else "")))
+        if dconn:
+            add(dconn.get("t"), role, f"will load {dconn.get('load') or 0:,} tokens and compute "
+                f"{max(0, (D.get('n_prompt') or 0) - dvh - (dconn.get('load') or 0)):,}")
+        r0 = (D["retrieves"] or [None])[-1]
+        if r0:
+            skip = (r0.get("skip") or 0) // BLOCK
+            add(r0["t"], f"{role} GPU", f"slots for the loaded blocks: {_ranges((r0.get('blocks') or [])[skip:])}")
+        rs, re_ = first(dsrv.get("mp.retrieve.start") or []), (dsrv.get("mp.retrieve.end") or [None])[-1]
+        if rs:
+            add(rs["t"], f"LMCache memory → {role} GPU", f"the copy starts: LMCache writes {role}'s GPU slots (CUDA IPC)")
+        if re_:
+            add(re_["t"], f"LMCache memory → {role} GPU", f"copy done: {_n(re_.get('retrieved_count') or 0, 'chunk')}, "
+                f"{mb(re_.get('total_bytes'))}" + (f" in {(re_['t'] - rs['t']) * 1000:.1f} ms" if rs else ""))
+        t_lo, t_hi = D.get("t_added") or 0, D.get("t_finished") or 9e18
+        buf = [t for c in R.chunks.values() for t in (c.get("t_l1_removed") or [])[1:] if t_lo <= t <= t_hi
+               and any(rd["key"] == D["key"] and rd["role"] == role for rd in c.get("reads") or [])]
+        add(max(buf) if buf else None, "LMCache memory", f"the read buffer dropped ({_n(len(buf), 'chunk')})")
+        add(D.get("t_received"), role, "has the KV in its GPU slots")
+        grows = [a for a in D["allocs"] if a.get("blocks")]
+        if grows:                                    # the first: the prompt's rest; then one slot per 16 answer tokens
+            a = grows[0]
+            add(a["t"], f"{role} GPU", f"{_n(len(a['blocks']), 'new slot')} for the {a.get('new', 0):,} prompt tokens "
+                f"it computes: {_ranges(a['blocks'])}")
+            later = [b for g in grows[1:] for b in g["blocks"]]
+            if later:
+                add(grows[1]["t"], f"{role} GPU", f"decoding: the answer's KV takes {_n(len(later), 'new slot')} as it "
+                    f"grows, one per 16 tokens: {_ranges(later)}, until {(grows[-1]['t'] - px['t_in']) * 1000:,.0f} ms")
+        add(px.get("t_first_byte"), f"{role} → proxy", "the first answer token")
+        add(D.get("t_finished"), role, "done" + (f": {D['n_out']} tokens decoded" if D.get("n_out") else "")
+            + "; its blocks stay cached in its GPU slots for the next turn")
+        add(px.get("t_out"), "proxy", "the response is complete")
+    return [(round((t - T) * 1000, 1), where, what) for t, where, what in sorted(ev, key=lambda e: e[0])]
+
+
 def turn_story(w, wait_ms):
     """A turn in one sentence: what P did, where its chunks went, what D did with them."""
     if not w:
@@ -1411,8 +1522,16 @@ def conversation_views(R, out, conversations=None):
             w = turn_times(R, rq.get("P"), rq.get("D"), R.proxy.get(key, {}))
             if w:
                 tl_rows.append((t.get("turn"), w))
+            evs = turn_events(R, rq.get("P"), rq.get("D"), R.proxy.get(key, {}), wait_ms)
+            events_md = (["### Step by step", "",
+                          "Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are "
+                          "LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each "
+                          "engine registered at start (no NIXL in this setup).", "",
+                          "| ms | where | what |", "| ---: | --- | --- |"]
+                         + [f"| {ms:,.1f} | {where} | {what} |" for ms, where, what in evs] + [""]) if evs else []
             detail += [f"## Turn {t.get('turn')}", "",
                        *(["**Timeline:** " + turn_story(w, wait_ms) + " ([all turns](#timeline))", ""] if w else []),
+                       *events_md,
                        f"{n:,} prompt tokens: {_n(nfull, 'whole chunk')} and {tail} tokens over (the partial chunk, computed "
                        "by both engines and stored only when a later turn completes it). "
                        f"P held {p_hit:,} tokens on its GPU, computed {p_comp:,} and stored {_n(stored_now, 'new chunk')}; "

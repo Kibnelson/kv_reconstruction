@@ -9,6 +9,7 @@ conversation, and an index. Each page follows its conversation turn by turn:
   in the prompt, so in other chunks, and a prefix cache cannot reuse it). Documents fold away (click to open);
   lines over 100 characters are wrapped for reading;
 - a timeline: every turn on one clock (ms from the turn's send to P), as a picture and a table: P's queue and prefill, the chunks it stored in LMCache's memory and (disk mode) on disk, the store wait, then D's find (the disk read), copy into its GPU, compute, first token and decode; each turn's section repeats it in one sentence;
+- step by step, in each turn: every move of the turn's KV in time order: the slots P's GPU holds and takes, the store planned, LMCache's space reserved, the copy out of P's GPU (LMCache's server reads P's slots through CUDA IPC; there is no NIXL in this setup), the chunks in memory, on disk and dropped from memory, then D's lookup, the read from disk, the slots for the loaded blocks, the copy into D's GPU, the read buffer dropped, the slots for what D computes and for the answer, the first token and the response;
 - how the prompt grows: per turn, its new tokens by what they are (previous answer, documents and how many of them
   were sent before, question, framing) and its whole chunks;
 - the prompt's pieces in order (system, documents, question, the `assistant:` marker, the answer that follows, the

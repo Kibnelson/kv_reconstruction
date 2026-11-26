@@ -417,6 +417,21 @@ class LifecycleReportTests(unittest.TestCase):
         for want in ("turn 0 · 69 tokens", "P", "LMCache", "D1", "on disk"):
             self.assertIn(want, texts)
         self.assertTrue(any(t and t.startswith("→ 0.81 s") for t in texts))     # D's end, past the axis
+        # step by step: every move of the turn's KV in time order, P's GPU slots to LMCache to D's
+        steps = page.split("### Step by step")[1].split("\n\n69 prompt tokens")[0]
+        rows = [r for r in steps.splitlines() if r.startswith("| ") and not r.startswith(("| ms", "| ---"))]
+        ms = [float(r.split("|")[1].replace(",", "")) for r in rows]
+        self.assertEqual(ms, sorted(ms))
+        for want in ("| 13.0 | P GPU | 5 new slots for the 69 tokens it computes: 10-14; the prefill runs |",
+                     "| 61.0 | P → LMCache | store planned: tokens 0-64, chunks 0-1 (4 blocks) |",
+                     "| 82.0 | P GPU → LMCache memory | copy done: 2 chunks, 0 MB in 18.0 ms |",
+                     "| 90.0 | LMCache disk | 2 chunks written to disk (one file each) |",
+                     "| 91.0 | LMCache memory | 2 memory copies dropped: on disk only now |",
+                     "| 610.0 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |",
+                     "| 633.0 | D1 GPU | slots for the loaded blocks: 20-23 |",
+                     "| 641.0 | LMCache memory → D1 GPU | copy done: 2 chunks, 0 MB in 6.0 ms |",
+                     "| 710.0 | D1 → proxy | the first answer token |"):
+            self.assertIn(want, rows)
 
     CONV = [{"domain": "dom", "messages": [
         {"speaker": "user", "text": "Q zero?"},

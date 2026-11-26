@@ -80,6 +80,42 @@ Tokens 0-256 (system: 28; doc c8db6e06ff4666: 228). P computed its blocks on tur
 
 **Timeline:** P queued until 26 ms, prefilled 893 tokens (held 32) and was done at 249 ms; its 3 new chunks were in LMCache's memory at 252 ms, on disk at 517 ms and out of memory. After the 500 ms store wait, D1 started at 776 ms holding 0 tokens, pulled 768 from disk (found 779-830 ms, copied into its GPU 833-837 ms), computed 157 and gave its first token at 876 ms; it decoded 128 tokens until 2,260 ms. ([all turns](#timeline))
 
+### Step by step
+
+Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each engine registered at start (no NIXL in this setup).
+
+| ms | where | what |
+| ---: | --- | --- |
+| 0.0 | proxy → P | sends the turn (925 prompt tokens; P is asked for one token: prefill only) |
+| 4.9 | P | the request arrives |
+| 25.6 | P GPU | its prefix cache holds 32 of the prompt's tokens: 2 blocks in slots 1-2 |
+| 25.6 | P ↔ LMCache | LMCache has 0 of its tokens; P loads 0 and computes the rest |
+| 25.7 | P GPU | 56 new slots for the 893 tokens it computes: 82-137; the prefill runs |
+| 26.1 | P → LMCache | store planned: tokens 0-768, chunks 0-2 (48 blocks) |
+| 35.4 | LMCache | the store request is in; it waits for P's forward pass to finish (a CUDA event) |
+| 35.6 | LMCache memory | space reserved for 3 chunks (88 MB) |
+| 244.0 | P GPU → LMCache memory | the copy starts: LMCache reads P's GPU slots (CUDA IPC) |
+| 247.5 | P GPU → LMCache memory | copy done: 3 chunks, 88 MB in 3.4 ms |
+| 249.3 | P → proxy | P answers its one token: the prefill is done |
+| 251.6 | LMCache memory | 3 chunks in memory, ready for D; P keeps its copy in its GPU slots |
+| 516.6 | LMCache disk | 3 chunks written to disk (one file each) |
+| 517.2 | LMCache memory | 3 memory copies dropped: on disk only now |
+| 775.9 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |
+| 779.3 | D1 ↔ LMCache | asks LMCache for the prompt's chunks |
+| 829.7 | LMCache disk → memory | found 768 tokens it lacks: 3 chunks read from disk into a memory buffer |
+| 830.8 | D1 GPU | its prefix cache holds 0 of the prompt's tokens |
+| 830.9 | D1 | will load 768 tokens and compute 157 |
+| 831.2 | D1 GPU | slots for the loaded blocks: 49-96 |
+| 832.8 | LMCache memory → D1 GPU | the copy starts: LMCache writes D1's GPU slots (CUDA IPC) |
+| 836.4 | LMCache memory → D1 GPU | copy done: 3 chunks, 88 MB in 3.5 ms |
+| 837.0 | D1 | has the KV in its GPU slots |
+| 839.8 | LMCache memory | the read buffer dropped (3 chunks) |
+| 851.6 | D1 GPU | 10 new slots for the 157 prompt tokens it computes: 101-110 |
+| 875.9 | D1 → proxy | the first answer token |
+| 896.3 | D1 GPU | decoding: the answer's KV takes 8 new slots as it grows, one per 16 tokens: 111 … 125 (8 blocks), until 2,118 ms |
+| 2,260.4 | D1 | done: 128 tokens decoded; its blocks stay cached in its GPU slots for the next turn |
+| 2,261.8 | proxy | the response is complete |
+
 925 prompt tokens: 3 whole chunks and 157 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 32 tokens on its GPU, computed 893 and stored 3 new chunks; D1 held 0, loaded 768 from LMCache and computed 157.
 
 ### The prompt
@@ -212,6 +248,42 @@ D  SSS+
 ## Turn 1
 
 **Timeline:** P queued until 83 ms, prefilled 1,424 tokens (held 912) and was done at 218 ms; its 6 new chunks were in LMCache's memory at 225 ms, on disk at 624 ms and out of memory. After the 500 ms store wait, D1 started at 733 ms holding 1,040 tokens, pulled 1,264 from disk (found 735-779 ms, copied into its GPU 794-825 ms), computed 32 and gave its first token at 871 ms; it decoded 128 tokens until 2,306 ms. ([all turns](#timeline))
+
+### Step by step
+
+Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each engine registered at start (no NIXL in this setup).
+
+| ms | where | what |
+| ---: | --- | --- |
+| 0.0 | proxy → P | sends the turn (2,336 prompt tokens; P is asked for one token: prefill only) |
+| 16.9 | P | the request arrives |
+| 82.8 | P GPU | its prefix cache holds 912 of the prompt's tokens: 57 blocks in slots 1-2, 82-136 |
+| 82.9 | P ↔ LMCache | LMCache has 768 of its tokens; P loads 0 and computes the rest |
+| 83.1 | P GPU | 89 new slots for the 1,424 tokens it computes: 345-433; the prefill runs |
+| 83.7 | P → LMCache | store planned: tokens 768-2,304, chunks 3-8 (96 blocks) |
+| 105.7 | LMCache | the store request is in; it waits for P's forward pass to finish (a CUDA event) |
+| 106.5 | LMCache memory | space reserved for 6 chunks (176 MB) |
+| 213.2 | P GPU → LMCache memory | the copy starts: LMCache reads P's GPU slots (CUDA IPC) |
+| 218.5 | P → proxy | P answers its one token: the prefill is done |
+| 220.0 | P GPU → LMCache memory | copy done: 6 chunks, 176 MB in 6.8 ms |
+| 224.6 | LMCache memory | 6 chunks in memory, ready for D; P keeps its copy in its GPU slots |
+| 623.5 | LMCache disk | 6 chunks written to disk (one file each) |
+| 624.1 | LMCache memory | 6 memory copies dropped: on disk only now |
+| 733.4 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |
+| 735.3 | D1 ↔ LMCache | asks LMCache for the prompt's chunks |
+| 778.9 | LMCache disk → memory | found 1,280 tokens it lacks: 5 chunks read from disk into a memory buffer |
+| 788.8 | D1 GPU | its prefix cache holds 1,040 of the prompt's tokens: slots 1 … 123 (65 blocks) |
+| 788.9 | D1 | will load 1,264 tokens and compute 32 |
+| 789.4 | D1 GPU | slots for the loaded blocks: 180-258 |
+| 793.9 | LMCache memory → D1 GPU | the copy starts: LMCache writes D1's GPU slots (CUDA IPC) |
+| 816.1 | LMCache memory → D1 GPU | copy done: 5 chunks, 147 MB in 22.2 ms |
+| 820.0 | LMCache memory | the read buffer dropped (5 chunks) |
+| 824.7 | D1 | has the KV in its GPU slots |
+| 844.6 | D1 GPU | 2 new slots for the 32 prompt tokens it computes: 259-260 |
+| 857.2 | D1 GPU | decoding: the answer's KV takes 8 new slots as it grows, one per 16 tokens: 261 … 275 (8 blocks), until 2,126 ms |
+| 871.3 | D1 → proxy | the first answer token |
+| 2,306.0 | D1 | done: 128 tokens decoded; its blocks stay cached in its GPU slots for the next turn |
+| 2,307.6 | proxy | the response is complete |
 
 2,336 prompt tokens: 9 whole chunks and 32 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 912 tokens on its GPU, computed 1,424 and stored 6 new chunks; D1 held 1,040, loaded 1,264 from LMCache and computed 32.
 
@@ -425,6 +497,42 @@ D  ====SSSSS+
 ## Turn 2
 
 **Timeline:** P queued until 17 ms, prefilled 1,585 tokens (held 2,336) and was done at 173 ms; its 6 new chunks were in LMCache's memory at 174 ms, on disk at 645 ms and out of memory. After the 500 ms store wait, D1 started at 685 ms holding 2,448 tokens, pulled 1,392 from disk (found 687-743 ms, copied into its GPU 758-792 ms), computed 81 and gave its first token at 845 ms; it decoded 128 tokens until 2,340 ms. ([all turns](#timeline))
+
+### Step by step
+
+Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each engine registered at start (no NIXL in this setup).
+
+| ms | where | what |
+| ---: | --- | --- |
+| 0.0 | proxy → P | sends the turn (3,921 prompt tokens; P is asked for one token: prefill only) |
+| 7.2 | P | the request arrives |
+| 17.0 | P GPU | its prefix cache holds 2,336 of the prompt's tokens: 146 blocks in slots 1-2, 82-136, 345-433 |
+| 17.0 | P ↔ LMCache | LMCache has 2,304 of its tokens; P loads 0 and computes the rest |
+| 17.3 | P GPU | 100 new slots for the 1,585 tokens it computes: 639-738; the prefill runs |
+| 18.0 | P → LMCache | store planned: tokens 2,304-3,840, chunks 9-14 (96 blocks) |
+| 38.8 | LMCache | the store request is in; it waits for P's forward pass to finish (a CUDA event) |
+| 39.6 | LMCache memory | space reserved for 6 chunks (176 MB) |
+| 166.5 | P GPU → LMCache memory | the copy starts: LMCache reads P's GPU slots (CUDA IPC) |
+| 173.0 | P → proxy | P answers its one token: the prefill is done |
+| 173.3 | P GPU → LMCache memory | copy done: 6 chunks, 176 MB in 6.8 ms |
+| 173.8 | LMCache memory | 6 chunks in memory, ready for D; P keeps its copy in its GPU slots |
+| 645.4 | LMCache disk | 6 chunks written to disk (one file each) |
+| 646.3 | LMCache memory | 6 memory copies dropped: on disk only now |
+| 684.9 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |
+| 687.0 | D1 ↔ LMCache | asks LMCache for the prompt's chunks |
+| 743.3 | LMCache disk → memory | found 1,536 tokens it lacks: 6 chunks read from disk into a memory buffer |
+| 753.6 | D1 GPU | its prefix cache holds 2,448 of the prompt's tokens: slots 1 … 273 (153 blocks) |
+| 753.7 | D1 | will load 1,392 tokens and compute 81 |
+| 754.3 | D1 GPU | slots for the loaded blocks: 373-459 |
+| 758.1 | LMCache memory → D1 GPU | the copy starts: LMCache writes D1's GPU slots (CUDA IPC) |
+| 782.3 | LMCache memory → D1 GPU | copy done: 6 chunks, 176 MB in 24.3 ms |
+| 784.7 | LMCache memory | the read buffer dropped (6 chunks) |
+| 791.5 | D1 | has the KV in its GPU slots |
+| 811.5 | D1 GPU | 6 new slots for the 81 prompt tokens it computes: 461-466 |
+| 845.3 | D1 → proxy | the first answer token |
+| 1,006.4 | D1 GPU | decoding: the answer's KV takes 7 new slots as it grows, one per 16 tokens: 468 … 480 (7 blocks), until 2,142 ms |
+| 2,339.8 | D1 | done: 128 tokens decoded; its blocks stay cached in its GPU slots for the next turn |
+| 2,341.4 | proxy | the response is complete |
 
 3,921 prompt tokens: 15 whole chunks and 81 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 2,336 tokens on its GPU, computed 1,585 and stored 6 new chunks; D1 held 2,448, loaded 1,392 from LMCache and computed 81.
 
@@ -695,6 +803,42 @@ D  =========SSSSSS+
 ## Turn 3
 
 **Timeline:** P queued until 13 ms, prefilled 1,112 tokens (held 3,920) and was done at 133 ms; its 4 new chunks were in LMCache's memory at 132 ms, on disk at 346 ms and out of memory. After the 500 ms store wait, D1 started at 649 ms holding 4,048 tokens, pulled 816 from disk (found 652-685 ms, copied into its GPU 700-722 ms), computed 168 and gave its first token at 784 ms; it decoded 128 tokens until 2,321 ms. ([all turns](#timeline))
+
+### Step by step
+
+Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each engine registered at start (no NIXL in this setup).
+
+| ms | where | what |
+| ---: | --- | --- |
+| 0.0 | proxy → P | sends the turn (5,032 prompt tokens; P is asked for one token: prefill only) |
+| 5.5 | P | the request arrives |
+| 12.8 | P GPU | its prefix cache holds 3,920 of the prompt's tokens: slots 1-2 … 639-737 (245 blocks) |
+| 12.9 | P ↔ LMCache | LMCache has 3,840 of its tokens; P loads 0 and computes the rest |
+| 13.2 | P GPU | 70 new slots for the 1,112 tokens it computes: 900-969; the prefill runs |
+| 13.8 | P → LMCache | store planned: tokens 3,840-4,864, chunks 15-18 (64 blocks) |
+| 35.1 | LMCache | the store request is in; it waits for P's forward pass to finish (a CUDA event) |
+| 35.9 | LMCache memory | space reserved for 4 chunks (117 MB) |
+| 124.1 | P GPU → LMCache memory | the copy starts: LMCache reads P's GPU slots (CUDA IPC) |
+| 128.6 | P GPU → LMCache memory | copy done: 4 chunks, 117 MB in 4.6 ms |
+| 131.8 | LMCache memory | 4 chunks in memory, ready for D; P keeps its copy in its GPU slots |
+| 132.9 | P → proxy | P answers its one token: the prefill is done |
+| 346.2 | LMCache disk | 4 chunks written to disk (one file each) |
+| 346.9 | LMCache memory | 4 memory copies dropped: on disk only now |
+| 649.0 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |
+| 651.5 | D1 ↔ LMCache | asks LMCache for the prompt's chunks |
+| 685.4 | LMCache disk → memory | found 1,024 tokens it lacks: 4 chunks read from disk into a memory buffer |
+| 696.0 | D1 GPU | its prefix cache holds 4,048 of the prompt's tokens: slots 1 … 480 (253 blocks) |
+| 696.1 | D1 | will load 816 tokens and compute 168 |
+| 696.7 | D1 GPU | slots for the loaded blocks: 540-590 |
+| 700.5 | LMCache memory → D1 GPU | the copy starts: LMCache writes D1's GPU slots (CUDA IPC) |
+| 722.4 | D1 | has the KV in its GPU slots |
+| 722.4 | LMCache memory → D1 GPU | copy done: 4 chunks, 117 MB in 21.9 ms |
+| 727.7 | LMCache memory | the read buffer dropped (4 chunks) |
+| 743.0 | D1 GPU | 11 new slots for the 168 prompt tokens it computes: 592-602 |
+| 784.4 | D1 → proxy | the first answer token |
+| 866.0 | D1 GPU | decoding: the answer's KV takes 8 new slots as it grows, one per 16 tokens: 603 … 615-616 (8 blocks), until 2,228 ms |
+| 2,321.2 | D1 | done: 128 tokens decoded; its blocks stay cached in its GPU slots for the next turn |
+| 2,322.8 | proxy | the response is complete |
 
 5,032 prompt tokens: 19 whole chunks and 168 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 3,920 tokens on its GPU, computed 1,112 and stored 4 new chunks; D1 held 4,048, loaded 816 from LMCache and computed 168.
 
@@ -1006,6 +1150,42 @@ D  ===============SSSS+
 ## Turn 4
 
 **Timeline:** P queued until 18 ms, prefilled 1,971 tokens (held 5,024) and was done at 234 ms; its 8 new chunks were in LMCache's memory at 235 ms, on disk at 604 ms and out of memory. After the 500 ms store wait, D1 started at 746 ms holding 5,152 tokens, pulled 1,760 from disk (found 748-804 ms, copied into its GPU 819-852 ms), computed 83 and gave its first token at 923 ms; it decoded 128 tokens until 2,501 ms. ([all turns](#timeline))
+
+### Step by step
+
+Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each engine registered at start (no NIXL in this setup).
+
+| ms | where | what |
+| ---: | --- | --- |
+| 0.0 | proxy → P | sends the turn (6,995 prompt tokens; P is asked for one token: prefill only) |
+| 7.1 | P | the request arrives |
+| 17.5 | P GPU | its prefix cache holds 5,024 of the prompt's tokens: slots 1-2 … 900-968 (314 blocks) |
+| 17.6 | P ↔ LMCache | LMCache has 4,864 of its tokens; P loads 0 and computes the rest |
+| 17.9 | P GPU | 124 new slots for the 1,971 tokens it computes: 1157-1280; the prefill runs |
+| 18.8 | P → LMCache | store planned: tokens 4,864-6,912, chunks 19-26 (128 blocks) |
+| 42.1 | LMCache | the store request is in; it waits for P's forward pass to finish (a CUDA event) |
+| 43.1 | LMCache memory | space reserved for 8 chunks (235 MB) |
+| 224.6 | P GPU → LMCache memory | the copy starts: LMCache reads P's GPU slots (CUDA IPC) |
+| 233.6 | P GPU → LMCache memory | copy done: 8 chunks, 235 MB in 9.0 ms |
+| 234.2 | P → proxy | P answers its one token: the prefill is done |
+| 234.7 | LMCache memory | 8 chunks in memory, ready for D; P keeps its copy in its GPU slots |
+| 603.5 | LMCache disk | 8 chunks written to disk (one file each) |
+| 604.2 | LMCache memory | 8 memory copies dropped: on disk only now |
+| 745.7 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |
+| 748.4 | D1 ↔ LMCache | asks LMCache for the prompt's chunks |
+| 803.8 | LMCache disk → memory | found 1,792 tokens it lacks: 7 chunks read from disk into a memory buffer |
+| 814.2 | D1 GPU | its prefix cache holds 5,152 of the prompt's tokens: slots 1 … 615 (322 blocks) |
+| 814.3 | D1 | will load 1,760 tokens and compute 83 |
+| 815.0 | D1 GPU | slots for the loaded blocks: 688-797 |
+| 819.1 | LMCache memory → D1 GPU | the copy starts: LMCache writes D1's GPU slots (CUDA IPC) |
+| 845.0 | LMCache memory → D1 GPU | copy done: 7 chunks, 206 MB in 26.0 ms |
+| 845.4 | LMCache memory | the read buffer dropped (7 chunks) |
+| 852.5 | D1 | has the KV in its GPU slots |
+| 874.2 | D1 GPU | 6 new slots for the 83 prompt tokens it computes: 798-803 |
+| 923.0 | D1 → proxy | the first answer token |
+| 1,060.6 | D1 GPU | decoding: the answer's KV takes 8 new slots as it grows, one per 16 tokens: 805 … 815-817 (8 blocks), until 2,465 ms |
+| 2,500.6 | D1 | done: 128 tokens decoded; its blocks stay cached in its GPU slots for the next turn |
+| 2,502.3 | proxy | the response is complete |
 
 6,995 prompt tokens: 27 whole chunks and 83 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 5,024 tokens on its GPU, computed 1,971 and stored 8 new chunks; D1 held 5,152, loaded 1,760 from LMCache and computed 83.
 
@@ -1355,6 +1535,42 @@ D  ====================SSSSSSS+
 
 **Timeline:** P queued until 15 ms, prefilled 593 tokens (held 6,992) and was done at 102 ms; its 2 new chunks were in LMCache's memory at 97 ms, on disk at 170 ms and out of memory. After the 500 ms store wait, D1 started at 612 ms holding 7,120 tokens, pulled 304 from disk (found 615-672 ms, copied into its GPU 687-708 ms), computed 161 and gave its first token at 778 ms; it decoded 128 tokens until 2,395 ms. ([all turns](#timeline))
 
+### Step by step
+
+Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each engine registered at start (no NIXL in this setup).
+
+| ms | where | what |
+| ---: | --- | --- |
+| 0.0 | proxy → P | sends the turn (7,585 prompt tokens; P is asked for one token: prefill only) |
+| 7.6 | P | the request arrives |
+| 14.5 | P GPU | its prefix cache holds 6,992 of the prompt's tokens: slots 1-2 … 1157-1279 (437 blocks) |
+| 14.8 | P ↔ LMCache | LMCache has 6,912 of its tokens; P loads 0 and computes the rest |
+| 15.3 | P GPU | 38 new slots for the 593 tokens it computes: 1441-1478; the prefill runs |
+| 16.0 | P → LMCache | store planned: tokens 6,912-7,424, chunks 27-28 (32 blocks) |
+| 39.8 | LMCache | the store request is in; it waits for P's forward pass to finish (a CUDA event) |
+| 40.6 | LMCache memory | space reserved for 2 chunks (59 MB) |
+| 92.1 | P GPU → LMCache memory | the copy starts: LMCache reads P's GPU slots (CUDA IPC) |
+| 94.4 | P GPU → LMCache memory | copy done: 2 chunks, 59 MB in 2.3 ms |
+| 97.4 | LMCache memory | 2 chunks in memory, ready for D; P keeps its copy in its GPU slots |
+| 102.1 | P → proxy | P answers its one token: the prefill is done |
+| 169.5 | LMCache disk | 2 chunks written to disk (one file each) |
+| 170.1 | LMCache memory | 2 memory copies dropped: on disk only now |
+| 612.4 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |
+| 615.3 | D1 ↔ LMCache | asks LMCache for the prompt's chunks |
+| 671.9 | LMCache disk → memory | found 512 tokens it lacks: 2 chunks read from disk into a memory buffer |
+| 682.5 | D1 GPU | its prefix cache holds 7,120 of the prompt's tokens: slots 1 … 815-816 (445 blocks) |
+| 682.7 | D1 | will load 304 tokens and compute 161 |
+| 683.4 | D1 GPU | slots for the loaded blocks: 881-899 |
+| 687.4 | LMCache memory → D1 GPU | the copy starts: LMCache writes D1's GPU slots (CUDA IPC) |
+| 707.2 | LMCache memory → D1 GPU | copy done: 2 chunks, 59 MB in 19.8 ms |
+| 708.4 | D1 | has the KV in its GPU slots |
+| 708.9 | LMCache memory | the read buffer dropped (2 chunks) |
+| 730.4 | D1 GPU | 11 new slots for the 161 prompt tokens it computes: 900-910 |
+| 778.4 | D1 → proxy | the first answer token |
+| 953.2 | D1 GPU | decoding: the answer's KV takes 7 new slots as it grows, one per 16 tokens: 912 … 921 (7 blocks), until 2,189 ms |
+| 2,395.3 | D1 | done: 128 tokens decoded; its blocks stay cached in its GPU slots for the next turn |
+| 2,396.9 | proxy | the response is complete |
+
 7,585 prompt tokens: 29 whole chunks and 161 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 6,992 tokens on its GPU, computed 593 and stored 2 new chunks; D1 held 7,120, loaded 304 from LMCache and computed 161.
 
 ### The prompt
@@ -1461,6 +1677,42 @@ D  ===========================SS+
 ## Turn 6
 
 **Timeline:** P queued until 19 ms, prefilled 1,121 tokens (held 7,584) and was done at 164 ms; its 5 new chunks were in LMCache's memory at 162 ms, on disk at 335 ms and out of memory. After the 500 ms store wait, D1 started at 675 ms holding 7,712 tokens, pulled 992 from disk (found 678-711 ms, copied into its GPU 727-761 ms), computed 1 and gave its first token at 817 ms; it decoded 128 tokens until 2,471 ms. ([all turns](#timeline))
+
+### Step by step
+
+Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each engine registered at start (no NIXL in this setup).
+
+| ms | where | what |
+| ---: | --- | --- |
+| 0.0 | proxy → P | sends the turn (8,705 prompt tokens; P is asked for one token: prefill only) |
+| 8.5 | P | the request arrives |
+| 18.1 | P GPU | its prefix cache holds 7,584 of the prompt's tokens: slots 1-2 … 1441-1477 (474 blocks) |
+| 18.3 | P ↔ LMCache | LMCache has 7,424 of its tokens; P loads 0 and computes the rest |
+| 18.7 | P GPU | 71 new slots for the 1,121 tokens it computes: 1633-1703; the prefill runs |
+| 19.4 | P → LMCache | store planned: tokens 7,424-8,704, chunks 29-33 (80 blocks) |
+| 42.0 | LMCache | the store request is in; it waits for P's forward pass to finish (a CUDA event) |
+| 43.0 | LMCache memory | space reserved for 5 chunks (147 MB) |
+| 151.9 | P GPU → LMCache memory | the copy starts: LMCache reads P's GPU slots (CUDA IPC) |
+| 157.6 | P GPU → LMCache memory | copy done: 5 chunks, 147 MB in 5.7 ms |
+| 161.5 | LMCache memory | 5 chunks in memory, ready for D; P keeps its copy in its GPU slots |
+| 163.8 | P → proxy | P answers its one token: the prefill is done |
+| 335.3 | LMCache disk | 5 chunks written to disk (one file each) |
+| 335.9 | LMCache memory | 5 memory copies dropped: on disk only now |
+| 674.9 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |
+| 678.2 | D1 ↔ LMCache | asks LMCache for the prompt's chunks |
+| 710.9 | LMCache disk → memory | found 1,024 tokens it lacks: 4 chunks read from disk into a memory buffer |
+| 721.8 | D1 GPU | its prefix cache holds 7,712 of the prompt's tokens: slots 1 … 921 (482 blocks) |
+| 721.9 | D1 | will load 992 tokens and compute 1 |
+| 722.7 | D1 GPU | slots for the loaded blocks: 987-1048 |
+| 726.7 | LMCache memory → D1 GPU | the copy starts: LMCache writes D1's GPU slots (CUDA IPC) |
+| 749.9 | LMCache memory → D1 GPU | copy done: 4 chunks, 117 MB in 23.2 ms |
+| 753.7 | LMCache memory | the read buffer dropped (4 chunks) |
+| 761.0 | D1 | has the KV in its GPU slots |
+| 782.9 | D1 GPU | 1 new slot for the 1 prompt tokens it computes: 1049 |
+| 817.4 | D1 → proxy | the first answer token |
+| 994.7 | D1 GPU | decoding: the answer's KV takes 7 new slots as it grows, one per 16 tokens: 1051 … 1060 (7 blocks), until 2,261 ms |
+| 2,470.6 | D1 | done: 128 tokens decoded; its blocks stay cached in its GPU slots for the next turn |
+| 2,472.2 | proxy | the response is complete |
 
 8,705 prompt tokens: 34 whole chunks and 1 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 7,584 tokens on its GPU, computed 1,121 and stored 5 new chunks; D1 held 7,712, loaded 992 from LMCache and computed 1.
 
@@ -1716,6 +1968,42 @@ D  ==============================SSSS+
 ## Turn 7
 
 **Timeline:** P queued until 19 ms, prefilled 1,061 tokens (held 8,704) and was done at 168 ms; its 4 new chunks were in LMCache's memory at 162 ms, on disk at 350 ms and out of memory. After the 500 ms store wait, D1 started at 680 ms holding 8,832 tokens, pulled 896 from disk (found 684-719 ms, copied into its GPU 735-770 ms), computed 37 and gave its first token at 833 ms; it decoded 128 tokens until 2,524 ms. ([all turns](#timeline))
+
+### Step by step
+
+Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each engine registered at start (no NIXL in this setup).
+
+| ms | where | what |
+| ---: | --- | --- |
+| 0.0 | proxy → P | sends the turn (9,765 prompt tokens; P is asked for one token: prefill only) |
+| 9.1 | P | the request arrives |
+| 18.6 | P GPU | its prefix cache holds 8,704 of the prompt's tokens: slots 1-2 … 1633-1702 (544 blocks) |
+| 18.8 | P ↔ LMCache | LMCache has 8,704 of its tokens; P loads 0 and computes the rest |
+| 19.2 | P GPU | 67 new slots for the 1,061 tokens it computes: 1770-1836; the prefill runs |
+| 19.9 | P → LMCache | store planned: tokens 8,704-9,728, chunks 34-37 (64 blocks) |
+| 41.8 | LMCache | the store request is in; it waits for P's forward pass to finish (a CUDA event) |
+| 42.7 | LMCache memory | space reserved for 4 chunks (117 MB) |
+| 156.3 | P GPU → LMCache memory | the copy starts: LMCache reads P's GPU slots (CUDA IPC) |
+| 160.9 | P GPU → LMCache memory | copy done: 4 chunks, 117 MB in 4.6 ms |
+| 162.1 | LMCache memory | 4 chunks in memory, ready for D; P keeps its copy in its GPU slots |
+| 168.4 | P → proxy | P answers its one token: the prefill is done |
+| 350.3 | LMCache disk | 4 chunks written to disk (one file each) |
+| 351.0 | LMCache memory | 4 memory copies dropped: on disk only now |
+| 679.8 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |
+| 683.5 | D1 ↔ LMCache | asks LMCache for the prompt's chunks |
+| 718.8 | LMCache disk → memory | found 1,024 tokens it lacks: 4 chunks read from disk into a memory buffer |
+| 730.1 | D1 GPU | its prefix cache holds 8,832 of the prompt's tokens: slots 1 … 1060 (552 blocks) |
+| 730.3 | D1 | will load 896 tokens and compute 37 |
+| 731.1 | D1 GPU | slots for the loaded blocks: 1124-1179 |
+| 735.0 | LMCache memory → D1 GPU | the copy starts: LMCache writes D1's GPU slots (CUDA IPC) |
+| 758.2 | LMCache memory → D1 GPU | copy done: 4 chunks, 117 MB in 23.2 ms |
+| 759.2 | LMCache memory | the read buffer dropped (4 chunks) |
+| 769.6 | D1 | has the KV in its GPU slots |
+| 792.3 | D1 GPU | 3 new slots for the 37 prompt tokens it computes: 1180-1182 |
+| 833.1 | D1 → proxy | the first answer token |
+| 960.3 | D1 GPU | decoding: the answer's KV takes 8 new slots as it grows, one per 16 tokens: 1184 … 1195 (8 blocks), until 2,461 ms |
+| 2,523.8 | D1 | done: 128 tokens decoded; its blocks stay cached in its GPU slots for the next turn |
+| 2,525.5 | proxy | the response is complete |
 
 9,765 prompt tokens: 38 whole chunks and 37 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 8,704 tokens on its GPU, computed 1,061 and stored 4 new chunks; D1 held 8,832, loaded 896 from LMCache and computed 37.
 
