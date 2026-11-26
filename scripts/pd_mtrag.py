@@ -11,6 +11,13 @@ read as data only: the passages of a turn are those on its agent message ("conte
 messages. Its own agent answers are not used: the next turn's history holds the answer this model generated, as a
 chat system would send it.
 
+Which conversations, and which passages: by default the first --limit of conversations.json, each turn with the
+passages on its agent message. --tasks names MTRAG's generation-task files (generation_tasks/RAG.jsonl: the
+retriever's top 5 for each turn; reference.jsonl: the passages marked relevant; both, with commas: each turn's
+passages from every file, the first file's first, each passage once), whose rows carry each conversation's id:
+--conv-ids picks conversations by it, in its order, and the turns' passages come from those files (--docs tasks) or
+from conversations.json (--docs conversations: the conversation found there by its questions, every one equal).
+
 Layouts (where a turn's passages go):
   docs_first     system, the turn's passages, the conversation so far, the question (the usual RAG prompt; the
                  passages change from turn to turn, so the history after them is never a cached prefix)
@@ -51,6 +58,87 @@ def turns_of(conv):
             for c in ms[i + 1].get("contexts") or []:
                 ctx.append((str(c.get("document_id")), str(c.get("title") or ""), str(c.get("text") or "")))
         out.append((str(m.get("text") or ""), ctx))
+    return out
+
+
+def _norm(s):
+    return " ".join(str(s).split()).lower()
+
+
+def _passage_key(c):
+    return c.get("document_id") or (c.get("title") or "", c.get("text") or "")
+
+
+def load_tasks(paths):
+    """MTRAG generation tasks: conversation id -> {turn (1-based): row}. Several files (commas) hold the same turns
+    with different passages: a turn's row is the first file's, its contexts every file's, in file order, each once."""
+    out = {}
+    for path in [x for x in paths.split(",") if x]:
+        for ln in open(path):
+            if not ln.strip():
+                continue
+            r = json.loads(ln)
+            turns = out.setdefault(str(r["conversation_id"]), {})
+            t = int(r["turn"])
+            if t not in turns:
+                turns[t] = dict(r, contexts=list(r.get("contexts") or []))
+                continue
+            have = turns[t]
+            if have["input"] != r["input"]:
+                raise SystemExit(f"{path}: turn {t} of {r['conversation_id']} has another history than the first file")
+            seen = {_passage_key(c) for c in have["contexts"]}
+            have["contexts"] += [c for c in r.get("contexts") or [] if _passage_key(c) not in seen]
+    return out
+
+
+def conv_from_tasks(cid, rows, source):
+    """A conversation in conversations.json's shape from its task rows: each turn's question (the last user message of
+    its input), its passages (the task's contexts) and MTRAG's answer to it (the next turn's input has it)."""
+    msgs = []
+    turns = sorted(rows)
+    if turns != list(range(1, len(turns) + 1)):
+        raise ValueError(f"conversation {cid}: turns {turns}")
+    for t in turns:
+        r = rows[t]
+        last = (r.get("input") or [{}])[-1]
+        if last.get("speaker") != "user":
+            raise ValueError(f"conversation {cid} turn {t}: its input does not end with the user's question")
+        nxt = rows.get(t + 1)
+        answer = nxt["input"][-2]["text"] if nxt and len(nxt.get("input") or []) >= 2 else \
+            ((r.get("targets") or [{}])[0].get("text") or "")
+        msgs.append({"speaker": "user", "text": last.get("text") or ""})
+        msgs.append({"speaker": "agent", "text": answer, "contexts": [
+            {"document_id": c.get("document_id"), "title": c.get("title") or "", "text": c.get("text") or ""}
+            for c in r.get("contexts") or []]})
+    return {"conversation_id": cid, "domain": rows[turns[0]].get("Collection"), "messages": msgs, "source": source}
+
+
+def select(a, convs):
+    """The run's conversations, in order (the module docstring)."""
+    if not a.tasks:
+        if a.conv_ids:
+            raise SystemExit("--conv-ids needs --tasks: conversations.json has no conversation ids")
+        return convs[:a.limit] if a.limit else convs
+    tasks = load_tasks(a.tasks)
+    ids = [x for x in (a.conv_ids or "").split(",") if x] or list(tasks)
+    if a.limit:
+        ids = ids[:a.limit]
+    by_q = {}
+    for c in convs:
+        by_q.setdefault(tuple(_norm(m.get("text")) for m in c["messages"] if m.get("speaker") == "user"), []).append(c)
+    out = []
+    for cid in ids:
+        rows = tasks.get(cid)
+        if not rows:
+            raise SystemExit(f"conversation {cid} is not in {a.tasks}")
+        if a.docs == "tasks":
+            out.append(conv_from_tasks(cid, rows, "+".join(x.rsplit("/", 1)[-1] for x in a.tasks.split(",") if x)))
+            continue
+        qs = tuple(_norm(rows[t]["input"][-1]["text"]) for t in sorted(rows))
+        found = by_q.get(qs) or []
+        if len(found) != 1:
+            raise SystemExit(f"conversation {cid}: {len(found)} conversations in {a.conversations} have its questions")
+        out.append(dict(found[0], conversation_id=cid, source="conversations.json"))
     return out
 
 
@@ -166,7 +254,8 @@ async def conversation(session, tok, a, k, conv, out, trace):
         texts = [] if trace else None              # with --trace each piece's text is kept (the answers' too)
         ids, pieces = await build(tok, a.layout, turns, t, answers, texts, answer_texts)
         rec = {"tag": f"{run_of(a)}|{k}|{t}", "run": run_of(a), "layout": a.layout, "policy": a.policy, "conv": k,
-               "conv_id": cid, "domain": conv.get("domain"), "turn": t, "turns": len(turns),
+               "conv_id": cid, "domain": conv.get("domain"), "docs": conv.get("source", "conversations.json"),
+               "turn": t, "turns": len(turns),
                "prompt_tokens": len(ids), "pieces": pieces, "trace": trace}
         if a.max_len and len(ids) + a.max_tokens > a.max_len:
             out.append(dict(rec, error=f"over the model's length ({len(ids)} + {a.max_tokens} > {a.max_len})"))
@@ -202,9 +291,7 @@ def p50(xs):
 
 async def main_async(a):
     import aiohttp
-    convs = json.load(open(a.conversations))
-    if a.limit:
-        convs = convs[:a.limit]
+    convs = select(a, json.load(open(a.conversations)))
     out = []
     t0 = time.time()
     timeout = aiohttp.ClientTimeout(total=None, sock_read=a.request_timeout)
@@ -248,6 +335,10 @@ def main(argv=None):
     ap.add_argument("--max-tokens", type=int, default=128)
     ap.add_argument("--max-len", type=int, default=0, help="the engines' model length (0: no check)")
     ap.add_argument("--limit", type=int, default=0, help="the first N conversations (0: all)")
+    ap.add_argument("--tasks", default="", help="MTRAG generation-task files (RAG.jsonl, reference.jsonl; commas)")
+    ap.add_argument("--conv-ids", default="", help="with --tasks: the conversations by id, in order (commas)")
+    ap.add_argument("--docs", default="tasks", choices=["tasks", "conversations"],
+                    help="with --tasks: each turn's passages from the task file, or from conversations.json")
     ap.add_argument("--request-timeout", type=float, default=600)
     ap.add_argument("--trace", action="store_true", help="the prefill engine hashes every page (and ids are kept)")
     ap.add_argument("--capture-convs", type=int, default=0,

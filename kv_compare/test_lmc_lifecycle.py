@@ -427,7 +427,8 @@ class LifecycleReportTests(unittest.TestCase):
                                           "chunks_with_full_chain": "2 of 2",
                                           "disk_mode_on_disk_then_out_of_memory": "2 of 2",
                                           "disk_mode_pulls_from_disk": "2 of 2",
-                                          "disk_mode_pulls_while_still_in_memory": 0})
+                                          "disk_mode_pulls_while_still_in_memory": 0,
+            "disk_mode_reads_kept_in_memory": "2 of 2 disk reads still in memory at the end (prefetch policy default)"})
         self.assertEqual(nums["D"]["lmcache_loaded_tokens"], 64)
         self.assertEqual(nums["D"]["computed_tokens"], 5)
         self.assertEqual(nums["P"]["stored_tokens"], 64)
@@ -941,14 +942,19 @@ class ProxyStoreModeTests(unittest.TestCase):
         self.assertEqual({k.lower(): v for k, v in hd.items()}["x-request-id"], key)
 
 
+LMC_DEFAULTS = " MTRAG_LAYOUT=interleaved MTRAG_DOCS=conversations LMC_DISK_READS=temporary"
+
+
 class MatrixTests(unittest.TestCase):
     def test_lmctrace_runs(self):
         m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                            env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1"))
         self.assertEqual(m.returncode, 0, m.stderr)
         self.assertEqual(m.stdout.splitlines(), [
-            "RUNNER=lmc_run.sh LMC_MODE=memory LMC_TRANSFER=lmcache LMC_SERVERS=shared MTRAG_LIMIT=4 STORE_WAIT_MS=500",
-            "RUNNER=lmc_run.sh LMC_MODE=disk LMC_TRANSFER=lmcache LMC_SERVERS=shared MTRAG_LIMIT=4 STORE_WAIT_MS=500"])
+            "RUNNER=lmc_run.sh LMC_MODE=memory LMC_TRANSFER=lmcache LMC_SERVERS=shared MTRAG_LIMIT=4 STORE_WAIT_MS=500"
+            + LMC_DEFAULTS,
+            "RUNNER=lmc_run.sh LMC_MODE=disk LMC_TRANSFER=lmcache LMC_SERVERS=shared MTRAG_LIMIT=4 STORE_WAIT_MS=500"
+            + LMC_DEFAULTS])
         bad = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                              env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_CONVS="0"))
         self.assertEqual(bad.returncode, 2)
@@ -962,15 +968,46 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(m.returncode, 0, m.stderr)
         self.assertEqual(m.stdout.splitlines(), [
             f"RUNNER=lmc_run.sh LMC_MODE={x} LMC_TRANSFER=nixl LMC_SERVERS={sv} MTRAG_LIMIT=4 STORE_WAIT_MS=500"
-            for sv in ("shared", "per_engine") for x in ("memory", "disk")])
+            + LMC_DEFAULTS for sv in ("shared", "per_engine") for x in ("memory", "disk")])
         both = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                               env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_TRANSFERS="lmcache,nixl",
                                        KVPD_LMC_SERVERS="per_engine", KVPD_LMC_MODES="memory"))
         self.assertEqual(both.stdout.splitlines(), [
-            "RUNNER=lmc_run.sh LMC_MODE=memory LMC_TRANSFER=nixl LMC_SERVERS=per_engine MTRAG_LIMIT=4 STORE_WAIT_MS=500"])
+            "RUNNER=lmc_run.sh LMC_MODE=memory LMC_TRANSFER=nixl LMC_SERVERS=per_engine MTRAG_LIMIT=4 STORE_WAIT_MS=500"
+            + LMC_DEFAULTS])
         for k, v in (("KVPD_LMC_TRANSFERS", "rdma"), ("KVPD_LMC_SERVERS", "two")):
             bad = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                                  env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", **{k: v}))
+            self.assertEqual(bad.returncode, 2, k)
+
+    def test_eight_configurations(self):
+        """KVPD_LMC_PRESET=eight: NIXL, 2 server settings x 2 modes x 2 layouts, the ten conversations by id (the
+        first KVPD_LMC_CONVS), one at a time, every passage, disk reads kept, 8 GB shared or 2 GB per engine."""
+        ten = ("1534a095279f2cb888fb0bea17bd70da,0208bf26ec357a803445290fa88a2e9e,a2698b2973ea7db1ee5adb5e70ec02e4,"
+               "c1e53df98a28f19448f4af244304b89a,cfbcfa3e382f12aed450b10f87a72aeb,3f5fa378239f7475baac89fa40288aaa,"
+               "5c13daa9432149f6243aa1115629cd1a,694e275f1a01ad0e8ac448ad809f7930,aea2634b0e5f1c2444550d31c41adc94,"
+               "79f0d0539d9ec0acbf90cb3388b30c17")
+        for n in ("1", "5", "10"):
+            m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                               env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_PRESET="eight",
+                                        KVPD_LMC_CONVS=n))
+            self.assertEqual(m.returncode, 0, m.stderr)
+            self.assertEqual(m.stdout.splitlines(), [
+                f"RUNNER=lmc_run.sh LMC_MODE={x} LMC_TRANSFER=nixl LMC_SERVERS={sv} MTRAG_LIMIT={n} STORE_WAIT_MS=500"
+                f" MTRAG_LAYOUT={ly} MTRAG_DOCS=all LMC_DISK_READS=retain MTRAG_CONV_IDS={ten} MTRAG_CONCURRENCY=1"
+                f" LMC_L1_GB={8 if sv == 'shared' else 2}"
+                for sv in ("shared", "per_engine") for ly in ("history_first", "interleaved") for x in ("memory", "disk")])
+        one = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                             env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_PRESET="eight",
+                                      KVPD_LMC_CONVS="1", KVPD_LMC_DOCS="rag", KVPD_LMC_SERVERS="shared",
+                                      KVPD_LMC_MODES="disk", KVPD_LMC_LAYOUTS="history_first"))
+        self.assertEqual(len(one.stdout.splitlines()), 1, one.stderr)
+        self.assertIn(" MTRAG_DOCS=rag ", one.stdout)
+        for k, v in (("KVPD_LMC_CONVS", "11"), ("KVPD_LMC_DOCS", "web"), ("KVPD_LMC_LAYOUTS", "flat"),
+                     ("KVPD_LMC_DISK_READS", "keep"), ("KVPD_LMC_CONV_IDS", "not an id"), ("KVPD_LMC_PRESET", "nine")):
+            bad = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                                 env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1",
+                                          **{"KVPD_LMC_PRESET": "eight", k: v}))
             self.assertEqual(bad.returncode, 2, k)
 
     def test_disk_plan_counts_the_disk_tier(self):
@@ -982,6 +1019,12 @@ class MatrixTests(unittest.TestCase):
         # a server per engine: P's copy and up to one on each D's server
         pe = runs + ["RUNNER=lmc_run.sh LMC_MODE=disk LMC_TRANSFER=nixl LMC_SERVERS=per_engine MTRAG_LIMIT=4"]
         self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", pe), 1.0 * 4 * 4 + 3 * 0.25)
+        # chat prompts: fewer copies; every passage: 10% more; the largest run counts
+        chat = ["RUNNER=lmc_run.sh LMC_MODE=disk LMC_TRANSFER=nixl LMC_SERVERS=per_engine MTRAG_LIMIT=10"
+                " MTRAG_LAYOUT=history_first MTRAG_DOCS=all"]
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", chat), 10 * 2.5 * 1.1 + 0.25)
+        carry = chat + [chat[0].replace("history_first", "interleaved")]
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", carry), 10 * 4 * 1.1 + 2 * 0.25)
         self.assertIn("lmctrace", pd_campaign.MATRICES)
 
     @staticmethod

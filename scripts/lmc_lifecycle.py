@@ -138,6 +138,23 @@ def dedup_stream(recs):
 
 
 # ------------------------------------------------------------------------------------------------- analysis
+LAYOUT_NAMES = {"history_first": "chat RAG", "interleaved": "carry-forward", "docs_first": "docs first"}
+DOCS_NAMES = {"conversations": "conversations.json's passages", "rag": "the retriever's top 5 (RAG.jsonl)",
+              "reference": "the relevant passages (reference.jsonl)",
+              "all": "every passage MTRAG has for the turn (reference.jsonl and RAG.jsonl, each once)"}
+
+
+def run_label(e, mode=None):
+    """A run's name in titles: its mode, and for NIXL its servers, prompt layout and passages (runs that set them)."""
+    out = f"{mode or e.get('mode', '?')} mode"
+    if (e.get("transfer") or "lmcache") == "lmcache":
+        return out
+    out += f", NIXL, {(e.get('servers') or 'shared').replace('_', '-')} servers"
+    if e.get("layout_label"):
+        out += f", {LAYOUT_NAMES.get(e.get('layout'), e.get('layout'))}, {e.get('mtrag_docs')} passages"
+    return out
+
+
 class Run:
     def __init__(self, run):
         self.dir = pathlib.Path(run)
@@ -147,8 +164,7 @@ class Run:
         # how P's KV reaches D (lmcache: through the shared server; nixl: D reads P's GPU) and the LMCache servers
         self.transfer = self.env.get("transfer", "lmcache")
         self.servers = self.env.get("servers", "shared")
-        self.label = f"{self.mode} mode" + ("" if self.transfer == "lmcache" else
-                                             f", NIXL, {self.servers.replace('_', '-')} servers")
+        self.label = run_label(self.env, self.mode)
         self.engine_server = self.env.get("engine_server") or {e: "LMC" for e in ENGINES}
         recs, self.load_info = load(self.dir)
         self.recs = dedup_stream(recs)
@@ -620,7 +636,9 @@ class Run:
                                                                     "chunk", "odirect", "d_role", "mtrag_limit",
                                                                     "layout", "store_wait_ms", "gpu_blocks",
                                                                     "d_prefix_cache", "transfer", "servers",
-                                                                    "routing")},
+                                                                    "routing", "concurrency", "mtrag_docs",
+                                                                    "conv_ids", "disk_reads", "prefetch_policy",
+                                                                    "layout_label")},
             "trace": dict(self.load_info, hook_errors=dict(self.errors), unknown_events=dict(self.unknown)),
             "requests": {"P": len(P), "D": len(D), "turns": len(self.turns)},
             "prompt_tokens": {"P": sum(r["n_prompt"] or 0 for r in P), "D": sum(r["n_prompt"] or 0 for r in D)},
@@ -683,6 +701,19 @@ class Run:
             out["checks"]["disk_mode_on_disk_then_out_of_memory"] = f"{len(order)} of {len(written)}"
             out["checks"]["disk_mode_pulls_from_disk"] = f"{by_tier.get('L2', 0)} of {len(pulled)}"
             out["checks"]["disk_mode_pulls_while_still_in_memory"] = len(early)
+            # what a read from disk left in memory: with the retain prefetch policy it stays until evicted (LRU),
+            # with the default one it is temporary, removed once copied to the GPU (LMCache publishes that removal
+            # as l1.keys.evicted too)
+            # (traces before the read hook: the pulls from disk; LMCache's access events count lookups too)
+            disk_reads = ([(c, t) for c in stored for t in c.get("t_l2_read") or []] if self.has_read_hook else
+                          [(c, rd["t_lookup"]) for c in stored for rd in c["reads"]
+                           if rd["how"] == "pulled" and rd["tier"] == "L2"])
+            gone = [min(x for x in c["t_l1_removed"] if x >= t) - t for c, t in disk_reads
+                    if any(x >= t for x in c.get("t_l1_removed") or [])]
+            out["checks"]["disk_mode_reads_kept_in_memory"] = (
+                f"{len(disk_reads) - len(gone)} of {len(disk_reads)} disk reads still in memory at the end"
+                + (f"; {len(gone)} removed later, {ms(q(gone, 0.5))} ms after the read at the median" if gone else "")
+                + f" (prefetch policy {self.env.get('prefetch_policy') or 'default'})")
             roles = self.env.get("server_roles") or ["LMC"]
             for srv in roles:                        # each server's folder (the shared one: server/ itself)
                 st = self.dir / "server" if self.servers == "shared" else self.dir / "server" / srv
@@ -851,8 +882,18 @@ def write_report(run, out, conversations=None):
                f"{e.get('d_role')}")
     md += [f"1 prefill engine (P) and 3 decode engines (D1-D3), {servers}; mode **{R.mode}**"
            f" (memory {e.get('l1_gb')} GB each, eviction {e.get('eviction')}, store policy {e.get('store_policy')}, "
-           f"chunk {e.get('chunk')} tokens); MTRAG's first {e.get('mtrag_limit')} conversations, {e.get('layout')}. "
-           f"{how}. Commit {str(e.get('commit'))[:12]}.", ""]
+           f"chunk {e.get('chunk')} tokens"
+           + (f", prefetch policy {e.get('prefetch_policy')}: what a disk read brings into memory "
+              + ("stays until evicted" if e.get("prefetch_policy") == "retain" else "is dropped after the copy")
+              if e.get("prefetch_policy") and R.mode != "memory" else "") + "); "
+           + (f"MTRAG's conversations {', '.join(c[:8] for c in (e.get('conv_ids') or [])[:e.get('mtrag_limit') or None])}"
+              if e.get("conv_ids") else f"MTRAG's first {e.get('mtrag_limit')} conversations")
+           + f", {e.get('layout')}"
+           + (f" ({LAYOUT_NAMES[e.get('layout')]})" if e.get("layout_label") and e.get("layout") in LAYOUT_NAMES else "")
+           + (f", passages: {DOCS_NAMES.get(e.get('mtrag_docs'), e.get('mtrag_docs'))}" if e.get("mtrag_docs") else "")
+           + (", one conversation at a time" if e.get("concurrency") == 1 else
+              f", {e.get('concurrency')} conversations at a time" if e.get("concurrency") else "")
+           + f". {how}. Commit {str(e.get('commit'))[:12]}.", ""]
     t = nums["trace"]
     md += [f"Trace: {t['records']} records from {t['files']} processes ({', '.join(f'{k} {v}' for k, v in sorted((t['by_role'] or {}).items(), key=lambda kv: str(kv[0])))}); "
            f"hook errors {sum(t['hook_errors'].values()) if t['hook_errors'] else 0}"
@@ -1866,6 +1907,10 @@ def compare(dirs, out):
             ("LMCache server errors", lambda n: (n.get("health") or {}).get("server_errors")),
             ("P to D", lambda n: (n.get("env") or {}).get("transfer") or "lmcache"),
             ("LMCache servers", lambda n: (n.get("env") or {}).get("servers") or "shared"),
+            ("prompt layout", lambda n: (n.get("env") or {}).get("layout")),
+            ("passages", lambda n: (n.get("env") or {}).get("mtrag_docs")),
+            ("conversations", lambda n: (n.get("env") or {}).get("mtrag_limit")),
+            ("disk reads", lambda n: (n.get("env") or {}).get("disk_reads")),
             ("chunks bound by the engines' stores", lambda n: n["chunks"]["stored"]),
             ("chunks stored by", lambda n: n["chunks"].get("stored_by")),
             ("chunks written to memory", lambda n: n["chunks"].get("in_memory")),
@@ -1894,8 +1939,9 @@ def compare(dirs, out):
             ("checks", lambda n: "; ".join(f"{v}" for v in n["checks"].values()))]
     def label(n):
         e = n.get("env") or {}
-        return n["mode"] + ("" if (e.get("transfer") or "lmcache") == "lmcache" else
-                            f", NIXL, {(e.get('servers') or 'shared').replace('_', '-')}")
+        out = n["mode"] + ("" if (e.get("transfer") or "lmcache") == "lmcache" else
+                           f", NIXL, {(e.get('servers') or 'shared').replace('_', '-')}")
+        return out + (f", {LAYOUT_NAMES.get(e.get('layout'), e.get('layout'))}" if e.get("layout_label") else "")
     md = ["# LMCache lifecycle: the runs side by side", "", "| | " + " | ".join(label(n) for _, n in runs) + " |",
           "| --- |" + " ---: |" * len(runs)]
     table = {}

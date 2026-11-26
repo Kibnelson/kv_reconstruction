@@ -25,7 +25,11 @@
 # Options (environment): LMC_L1_GB (memory 16, disk 4, tiered 2), LMC_CHUNK (256 tokens), LMC_ODIRECT (1),
 # LMC_WORKERS (4), LMC_SAVE_DECODE (0: only prompt chunks are stored), LMC_D_ROLE (kv_consumer: D only pulls;
 # kv_both: D stores what it computes too), MTRAG_LIMIT (4 conversations), MTRAG_LAYOUT (interleaved: each turn's
-# prompt extends the previous one), MTRAG_CONCURRENCY (4), MAX_TOKENS (128), MAXLEN (32768), MAXBT (8192),
+# prompt extends the previous one; history_first: the chat RAG prompt), MTRAG_DOCS (conversations: the passages on
+# conversations.json's answers; rag: MTRAG's RAG.jsonl, the retriever's top 5; reference: reference.jsonl, the
+# relevant ones; all: both, each once), MTRAG_CONV_IDS (MTRAG conversation ids, commas, in run order),
+# LMC_DISK_READS (temporary: what a disk read brings into memory is dropped after the copy, LMCache's default;
+# retain: it stays until evicted, LRU), MTRAG_CONCURRENCY (4), MAX_TOKENS (128), MAXLEN (32768), MAXBT (8192),
 # STORE_WAIT_MS (500: the proxy's wait between P's answer and D's request, for the store to land; 0 shows the race),
 # GPU_MEM (0.80), GPU_BLOCKS (empty: vLLM's; a number makes every engine's GPU cache that small, so its own blocks
 # are evicted and come back from LMCache), D_PREFIX_CACHE (1; 0: D keeps no prefix cache, every turn pulls all),
@@ -57,6 +61,16 @@ case "$MODE" in
     tiered) L1_GB=${LMC_L1_GB:-2};  EVICT=LRU;  STORE_POLICY=default ;;
     *) echo "STOP: LMC_MODE is memory, disk or tiered"; exit 1 ;;
 esac
+# what a read from disk leaves in memory: temporary (LMCache's default prefetch policy: a buffer dropped after the
+# copy) or retain (its retain policy: kept in memory until evicted; the disk mode then evicts by LRU, as a memory
+# that keeps what it read must make room)
+DISK_READS=${LMC_DISK_READS:-temporary}
+PREFETCH_POLICY=default
+case "$DISK_READS" in
+    temporary) ;;
+    retain) PREFETCH_POLICY=retain; [ "$MODE" = disk ] && EVICT=LRU ;;
+    *) echo "STOP: LMC_DISK_READS is temporary or retain"; exit 1 ;;
+esac
 CHUNK=${LMC_CHUNK:-256}
 ODIRECT=$([ "${LMC_ODIRECT:-1}" = 1 ] && echo true || echo false)
 SAVE_DECODE=$([ "${LMC_SAVE_DECODE:-0}" = 1 ] && echo true || echo false)
@@ -72,10 +86,22 @@ if [ "$TRANSFER" = lmcache ] && [ "$SERVERS" = per_engine ]; then
 fi
 # LMCache's guide: D's LMCache connector stores too (kv_both), beside NIXL; LMC_D_ROLE is for the lmcache transfer
 [ "$TRANSFER" = nixl ] && D_ROLE=kv_both
-RUN_NAME=lmc_$MODE
-[ "$TRANSFER" = nixl ] && RUN_NAME=lmc_${MODE}_nixl_${SERVERS}
 LIMIT=${MTRAG_LIMIT:-4}
 LAYOUT=${MTRAG_LAYOUT:-interleaved}
+case "$LAYOUT" in
+    history_first) LAYOUT_LABEL=chat ;;           # chat RAG: earlier Q&A, then this turn's passages and question
+    interleaved) LAYOUT_LABEL=carry ;;            # carry-forward RAG: every turn's passages with its Q&A
+    docs_first) LAYOUT_LABEL=docsfirst ;;
+    *) echo "STOP: MTRAG_LAYOUT is history_first, interleaved or docs_first"; exit 1 ;;
+esac
+# which passages each turn has: conversations (conversations.json's, by default), rag (MTRAG's RAG.jsonl: the
+# retriever's top 5), reference (reference.jsonl: those marked relevant) or all (both: the relevant ones, then the
+# retrieved ones not among them); MTRAG_CONV_IDS picks conversations by MTRAG's id, in that order (MTRAG_LIMIT of them)
+DOCS=${MTRAG_DOCS:-conversations}
+CONV_IDS=${MTRAG_CONV_IDS:-}
+case "$DOCS" in conversations|rag|reference|all) ;; *) echo "STOP: MTRAG_DOCS is conversations, rag, reference or all"; exit 1 ;; esac
+RUN_NAME=lmc_$MODE
+[ "$TRANSFER" = nixl ] && RUN_NAME=lmc_${MODE}_nixl_${SERVERS}_${LAYOUT_LABEL}_${DOCS/conversations/conv}
 CONC=${MTRAG_CONCURRENCY:-4}
 MAX_TOKENS=${MAX_TOKENS:-128}
 MAXLEN=${MAXLEN:-32768}
@@ -95,6 +121,15 @@ OVERLAY=$KV_HOME/lmc_overlay
 [ -x "$LPY" ] && [ -s "$OVERLAY/OVERLAY.json" ] || { echo "STOP: no $ENV_DIR or $OVERLAY: run scripts/lmc_setup.sh first"; exit 1; }
 MTRAG_FILE=${MTRAG_FILE:-$KV_RUNS/mtrag/conversations.json}
 [ -s "$MTRAG_FILE" ] || { echo "STOP: no $MTRAG_FILE: run scripts/lmc_setup.sh first"; exit 1; }
+SEL_ARGS=()
+if [ "$DOCS" != conversations ] || [ -n "$CONV_IDS" ]; then
+    # the task file: the passages (rag, reference), or only the conversations' ids (conversations.json's passages)
+    MD=$(dirname "$MTRAG_FILE")
+    case "$DOCS" in rag) TASKS=$MD/RAG.jsonl ;; all) TASKS=$MD/reference.jsonl,$MD/RAG.jsonl ;; *) TASKS=$MD/reference.jsonl ;; esac
+    for f in ${TASKS//,/ }; do [ -s "$f" ] || { echo "STOP: no $f: run scripts/lmc_setup.sh first"; exit 1; }; done
+    SEL_ARGS=(--tasks "$TASKS" --docs "$([ "$DOCS" = conversations ] && echo conversations || echo tasks)")
+    [ -z "$CONV_IDS" ] || SEL_ARGS+=(--conv-ids "$CONV_IDS")
+fi
 # the overlay must be this checkout's hooks (a rerun after a change to them rebuilds it)
 python3 -I scripts/lmc_overlay.py check >/dev/null
 for f in $("$LPY" -I -c 'import json, sys; print(" ".join(json.load(open(sys.argv[1]))["hooked_files"]))' "$OVERLAY/OVERLAY.json"); do
@@ -133,7 +168,7 @@ GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n 1p | tr 'A-
 RES=$RESULTS_ROOT/llama32_3b_${RUN_NAME}_${GPU_TAG}_${STAMP}
 echo "== LMCache lifecycle run $OUT: mode $MODE (L1 $L1_GB GB, eviction $EVICT, store policy $STORE_POLICY), chunk $CHUNK," \
      "transfer $TRANSFER, servers $SERVERS, P on GPU ${DEVS[0]}, D1-D3 on ${DEVS[*]:1}; MTRAG $LIMIT conversations" \
-     "$LAYOUT; commit $(git log --oneline -1 2>/dev/null || echo '?')"
+     "$LAYOUT, passages $DOCS${CONV_IDS:+ (by id)}, disk reads $DISK_READS; commit $(git log --oneline -1 2>/dev/null || echo '?')"
 if [ "$TRANSFER" = nixl ] && ! "$LPY" -c "import torch; from nixl._api import nixl_agent" 2>/dev/null; then
     echo "STOP: NIXL does not import in $ENV_DIR (scripts/lmc_setup.sh installs it):"
     "$LPY" -c "import torch; from nixl._api import nixl_agent" 2>&1 | tail -n 3 || true
@@ -229,7 +264,8 @@ for k in "${!SRV_ROLES[@]}"; do
     L2ARGS=()
     if [ "$MODE" != memory ]; then
         mkdir -p "$(srv_l2 "$k")"
-        L2ARGS=(--l2-adapter "{\"type\":\"fs\",\"base_path\":\"$(srv_l2 "$k")\",\"use_odirect\":$ODIRECT}" --l2-store-policy "$STORE_POLICY")
+        L2ARGS=(--l2-adapter "{\"type\":\"fs\",\"base_path\":\"$(srv_l2 "$k")\",\"use_odirect\":$ODIRECT}" --l2-store-policy "$STORE_POLICY"
+                --l2-prefetch-policy "$PREFETCH_POLICY")
     fi
     INSTANCE=()
     [ "$TRANSFER" = nixl ] && INSTANCE=(--instance-id "$role")        # as LMCache's P/D guide names its servers
@@ -328,7 +364,7 @@ if [ "$UP" = 1 ]; then
     timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" "$LPY" -I -u scripts/pd_mtrag.py \
         --conversations "$MTRAG_FILE" --proxy "http://127.0.0.1:$PROXY_PORT" --tokenize "http://127.0.0.1:$P_PORT" \
         --model llama --layout "$LAYOUT" --policy conversation --run "$RUN_NAME" --concurrency "$CONC" \
-        --max-tokens "$MAX_TOKENS" --max-len "$MAXLEN" --limit "$LIMIT" --trace \
+        --max-tokens "$MAX_TOKENS" --max-len "$MAXLEN" --limit "$LIMIT" "${SEL_ARGS[@]}" --trace \
         --output "$OUT/mtrag.jsonl" --summary "$OUT/mtrag_summary.json" 2>&1 | tee "$OUT/mtrag.log"
     STATUS=${PIPESTATUS[0]}
     set -e
@@ -373,7 +409,8 @@ cp "$KV_HOME/lmc_verify.json" "$OUT/server/lmc_verify.json" 2>/dev/null || true
     "$LIMIT" "$LAYOUT" "$CONC" "$MAX_TOKENS" "$STORE_WAIT_MS" "$GPU_MEM" "${GPU_BLOCKS:-}" "${D_PREFIX_CACHE:-1}" \
     "$OVERLAY/OVERLAY.json" "$ALL_GPUS" "$(git rev-parse HEAD 2>/dev/null || echo '?')" "$SERVER_ALIVE" \
     "$TRANSFER" "$SERVERS" "$RUN_NAME" "$(IFS=,; echo "${SRV_ROLES[*]}")" "$(IFS=,; echo "${ENGINE_SRV[*]}")" \
-    "$(kv_config 0)" "$(kv_config 1)" "${PX_ARGS[*]:-}" <<'EOF'
+    "$(kv_config 0)" "$(kv_config 1)" "${PX_ARGS[*]:-}" "$DOCS" "$CONV_IDS" "$DISK_READS" "$PREFETCH_POLICY" \
+    "$LAYOUT_LABEL" <<'EOF'
 import json, subprocess, sys
 a = sys.argv[1:]
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
@@ -390,6 +427,8 @@ json.dump({"mode": a[1], "l1_gb": float(a[2]), "eviction": a[3], "store_policy":
            "engine_server": dict(zip(["P", "D1", "D2", "D3"], (srv[int(i)] for i in a[25].split(",")))),
            "kv_transfer_config": {"P": json.loads(a[26]), "D": json.loads(a[27])},
            "proxy": a[28], "routing": "round_robin" if transfer == "nixl" else "conversation",
+           "mtrag_docs": a[29], "conv_ids": [x for x in a[30].split(",") if x], "disk_reads": a[31],
+           "prefetch_policy": a[32], "layout_label": a[33],
            "engines": {"P": "kv_producer (NIXL) + kv_both (LMCache)" if transfer == "nixl" else "kv_both",
                        "D": "kv_consumer (NIXL) + kv_both (LMCache)" if transfer == "nixl" else a[8]},
            "server_alive_at_end": {"1": True, "0": False}.get(a[20])},

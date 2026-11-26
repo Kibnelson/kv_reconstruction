@@ -1996,6 +1996,51 @@ class MtragDriverTests(unittest.TestCase):
         s, e = next((s, e) for k, ref, s, e in r["pieces"] if k == "answer")
         self.assertEqual(b["prompt"][s:e], [ord(c) for c in "abc"])
 
+    def test_conversations_by_id_from_task_files(self):
+        """--tasks/--conv-ids: MTRAG's conversations by id, in the order given; the passages from the task files
+        (several: every file's, the first's first, each once) or from conversations.json, matched by questions."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_mtrag as m
+        d = Path(tempfile.mkdtemp())
+
+        def row(cid, turn, qs, ctx):
+            hist = []
+            for i, q in enumerate(qs[:turn]):
+                hist.append({"speaker": "user", "text": q})
+                if i < turn - 1:
+                    hist.append({"speaker": "agent", "text": f"a{i}"})
+            return {"conversation_id": cid, "turn": turn, "input": hist, "Collection": "c",
+                    "targets": [{"text": f"a{turn - 1}"}], "contexts": [{"document_id": x, "title": "", "text": x}
+                                                                        for x in ctx]}
+        rag = [row("A", 1, ["q0", "q1", "q2"], ["D1", "D3"]), row("A", 2, ["q0", "q1", "q2"], ["D4"]),
+               row("A", 3, ["q0", "q1", "q2"], ["D1"]), row("B", 1, ["r0"], ["D9"])]
+        ref = [row("A", 1, ["q0", "q1", "q2"], ["D2", "D1"]), row("A", 2, ["q0", "q1", "q2"], []),
+               row("A", 3, ["q0", "q1", "q2"], ["D1"]), row("B", 1, ["r0"], [])]
+        for name, rows in (("RAG.jsonl", rag), ("reference.jsonl", ref)):
+            (d / name).write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+        def pick(tasks, ids, docs="tasks", limit=0):
+            a = SimpleNamespace(tasks=",".join(str(d / t) for t in tasks), conv_ids=ids, limit=limit, docs=docs,
+                                conversations="c.json")
+            return m.select(a, self.CONVS)
+
+        def passages(c):
+            return [[x["document_id"] for x in mm.get("contexts", [])] for mm in c["messages"] if mm["speaker"] == "agent"]
+        a, b = pick(["RAG.jsonl"], "B,A")
+        self.assertEqual((a["conversation_id"], b["conversation_id"]), ("B", "A"))
+        self.assertEqual(passages(b), [["D1", "D3"], ["D4"], ["D1"]])
+        self.assertEqual([mm["text"] for mm in b["messages"]], ["q0", "a0", "q1", "a1", "q2", "a2"])
+        both, = pick(["reference.jsonl", "RAG.jsonl"], "A")
+        self.assertEqual(passages(both), [["D2", "D1", "D3"], ["D4"], ["D1"]])
+        self.assertEqual(both["source"], "reference.jsonl+RAG.jsonl")
+        conv, = pick(["reference.jsonl"], "A", docs="conversations")
+        self.assertEqual(passages(conv), [["D1", "D2"], [], ["D1"]])
+        self.assertEqual(len(pick(["RAG.jsonl"], "A,B", limit=1)), 1)
+        with self.assertRaises(SystemExit):
+            pick(["RAG.jsonl"], "C")
+        with self.assertRaises(SystemExit):
+            m.select(SimpleNamespace(tasks="", conv_ids="A", limit=0, docs="tasks", conversations="c.json"), self.CONVS)
+
 
 def _in_process(test, da):
     """pd_delta_analysis.pmap forks its workers. In this process numpy and torch have started their threads already

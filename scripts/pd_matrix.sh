@@ -62,7 +62,10 @@
 #               KVPD_LMC_TRANSFERS (lmcache; or nixl, or both by commas) and KVPD_LMC_SERVERS (shared; or
 #               per_engine, or both): every combination with every mode, lmcache with per_engine left out (D could
 #               not load what P stored). nixl is LMCache's documented P/D (MultiConnector: NixlConnector and
-#               LMCache's connector; the proxy as vllm-router, no wait, D engines round-robin)
+#               LMCache's connector; the proxy as vllm-router, no wait, D engines round-robin). KVPD_LMC_LAYOUTS
+#               (interleaved; history_first), KVPD_LMC_DOCS (conversations; rag, reference, all), KVPD_LMC_CONV_IDS,
+#               KVPD_LMC_CONCURRENCY, KVPD_LMC_DISK_READS, KVPD_LMC_L1_SHARED_GB, KVPD_LMC_L1_PER_ENGINE_GB: by
+#               commas where a list. KVPD_LMC_PRESET=eight: the eight configurations (below, and the doc's runbook)
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh, or with
 # RUNNER=lmc_run.sh those of scripts/lmc_run.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
@@ -129,11 +132,32 @@ XSHARE="2048:24:128:2:share,8192:12:128:2:share,16384:6:128:2:share"
 XSRUN="LAYOUT=3p1d SHARED_LINK=1 PROMPT_TOKENS=2048 RATES=2,4,8,inf NUM_PROMPTS=48 STAGES=check,sweep,shapes,report SHAPES=$XSHARE RUN_TIMEOUT_S=18000"
 WLLONG="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$WLONG RUN_TIMEOUT_S=10800"
 # lmctrace: one run of scripts/lmc_run.sh per mode
+# KVPD_LMC_PRESET=eight: the eight configurations (docs/lmcache_lifecycle.md, "The eight configurations"): NIXL;
+# shared and per-engine servers; memory and disk; chat and carry-forward prompts; MTRAG's ten conversations below by
+# id, the first KVPD_LMC_CONVS of them, one at a time; every passage MTRAG has for a turn; disk reads kept in memory
+# until evicted; LMCache memory 8 GB for the shared server, 2 GB for each per-engine one. Each KVPD_LMC_* still wins.
+LMC_TEN=1534a095279f2cb888fb0bea17bd70da,0208bf26ec357a803445290fa88a2e9e,a2698b2973ea7db1ee5adb5e70ec02e4,\
+c1e53df98a28f19448f4af244304b89a,cfbcfa3e382f12aed450b10f87a72aeb,3f5fa378239f7475baac89fa40288aaa,\
+5c13daa9432149f6243aa1115629cd1a,694e275f1a01ad0e8ac448ad809f7930,aea2634b0e5f1c2444550d31c41adc94,\
+79f0d0539d9ec0acbf90cb3388b30c17
+case "${KVPD_LMC_PRESET:-}" in
+    '') P_T=lmcache P_S=shared P_M=memory,disk P_L=interleaved P_D=conversations P_I='' P_C='' P_R=temporary P_SH='' P_PE='' ;;
+    eight) P_T=nixl P_S=shared,per_engine P_M=memory,disk P_L=history_first,interleaved P_D=all P_I=$LMC_TEN P_C=1
+           P_R=retain P_SH=8 P_PE=2 ;;
+    *) echo "STOP: KVPD_LMC_PRESET=$KVPD_LMC_PRESET: eight, or none" >&2; exit 2 ;;
+esac
 LMCN=${KVPD_LMC_CONVS:-4}
-LMCM=${KVPD_LMC_MODES:-memory,disk}
+LMCM=${KVPD_LMC_MODES:-$P_M}
 LMCW=${KVPD_LMC_STORE_WAIT_MS:-500}
-LMCT=${KVPD_LMC_TRANSFERS:-lmcache}           # how P's KV reaches D: lmcache (the shared server) and/or nixl
-LMCS=${KVPD_LMC_SERVERS:-shared}              # LMCache servers: shared and/or per_engine (NIXL only)
+LMCT=${KVPD_LMC_TRANSFERS:-$P_T}              # how P's KV reaches D: lmcache (the shared server) and/or nixl
+LMCS=${KVPD_LMC_SERVERS:-$P_S}                # LMCache servers: shared and/or per_engine (NIXL only)
+LMCL=${KVPD_LMC_LAYOUTS:-$P_L}                # prompt layouts: interleaved (carry-forward) and/or history_first (chat)
+LMCD=${KVPD_LMC_DOCS:-$P_D}                   # passages: conversations, rag, reference and/or all
+LMCI=${KVPD_LMC_CONV_IDS:-$P_I}               # MTRAG conversation ids, in run order (the first KVPD_LMC_CONVS)
+LMCC=${KVPD_LMC_CONCURRENCY:-$P_C}            # conversations at a time (empty: scripts/lmc_run.sh's 4)
+LMCR=${KVPD_LMC_DISK_READS:-$P_R}             # temporary or retain (scripts/lmc_run.sh, LMC_DISK_READS)
+LMCSH=${KVPD_LMC_L1_SHARED_GB:-$P_SH}         # LMCache memory (GB) of the shared server (empty: the mode's default)
+LMCPE=${KVPD_LMC_L1_PER_ENGINE_GB:-$P_PE}     # ... of each per-engine server
 MATRIX=${MATRIX:-smoke}
 if [ -z "${RUNS:-}" ]; then
     case "$MATRIX" in
@@ -206,6 +230,15 @@ if [ -z "${RUNS:-}" ]; then
                 echo "STOP: KVPD_LMC_CONVS=$LMCN: 1 to 110 conversations" >&2; exit 2
             fi
             [[ "$LMCW" =~ ^[0-9]+$ ]] || { echo "STOP: KVPD_LMC_STORE_WAIT_MS=$LMCW: whole milliseconds" >&2; exit 2; }
+            if [ -n "$LMCI" ]; then
+                [[ "$LMCI" =~ ^[0-9a-f]+(,[0-9a-f]+)*$ ]] || { echo "STOP: KVPD_LMC_CONV_IDS: MTRAG ids by commas" >&2; exit 2; }
+                nid=$(echo "$LMCI" | tr ',' '\n' | wc -l)
+                [ "$LMCN" -le "$nid" ] || { echo "STOP: KVPD_LMC_CONVS=$LMCN but KVPD_LMC_CONV_IDS has $nid ids" >&2; exit 2; }
+            fi
+            for v in "$LMCC" "$LMCSH" "$LMCPE"; do
+                [[ -z "$v" || "$v" =~ ^[0-9]+$ ]] || { echo "STOP: KVPD_LMC_CONCURRENCY, KVPD_LMC_L1_*_GB: whole numbers" >&2; exit 2; }
+            done
+            case "$LMCR" in temporary|retain) ;; *) echo "STOP: KVPD_LMC_DISK_READS=$LMCR: temporary or retain" >&2; exit 2 ;; esac
             RUNS=""
             for tx in $(echo "$LMCT" | tr ',' ' '); do
                 case "$tx" in lmcache|nixl) ;;
@@ -215,10 +248,21 @@ if [ -z "${RUNS:-}" ]; then
                         *) echo "STOP: KVPD_LMC_SERVERS=$LMCS: shared or per_engine, by commas" >&2; exit 2 ;; esac
                     # the lmcache transfer needs the shared server (D loads what P stored there): skipped, not stopped
                     [ "$tx" = lmcache ] && [ "$sv" = per_engine ] && continue
-                    for x in $(echo "$LMCM" | tr ',' ' '); do
-                        case "$x" in memory|disk|tiered) ;;
-                            *) echo "STOP: KVPD_LMC_MODES=$LMCM: memory, disk or tiered, by commas" >&2; exit 2 ;; esac
-                        RUNS+="RUNNER=lmc_run.sh LMC_MODE=$x LMC_TRANSFER=$tx LMC_SERVERS=$sv MTRAG_LIMIT=$LMCN STORE_WAIT_MS=$LMCW;"
+                    l1=$([ "$sv" = shared ] && echo "$LMCSH" || echo "$LMCPE")
+                    for ly in $(echo "$LMCL" | tr ',' ' '); do
+                        case "$ly" in interleaved|history_first|docs_first) ;;
+                            *) echo "STOP: KVPD_LMC_LAYOUTS=$LMCL: interleaved, history_first or docs_first, by commas" >&2; exit 2 ;; esac
+                        for dc in $(echo "$LMCD" | tr ',' ' '); do
+                            case "$dc" in conversations|rag|reference|all) ;;
+                                *) echo "STOP: KVPD_LMC_DOCS=$LMCD: conversations, rag, reference or all, by commas" >&2; exit 2 ;; esac
+                            for x in $(echo "$LMCM" | tr ',' ' '); do
+                                case "$x" in memory|disk|tiered) ;;
+                                    *) echo "STOP: KVPD_LMC_MODES=$LMCM: memory, disk or tiered, by commas" >&2; exit 2 ;; esac
+                                RUNS+="RUNNER=lmc_run.sh LMC_MODE=$x LMC_TRANSFER=$tx LMC_SERVERS=$sv MTRAG_LIMIT=$LMCN"
+                                RUNS+=" STORE_WAIT_MS=$LMCW MTRAG_LAYOUT=$ly MTRAG_DOCS=$dc LMC_DISK_READS=$LMCR"
+                                RUNS+="${LMCI:+ MTRAG_CONV_IDS=$LMCI}${LMCC:+ MTRAG_CONCURRENCY=$LMCC}${l1:+ LMC_L1_GB=$l1};"
+                            done
+                        done
                     done
                 done
             done

@@ -50,9 +50,9 @@ campaign `KVPD_LMC_TRANSFERS` and `KVPD_LMC_SERVERS`, every combination with eve
 - What the trace shows: P's request holding its blocks for D (`nixl.request_finished`), D's match and its blocks
   (`nixl.match`, `nixl.recv_planned`), the handshake (once per pair), D's read of P's blocks (`nixl.read`), D having
   the KV and P freeing its blocks (`nixl.done`), and every engine's LMCache stores, on its server.
-- What to expect: D never loads from LMCache (NIXL has the tokens first), so in the disk mode the chunks go to disk
-  and leave memory but nothing reads them back unless an engine's own GPU cache no longer holds a prefix
-  (`GPU_BLOCKS` makes that happen). With a server per engine each server keeps its own copy, and with D engines
+- What to expect: D never loads from LMCache (NIXL has the tokens first). Its lookup still runs, and in the disk mode
+  the server's lookup reads what it finds from disk into memory (its prefetch) even though nothing loads it; P loads
+  from LMCache only what its own GPU cache no longer holds (`GPU_BLOCKS` makes that happen). With a server per engine each server keeps its own copy, and with D engines
   round-robin one conversation's chunks can end up on all three D servers.
 
 ### Differences from LMCache's documented P/D, in the `nixl` runs
@@ -64,14 +64,14 @@ What the `nixl` runs do differently from the guide, kept here to change later:
 | LMCache's connector class | `"kv_connector": "LMCacheMPConnector"` only, which in vLLM 0.32 is vLLM's own copy | LMCache 0.5.7's own class (`kv_connector_module_path: lmcache.integration.vllm.lmcache_mp_connector`) | matched to the server's version; our hooks are in it (the store path uses it too) |
 | connector to server | `grpc://` (current LMCache) | `tcp://` (ZMQ, LMCache 0.5.7's default) | the pinned version |
 | hosts | P and D on their own hosts | one node, 4 GPUs (P on the first, D1-D3 on the others) | the card's node |
-| LMCache memory | `--l1-size-gb 100` | 16 GB (memory mode), 4 GB (disk mode) per server | the node's memory |
-| disk tier | none | disk mode: `fs` adapter with O_DIRECT, `skip_l1`, eviction `noop` | to see the disk path (memory mode has none) |
+| LMCache memory | `--l1-size-gb 100` | 16 GB (memory mode), 4 GB (disk mode) per server; the eight configurations: 8 GB shared, 2 GB per engine | the node's memory |
+| disk tier | none | disk mode: `fs` adapter with O_DIRECT, `skip_l1`, eviction `noop`; the eight configurations: prefetch policy `retain`, eviction LRU | to see the disk path (memory mode has none) |
 | `--max-workers`, `--l1-init-size-gb` | defaults (1, 20) | 4, equal to the memory size | as the store-path runs |
 | proxy | `vllm-router` | `scripts/pd_proxy.py --mode nixl` with the router's requests (above); our request id (`X-Request-Id`, the same on P and D) in place of the router's `___prefill_addr_..._decode_addr_...` ids, which only other connectors read | the per-turn times |
 | vLLM settings | defaults | `--gpu-memory-utilization 0.80` (0.90), `--max-model-len 32768`, `--max-num-batched-tokens 8192`, `VLLM_USE_FLASHINFER_SAMPLER=0`, `VLLM_SERVER_DEV_MODE=1`, `PYTHONHASHSEED=0` (vLLM's SHA-256 block hashes already match across engines without it), `UCX_PROTO_INFO=y` (a log line) | as the store-path runs |
 | LMCache's compiled modules | the wheel's | built from our copy's sources | the wheel's do not load beside vLLM 0.32's torch (job 30694) |
 | trace hooks | none | 41 lines in 10 files, recording only | the trace |
-| workload | | MTRAG's first 4 conversations at once, 128-token answers | the lifecycle's workload |
+| workload | | MTRAG's first 4 conversations at once, 128-token answers; the eight configurations: the ten by id, one at a time, every passage | the lifecycle's workload |
 
 ### What a `nixl` run must show (to check it kept to the plan)
 
@@ -91,7 +91,7 @@ What the `nixl` runs do differently from the guide, kept here to change later:
 | Mode | Server memory (L1) | Disk (L2) | What a D pull reads |
 | --- | --- | --- | --- |
 | `memory` | 16 GB, LRU | none | memory |
-| `disk` | 4 GB, a write buffer only (eviction `noop`) | `fs` adapter, one file per chunk, `O_DIRECT` (no page cache); store policy `skip_l1`: a chunk is deleted from memory as soon as it is on disk; prefetch policy `default`: a chunk read from disk is not kept in memory | disk, every time |
+| `disk` | 4 GB, a write buffer only (eviction `noop`) | `fs` adapter, one file per chunk, `O_DIRECT` (no page cache); store policy `skip_l1`: a chunk is deleted from memory as soon as it is on disk; prefetch policy `default`: a chunk read from disk is not kept in memory (`LMC_DISK_READS=retain`: it is, until evicted; eviction then LRU) | disk, every time (with `retain`: disk the first time, memory after) |
 | `tiered` (optional) | 2 GB, LRU | the same files, written through (store policy `default`) | memory while the chunk is there, disk after it is evicted |
 
 `O_DIRECT` matters for the disk mode: without it the kernel's page cache would answer reads from memory.
@@ -317,19 +317,24 @@ what it computes), `MTRAG_LIMIT` (4), `MTRAG_LAYOUT` (interleaved), `MTRAG_CONCU
 (a small number shrinks every engine's GPU cache, so blocks are evicted from it and come back from LMCache),
 `D_PREFIX_CACHE` (1; 0 makes every turn pull its whole prefix), `KEEP_L2` (0), `ENGINE_EAGER` (0),
 `LMC_TRANSFER` (lmcache; nixl), `LMC_SERVERS` (shared; per_engine), `LMC_HOST_MARGIN_GB` (16: the host memory kept for
-the engines beside the servers').
+the engines beside the servers'), `MTRAG_DOCS` (conversations; rag, reference, all), `MTRAG_CONV_IDS` (MTRAG ids by
+commas, in run order), `LMC_DISK_READS` (temporary; retain).
 `scripts/lmc_setup.sh`: `LMC_TORCH_BASELINE=1` skips the CUDA ops build (the wheel's ops, or LMCache's torch
 fallback, as job 30694 ran: not for real runs), `CUDA13_HOME` (a toolkit already there, used only if the environment
 has no CUDA 13 compiler of its own; never downloaded by this setup).
 
 The matrix `lmctrace` (`scripts/pd_matrix.sh`) runs one per mode; set before the campaign starts:
 `KVPD_LMC_MODES` (memory,disk), `KVPD_LMC_CONVS` (4), `KVPD_LMC_STORE_WAIT_MS` (500), `KVPD_LMC_TRANSFERS` (lmcache;
-nixl; or both), `KVPD_LMC_SERVERS` (shared; per_engine; or both). Its setup is
+nixl; or both), `KVPD_LMC_SERVERS` (shared; per_engine; or both), `KVPD_LMC_LAYOUTS` (interleaved; history_first;
+or both), `KVPD_LMC_DOCS` (conversations; rag, reference, all, by commas), `KVPD_LMC_CONV_IDS`,
+`KVPD_LMC_CONCURRENCY`, `KVPD_LMC_DISK_READS`, `KVPD_LMC_L1_SHARED_GB`, `KVPD_LMC_L1_PER_ENGINE_GB`, and
+`KVPD_LMC_PRESET=eight` ("The eight configurations"). Its setup is
 `scripts/lmc_setup.sh` only (the LMCache environment, LMCache's CUDA ops, the overlay, MTRAG, the model): no codec
 builds, no toolkit download; NIXL 1.5.2 is installed in the LMCache environment for the `nixl` runs. The run stage
 defaults to 3 hours. The disk plan reserves 3.5 GB for the setup, 1 GB a conversation for the disk tier (job 30728's
-first 4 conversations: 3.35 GB in all), four times that for a run with a server per engine (P's copy and up to one on
-each D's server), and 0.25 GB a run for its records, and keeps 10 GB free; each run deletes its disk tier after its report, keeping the file list in `server/l2_files.tsv`.
+first 4 conversations: 3.35 GB in all; 10% more with every passage, `all`), for a run with a server per engine four
+times that with the carry-forward layout (P's copy and up to one on each D's server) and 2.5 times with the chat one,
+for the largest run, and 0.25 GB a run for its records, and keeps 10 GB free; each run deletes its disk tier after its report, keeping the file list in `server/l2_files.tsv`.
 
 To report again on a published run (no GPU, standard library only), from a checkout with the results:
 
@@ -338,6 +343,101 @@ python3 -I scripts/lmc_lifecycle.py report \
     --results benchmark_results/pd_card/<tag>/matrix/llama32_3b_lmc_<mode>_rtxa5000_<time> --output /tmp/re_<mode>
 python3 -I scripts/lmc_lifecycle.py compare --dirs /tmp/re_memory,/tmp/re_disk --output /tmp/re_compare
 ```
+
+## The eight configurations
+
+Every run hands each turn over the same way: P computes the turn's prompt (one token) and holds its GPU blocks; the
+proxy sends the request on at once to the next D engine (round-robin), with P's blocks named in it; D checks its own
+GPU prefix cache, reads the blocks it does not have from P's GPU over NIXL, and generates the answer (128 tokens).
+Every engine's LMCache connector stores the prompt's chunks on its server. What changes is where those chunks live
+and what the prompts look like:
+
+| | setting | the two values |
+| --- | --- | --- |
+| topology | `LMC_SERVERS` | `shared`: one LMCache server for P, D1, D2, D3, 8 GB of memory · `per_engine`: four, `LMC_P` and `LMC_D1`-`LMC_D3`, 2 GB each |
+| storage | `LMC_MODE` | `memory`: chunks in the server's memory, LRU · `disk`: each chunk written to disk (`fs`, O_DIRECT) and then removed from memory (`skip_l1`); a read from disk brings it back into memory, where it stays until evicted (`LMC_DISK_READS=retain`: prefetch policy `retain`, eviction LRU) |
+| prompt layout | `MTRAG_LAYOUT` | chat RAG (`history_first`): Instructions, Q1 A1, this turn's passages, Q2, cue · carry-forward (`interleaved`): Instructions, turn 1's passages, Q1 A1, turn 2's passages, Q2, cue |
+
+2 × 2 × 2 = 8 runs. In all eight:
+
+- Conversations: the ten below, by MTRAG id, the first `KVPD_LMC_CONVS` of them (1, 5 or 10: three campaigns),
+  one conversation at a time (`MTRAG_CONCURRENCY=1`), in this order.
+- Passages (`MTRAG_DOCS=all`): each turn's passages marked relevant (`reference.jsonl`) and then the retriever's top
+  5 (`RAG.jsonl`) not among them, each once: 5 to 9 a turn for these ten. `KVPD_LMC_DOCS` picks others: `rag` (the
+  top 5 only), `reference` (the relevant ones only: 0 to 6, some turns none), `conversations`
+  (`conversations.json`'s), or several by commas (8 more runs each). MTRAG's own `reference+RAG.jsonl` has only
+  some turns of each conversation (2 of a2698b29's 9), so it is not used.
+- Earlier answers: D's own (what the model generated for the turn before), as a chat system sends them.
+- Routing: round-robin over D1-D3 across every request of the run, so a conversation's turns go D1, D2, D3, D1...
+- Each run starts empty: new engines and servers, empty GPU caches, empty LMCache memory and disk. Within a run each
+  D keeps its GPU prefix cache from one turn to the next.
+
+| # | MTRAG conversation | turns | passages a turn (`all`) |
+| --- | --- | ---: | --- |
+| 1 | `1534a095279f2cb888fb0bea17bd70da` | 5 | 5,5,5,5,5 |
+| 2 | `0208bf26ec357a803445290fa88a2e9e` | 7 | 5,6,5,5,6,5,5 |
+| 3 | `a2698b2973ea7db1ee5adb5e70ec02e4` | 9 | 6,7,7,5,8,7,6,6,7 |
+| 4 | `c1e53df98a28f19448f4af244304b89a` | 6 | 5,5,6,8,7,6 |
+| 5 | `cfbcfa3e382f12aed450b10f87a72aeb` | 6 | 5,5,5,6,5,6 |
+| 6 | `3f5fa378239f7475baac89fa40288aaa` | 6 | 5,6,5,5,5,6 |
+| 7 | `5c13daa9432149f6243aa1115629cd1a` | 7 | 5,6,5,9,8,5,6 |
+| 8 | `694e275f1a01ad0e8ac448ad809f7930` | 8 | 5,5,7,7,7,7,6,6 |
+| 9 | `aea2634b0e5f1c2444550d31c41adc94` | 8 | 6,5,7,5,6,5,5,6 |
+| 10 | `79f0d0539d9ec0acbf90cb3388b30c17` | 7 | 5,7,6,6,7,8,6 |
+
+All ten are ClapNQ conversations. `scripts/lmc_setup.sh` fetches `conversations.json`, `RAG.jsonl` and
+`reference.jsonl` from MTRAG's repository at commit `e0970de1`, each checked by its SHA-256.
+
+**What LMCache does in these runs.** vLLM's `MultiConnector` asks every connector for a request's tokens and gives
+the load to the first that has some: on D, NIXL always does, so LMCache never loads on D. Its lookup still runs, and
+D waits for it; in the disk mode that lookup reads the chunks it finds from disk into memory (its prefetch), and
+with `retain` they stay there. P's requests carry no blocks to read, so on P LMCache loads what P's own GPU cache no
+longer holds. With a server per engine each server keeps the chunks of the requests its engine ran.
+
+**Disk.** The disk tier lives in the run's folder in node-local `/tmp` and is deleted after the run's report, so a
+campaign needs room for its largest run: the per-engine carry-forward run on disk. Estimated from the prompts (4
+characters a token, 112 KB a token), and what the campaign's disk plan reserves (`scripts/pd_campaign.py`: 1 GB a
+conversation, 10% more for `all`, 4 copies for per-engine carry-forward, 2.5 for per-engine chat, 3.5 GB of setup,
+0.25 GB a run, 10 GB kept free):
+
+| conversations | shared server | per engine, chat | per engine, carry-forward | free disk the plan asks for |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.6 GB | 1.2 GB | 1.8 GB | 20 GB |
+| 5 | 4.8 GB | 10.2 GB | 15.4 GB | 38 GB |
+| 10 | 10.2 GB | 21.4 GB | 33.3 GB | 60 GB |
+
+The campaign's create stage stops before anything runs if the node's `/tmp` lacks that room.
+
+### Running them
+
+The runbook below, once per campaign, with these exported before `bash <<'LOGIN'`:
+
+```bash
+export KVPD_LMC_PRESET=eight KVPD_LMC_CONVS=1     # then 5, then 10: one campaign each
+```
+
+The preset sets `KVPD_LMC_TRANSFERS=nixl`, `KVPD_LMC_SERVERS=shared,per_engine`, `KVPD_LMC_MODES=memory,disk`,
+`KVPD_LMC_LAYOUTS=history_first,interleaved`, `KVPD_LMC_DOCS=all`, `KVPD_LMC_CONV_IDS` (the ten),
+`KVPD_LMC_CONCURRENCY=1`, `KVPD_LMC_DISK_READS=retain`, `KVPD_LMC_L1_SHARED_GB=8` and
+`KVPD_LMC_L1_PER_ENGINE_GB=2`; each of them, exported too, wins over the preset. To see a campaign's runs first:
+`MATRIX=lmctrace KVPD_LMC_PRESET=eight KVPD_LMC_CONVS=5 PRINT_RUNS=1 bash scripts/pd_matrix.sh`. Each run's folder
+is `llama32_3b_lmc_<mode>_nixl_<servers>_<chat|carry>_<docs>_rtxa5000_<time>/`.
+
+### What each of the eight must show
+
+1. `env.json`: `transfer: nixl`; `servers`; `layout` and `layout_label` (`chat` or `carry`); `mtrag_docs: all`;
+   `conv_ids` (the ten) and `mtrag_limit` (1, 5 or 10); `concurrency: 1`; `routing: round_robin`;
+   `store_wait_ms: 0`; `l1_gb` 8 (shared) or 2 (per engine); in the disk mode `store_policy: skip_l1`,
+   `prefetch_policy: retain`, `eviction: LRU`.
+2. `mtrag.jsonl`: the conversations in the order above, each turn's `docs` from `reference.jsonl+RAG.jsonl`, and
+   each prompt's earlier answers the ones D generated.
+3. The report: every D request read the tokens its own GPU lacked from P over NIXL; LMCache loaded nothing on D; no
+   failed reads; D's own GPU hits on the turns a D had seen the conversation before (carry-forward: the whole
+   earlier prompt; chat: the instructions and the history up to the earlier answers); the chunks on each server
+   (`per_server`, per engine).
+4. Disk mode: every chunk on disk and then out of memory; "disk reads kept in memory": N of N still in memory at the
+   end unless LRU evicted them (with the default policy they leave about 80 ms after the read: job 30728, 102 of
+   102); the server's memory at the end holds what was read back.
 
 ## Runbook (gpu-grad-01, the card)
 
@@ -366,6 +466,8 @@ export KVPD_TAG="pd_${KVPD_MATRIX}_$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p ~/.kvpd_campaigns
 STATE=~/.kvpd_campaigns/$KVPD_TAG.sh
 printf 'export KVPD_BRANCH=%q\nexport KVPD_PIN=%q\nexport KVPD_TAG=%q\n' "$KVPD_BRANCH" "$KVPD_PIN" "$KVPD_TAG" > "$STATE"
+for v in $(compgen -e | grep '^KVPD_LMC_' || true); do printf 'export %s=%q\n' "$v" "${!v}"; done >> "$STATE"
+cat "$STATE"
 printf 'PIN=%s\nTAG=%s\nSTATE=%s\n' "$KVPD_PIN" "$KVPD_TAG" "$STATE"
 for STAGE in create run cleanup verify-cleanup review publish; do
     bash scripts/pd_card.sh "$STAGE" "$KVPD_PIN" "$KVPD_TAG"
@@ -376,7 +478,7 @@ LOGIN
 
 Options go before `bash <<'LOGIN'`, exported: for example `export KVPD_LMC_MODES=memory,disk,tiered` or
 `export KVPD_LMC_CONVS=8`. LMCache's documented P/D, with a shared server and with a server per engine, in memory and
-on disk (four runs): `export KVPD_LMC_TRANSFERS=nixl KVPD_LMC_SERVERS=shared,per_engine KVPD_LMC_MODES=memory,disk`. To resume after a stop: `source ~/.kvpd_campaigns/<tag>.sh`, `git switch -q --detach
+on disk (four runs): `export KVPD_LMC_TRANSFERS=nixl KVPD_LMC_SERVERS=shared,per_engine KVPD_LMC_MODES=memory,disk`. To resume after a stop: `source ~/.kvpd_campaigns/<tag>.sh` (it keeps the `KVPD_LMC_*` options too), `git switch -q --detach
 "$KVPD_PIN"`, then the remaining stages as in `docs/pd_baselines.md`.
 
 The published branch is `evidence/lmcache-lifecycle/<pin12>/lmctrace/job<run job>`. In it,

@@ -11,7 +11,8 @@
 #   $KV_HOME/lmc_overlay       those wheels' packages with our copies' Python over them (third_party/, the trace
 #                              hooks; scripts/lmc_overlay.py checks every other file is the wheel's, byte for byte),
 #                              and our build of lmcache.cuda_ops in place of the wheel's
-#   $KV_RUNS/mtrag/conversations.json   IBM's MTRAG conversations (pinned commit, SHA-256 checked)
+#   $KV_RUNS/mtrag/conversations.json   IBM's MTRAG conversations (pinned commit, SHA-256 checked), and its
+#                              generation tasks RAG.jsonl and reference.jsonl (the same commit)
 #   the model, unsloth/Llama-3.2-3B at its pinned revision, in HF_HOME
 #   NIXL 1.5.2 in that environment (nixl-cu13 + nixl), for LMC_TRANSFER=nixl
 #
@@ -103,31 +104,41 @@ cp "$KV_HOME/lmc_overlay/VERIFY.json" "$KV_HOME/lmc_verify.json" 2>/dev/null || 
 [ "${VERIFIED:-0}" = 0 ] || { echo "STOP: the overlay is not what the engines must import (above)"; exit 1; }
 rm -rf -- "$CHECK_DIR"
 
-# IBM's MTRAG (github.com/IBM/mt-rag-benchmark, Apache-2.0): 110 human multi-turn RAG conversations; one file at a
-# pinned commit, checked by its SHA-256; data only (read with python -I). The same file scripts/pd_setup.sh fetches.
-echo "== MTRAG conversations"
+# IBM's MTRAG (github.com/IBM/mt-rag-benchmark, Apache-2.0): 110 human multi-turn RAG conversations, and the
+# generation tasks made from them (each turn with its conversation's id: RAG.jsonl has the retriever's top 5 passages
+# for each turn, reference.jsonl the passages marked relevant). Files at a pinned commit, each checked by its
+# SHA-256; data only (read with python -I). conversations.json is the file scripts/pd_setup.sh fetches.
+echo "== MTRAG"
 MTRAG_COMMIT=e0970de1b1207c2a9506adf238e6e1a22037e38a
-MTRAG_SHA=1a30baf5e025b4915e87556c64de37d7fe96e98f9f4ea9f3cf9322199e538f89
 MTRAG_DIR=$KV_RUNS/mtrag
-if [ -s "$MTRAG_DIR/conversations.json" ] && echo "$MTRAG_SHA  $MTRAG_DIR/conversations.json" | sha256sum -c --quiet - 2>/dev/null; then
-    echo "MTRAG: $MTRAG_DIR/conversations.json (as fetched before)"
-else
-    mkdir -p "$MTRAG_DIR"
-    MT_TMP=$(mktemp -d "$TMPDIR/mtrag.XXXXXX")
-    if curl -fsSL --retry 3 -o "$MT_TMP/c.json" \
-            "https://raw.githubusercontent.com/IBM/mt-rag-benchmark/$MTRAG_COMMIT/mtrag-human/conversations/conversations.json" ||
-       { git -C "$MT_TMP" init -q && git -C "$MT_TMP" remote add origin https://github.com/IBM/mt-rag-benchmark.git &&
-         git -C "$MT_TMP" fetch -q --depth 1 --filter=blob:none origin "$MTRAG_COMMIT" &&
-         git -C "$MT_TMP" show "$MTRAG_COMMIT:mtrag-human/conversations/conversations.json" > "$MT_TMP/c.json"; }; then
-        echo "$MTRAG_SHA  $MT_TMP/c.json" | sha256sum -c --quiet - || {
-            echo "STOP: MTRAG's conversations.json does not match its SHA-256"; rm -rf -- "$MT_TMP"; exit 1; }
-        mv "$MT_TMP/c.json" "$MTRAG_DIR/conversations.json"
-        echo "MTRAG: $MTRAG_DIR/conversations.json (commit ${MTRAG_COMMIT:0:12}, SHA-256 checked)"
-    else
-        echo "STOP: MTRAG could not be fetched"; rm -rf -- "$MT_TMP"; exit 1
+mkdir -p "$MTRAG_DIR"
+mtrag_fetch() {   # path in the repository, its SHA-256, the file name here
+    local src=$1 sha=$2 dst=$MTRAG_DIR/$3
+    if [ -s "$dst" ] && echo "$sha  $dst" | sha256sum -c --quiet - 2>/dev/null; then
+        echo "MTRAG: $dst (as fetched before)"
+        return 0
     fi
-    rm -rf -- "$MT_TMP"
-fi
+    local tmp
+    tmp=$(mktemp -d "$TMPDIR/mtrag.XXXXXX")
+    if curl -fsSL --retry 3 -o "$tmp/f" "https://raw.githubusercontent.com/IBM/mt-rag-benchmark/$MTRAG_COMMIT/$src" ||
+       { git -C "$tmp" init -q && git -C "$tmp" remote add origin https://github.com/IBM/mt-rag-benchmark.git &&
+         git -C "$tmp" fetch -q --depth 1 --filter=blob:none origin "$MTRAG_COMMIT" &&
+         git -C "$tmp" show "$MTRAG_COMMIT:$src" > "$tmp/f"; }; then
+        echo "$sha  $tmp/f" | sha256sum -c --quiet - || {
+            echo "STOP: MTRAG's $src does not match its SHA-256"; rm -rf -- "$tmp"; exit 1; }
+        mv "$tmp/f" "$dst"
+        echo "MTRAG: $dst (commit ${MTRAG_COMMIT:0:12}, SHA-256 checked)"
+    else
+        echo "STOP: MTRAG's $src could not be fetched"; rm -rf -- "$tmp"; exit 1
+    fi
+    rm -rf -- "$tmp"
+}
+mtrag_fetch mtrag-human/conversations/conversations.json \
+    1a30baf5e025b4915e87556c64de37d7fe96e98f9f4ea9f3cf9322199e538f89 conversations.json
+mtrag_fetch mtrag-human/generation_tasks/RAG.jsonl \
+    5d5201da9fabd072fd8f6b8d051bfaafa7ef031e76722a4920c66e94cede1873 RAG.jsonl
+mtrag_fetch mtrag-human/generation_tasks/reference.jsonl \
+    b3dde4076f9f692a99513e424a0a39f57591dbe45600a4c1017aaa7a7edcfaac reference.jsonl
 
 echo "== the model"
 "$LPY" -I -c "from huggingface_hub import snapshot_download; print('  ', snapshot_download('unsloth/Llama-3.2-3B', revision='d4446454d87d51aa42e1fb174f25acc5f8762331'))"

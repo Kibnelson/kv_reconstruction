@@ -57,8 +57,12 @@ LMC_GB_PER_CONV = 1.0      # MATRIX=lmctrace: the disk tier's files for one inte
                            # prompt's whole chunks, 112 KB a token, each stored once: job 30728's first 4 had 9,765,
                            # 9,097, 7,503 and 3,102 tokens, 114 chunks, 3.35 GB in all), one run at a time
                            # (scripts/lmc_run.sh deletes them after its report)
-LMC_PER_ENGINE_COPIES = 4  # LMC_SERVERS=per_engine: P's server and each D's own (D engines round-robin, so a
-                           # conversation's chunks can land on all three D servers): at most 4 copies
+LMC_DOCS_SCALE = {"all": 1.1}   # MTRAG_DOCS=all: 5 to 9 passages a turn, not 5 (rag) or fewer: about 10% more
+LMC_PER_ENGINE_COPIES = {       # LMC_SERVERS=per_engine: P's server and each D's own (D engines round-robin, so a
+    "interleaved": 4.0,         # conversation's chunks land on all three D servers): each carry-forward prompt holds
+    "history_first": 2.5,       # the ones before it, so up to 4 copies (about 3.3 estimated for the ten); a chat
+}                               # prompt's passages are its own turn's, so each D stores mostly its turns' (about 2.1)
+LMC_PER_ENGINE_DEFAULT = 4.0    # any other layout: at most 4
 LMC_RECORDS_GB = 0.25      # and the traces, logs and results a run keeps (job 30694: about 15 MB a run)
 LMC_SETUP_GB = 3.5         # MATRIX=lmctrace's setup: the environments are links into uv's cache (NIXL's wheels too);
                            # the CUDA ops' build
@@ -354,10 +358,19 @@ def find_uv(cache):
 def extra_gb(matrix, runs=()):
     """What a matrix adds to the disk after setup, and keeps (GB): MATRIX=capture's stores as pd_matrix.sh sets them:
     P's (16 GB for the default 6 conversations, else 2 GB each: KVPD_CAPTURE_CONVS) and each of the 3 D engines'
-    (KVPD_CAPTURE_D_GB, 2). MATRIX=lmctrace: its runs' disk tier (the most conversations of a run with one) and
-    records."""
+    (KVPD_CAPTURE_D_GB, 2). MATRIX=lmctrace: its runs' disk tier (the largest run's: conversations, copies with a
+    server per engine by layout, passages; scripts/lmc_run.sh deletes each run's) and records."""
     if matrix == "lmctrace":
-        disk = [int(m.group(1)) * (LMC_PER_ENGINE_COPIES if re.search(r"LMC_SERVERS=per_engine\b", r) else 1)
+        def copies(r):
+            if not re.search(r"LMC_SERVERS=per_engine\b", r):
+                return 1.0
+            ly = re.search(r"MTRAG_LAYOUT=(\w+)", r)
+            return LMC_PER_ENGINE_COPIES.get(ly.group(1) if ly else "interleaved", LMC_PER_ENGINE_DEFAULT)
+
+        def docs(r):
+            d = re.search(r"MTRAG_DOCS=(\w+)", r)
+            return LMC_DOCS_SCALE.get(d.group(1) if d else "", 1.0)
+        disk = [int(m.group(1)) * copies(r) * docs(r)
                 for r in runs if re.search(r"LMC_MODE=(disk|tiered)\b", r)
                 for m in [re.search(r"MTRAG_LIMIT=(\d+)", r)] if m]
         return (LMC_GB_PER_CONV * max(disk) if disk else 0.0) + LMC_RECORDS_GB * max(1, len(runs))
