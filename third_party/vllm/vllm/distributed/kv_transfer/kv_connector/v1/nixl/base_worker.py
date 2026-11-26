@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Base worker-side logic for the NIXL connector."""
 
+import kvtrace  # KVTRACE
 import contextlib
 import itertools
 import logging
@@ -993,6 +994,7 @@ class NixlBaseConnectorWorker:
         notif_agents_only: bool = False,
     ) -> tuple[dict[tuple[int, int], str], float]:
         """Do a NIXL handshake with a remote instance."""
+        if kvtrace.ON: kvtrace.hook("nixl.handshake", phase="start", host=host, port=port, engine=expected_engine_id)  # KVTRACE
         if self._is_csa_linear:
             self._validate_csa_linear_tp_layout(remote_tp_size)
 
@@ -1136,6 +1138,7 @@ class NixlBaseConnectorWorker:
                 remote_rank_to_agent_name[remote_ranks] = remote_agent_name
 
         assert best_offset is not None
+        if kvtrace.ON: kvtrace.hook("nixl.handshake", phase="done", host=host, port=port, engine=expected_engine_id)  # KVTRACE
         return remote_rank_to_agent_name, best_offset
 
     def _add_notif_only_remote_agent(
@@ -2985,6 +2988,7 @@ class NixlBaseConnectorWorker:
         self._reap_expired_send_leases(done_sending)
 
         self._cleanup_remote_engines()
+        if kvtrace.ON and (done_sending or done_recving or failed_recv_reqs): kvtrace.hook("nixl.done", sending=done_sending, recving=done_recving, failed=failed_recv_reqs)  # KVTRACE
         return KVConnectorTransferResults(
             finished_sending=done_sending,
             finished_recving=done_recving,

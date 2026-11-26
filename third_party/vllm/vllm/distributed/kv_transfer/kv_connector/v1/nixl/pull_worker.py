@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Pull-specific (READ) worker-side logic for the NIXL connector."""
 
+import kvtrace  # KVTRACE
 import time
 from typing import TYPE_CHECKING
 
@@ -413,6 +414,7 @@ class NixlPullConnectorWorker(NixlBaseConnectorWorker):
         remote_rank = read_spec.remote_rank
         local_block_ids = read_spec.local_block_ids
         remote_block_ids = read_spec.remote_block_ids
+        if kvtrace.ON: kvtrace.hook("nixl.read", req_id=request_id, local=local_block_ids, remote=remote_block_ids, engine=dst_engine_id)  # KVTRACE
 
         remote_info = self.transfer_topo.get_engine_info(dst_engine_id)
         block_size_ratio = self.transfer_topo.block_size_ratio(

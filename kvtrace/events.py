@@ -18,6 +18,12 @@ Names (docs/lmcache_lifecycle.md has each with the file and function of its hook
   lmc.conn.request_finished the connector's last word on a request (its vLLM and LMCache hits)
   lmc.l2.read               the file adapter read chunks from disk (LMCache's l2.keys.accessed is also a touch)
   lmc.touch                 the storage manager refreshed chunks' eviction order, no I/O
+  nixl.match                D's NIXL connector: how many prompt tokens it will read from P (beyond its own hit)
+  nixl.recv_planned         D's blocks the read goes into, P's blocks it reads (P's reply's kv_transfer_params)
+  nixl.request_finished     P's request done: its blocks held for D (delay), the blocks D may read
+  nixl.read                 D's worker posts the read of P's blocks into its own (NIXL READ)
+  nixl.handshake            D's worker meets P's NIXL agent (start, done): once per pair of engines
+  nixl.done                 finished NIXL transfers: sending (P: D has read, P frees), receiving (D has the KV)
   lmc.<event>               every event LMCache publishes on its event bus (l1.write.finished, l1.keys.evicted,
                             l2.store.completed, l2.prefetch.load.completed, mp.tokens, ...), in the server and in
                             the engines' connectors. "via" says how it came: absent for EventBus.publish, "stream"
@@ -262,6 +268,43 @@ def touch(keys):
     return {"keys": [hx(k) for k in keys[:KEYS_MAX]], "n_keys": len(keys)}
 
 
+# ------------------------------------------------------------------------------------------------------ NIXL
+def _blocks(block_ids):
+    """Block ids from NIXL's per-group lists (the first group: one attention group here)."""
+    return [int(b) for b in group0(block_ids or ())]
+
+
+def nixl_match(request, count, computed):
+    return dict(req_of(request), count=int(count), computed=int(computed),
+                n_prompt=int(getattr(request, "num_prompt_tokens", 0) or 0))
+
+
+def nixl_recv_planned(request, local, computed_blocks, external, params):
+    p = params or {}
+    return dict(req_of(request), local=_blocks(local), computed_blocks=[int(x) for x in computed_blocks or ()],
+                external=int(external), remote=_blocks(p.get("remote_block_ids")),
+                remote_engine=p.get("remote_engine_id"), remote_req=p.get("remote_request_id"),
+                remote_tokens=p.get("remote_num_tokens"))
+
+
+def nixl_request_finished(request, delay, blocks, num_tokens, is_p):
+    return dict(req_of(request), delay=bool(delay), blocks=_blocks(blocks), num_tokens=int(num_tokens or 0),
+                is_p=bool(is_p))
+
+
+def nixl_read(req_id, local, remote, engine):
+    return {"req": req_id, "local": _blocks(local), "remote": _blocks(remote), "engine": engine}
+
+
+def nixl_handshake(phase, host, port, engine):
+    return {"phase": phase, "host": host, "port": port, "engine": engine}
+
+
+def nixl_done(sending, recving, failed):
+    return {"sending": sorted(map(str, sending or ())), "recving": sorted(map(str, recving or ())),
+            "failed": sorted(map(str, failed or ()))}
+
+
 def generic(**objs):
     return {k: _md(v) for k, v in objs.items()}
 
@@ -288,5 +331,11 @@ EXTRACT = {
     "lmc.bus.native": lmc_native,
     "lmc.l2.read": l2_read,
     "lmc.touch": touch,
+    "nixl.match": nixl_match,
+    "nixl.recv_planned": nixl_recv_planned,
+    "nixl.request_finished": nixl_request_finished,
+    "nixl.read": nixl_read,
+    "nixl.handshake": nixl_handshake,
+    "nixl.done": nixl_done,
 }
 

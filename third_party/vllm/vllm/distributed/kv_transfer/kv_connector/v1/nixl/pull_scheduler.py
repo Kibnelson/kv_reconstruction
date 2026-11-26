@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Pull-specific scheduler-side logic for the NIXL connector."""
 
+import kvtrace  # KVTRACE
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -61,6 +62,7 @@ class NixlPullConnectorScheduler(NixlBaseConnectorScheduler):
             token_ids = request.prompt_token_ids or []
             actual = self._get_remote_prefill_token_count(len(token_ids))
             count = actual - num_computed_tokens
+            if kvtrace.ON: kvtrace.hook("nixl.match", request=request, count=count, computed=num_computed_tokens)  # KVTRACE
             if count > 0:
                 return count, True
 
@@ -175,6 +177,7 @@ class NixlPullConnectorScheduler(NixlBaseConnectorScheduler):
                         # something to pull; a full local hit stays RUNNING.
                         num_external_tokens > 0,
                     )
+                    if kvtrace.ON: kvtrace.hook("nixl.recv_planned", request=request, local=local_block_ids, computed_blocks=local_num_computed_blocks, external=num_external_tokens, params=params)  # KVTRACE
 
                 else:
                     logger.warning(
@@ -275,6 +278,7 @@ class NixlPullConnectorScheduler(NixlBaseConnectorScheduler):
 
             remote_num_tokens = request.num_computed_tokens
 
+        if kvtrace.ON: kvtrace.hook("nixl.request_finished", request=request, delay=delay_free_blocks, blocks=block_ids, num_tokens=remote_num_tokens, is_p=is_p_node)  # KVTRACE
         return delay_free_blocks, dict(
             do_remote_prefill=is_p_node,
             do_remote_decode=is_d_node,
