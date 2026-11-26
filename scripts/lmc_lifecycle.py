@@ -47,6 +47,9 @@ L1_EVENTS = {"l1.write.reserved", "l1.write.finished", "l1.write_finished_and_re
              "l1.read.finished", "l1.keys.evicted", "l1.keys.accessed", "l1.allocation.failed", "l1.read.failed"}
 L2_EVENTS = {"l2.keys.stored", "l2.keys.accessed", "l2.keys.deleted", "l2.prefetch.failed"}
 SM_EVENTS = {"sm.write.reserved", "sm.write.finished", "sm.read.prefetched_finished"}
+# LMCache events the report reads nothing from: the connector's report of vLLM's block allocations, for the server's
+# metrics (vLLM's own hooks record the allocations)
+LMC_IGNORED = {"mp.vllm.block_allocation"}
 SESSION_EVENTS = {"mp.request.start", "mp.request.end", "mp.store.submitted", "mp.store.start", "mp.store.end",
                   "mp.retrieve.submitted", "mp.retrieve.start", "mp.retrieve.end", "mp.lookup_prefetch.start",
                   "mp.lookup_prefetch.end", "mp.vllm.end_session"}
@@ -179,7 +182,10 @@ class Run:
         self.prefetch = []                                # L2 prefetch / load task events (by request_id)
         self.errors = collections.Counter()
         self.unknown = collections.Counter()
-        self.has_read_hook = False                   # traces from before the lmc.l2.read hook (jobs up to 30728)
+        # the lmc.l2.read hook (not in jobs up to 30728): the overlay's hooked files say so even when nothing read the
+        # disk; older runs' records show it by its events
+        self.has_read_hook = any(f.endswith("l2_adapters/fs_l2_adapter.py")
+                                 for f in (self.env.get("overlay") or {}).get("hooked_files") or [])
         self._engine()
         self._server()
 
@@ -338,6 +344,8 @@ class Run:
                         C(h)["sm"].append((name, k.split("_")[0], t))
             elif name.startswith(("l2.prefetch", "l2.load_task", "l2.store")):
                 self.prefetch.append(r)
+            elif name in LMC_IGNORED:
+                pass
             else:
                 self.unknown["lmc." + name] += 1
 
