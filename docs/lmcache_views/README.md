@@ -8,6 +8,7 @@ conversation, and an index. Each page follows its conversation turn by turn:
   and chunks; a document sent on an earlier turn is pointed back to rather than shown again (it is at another place
   in the prompt, so in other chunks, and a prefix cache cannot reuse it). Documents fold away (click to open);
   lines over 100 characters are wrapped for reading;
+- a timeline: every turn on one clock (ms from the turn's send to P), as a picture and a table: P's queue and prefill, the chunks it stored in LMCache's memory and (disk mode) on disk, the store wait, then D's find (the disk read), copy into its GPU, compute, first token and decode; each turn's section repeats it in one sentence;
 - how the prompt grows: per turn, its new tokens by what they are (previous answer, documents and how many of them
   were sent before, question, framing) and its whole chunks;
 - the prompt's pieces in order (system, documents, question, the `assistant:` marker, the answer that follows, the

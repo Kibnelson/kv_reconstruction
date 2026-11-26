@@ -222,7 +222,7 @@ one D request's, as timelines. `conversations/` has one page per conversation, f
 chunks and blocks, turn by turn (`docs/lmcache_views/`: job 30728's, both modes): each turn's prompt as text (turn 0
 whole; on later turns only what is new after the previous prompt, which is checked to be its prefix id for id), how
 the prompt grows (the previous answer, the documents and how many were sent before, the question, the framing, the
-whole chunks), then its chunks. The text is the driver's record of what it sent (`texts` in `mtrag.jsonl`, with
+whole chunks), a timeline of every turn on one clock (P's prefill, its chunks in memory and on disk, the store wait, D's find, copy, compute and decode: `conversation_<k>_timeline.svg` and a table), then its chunks. The text is the driver's record of what it sent (`texts` in `mtrag.jsonl`, with
 `--trace`, the answers too), or for an older run, rebuilt by the driver's `build()` from the MTRAG file
 (`--conversations`), every piece but the answers, and only where it comes out the run's pieces kind for kind and id
 for id. Checks it makes: every chunk's tokens against the prompt (CRC), every pulled block's

@@ -397,6 +397,27 @@ class LifecycleReportTests(unittest.TestCase):
         self.assertIn("| 0 | 0-32 | system: 10; doc d1: 22 | 0-1 | P 10-11; D 20-21; 2/2 hashes = P's |", page)
         self.assertIn("One chunk, block by block", page)
 
+    def test_a_timeline_per_conversation(self):
+        """Each turn on one clock (ms from the turn's send to P): P's queue and prefill, where its chunks went, and
+        D's start, find (the disk read), copy, compute, first token and end; as an SVG, a table and a sentence."""
+        run, out = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate(run, mode="disk")
+        lmc_lifecycle.main(["conversations", "--run", str(run), "--output", str(out)])
+        page = (out / "conversation_0.md").read_text()
+        self.assertIn("## Timeline", page)
+        self.assertIn("![timeline of conversation 0](conversation_0_timeline.svg)", page)
+        self.assertIn("| 0 | 13 → 75 | 2 | 80 | 90 (out of memory) | 610 | 611-630 | 635-642 | 0 / 64 from disk / 5 | "
+                      "710 | 810 |", page)
+        self.assertIn("**Timeline:** P queued until 13 ms, prefilled 69 tokens (held 0) and was done at 75 ms; its 2 new "
+                      "chunks were in LMCache's memory at 80 ms, on disk at 90 ms and out of memory. After the 500 ms "
+                      "store wait, D1 started at 610 ms holding 0 tokens, pulled 64 from disk", page)
+        import xml.etree.ElementTree as ET
+        svg = ET.fromstring((out / "conversation_0_timeline.svg").read_text())
+        texts = [t.text for t in svg.iter("{http://www.w3.org/2000/svg}text")]
+        for want in ("turn 0 · 69 tokens", "P", "LMCache", "D1", "on disk"):
+            self.assertIn(want, texts)
+        self.assertTrue(any(t and t.startswith("→ 0.81 s") for t in texts))     # D's end, past the axis
+
     CONV = [{"domain": "dom", "messages": [
         {"speaker": "user", "text": "Q zero?"},
         {"speaker": "agent", "contexts": [{"document_id": "d1", "title": "T1", "text": "doc one"}]},

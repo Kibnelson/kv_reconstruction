@@ -34,6 +34,25 @@ Each turn's prompt is the previous one, token for token, and then: D's answer to
 | 6 | 8,705 | +1,120 | 128 | 2 docs, 978 | 11: Is flooding the most common type of disaster? | 3 | 34 (+5) |
 | 7 | 9,765 | +1,060 | 128 | 2 docs, 918 | 11: Is climate change the cause of natural disasters? | 3 | 38 (+4) |
 
+## Timeline
+
+Every turn on one clock: ms from the moment the proxy sent the turn to P. P prefills it (one token out) and stores its new whole chunks in LMCache; the proxy waits 500 ms after P is done (the store wait) and sends the turn to D1, which finds what LMCache has (reading it from disk), copies it into its GPU, computes the rest and decodes the answer. The lanes: P, LMCache (the chunks P stored this turn) and D.
+
+![timeline of conversation 1](conversation_1_timeline.svg)
+
+| turn | P queued → done | chunks stored | in memory | on disk | D starts | D finds (+ disk read) | copy into D's GPU | D: held / pulled / computed | first token | D done |
+| ---: | --- | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | ---: |
+| 0 | 26 → 249 | 3 | 252 | 517 (out of memory) | 776 | 779-830 | 833-837 | 0 / 768 from disk / 157 | 876 | 2,260 |
+| 1 | 83 → 218 | 6 | 225 | 624 (out of memory) | 733 | 735-779 | 794-825 | 1,040 / 1,264 from disk / 32 | 871 | 2,306 |
+| 2 | 17 → 173 | 6 | 174 | 645 (out of memory) | 685 | 687-743 | 758-792 | 2,448 / 1,392 from disk / 81 | 845 | 2,340 |
+| 3 | 13 → 133 | 4 | 132 | 346 (out of memory) | 649 | 652-685 | 700-722 | 4,048 / 816 from disk / 168 | 784 | 2,321 |
+| 4 | 18 → 234 | 8 | 235 | 604 (out of memory) | 746 | 748-804 | 819-852 | 5,152 / 1,760 from disk / 83 | 923 | 2,501 |
+| 5 | 15 → 102 | 2 | 97 | 170 (out of memory) | 612 | 615-672 | 687-708 | 7,120 / 304 from disk / 161 | 778 | 2,395 |
+| 6 | 19 → 164 | 5 | 162 | 335 (out of memory) | 675 | 678-711 | 727-761 | 7,712 / 992 from disk / 1 | 817 | 2,471 |
+| 7 | 19 → 168 | 4 | 162 | 350 (out of memory) | 680 | 684-719 | 735-770 | 8,832 / 896 from disk / 37 | 833 | 2,524 |
+
+All times in ms from the turn's send to P. "in memory": the last of the turn's chunks written into LMCache's memory; "on disk": the last one written to disk (then dropped from memory, in the disk mode); D finds: from LMCache's lookup to its prefetch done (in the disk mode that is the read from disk); copy: LMCache's retrieve into D's GPU slots until D's connector has it. Each turn's section below tells it in a sentence.
+
 ### One chunk, block by block: chunk 0 of turn 0 (`1dd495890c85343c`)
 
 Tokens 0-256 (system: 28; doc c8db6e06ff4666: 228). P computed its blocks on turn 0 and stored them as one chunk; D1 pulled the chunk into these GPU blocks:
@@ -58,6 +77,8 @@ Tokens 0-256 (system: 28; doc c8db6e06ff4666: 228). P computed its blocks on tur
 | 15 | 240-256 | 95 | `549e5b84eeeceb71` | 64 | yes | True |
 
 ## Turn 0
+
+**Timeline:** P queued until 26 ms, prefilled 893 tokens (held 32) and was done at 249 ms; its 3 new chunks were in LMCache's memory at 252 ms, on disk at 517 ms and out of memory. After the 500 ms store wait, D1 started at 776 ms holding 0 tokens, pulled 768 from disk (found 779-830 ms, copied into its GPU 833-837 ms), computed 157 and gave its first token at 876 ms; it decoded 128 tokens until 2,260 ms. ([all turns](#timeline))
 
 925 prompt tokens: 3 whole chunks and 157 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 32 tokens on its GPU, computed 893 and stored 3 new chunks; D1 held 0, loaded 768 from LMCache and computed 157.
 
@@ -189,6 +210,8 @@ D  SSS+
 | 3 | 768-925 | doc 7d4d64e7f6aff1: 142; question 0: 13; `assistant:` 0: 2 | 48-57 | P 128-136; D 101-110 | – | computed (partial chunk: not stored) | computed by D (partial chunk) |
 
 ## Turn 1
+
+**Timeline:** P queued until 83 ms, prefilled 1,424 tokens (held 912) and was done at 218 ms; its 6 new chunks were in LMCache's memory at 225 ms, on disk at 624 ms and out of memory. After the 500 ms store wait, D1 started at 733 ms holding 1,040 tokens, pulled 1,264 from disk (found 735-779 ms, copied into its GPU 794-825 ms), computed 32 and gave its first token at 871 ms; it decoded 128 tokens until 2,306 ms. ([all turns](#timeline))
 
 2,336 prompt tokens: 9 whole chunks and 32 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 912 tokens on its GPU, computed 1,424 and stored 6 new chunks; D1 held 1,040, loaded 1,264 from LMCache and computed 32.
 
@@ -400,6 +423,8 @@ D  ====SSSSS+
 | 9 | 2304-2336 | doc 88aca7ee734372 (new): 22; question 1 (new): 8; `assistant:` 1 (new): 2 | 144-145 | P 432-433; D 259-260 | – | computed (partial chunk: not stored) | computed by D (partial chunk) |
 
 ## Turn 2
+
+**Timeline:** P queued until 17 ms, prefilled 1,585 tokens (held 2,336) and was done at 173 ms; its 6 new chunks were in LMCache's memory at 174 ms, on disk at 645 ms and out of memory. After the 500 ms store wait, D1 started at 685 ms holding 2,448 tokens, pulled 1,392 from disk (found 687-743 ms, copied into its GPU 758-792 ms), computed 81 and gave its first token at 845 ms; it decoded 128 tokens until 2,340 ms. ([all turns](#timeline))
 
 3,921 prompt tokens: 15 whole chunks and 81 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 2,336 tokens on its GPU, computed 1,585 and stored 6 new chunks; D1 held 2,448, loaded 1,392 from LMCache and computed 81.
 
@@ -668,6 +693,8 @@ D  =========SSSSSS+
 | 15 | 3840-3921 | doc 8bb77f30210c5f (new): 70; question 2 (new): 9; `assistant:` 2 (new): 2 | 240-245 | P 733-737; D 461-466 | – | computed (partial chunk: not stored) | computed by D (partial chunk) |
 
 ## Turn 3
+
+**Timeline:** P queued until 13 ms, prefilled 1,112 tokens (held 3,920) and was done at 133 ms; its 4 new chunks were in LMCache's memory at 132 ms, on disk at 346 ms and out of memory. After the 500 ms store wait, D1 started at 649 ms holding 4,048 tokens, pulled 816 from disk (found 652-685 ms, copied into its GPU 700-722 ms), computed 168 and gave its first token at 784 ms; it decoded 128 tokens until 2,321 ms. ([all turns](#timeline))
 
 5,032 prompt tokens: 19 whole chunks and 168 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 3,920 tokens on its GPU, computed 1,112 and stored 4 new chunks; D1 held 4,048, loaded 816 from LMCache and computed 168.
 
@@ -977,6 +1004,8 @@ D  ===============SSSS+
 | 19 | 4864-5032 | doc 2806a7d8f0775d (new): 158; question 3 (new): 8; `assistant:` 3 (new): 2 | 304-314 | P 959-968; D 592-602 | – | computed (partial chunk: not stored) | computed by D (partial chunk) |
 
 ## Turn 4
+
+**Timeline:** P queued until 18 ms, prefilled 1,971 tokens (held 5,024) and was done at 234 ms; its 8 new chunks were in LMCache's memory at 235 ms, on disk at 604 ms and out of memory. After the 500 ms store wait, D1 started at 746 ms holding 5,152 tokens, pulled 1,760 from disk (found 748-804 ms, copied into its GPU 819-852 ms), computed 83 and gave its first token at 923 ms; it decoded 128 tokens until 2,501 ms. ([all turns](#timeline))
 
 6,995 prompt tokens: 27 whole chunks and 83 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 5,024 tokens on its GPU, computed 1,971 and stored 8 new chunks; D1 held 5,152, loaded 1,760 from LMCache and computed 83.
 
@@ -1324,6 +1353,8 @@ D  ====================SSSSSSS+
 
 ## Turn 5
 
+**Timeline:** P queued until 15 ms, prefilled 593 tokens (held 6,992) and was done at 102 ms; its 2 new chunks were in LMCache's memory at 97 ms, on disk at 170 ms and out of memory. After the 500 ms store wait, D1 started at 612 ms holding 7,120 tokens, pulled 304 from disk (found 615-672 ms, copied into its GPU 687-708 ms), computed 161 and gave its first token at 778 ms; it decoded 128 tokens until 2,395 ms. ([all turns](#timeline))
+
 7,585 prompt tokens: 29 whole chunks and 161 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 6,992 tokens on its GPU, computed 593 and stored 2 new chunks; D1 held 7,120, loaded 304 from LMCache and computed 161.
 
 ### The prompt
@@ -1428,6 +1459,8 @@ D  ===========================SS+
 | 29 | 7424-7585 | doc 7d4d64e7f6aff1 (new): 142; question 5 (new): 17; `assistant:` 5 (new): 2 | 464-474 | P 1468-1477; D 900-910 | – | computed (partial chunk: not stored) | computed by D (partial chunk) |
 
 ## Turn 6
+
+**Timeline:** P queued until 19 ms, prefilled 1,121 tokens (held 7,584) and was done at 164 ms; its 5 new chunks were in LMCache's memory at 162 ms, on disk at 335 ms and out of memory. After the 500 ms store wait, D1 started at 675 ms holding 7,712 tokens, pulled 992 from disk (found 678-711 ms, copied into its GPU 727-761 ms), computed 1 and gave its first token at 817 ms; it decoded 128 tokens until 2,471 ms. ([all turns](#timeline))
 
 8,705 prompt tokens: 34 whole chunks and 1 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 7,584 tokens on its GPU, computed 1,121 and stored 5 new chunks; D1 held 7,712, loaded 992 from LMCache and computed 1.
 
@@ -1681,6 +1714,8 @@ D  ==============================SSSS+
 | 34 | 8704-8705 | `assistant:` 6 (new): 1 | 544 | P –; D 1049 | – | computed (partial chunk: not stored) | computed by D (partial chunk) |
 
 ## Turn 7
+
+**Timeline:** P queued until 19 ms, prefilled 1,061 tokens (held 8,704) and was done at 168 ms; its 4 new chunks were in LMCache's memory at 162 ms, on disk at 350 ms and out of memory. After the 500 ms store wait, D1 started at 680 ms holding 8,832 tokens, pulled 896 from disk (found 684-719 ms, copied into its GPU 735-770 ms), computed 37 and gave its first token at 833 ms; it decoded 128 tokens until 2,524 ms. ([all turns](#timeline))
 
 9,765 prompt tokens: 38 whole chunks and 37 tokens over (the partial chunk, computed by both engines and stored only when a later turn completes it). P held 8,704 tokens on its GPU, computed 1,061 and stored 4 new chunks; D1 held 8,832, loaded 896 from LMCache and computed 37.
 

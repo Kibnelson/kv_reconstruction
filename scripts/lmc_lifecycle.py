@@ -1023,6 +1023,162 @@ def growth_row(t, pieces, texts, prev_len, ch):
             f"{parts['framing']} | {n // ch} (+{n // ch - prev_len // ch}) |"), question
 
 
+def turn_times(R, P, D, px):
+    """One turn's moments, in ms from the proxy sending it to P: P's queue and prefill, LMCache's memory and disk for
+    the chunks P stored, and D's start, find (with the read from disk), copy into its GPU, compute, first token, end."""
+    T = px.get("t_in")
+    if T is None or P is None:
+        return None
+    ms = lambda t: None if t is None else round((t - T) * 1000, 1)   # noqa: E731
+    lo = lambda xs: min(xs) if xs else None                          # noqa: E731
+    hi = lambda xs: max(xs) if xs else None                          # noqa: E731
+
+    def split(q):
+        conn = (q["lookups"] or [None])[-1] or {}
+        n = q.get("n_prompt") or 0
+        vh = conn.get("vllm_hit", q.get("local_hit")) or 0
+        load = conn.get("load") or 0
+        return n, vh, load, max(0, n - vh - load)
+    n, p_held, p_load, p_comp = split(P)
+    ch = [c for c in R.chunks.values() if c.get("key") == P["key"] and c.get("store_role") == "P"]
+    w = {"n": n, "p_held": p_held, "p_computed": p_comp, "chunks": len(ch),
+         "p_added": ms(P.get("t_added")), "p_start": ms(P["allocs"][0]["t"] if P["allocs"] else None),
+         "p_done": ms(px.get("t_prefill_done") or P.get("t_finished")),
+         "mem_in": ms(lo([c["t_l1_reserved"] for c in ch if c.get("t_l1_reserved")])),
+         "mem_written": ms(hi([c["t_l1_written"] for c in ch if c.get("t_l1_written")])),
+         "disk": ms(hi([c["t_l2_stored"] for c in ch if c.get("t_l2_stored")])),
+         "mem_out": ms(hi([c["t_l1_removed"][0] for c in ch if c.get("t_l1_removed")]))}
+    if D is not None:
+        srv = D.get("server") or {}
+        _n, d_held, d_load, d_comp = split(D)
+        tiers = collections.Counter(rd.get("tier") for c in R.chunks.values() for rd in c.get("reads") or []
+                                    if rd["key"] == D["key"] and rd["role"] == D["role"] and rd["how"] == "pulled")
+        w.update(d_role=D["role"], d_held=d_held, d_loaded=d_load, d_computed=d_comp, n_out=D.get("n_out"),
+                 d_from=("disk" if tiers.get("L2") and not tiers.get("L1") else "memory" if tiers.get("L1") and
+                         not tiers.get("L2") else "memory and disk" if tiers else None),
+                 d_added=ms(D.get("t_added")), d_find=ms(lo([x["t"] for x in srv.get("mp.lookup") or []])),
+                 d_found=ms(lo([x["t"] for x in srv.get("mp.lookup_prefetch.end") or []])),
+                 d_copy=ms(lo([x["t"] for x in srv.get("mp.retrieve.start") or []])) if d_load else None,
+                 d_received=ms(D.get("t_received")) if d_load else None,
+                 d_first=ms(px.get("t_first_byte")), d_done=ms(D.get("t_finished") or px.get("t_out")))
+    return w
+
+
+def _f(x):
+    return "–" if x is None else f"{x:,.0f}"
+
+
+def turn_story(w, wait_ms):
+    """A turn in one sentence: what P did, where its chunks went, what D did with them."""
+    if not w:
+        return ""
+    s = (f"P queued until {_f(w['p_start'])} ms, prefilled {w['p_computed']:,} tokens (held {w['p_held']:,}) and was "
+         f"done at {_f(w['p_done'])} ms")
+    if w["chunks"]:
+        s += (f"; its {_n(w['chunks'], 'new chunk')} were in LMCache's memory at {_f(w['mem_written'])} ms"
+              + (f", on disk at {_f(w['disk'])} ms" + (" and out of memory" if w.get("mem_out") else "")
+                 if w.get("disk") is not None else ""))
+    else:
+        s += "; no new chunk to store"
+    if w.get("d_role"):
+        s += (f". After the {wait_ms:,.0f} ms store wait, {w['d_role']} started at {_f(w['d_added'])} ms holding "
+              f"{w['d_held']:,} tokens")
+        if w["d_loaded"]:
+            s += (f", pulled {w['d_loaded']:,} from {w.get('d_from') or 'LMCache'} (found {_f(w['d_find'])}-"
+                  f"{_f(w['d_found'])} ms, copied into its GPU {_f(w['d_copy'])}-{_f(w['d_received'])} ms)")
+        s += (f", computed {w['d_computed']:,} and gave its first token at {_f(w['d_first'])} ms; it decoded "
+              + (f"{w['n_out']} tokens " if w.get("n_out") else "") + f"until {_f(w['d_done'])} ms.")
+    return s
+
+
+TL_COLORS = {"wait": "#D3D1C7", "compute": "#7F77DD", "memory": "#EF9F27", "disk": "#1D9E75", "find": "#85B7EB",
+             "copy": "#185FA5", "decode": "#CECBF6"}
+
+
+def timeline_svg(rows, mode, wait_ms):
+    """One conversation's turns as lanes (P, LMCache, D) on one time axis: ms from the turn's send to P. An SVG
+    GitHub shows as an image: fixed colors on a white ground."""
+    import html
+    X0, X1, LANE, GAP = 150, 840, 14, 4
+    ends = [w.get("d_first") or w.get("p_done") or 0 for _k, w in rows] + [w.get("disk") or 0 for _k, w in rows]
+    A = max(500, int(max(ends, default=0) * 1.08 // 100 + 1) * 100)
+    x = lambda v: X0 + (X1 - X0) * min(max(v, 0), A) / A          # noqa: E731
+    out, y = [], 16
+
+    def bar(a, b, yy, kind, label=""):
+        if a is None or b is None or b <= a:
+            return
+        xa, xb = x(a), x(b)
+        out.append(f'<rect x="{xa:.1f}" y="{yy}" width="{max(xb - xa, 1.5):.1f}" height="{LANE}" rx="2" '
+                   f'fill="{TL_COLORS[kind]}"/>')
+        if label and xb - xa <= len(label) * 6.2 + 8 and " " in label:
+            label = label.rsplit(" ", 1)[1]          # "compute 32" -> "32" where only the number fits
+        if label and xb - xa > len(label) * 6.2 + 8:
+            fg = "#ffffff" if kind in ("compute", "disk", "copy") else "#2C2C2A"
+            out.append(f'<text x="{(xa + xb) / 2:.1f}" y="{yy + LANE - 3.5}" text-anchor="middle" font-size="10.5" '
+                       f'fill="{fg}">{html.escape(label)}</text>')
+
+    def text(xx, yy, s, size=11, weight=400, anchor="start", fill="#2C2C2A"):
+        out.append(f'<text x="{xx:.1f}" y="{yy}" font-size="{size}" font-weight="{weight}" text-anchor="{anchor}" '
+                   f'fill="{fill}">{html.escape(s)}</text>')
+    for turn, w in rows:
+        text(10, y + 11, f"turn {turn} · {w['n']:,} tokens", 12, 600)
+        y += 18
+        text(20, y + LANE - 3, "P")
+        bar(0, w.get("p_start"), y, "wait", "queued")
+        bar(w.get("p_start"), w.get("p_done"), y, "compute", f"prefill {w['p_computed']:,}")
+        y += LANE + GAP
+        text(20, y + LANE - 3, "LMCache")
+        if w["chunks"]:
+            m_end = w["disk"] if w.get("disk") is not None else A
+            bar(w.get("mem_in"), m_end, y, "memory", f"{_n(w['chunks'], 'chunk')} in memory")
+            if w.get("disk") is not None:
+                bar(w["disk"], A, y, "disk", "on disk" + (", out of memory" if w.get("mem_out") else ""))
+        else:
+            text(X0 + 4, y + LANE - 3, "no new chunk", 10.5, fill="#888780")
+        y += LANE + GAP
+        if w.get("d_role"):
+            text(20, y + LANE - 3, w["d_role"])
+            bar(w.get("p_done"), w.get("d_added"), y, "wait", "store wait")
+            bar(w.get("d_added"), w.get("d_find"), y, "wait")
+            bar(w.get("d_find"), w.get("d_found"), y, "find", "find" + ("+read" if mode != "memory" else ""))
+            bar(w.get("d_found"), w.get("d_copy"), y, "wait")              # D's scheduler picks the answer up
+            bar(w.get("d_copy"), w.get("d_received"), y, "copy", "copy")
+            start = w.get("d_received") or w.get("d_found") or w.get("d_added")
+            bar(start, w.get("d_first"), y, "compute", f"compute {w['d_computed']:,}")
+            if w.get("d_first") is not None and w.get("d_done") is not None:
+                bar(w["d_first"], min(w["d_done"], A), y, "decode")
+                text(X1 + 4, y + LANE - 3, f"→ {w['d_done'] / 1000:.2f} s", 10.5, fill="#5F5E5A")
+            y += LANE + GAP
+        y += 10
+    # the axis
+    out.append(f'<line x1="{X0}" y1="{y}" x2="{X1}" y2="{y}" stroke="#888780" stroke-width="0.7"/>')
+    step = 100 if A <= 1200 else 200
+    for v in range(0, A + 1, step):
+        out.append(f'<line x1="{x(v):.1f}" y1="{y}" x2="{x(v):.1f}" y2="{y + 4}" stroke="#888780" stroke-width="0.7"/>')
+        text(x(v), y + 16, f"{v}", 10.5, anchor="middle", fill="#5F5E5A")
+    text(X1, y + 30, "ms from the turn's send to P (decode runs past the edge: its end is on the right)", 10.5,
+         anchor="end", fill="#5F5E5A")
+    y += 46
+    items = [("wait", "waiting (queue, store wait)"), ("compute", "computing (prefill, D's rest)"),
+             ("memory", "in LMCache memory"), ("disk", "on disk"), ("find", "D finds it" + (" (reads the disk)" if
+                                                                                           mode != "memory" else "")),
+             ("copy", "copy into D's GPU"), ("decode", "decoding the answer")]
+    lx = 10
+    for kind, label in items:
+        if kind == "disk" and mode == "memory":
+            continue
+        out.append(f'<rect x="{lx}" y="{y - 9}" width="10" height="10" rx="2" fill="{TL_COLORS[kind]}"/>')
+        text(lx + 14, y, label, 10.5)
+        lx += 14 + len(label) * 5.6 + 18
+        if lx > 760:
+            lx, y = 10, y + 16
+    y += 14
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="900" height="{y}" viewBox="0 0 900 {y}" '
+            f'font-family="Helvetica, Arial, sans-serif"><rect width="900" height="{y}" fill="#ffffff"/>'
+            + "".join(out) + "</svg>\n")
+
+
 def conversation_views(R, out, conversations=None):
     """One page per conversation (and an index): each turn's prompt, piece by piece with its text (the new pieces:
     the rest is the previous turn's prompt), how it grew, its 256-token chunks and their 16-token blocks, and what
@@ -1032,6 +1188,7 @@ def conversation_views(R, out, conversations=None):
     out.mkdir(parents=True, exist_ok=True)
     ch = R.chunk
     texts_of = prompt_texts(R, conversations)
+    wait_ms = float(R.env.get("store_wait_ms") or 0)
     srcs = collections.Counter(src for _tx, src in texts_of.values())
     if srcs.get("driver"):
         src_txt = ("The prompts' text is the driver's own record of what it sent (answers included); lines over "
@@ -1097,6 +1254,7 @@ def conversation_views(R, out, conversations=None):
         prev_ids = None
         seen_docs = {}
         first_q = ""
+        tl_rows = []
         lineage_done = False
         for t, rq, key in turns:
             n = t["prompt_tokens"]
@@ -1249,7 +1407,11 @@ def conversation_views(R, out, conversations=None):
                 carried = ["The whole prompt, piece by piece:", ""]
             prompt_md = ["### The prompt", ""] + carried + prompt_lines(pieces, texts, prev_len if t.get("turn") else 0,
                                                                         ch, seen_docs, t.get("turn"))
+            w = turn_times(R, rq.get("P"), rq.get("D"), R.proxy.get(key, {}))
+            if w:
+                tl_rows.append((t.get("turn"), w))
             detail += [f"## Turn {t.get('turn')}", "",
+                       *(["**Timeline:** " + turn_story(w, wait_ms) + " ([all turns](#timeline))", ""] if w else []),
                        f"{n:,} prompt tokens: {_n(nfull, 'whole chunk')} and {tail} tokens over (the partial chunk, computed "
                        "by both engines and stored only when a later turn completes it). "
                        f"P held {p_hit:,} tokens on its GPU, computed {p_comp:,} and stored {_n(stored_now, 'new chunk')}; "
@@ -1265,7 +1427,37 @@ def conversation_views(R, out, conversations=None):
                        "D this turn |", "| ---: | --- | --- | --- | --- | --- | --- | --- |"] + rows + [""]
             prev_len = n
             prev_ids = t.get("ids")
-        md += [""] + growth + [""] + (lineage if lineage_done else []) + detail
+        timeline = []
+        if tl_rows:
+            svg_name = f"conversation_{conv}_timeline.svg"
+            (out / svg_name).write_text(timeline_svg(tl_rows, mode, wait_ms))
+            timeline = ["## Timeline", "",
+                        "Every turn on one clock: ms from the moment the proxy sent the turn to P. P prefills it (one "
+                        "token out) and stores its new whole chunks in LMCache; the proxy waits "
+                        f"{wait_ms:,.0f} ms after P is done (the store wait) and sends the turn to "
+                        f"{', '.join(d_roles) or 'D'}, which finds what LMCache has"
+                        + (" (reading it from disk)" if mode != "memory" else "") + ", copies it into its GPU, "
+                        "computes the rest and decodes the answer. The lanes: P, LMCache (the chunks P stored this "
+                        "turn) and D.", "", f"![timeline of conversation {conv}]({svg_name})", "",
+                        "| turn | P queued → done | chunks stored | in memory | on disk | D starts | D finds"
+                        + (" (+ disk read)" if mode != "memory" else "") + " | copy into D's GPU | D: held / pulled / "
+                        "computed | first token | D done |",
+                        "| ---: | --- | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | ---: |"]
+            for turn, w in tl_rows:
+                pulled = f"{w.get('d_loaded') or 0:,}" + (f" from {w['d_from']}" if w.get("d_from") else "")
+                timeline.append(
+                    f"| {turn} | {_f(w['p_start'])} → {_f(w['p_done'])} | {w['chunks']} | {_f(w['mem_written'])} | "
+                    f"{_f(w.get('disk'))}{' (out of memory)' if w.get('mem_out') and w.get('disk') is not None else ''} | "
+                    f"{_f(w.get('d_added'))} | {_f(w.get('d_find'))}-{_f(w.get('d_found'))} | "
+                    + (f"{_f(w.get('d_copy'))}-{_f(w.get('d_received'))}" if w.get("d_loaded") else "–")
+                    + f" | {w.get('d_held', 0):,} / {pulled} / {w.get('d_computed', 0):,} | {_f(w.get('d_first'))} | "
+                    f"{_f(w.get('d_done'))} |")
+            timeline += ["", "All times in ms from the turn's send to P. \"in memory\": the last of the turn's chunks "
+                         "written into LMCache's memory; \"on disk\": the last one written to disk (then dropped from "
+                         "memory, in the disk mode); D finds: from LMCache's lookup to its prefetch done (in the disk "
+                         "mode that is the read from disk); copy: LMCache's retrieve into D's GPU slots until D's "
+                         "connector has it. Each turn's section below tells it in a sentence."]
+        md += [""] + growth + [""] + timeline + [""] + (lineage if lineage_done else []) + detail
         name = f"conversation_{conv}.md"
         (out / name).write_text("\n".join(md))
         index.append(f"| {conv} | {head.get('domain')} | {_cell(first_q, 50) or '–'} | {len(turns)} | "
