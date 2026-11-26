@@ -1072,6 +1072,14 @@ def conversation_views(R, out, conversations=None):
               "Legend for the strips (one character a chunk): P: `=` on P's GPU from an earlier turn, `#` computed "
               "and stored now, `+` computed, not stored (a partial chunk). D: `=` on D's GPU from an earlier turn, "
               "`M` pulled from memory, `S` pulled from disk, `+` computed by D (a partial chunk), `?` missed.", "",
+              "GPU blocks (the chunk tables): the slots in each engine's GPU KV cache (vLLM's block pool ids; slot 0 is "
+              "its reserved null block) that hold the chunk's 16 vLLM blocks, in block order, a run of consecutive "
+              "slots written as a range: `P 1, 138-152` is block 0 in slot 1 and blocks 1-15 in slots 138-152. An "
+              "engine hands a block a slot from its free list when it first computes or loads it, and the block keeps "
+              "it while cached, so a later turn that reuses the block shows the same slot. Blocks that are the same "
+              "in several prompts (the same tokens and everything before them) share one slot once the first is "
+              "cached: the system prompt's first block, the same in every conversation, is the usual one. "
+              "`16/16 hashes = P's`: of the blocks D pulled, how many have the same vLLM hash on D as on P.", "",
               src_txt, "",
               "| turn | prompt | chunks + tail | P: own GPU / computed / stored | D: own GPU / loaded / computed | "
               "pulled | pull ms | D first token ms |",
