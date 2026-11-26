@@ -140,22 +140,23 @@ LMC_TEN=1534a095279f2cb888fb0bea17bd70da,0208bf26ec357a803445290fa88a2e9e,a2698b
 c1e53df98a28f19448f4af244304b89a,cfbcfa3e382f12aed450b10f87a72aeb,3f5fa378239f7475baac89fa40288aaa,\
 5c13daa9432149f6243aa1115629cd1a,694e275f1a01ad0e8ac448ad809f7930,aea2634b0e5f1c2444550d31c41adc94,\
 79f0d0539d9ec0acbf90cb3388b30c17
-# KVPD_LMC_PRESET=nixlcheck: which transport NIXL's UCX takes between two GPUs of the node, and why (docs, "NIXL's
-# transport"): the first conversation, memory, a shared server, carry-forward, UCX's log at debug, each engine seeing
-# its own GPU and then every GPU.
-P_N=4 P_G=0 P_UL=''
+# KVPD_LMC_PRESET=nixlcheck: NIXL's reads with UCX's cuda_ipc reads turned on (UCX_CUDA_IPC_ENABLE_GET_ZCOPY=on; UCX's
+# auto turns them off without NVLink, job 30774), docs "NIXL's transport": the first conversation, memory, a shared
+# server, carry-forward, UCX's log at debug, each engine seeing its own GPU and then every GPU.
+P_N=4 P_G=0 P_UL='' P_GZ=auto
 case "${KVPD_LMC_PRESET:-}" in
     '') P_T=lmcache P_S=shared P_M=memory,disk P_L=interleaved P_D=conversations P_I='' P_C='' P_R=temporary P_SH='' P_PE='' ;;
     eight) P_T=nixl P_S=shared,per_engine P_M=memory,disk P_L=history_first,interleaved P_D=all P_I=$LMC_TEN P_C=1
            P_R=retain P_SH=8 P_PE=2 ;;
     nixlcheck) P_T=nixl P_S=shared P_M=memory P_L=interleaved P_D=all P_I=$LMC_TEN P_C=1 P_R=retain P_SH=8 P_PE=2
-               P_N=1 P_G=0,1 P_UL=debug ;;
+               P_N=1 P_G=0,1 P_UL=debug P_GZ=on ;;
     *) echo "STOP: KVPD_LMC_PRESET=$KVPD_LMC_PRESET: eight, nixlcheck, or none" >&2; exit 2 ;;
 esac
 LMCN=${KVPD_LMC_CONVS:-$P_N}
 LMCG=${KVPD_LMC_ALL_GPUS:-$P_G}               # NIXL: each engine sees its own GPU (0) and/or every GPU (1), by commas
 LMCUT=${KVPD_LMC_UCX_TLS:-}                   # NIXL: UCX_TLS for the engines (empty: UCX's default, all)
 LMCUL=${KVPD_LMC_UCX_LOG:-$P_UL}              # NIXL: UCX_LOG_LEVEL for the engines (empty: UCX's default)
+LMCGZ=${KVPD_LMC_UCX_GET_ZCOPY:-$P_GZ}        # NIXL: auto (UCX's default) and/or on (cuda_ipc reads without NVLink)
 LMCM=${KVPD_LMC_MODES:-$P_M}
 LMCW=${KVPD_LMC_STORE_WAIT_MS:-500}
 LMCT=${KVPD_LMC_TRANSFERS:-$P_T}              # how P's KV reaches D: lmcache (the shared server) and/or nixl
@@ -248,8 +249,10 @@ if [ -z "${RUNS:-}" ]; then
                 [[ -z "$v" || "$v" =~ ^[0-9]+$ ]] || { echo "STOP: KVPD_LMC_CONCURRENCY, KVPD_LMC_L1_*_GB: whole numbers" >&2; exit 2; }
             done
             case "$LMCR" in temporary|retain) ;; *) echo "STOP: KVPD_LMC_DISK_READS=$LMCR: temporary or retain" >&2; exit 2 ;; esac
-            [[ "$LMCG" =~ ^[01](,[01])*$ && "$LMCUT" =~ ^[A-Za-z0-9_,^]*$ && "$LMCUL" =~ ^[a-z]*$ ]] || {
-                echo "STOP: KVPD_LMC_ALL_GPUS 0 and/or 1; KVPD_LMC_UCX_TLS transports by commas; KVPD_LMC_UCX_LOG a level" >&2; exit 2; }
+            [[ "$LMCG" =~ ^[01](,[01])*$ && "$LMCUT" =~ ^[A-Za-z0-9_,^]*$ && "$LMCUL" =~ ^[a-z]*$
+               && "$LMCGZ" =~ ^(auto|on|off)(,(auto|on|off))*$ ]] || {
+                echo "STOP: KVPD_LMC_ALL_GPUS 0 and/or 1; KVPD_LMC_UCX_GET_ZCOPY auto, on and/or off;" \
+                     "KVPD_LMC_UCX_TLS transports by commas; KVPD_LMC_UCX_LOG a level" >&2; exit 2; }
             RUNS=""
             for tx in $(echo "$LMCT" | tr ',' ' '); do
                 case "$tx" in lmcache|nixl) ;;
@@ -270,16 +273,19 @@ if [ -z "${RUNS:-}" ]; then
                                 case "$x" in memory|disk|tiered) ;;
                                     *) echo "STOP: KVPD_LMC_MODES=$LMCM: memory, disk or tiered, by commas" >&2; exit 2 ;; esac
                                 for g in $(echo "$LMCG" | tr ',' ' '); do
-                                    # the NIXL settings only for NIXL runs, and every-GPU runs only there
-                                    [ "$tx" = nixl ] || [ "$g" = 0 ] || continue
+                                  for gz in $(echo "$LMCGZ" | tr ',' ' '); do
+                                    # the NIXL settings only for NIXL runs, and their variants only there
+                                    [ "$tx" = nixl ] || { [ "$g" = 0 ] && [ "$gz" = "${LMCGZ%%,*}" ]; } || continue
                                     RUNS+="RUNNER=lmc_run.sh LMC_MODE=$x LMC_TRANSFER=$tx LMC_SERVERS=$sv MTRAG_LIMIT=$LMCN"
                                     RUNS+=" STORE_WAIT_MS=$LMCW MTRAG_LAYOUT=$ly MTRAG_DOCS=$dc LMC_DISK_READS=$LMCR"
                                     RUNS+="${LMCI:+ MTRAG_CONV_IDS=$LMCI}${LMCC:+ MTRAG_CONCURRENCY=$LMCC}${l1:+ LMC_L1_GB=$l1}"
                                     if [ "$tx" = nixl ]; then
                                         [ "$g" = 1 ] && RUNS+=" NIXL_ALL_GPUS=1"
+                                        [ "$gz" = auto ] || RUNS+=" NIXL_UCX_GET_ZCOPY=$gz"
                                         RUNS+="${LMCUT:+ NIXL_UCX_TLS=$LMCUT}${LMCUL:+ NIXL_UCX_LOG=$LMCUL}"
                                     fi
                                     RUNS+=";"
+                                  done
                                 done
                             done
                         done

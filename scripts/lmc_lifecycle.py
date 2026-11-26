@@ -151,15 +151,17 @@ UCX_TRANSPORT = re.compile(r"\b(tcp|cuda_ipc|cuda_copy|gdr_copy|rc_mlx5|rc_verbs
                            r"cma|xpmem|knem|self)/[\w:\[\].-]+")
 
 
-UCX_IPC_ERROR = re.compile(r"(cuIpc\w*\(\) failed.*|peer access is not supported.*|cuda_ipc.*(?:fail|unreachable|error).*)",
-                           re.I)
+UCX_IPC_ERROR = re.compile(r"(cuIpc\w*\(\) failed.*|peer access is not supported.*|cuda-ipc get zcopy disabled.*|"
+                           r"cuda_ipc.*(?:fail|unreachable|error).*)", re.I)
 
 
-def ucx_transports(run, errors=None):
+def ucx_transports(run, errors=None, reads=None):
     """engine -> {UCX transport: table rows naming it}: what UCX chose, from its protocol tables in the engines' logs
     (UCX_PROTO_INFO=y): the run's own logs, or a published run's logs/*.log.gz. cuda_ipc is GPU to GPU (peer to
     peer over PCIe or NVLink); tcp with cuda_copy is the fallback, GPU to host, TCP, host to GPU. errors (a dict):
-    filled with UCX's distinct CUDA IPC failures (UCX_LOG_LEVEL=debug logs why cuda_ipc could not be used)."""
+    filled with UCX's distinct CUDA IPC failures (UCX_LOG_LEVEL=debug logs why cuda_ipc could not be used). reads
+    (a dict): engine -> the rows ("description: config") of UCX's tables for a read of remote GPU memory (ucp_get,
+    what NIXL's READ is), the read path itself (job 30774: "software emulation: tcp/bond0")."""
     out = {}
     files = sorted(run.glob("engine_*.log")) + sorted((run / "logs").glob("engine_*.log.gz"))
     for f in files:
@@ -167,12 +169,23 @@ def ucx_transports(run, errors=None):
         if role in out:
             continue
         seen = collections.Counter()
+        table = None                                  # inside a read-of-GPU-memory table: its rows so far
         try:
             with (gzip.open(f, "rt", errors="replace") if f.suffix == ".gz" else open(f, errors="replace")) as fh:
                 for ln in fh:
                     if "|" in ln:
                         for m in UCX_TRANSPORT.finditer(ln):
                             seen[m.group(0)] += 1
+                    if reads is not None:
+                        if "remote memory read by ucp_get" in ln and "from cuda" in ln:
+                            table = []
+                        elif table is not None:
+                            cells = [x.strip() for x in ln.split("|")[1:-1]] if "|" in ln else []
+                            if len(cells) == 3 and cells[0] != "Range":
+                                table.append(f"{cells[1]}: {cells[2]}")
+                            elif table and "+--" in ln:       # the table's end, after its rows
+                                reads.setdefault(role, set()).update(table)
+                                table = None
                     if errors is not None and len(errors) < 8:
                         m = UCX_IPC_ERROR.search(ln)
                         if m:
@@ -738,16 +751,20 @@ class Run:
             bpt = next((c["bytes"] / self.chunk for c in stored if c.get("bytes")), None)   # KV bytes a token
             rates = [r["nixl_load"] * bpt / r["nixl_read_s"] / 1e9 for r in d_nixl
                      if bpt and r.get("nixl_load") and r.get("nixl_read_s")]
-            ipc_errors = {}
-            ucx = ucx_transports(self.dir, ipc_errors)
+            ipc_errors, read_rows = {}, {}
+            ucx = ucx_transports(self.dir, ipc_errors, read_rows)
             names = sorted({t.split("/")[0] for v in ucx.values() for t in v})
+            read_path = {role: sorted(v) for role, v in read_rows.items()}
             out["nixl"] = {"handshakes": sum(1 for h in self.handshakes if h.get("phase") == "done"),
                            "failed_reads": sum(1 for r in self.reqs.values() if r.get("nixl_failed")),
                            "read_gb_s_median": q(rates, 0.5), "ucx_transports": ucx, "ucx_transport_names": names,
-                           "gpu_to_gpu": ("cuda_ipc" in names) if ucx else None,
+                           "read_path": read_path,
+                           "gpu_to_gpu": (all(any("cuda_ipc" in x for x in v) for v in read_path.values())
+                                          if read_path else ("cuda_ipc" in names) if ucx else None),
                            "ucx_ipc_errors": [f"{role}: {line}" for line, role in ipc_errors.items()],
                            "all_gpus_visible": bool(self.env.get("nixl_all_gpus")),
-                           "ucx_tls": self.env.get("ucx_tls") or None}
+                           "ucx_tls": self.env.get("ucx_tls") or None,
+                           "ucx_get_zcopy": self.env.get("ucx_get_zcopy") or None}
         if self.env.get("store_policy") == "skip_l1":   # the disk mode: on disk, then out of memory, read from disk
             written = [c for c in stored if c.get("t_l1_written") is not None]
             order = [c for c in written if c.get("t_l2_stored") is not None and c.get("t_l1_removed")
@@ -981,7 +998,12 @@ def write_report(run, out, conversations=None):
                   " — GPU to GPU (cuda_ipc)" if nx["gpu_to_gpu"] else
                   " — no cuda_ipc: the copy goes GPU to host, over TCP, host to GPU")
                + f"; every GPU visible to each engine: {'yes' if nx.get('all_gpus_visible') else 'no (its own only)'}"
-               + (f"; UCX_TLS={nx['ucx_tls']}" if nx.get("ucx_tls") else "; UCX_TLS unset (UCX's default, all)"),
+               + (f"; UCX_TLS={nx['ucx_tls']}" if nx.get("ucx_tls") else "; UCX_TLS unset (UCX's default, all)")
+               + (f"; UCX_CUDA_IPC_ENABLE_GET_ZCOPY={nx['ucx_get_zcopy']}" if nx.get("ucx_get_zcopy") else
+                  "; UCX_CUDA_IPC_ENABLE_GET_ZCOPY unset (auto: no cuda_ipc read without NVLink)"),
+               *([f"- the read of P's GPU memory (UCX's ucp_get table): "
+                  + "; ".join(f"{role} {', '.join(v)}" for role, v in sorted(nx["read_path"].items()))]
+                 if nx.get("read_path") else []),
                *([f"- UCX on CUDA IPC (its log): " + "; ".join(f"`{x}`" for x in nx["ucx_ipc_errors"])]
                  if nx.get("ucx_ipc_errors") else []), ""]
     md += ["## Chunks", "",

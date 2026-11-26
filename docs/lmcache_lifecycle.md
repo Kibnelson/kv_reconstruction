@@ -66,17 +66,28 @@ over TCP: GPU to host, TCP, host to GPU, at about 0.56 GB/s
 still succeed, and nothing warns at the default log level.
 
 Job 30763 took that path. UCX's protocol tables in every engine's log name `tcp/bond0`, `cuda_copy` and `cma`,
-never `cuda_ipc`, and vLLM's own transfer metrics give 540-580 MB/s for every read (0.59 GB/s in the report). The
-node's GPUs do report peer reads and writes ("OK" in `nvidia-smi topo -p2p`). Job 30293 (`pd-baselines`) ran NIXL
-with every GPU visible to each engine and got the same, about 520 MB/s, so the engines seeing only their own GPU
-is not the whole reason.
+and vLLM's own transfer metrics give 540-580 MB/s for every read (0.59 GB/s in the report), though the node's GPUs
+report peer reads and writes ("OK" in `nvidia-smi topo -p2p`).
 
-The report now says which transports UCX used and how fast the reads were (NIXL section; `nixl.ucx_transports`,
-`nixl.read_gb_s_median`, `nixl.gpu_to_gpu`), and it lists UCX's CUDA IPC failures when its log has them. To see why
-`cuda_ipc` was not used, run `export KVPD_LMC_PRESET=nixlcheck`. That is two short runs, the first conversation in
-memory with a shared server, with UCX's log at `debug`: one with each engine seeing its own GPU, and one with every
-GPU visible (`NIXL_ALL_GPUS=1`). Other switches: `KVPD_LMC_ALL_GPUS` (0 and/or 1), `KVPD_LMC_UCX_TLS` (for example
-`cuda_ipc,cuda_copy,tcp`) and `KVPD_LMC_UCX_LOG`; for one run, `NIXL_ALL_GPUS`, `NIXL_UCX_TLS` and `NIXL_UCX_LOG`.
+**Why (job 30774, UCX's log at debug).** UCX does set up `cuda_ipc` between the engines (`device(cuda_ipc/cuda)` in
+its lanes), but it turns `cuda_ipc` reads off when it finds no NVLink: `cuda-ipc get zcopy disabled as no nvlinks
+detected`. These A5000s are joined by PCIe only. NIXL's pull mode is a read (`ucp_get`), so its table says `remote
+memory read by ucp_get*(multi) into cuda/GPU0 from cuda/dev[4]`: `software emulation | tcp/bond0`. UCX's setting
+for it is `UCX_CUDA_IPC_ENABLE_GET_ZCOPY` (`auto` by default: "Enable get operations except for platforms known to
+have slower performance", [UCX's cuda_ipc
+interface](https://github.com/openucx/ucx/blob/master/src/uct/cuda/cuda_ipc/cuda_ipc_iface.c)); `on` allows the reads
+over PCIe. The 0.56 GB/s in vLLM issue 62080 is the same fallback on GPUs with no peer access at all, where `on` does
+not help; here the GPUs have it.
+
+The report says how D read P's memory (`nixl.read_path`, from that table when the log has it), which transports
+UCX used (`nixl.ucx_transports`), how fast the reads were (`nixl.read_gb_s_median`), whether they were GPU to GPU
+(`nixl.gpu_to_gpu`) and UCX's CUDA IPC messages. `export KVPD_LMC_PRESET=nixlcheck` runs the first conversation,
+memory, shared server, carry-forward, with `UCX_CUDA_IPC_ENABLE_GET_ZCOPY=on` and UCX's log at `debug`: once with each
+engine seeing its own GPU and once with every GPU visible (`NIXL_ALL_GPUS=1`). Its runs compare with job 30763's
+`memory_nixl_shared_carry_all` run and job 30774's (`auto`). Switches: `KVPD_LMC_UCX_GET_ZCOPY` (`auto`, `on`, `off`,
+by commas), `KVPD_LMC_ALL_GPUS` (0 and/or 1), `KVPD_LMC_UCX_TLS`, `KVPD_LMC_UCX_LOG`; for one run
+`NIXL_UCX_GET_ZCOPY`, `NIXL_ALL_GPUS`, `NIXL_UCX_TLS`, `NIXL_UCX_LOG`. (Job 30774's every-GPU run did not get every
+GPU: the run script's switch was overwritten by its own list of the GPUs; fixed.)
 
 ### Differences from LMCache's documented P/D, in the `nixl` runs
 

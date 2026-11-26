@@ -375,6 +375,21 @@ class NixlReportTests(unittest.TestCase):
         (run / "engine_P.log").write_text("[1.0] [h:1:1]   | 0..inf | zero-copy | cuda_ipc/cuda |\n")
         nums = lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))
         self.assertTrue(nums["nixl"]["gpu_to_gpu"])
+        # the read table (ucp_get of remote GPU memory, NIXL's READ) decides when it is there: job 30774's
+        table = ("[1.0] [h:1:0]   | remote memory read by ucp_get*(multi) into cuda/GPU0 from cuda/dev[4] |\n"
+                 "[1.0] [h:1:0]   +--------+--------------------+--------------+\n"
+                 "[1.0] [h:1:0]   | Range  |    Description     |    Config    |\n"
+                 "[1.0] [h:1:0]   +--------+--------------------+--------------+\n"
+                 "[1.0] [h:1:0]   | 0..inf | software emulation | tcp/bond0    |\n"
+                 "[1.0] [h:1:0]   +--------+--------------------+--------------+\n")
+        (run / "engine_D1.log").write_text(table)
+        nums = lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))
+        self.assertEqual(nums["nixl"]["read_path"], {"D1": ["software emulation: tcp/bond0"]})
+        self.assertFalse(nums["nixl"]["gpu_to_gpu"])                    # P's cuda_ipc row is not the read
+        (run / "engine_D1.log").write_text(table.replace("software emulation | tcp/bond0   ", "zero-copy | cuda_ipc/cuda"))
+        nums = lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))
+        self.assertEqual(nums["nixl"]["read_path"], {"D1": ["zero-copy: cuda_ipc/cuda"]})
+        self.assertTrue(nums["nixl"]["gpu_to_gpu"])
 
     def test_d_reads_p_over_nixl_and_loads_nothing_from_lmcache(self):
         nums, out = self.run_nixl("shared")
@@ -1041,6 +1056,12 @@ class MatrixTests(unittest.TestCase):
                             and r.endswith(" NIXL_UCX_LOG=debug") for r in runs))
         self.assertNotIn("NIXL_ALL_GPUS", runs[0])
         self.assertIn(" NIXL_ALL_GPUS=1 ", runs[1])
+        self.assertTrue(all(" NIXL_UCX_GET_ZCOPY=on " in r for r in runs))
+        # job 30774: the run script's every-GPU switch lost to its own ALL_GPUS (the shared server's GPU list)
+        script = (ROOT / "scripts" / "lmc_run.sh").read_text()
+        self.assertIn('NIXL_ALL=${NIXL_ALL_GPUS:-0}', script)
+        self.assertIn('if [ "$TRANSFER" = nixl ] && [ "$NIXL_ALL" = 1 ]; then', script)
+        self.assertIn('nixl_env+=(UCX_CUDA_IPC_ENABLE_GET_ZCOPY="$UCX_GZ_SET")', script)
         # the NIXL settings never reach an lmcache run
         both = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                               env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_TRANSFERS="lmcache,nixl",
