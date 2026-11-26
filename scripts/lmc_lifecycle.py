@@ -147,6 +147,43 @@ DOCS_NAMES = {"conversations": "conversations.json's passages", "rag": "the retr
               "all": "every passage MTRAG has for the turn (reference.jsonl and RAG.jsonl, each once)"}
 
 
+UCX_TRANSPORT = re.compile(r"\b(tcp|cuda_ipc|cuda_copy|gdr_copy|rc_mlx5|rc_verbs|dc_mlx5|ud_mlx5|ud_verbs|posix|sysv|"
+                           r"cma|xpmem|knem|self)/[\w:\[\].-]+")
+
+
+UCX_IPC_ERROR = re.compile(r"(cuIpc\w*\(\) failed.*|peer access is not supported.*|cuda_ipc.*(?:fail|unreachable|error).*)",
+                           re.I)
+
+
+def ucx_transports(run, errors=None):
+    """engine -> {UCX transport: table rows naming it}: what UCX chose, from its protocol tables in the engines' logs
+    (UCX_PROTO_INFO=y): the run's own logs, or a published run's logs/*.log.gz. cuda_ipc is GPU to GPU (peer to
+    peer over PCIe or NVLink); tcp with cuda_copy is the fallback, GPU to host, TCP, host to GPU. errors (a dict):
+    filled with UCX's distinct CUDA IPC failures (UCX_LOG_LEVEL=debug logs why cuda_ipc could not be used)."""
+    out = {}
+    files = sorted(run.glob("engine_*.log")) + sorted((run / "logs").glob("engine_*.log.gz"))
+    for f in files:
+        role = f.name.split(".")[0][len("engine_"):]
+        if role in out:
+            continue
+        seen = collections.Counter()
+        try:
+            with (gzip.open(f, "rt", errors="replace") if f.suffix == ".gz" else open(f, errors="replace")) as fh:
+                for ln in fh:
+                    if "|" in ln:
+                        for m in UCX_TRANSPORT.finditer(ln):
+                            seen[m.group(0)] += 1
+                    if errors is not None and len(errors) < 8:
+                        m = UCX_IPC_ERROR.search(ln)
+                        if m:
+                            errors.setdefault(m.group(1).strip()[:240], role)
+        except OSError:
+            continue
+        if seen:
+            out[role] = dict(seen.most_common())
+    return out
+
+
 def run_label(e, mode=None):
     """A run's name in titles: its mode, and for NIXL its servers, prompt layout and passages (runs that set them)."""
     out = f"{mode or e.get('mode', '?')} mode"
@@ -698,8 +735,19 @@ class Run:
                        "chunks_with_full_chain": f"{len(chain)} of {len(stored)}"},
         }
         if self.transfer == "nixl":
+            bpt = next((c["bytes"] / self.chunk for c in stored if c.get("bytes")), None)   # KV bytes a token
+            rates = [r["nixl_load"] * bpt / r["nixl_read_s"] / 1e9 for r in d_nixl
+                     if bpt and r.get("nixl_load") and r.get("nixl_read_s")]
+            ipc_errors = {}
+            ucx = ucx_transports(self.dir, ipc_errors)
+            names = sorted({t.split("/")[0] for v in ucx.values() for t in v})
             out["nixl"] = {"handshakes": sum(1 for h in self.handshakes if h.get("phase") == "done"),
-                           "failed_reads": sum(1 for r in self.reqs.values() if r.get("nixl_failed"))}
+                           "failed_reads": sum(1 for r in self.reqs.values() if r.get("nixl_failed")),
+                           "read_gb_s_median": q(rates, 0.5), "ucx_transports": ucx, "ucx_transport_names": names,
+                           "gpu_to_gpu": ("cuda_ipc" in names) if ucx else None,
+                           "ucx_ipc_errors": [f"{role}: {line}" for line, role in ipc_errors.items()],
+                           "all_gpus_visible": bool(self.env.get("nixl_all_gpus")),
+                           "ucx_tls": self.env.get("ucx_tls") or None}
         if self.env.get("store_policy") == "skip_l1":   # the disk mode: on disk, then out of memory, read from disk
             written = [c for c in stored if c.get("t_l1_written") is not None]
             order = [c for c in written if c.get("t_l2_stored") is not None and c.get("t_l1_removed")
@@ -925,7 +973,17 @@ def write_report(run, out, conversations=None):
                f"- P held its blocks for D from its request's end to D's read done: median "
                f"{fmt(ms(nums['P']['nixl_held_s_median']))} ms",
                f"- handshakes (D's worker meets P's agent, once a pair): {nx.get('handshakes')}; failed reads: "
-               f"{nx.get('failed_reads')}", ""]
+               f"{nx.get('failed_reads')}",
+               f"- the read's speed: median {fmt(nx.get('read_gb_s_median'))} GB/s (the KV it read over its time)",
+               "- UCX's transports (its protocol tables in the engines' logs): "
+               + (", ".join(nx.get("ucx_transport_names") or []) or "none logged")
+               + ("" if nx.get("gpu_to_gpu") is None else
+                  " — GPU to GPU (cuda_ipc)" if nx["gpu_to_gpu"] else
+                  " — no cuda_ipc: the copy goes GPU to host, over TCP, host to GPU")
+               + f"; every GPU visible to each engine: {'yes' if nx.get('all_gpus_visible') else 'no (its own only)'}"
+               + (f"; UCX_TLS={nx['ucx_tls']}" if nx.get("ucx_tls") else "; UCX_TLS unset (UCX's default, all)"),
+               *([f"- UCX on CUDA IPC (its log): " + "; ".join(f"`{x}`" for x in nx["ucx_ipc_errors"])]
+                 if nx.get("ucx_ipc_errors") else []), ""]
     md += ["## Chunks", "",
            f"- bound to their tokens by the engines' stores: {ck['stored']} chunks (by {ck['stored_by'] or '–'}"
            + (f"; per server {ck['per_server']}" if R.servers != "shared" else "") + "); written to memory "
@@ -1933,6 +1991,8 @@ def compare(dirs, out):
             ("D tokens read from P over NIXL", lambda n: n["D"].get("nixl_read_tokens")),
             ("NIXL read ms (median)", lambda n: ms(n["D"].get("nixl_read_s_median"))),
             ("NIXL read ms (p90)", lambda n: ms(n["D"].get("nixl_read_s_p90"))),
+            ("NIXL read GB/s (median)", lambda n: (n.get("nixl") or {}).get("read_gb_s_median")),
+            ("UCX transports", lambda n: ", ".join((n.get("nixl") or {}).get("ucx_transport_names") or []) or None),
             ("P held its blocks for D, ms (median)", lambda n: ms(n["P"].get("nixl_held_s_median"))),
             ("D tokens computed", lambda n: n["D"]["computed_tokens"]),
             ("pull ms, memory (median)", lambda n: ms(n["D"]["pull_s_median_l1"])),

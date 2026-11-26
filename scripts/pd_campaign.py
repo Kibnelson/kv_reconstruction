@@ -57,13 +57,16 @@ LMC_GB_PER_CONV = 1.0      # MATRIX=lmctrace: the disk tier's files for one inte
                            # prompt's whole chunks, 112 KB a token, each stored once: job 30728's first 4 had 9,765,
                            # 9,097, 7,503 and 3,102 tokens, 114 chunks, 3.35 GB in all), one run at a time
                            # (scripts/lmc_run.sh deletes them after its report)
-LMC_DOCS_SCALE = {"all": 1.1}   # MTRAG_DOCS=all: 5 to 9 passages a turn, not 5 (rag) or fewer: about 10% more
+LMC_GB_PER_CONV_TASKS = 0.75   # MTRAG_DOCS=rag, reference or all (the conversations by id, KVPD_LMC_PRESET=eight):
+                               # job 30763's first, every passage, 12 chunks (0.35 GB) and the ten estimated from its
+                               # tokens, 0.62 GB a conversation for 5, 0.66 for 10; a little more to spare
 LMC_PER_ENGINE_COPIES = {       # LMC_SERVERS=per_engine: P's server and each D's own (D engines round-robin, so a
-    "interleaved": 4.0,         # conversation's chunks land on all three D servers): each carry-forward prompt holds
-    "history_first": 2.5,       # the ones before it, so up to 4 copies (about 3.3 estimated for the ten); a chat
-}                               # prompt's passages are its own turn's, so each D stores mostly its turns' (about 2.1)
+    "interleaved": 3.6,         # conversation's chunks land on all three D servers): each carry-forward prompt holds
+    "history_first": 2.3,       # the ones before it (job 30763: 40 chunks for the shared server's 12, 3.3 copies; 3.5
+}                               # estimated for 5 and 10); a chat prompt's passages are its own turn's, so each D
+                                # stores mostly its turns' (26 for 12, 2.2; 2.1 estimated)
 LMC_PER_ENGINE_DEFAULT = 4.0    # any other layout: at most 4
-LMC_RECORDS_GB = 0.25      # and the traces, logs and results a run keeps (job 30694: about 15 MB a run)
+LMC_RECORDS_GB = 0.1       # and the traces, logs and results a run keeps (job 30763: 0.55 GB for 8 runs)
 LMC_SETUP_GB = 3.5         # MATRIX=lmctrace's setup: the environments are links into uv's cache (NIXL's wheels too);
                            # the CUDA ops' build
                            # (its objects), the overlay's few copies, the job's caches (not the codec setup's 14 GB)
@@ -367,13 +370,13 @@ def extra_gb(matrix, runs=()):
             ly = re.search(r"MTRAG_LAYOUT=(\w+)", r)
             return LMC_PER_ENGINE_COPIES.get(ly.group(1) if ly else "interleaved", LMC_PER_ENGINE_DEFAULT)
 
-        def docs(r):
+        def per_conv(r):
             d = re.search(r"MTRAG_DOCS=(\w+)", r)
-            return LMC_DOCS_SCALE.get(d.group(1) if d else "", 1.0)
-        disk = [int(m.group(1)) * copies(r) * docs(r)
+            return LMC_GB_PER_CONV_TASKS if d and d.group(1) != "conversations" else LMC_GB_PER_CONV
+        disk = [int(m.group(1)) * copies(r) * per_conv(r)
                 for r in runs if re.search(r"LMC_MODE=(disk|tiered)\b", r)
                 for m in [re.search(r"MTRAG_LIMIT=(\d+)", r)] if m]
-        return (LMC_GB_PER_CONV * max(disk) if disk else 0.0) + LMC_RECORDS_GB * max(1, len(runs))
+        return (max(disk) if disk else 0.0) + LMC_RECORDS_GB * max(1, len(runs))
     if matrix != "capture":
         return 0.0
     n = os.environ.get("KVPD_CAPTURE_CONVS", "6")

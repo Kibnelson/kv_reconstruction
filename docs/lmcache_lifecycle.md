@@ -55,6 +55,29 @@ campaign `KVPD_LMC_TRANSFERS` and `KVPD_LMC_SERVERS`, every combination with eve
   from LMCache only what its own GPU cache no longer holds (`GPU_BLOCKS` makes that happen). With a server per engine each server keeps its own copy, and with D engines
   round-robin one conversation's chunks can end up on all three D servers.
 
+### NIXL's transport
+
+NIXL's default backend is UCX ([vLLM's NIXL guide](https://docs.vllm.ai/en/stable/features/nixl_connector_usage/)),
+and UCX picks its transports itself (`UCX_TLS` unset means all). Between two GPUs of one node it should take
+`cuda_ipc`, a peer-to-peer copy over PCIe or NVLink: vLLM's guide says KV reads "should show `cuda_ipc`, not `tcp`".
+When `cuda_ipc` cannot open the peer GPU's memory and there is no RDMA card, UCX falls back to software emulation
+over TCP: GPU to host, TCP, host to GPU, at about 0.56 GB/s
+([vLLM issue 62080](https://github.com/vllm-project/vllm/issues/62080), on GPUs without peer access). The requests
+still succeed, and nothing warns at the default log level.
+
+Job 30763 took that path. UCX's protocol tables in every engine's log name `tcp/bond0`, `cuda_copy` and `cma`,
+never `cuda_ipc`, and vLLM's own transfer metrics give 540-580 MB/s for every read (0.59 GB/s in the report). The
+node's GPUs do report peer reads and writes ("OK" in `nvidia-smi topo -p2p`). Job 30293 (`pd-baselines`) ran NIXL
+with every GPU visible to each engine and got the same, about 520 MB/s, so the engines seeing only their own GPU
+is not the whole reason.
+
+The report now says which transports UCX used and how fast the reads were (NIXL section; `nixl.ucx_transports`,
+`nixl.read_gb_s_median`, `nixl.gpu_to_gpu`), and it lists UCX's CUDA IPC failures when its log has them. To see why
+`cuda_ipc` was not used, run `export KVPD_LMC_PRESET=nixlcheck`. That is two short runs, the first conversation in
+memory with a shared server, with UCX's log at `debug`: one with each engine seeing its own GPU, and one with every
+GPU visible (`NIXL_ALL_GPUS=1`). Other switches: `KVPD_LMC_ALL_GPUS` (0 and/or 1), `KVPD_LMC_UCX_TLS` (for example
+`cuda_ipc,cuda_copy,tcp`) and `KVPD_LMC_UCX_LOG`; for one run, `NIXL_ALL_GPUS`, `NIXL_UCX_TLS` and `NIXL_UCX_LOG`.
+
 ### Differences from LMCache's documented P/D, in the `nixl` runs
 
 What the `nixl` runs do differently from the guide, kept here to change later:
@@ -332,9 +355,9 @@ or both), `KVPD_LMC_DOCS` (conversations; rag, reference, all, by commas), `KVPD
 `scripts/lmc_setup.sh` only (the LMCache environment, LMCache's CUDA ops, the overlay, MTRAG, the model): no codec
 builds, no toolkit download; NIXL 1.5.2 is installed in the LMCache environment for the `nixl` runs. The run stage
 defaults to 3 hours. The disk plan reserves 3.5 GB for the setup, 1 GB a conversation for the disk tier (job 30728's
-first 4 conversations: 3.35 GB in all; 10% more with every passage, `all`), for a run with a server per engine four
-times that with the carry-forward layout (P's copy and up to one on each D's server) and 2.5 times with the chat one,
-for the largest run, and 0.25 GB a run for its records, and keeps 10 GB free; each run deletes its disk tier after its report, keeping the file list in `server/l2_files.tsv`.
+first 4 conversations: 3.35 GB in all; 0.75 GB for MTRAG's task files, `rag`, `reference`, `all`: job 30763), for a
+run with a server per engine 3.6 times that with the carry-forward layout (P's copy and one on each D's server, less
+what they share) and 2.3 times with the chat one, for the largest run, and 0.1 GB a run for its records, and keeps 10 GB free; each run deletes its disk tier after its report, keeping the file list in `server/l2_files.tsv`.
 
 To report again on a published run (no GPU, standard library only), from a checkout with the results:
 
@@ -395,16 +418,18 @@ with `retain` they stay there. P's requests carry no blocks to read, so on P LMC
 longer holds. With a server per engine each server keeps the chunks of the requests its engine ran.
 
 **Disk.** The disk tier lives in the run's folder in node-local `/tmp` and is deleted after the run's report, so a
-campaign needs room for its largest run: the per-engine carry-forward run on disk. Estimated from the prompts (4
-characters a token, 112 KB a token), and what the campaign's disk plan reserves (`scripts/pd_campaign.py`: 1 GB a
-conversation, 10% more for `all`, 4 copies for per-engine carry-forward, 2.5 for per-engine chat, 3.5 GB of setup,
-0.25 GB a run, 10 GB kept free):
+campaign needs room for its largest run: the per-engine carry-forward run on disk. Job 30763 measured the first
+conversation: 12 chunks on the shared server (0.35 GB), 40 across the per-engine servers carry-forward (1.17 GB) and
+26 chat (0.76 GB). The other nine are estimated from their text, scaled to that run's tokens (the estimate gives 12,
+40 and 27 for the first). The campaign's disk plan (`scripts/pd_campaign.py`) reserves 0.75 GB a conversation, 3.6
+copies for per-engine carry-forward and 2.3 for per-engine chat, 3.5 GB of setup and 0.1 GB a run, and keeps 10 GB
+free. The setup's caches (16 GB: the packages 9.6, the model 6.4) stay on the node between campaigns.
 
-| conversations | shared server | per engine, chat | per engine, carry-forward | free disk the plan asks for |
+| conversations | shared server | per engine, chat | per engine, carry-forward | free disk the plan asks for (caches there) |
 | ---: | ---: | ---: | ---: | ---: |
-| 1 | 0.6 GB | 1.2 GB | 1.8 GB | 20 GB |
-| 5 | 4.8 GB | 10.2 GB | 15.4 GB | 38 GB |
-| 10 | 10.2 GB | 21.4 GB | 33.3 GB | 60 GB |
+| 1 | 0.35 GB (measured) | 0.76 GB (measured) | 1.17 GB (measured) | 17 GB |
+| 5 | 3.1 GB | 6.8 GB | 10.7 GB | 28 GB |
+| 10 | 6.6 GB | 14.3 GB | 23.3 GB | 41 GB |
 
 The campaign's create stage stops before anything runs if the node's `/tmp` lacks that room.
 

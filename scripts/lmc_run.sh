@@ -29,7 +29,9 @@
 # conversations.json's answers; rag: MTRAG's RAG.jsonl, the retriever's top 5; reference: reference.jsonl, the
 # relevant ones; all: both, each once), MTRAG_CONV_IDS (MTRAG conversation ids, commas, in run order),
 # LMC_DISK_READS (temporary: what a disk read brings into memory is dropped after the copy, LMCache's default;
-# retain: it stays until evicted, LRU), MTRAG_CONCURRENCY (4), MAX_TOKENS (128), MAXLEN (32768), MAXBT (8192),
+# retain: it stays until evicted, LRU), NIXL_ALL_GPUS (0; 1: each engine sees every GPU, its own first), NIXL_UCX_TLS
+# and NIXL_UCX_LOG (UCX_TLS and UCX_LOG_LEVEL for the engines: NIXL's transport, docs "NIXL's transport"),
+# MTRAG_CONCURRENCY (4), MAX_TOKENS (128), MAXLEN (32768), MAXBT (8192),
 # STORE_WAIT_MS (500: the proxy's wait between P's answer and D's request, for the store to land; 0 shows the race),
 # GPU_MEM (0.80), GPU_BLOCKS (empty: vLLM's; a number makes every engine's GPU cache that small, so its own blocks
 # are evicted and come back from LMCache), D_PREFIX_CACHE (1; 0: D keeps no prefix cache, every turn pulls all),
@@ -100,8 +102,17 @@ esac
 DOCS=${MTRAG_DOCS:-conversations}
 CONV_IDS=${MTRAG_CONV_IDS:-}
 case "$DOCS" in conversations|rag|reference|all) ;; *) echo "STOP: MTRAG_DOCS is conversations, rag, reference or all"; exit 1 ;; esac
+# NIXL diagnostics: NIXL_ALL_GPUS=1 (each engine sees every GPU, its own first), NIXL_UCX_TLS (UCX_TLS for the
+# engines; empty: UCX's default, all), NIXL_UCX_LOG (UCX_LOG_LEVEL, e.g. info)
+ALL_GPUS=${NIXL_ALL_GPUS:-0}
+UCX_TLS_SET=${NIXL_UCX_TLS:-}
+UCX_LOG_SET=${NIXL_UCX_LOG:-}
+[[ "$ALL_GPUS" =~ ^[01]$ && "$UCX_TLS_SET" =~ ^[A-Za-z0-9_,^]*$ && "$UCX_LOG_SET" =~ ^[a-z]*$ ]] || {
+    echo "STOP: NIXL_ALL_GPUS is 0 or 1; NIXL_UCX_TLS transports by commas; NIXL_UCX_LOG a UCX log level"; exit 1; }
 RUN_NAME=lmc_$MODE
 [ "$TRANSFER" = nixl ] && RUN_NAME=lmc_${MODE}_nixl_${SERVERS}_${LAYOUT_LABEL}_${DOCS/conversations/conv}
+[ "$TRANSFER" = nixl ] && [ "$ALL_GPUS" = 1 ] && RUN_NAME+=_allgpus
+[ "$TRANSFER" = nixl ] && [ -n "$UCX_TLS_SET" ] && RUN_NAME+=_tls-$(echo "$UCX_TLS_SET" | tr ',^' '+x')
 CONC=${MTRAG_CONCURRENCY:-4}
 MAX_TOKENS=${MAX_TOKENS:-128}
 MAXLEN=${MAXLEN:-32768}
@@ -317,8 +328,16 @@ serve() {   # engine index, then extra engine args
     # transports it picks (a log line only)
     [ "$TRANSFER" = nixl ] && nixl_env=(VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT="${NIXL_PORTS[$e]}"
                                         UCX_PROTO_INFO=y)
+    # the NIXL diagnostics (docs/lmcache_lifecycle.md, "NIXL's transport"): UCX's transports and its log level, and
+    # every GPU visible to each engine, its own first (vLLM uses the first)
+    [ -n "$UCX_TLS_SET" ] && nixl_env+=(UCX_TLS="$UCX_TLS_SET")
+    [ -n "$UCX_LOG_SET" ] && nixl_env+=(UCX_LOG_LEVEL="$UCX_LOG_SET")
+    local vis=$gpu
+    if [ "$ALL_GPUS" = 1 ]; then
+        for g in "${DEVS[@]}"; do [ "$g" = "$gpu" ] || vis+=",$g"; done
+    fi
     # VLLM_USE_FLASHINFER_SAMPLER=0: no sampler kernels compiled at start (scripts/run_pd_vllm.sh)
-    ( cd "$OUT" && exec env CUDA_VISIBLE_DEVICES="$gpu" "${TRACE_ENV[@]}" KVTRACE_ROLE="$role" VLLM_SERVER_DEV_MODE=1 \
+    ( cd "$OUT" && exec env CUDA_VISIBLE_DEVICES="$vis" "${TRACE_ENV[@]}" KVTRACE_ROLE="$role" VLLM_SERVER_DEV_MODE=1 \
         VLLM_USE_FLASHINFER_SAMPLER=0 "${nixl_env[@]}" \
         nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$port" --served-model-name llama \
         --block-size 16 --gpu-memory-utilization "$GPU_MEM" --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" \
@@ -410,7 +429,7 @@ cp "$KV_HOME/lmc_verify.json" "$OUT/server/lmc_verify.json" 2>/dev/null || true
     "$OVERLAY/OVERLAY.json" "$ALL_GPUS" "$(git rev-parse HEAD 2>/dev/null || echo '?')" "$SERVER_ALIVE" \
     "$TRANSFER" "$SERVERS" "$RUN_NAME" "$(IFS=,; echo "${SRV_ROLES[*]}")" "$(IFS=,; echo "${ENGINE_SRV[*]}")" \
     "$(kv_config 0)" "$(kv_config 1)" "${PX_ARGS[*]:-}" "$DOCS" "$CONV_IDS" "$DISK_READS" "$PREFETCH_POLICY" \
-    "$LAYOUT_LABEL" <<'EOF'
+    "$LAYOUT_LABEL" "$ALL_GPUS" "$UCX_TLS_SET" "$UCX_LOG_SET" <<'EOF'
 import json, subprocess, sys
 a = sys.argv[1:]
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
@@ -429,6 +448,7 @@ json.dump({"mode": a[1], "l1_gb": float(a[2]), "eviction": a[3], "store_policy":
            "proxy": a[28], "routing": "round_robin" if transfer == "nixl" else "conversation",
            "mtrag_docs": a[29], "conv_ids": [x for x in a[30].split(",") if x], "disk_reads": a[31],
            "prefetch_policy": a[32], "layout_label": a[33],
+           "nixl_all_gpus": a[34] == "1", "ucx_tls": a[35] or None, "ucx_log_level": a[36] or None,
            "engines": {"P": "kv_producer (NIXL) + kv_both (LMCache)" if transfer == "nixl" else "kv_both",
                        "D": "kv_consumer (NIXL) + kv_both (LMCache)" if transfer == "nixl" else a[8]},
            "server_alive_at_end": {"1": True, "0": False}.get(a[20])},

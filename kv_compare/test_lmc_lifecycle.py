@@ -358,6 +358,24 @@ class NixlReportTests(unittest.TestCase):
         nums = lmc_lifecycle.write_report(run, out)
         return nums, out
 
+    def test_ucx_transports_from_the_engine_logs(self):
+        """UCX's protocol tables (UCX_PROTO_INFO=y) name the transports: cuda_ipc is GPU to GPU, tcp with cuda_copy
+        the fallback through host memory (job 30763: 0.59 GB/s)."""
+        run = Path(tempfile.mkdtemp())
+        simulate_nixl(run, servers="shared")
+        (run / "engine_D1.log").write_text(
+            "[1795725181.558736] [gpu-grad-01:759198:1]   | 0..inf | software emulation | tcp/bond0 |\n"
+            "[1795725181.558736] [gpu-grad-01:759198:1]   | 0..4294967295 | short | cuda_copy/cuda |\n"
+            "INFO a line about tcp/bond0 outside a table is not counted\n"
+            "[1.0] [h:1:1] cuda_ipc_md.c:400 UCX DEBUG cuIpcOpenMemHandle() failed: peer access is not supported\n")
+        nums = lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))
+        self.assertEqual(nums["nixl"]["ucx_transports"], {"D1": {"tcp/bond0": 1, "cuda_copy/cuda": 1}})
+        self.assertEqual((nums["nixl"]["ucx_transport_names"], nums["nixl"]["gpu_to_gpu"]), (["cuda_copy", "tcp"], False))
+        self.assertEqual(nums["nixl"]["ucx_ipc_errors"], ["D1: cuda_ipc_md.c:400 UCX DEBUG cuIpcOpenMemHandle() failed: peer access is not supported"])
+        (run / "engine_P.log").write_text("[1.0] [h:1:1]   | 0..inf | zero-copy | cuda_ipc/cuda |\n")
+        nums = lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))
+        self.assertTrue(nums["nixl"]["gpu_to_gpu"])
+
     def test_d_reads_p_over_nixl_and_loads_nothing_from_lmcache(self):
         nums, out = self.run_nixl("shared")
         self.assertEqual(nums["D"]["nixl_read_tokens"], 69)
@@ -366,7 +384,10 @@ class NixlReportTests(unittest.TestCase):
         self.assertEqual(nums["D"]["computed_tokens"], 0)
         self.assertAlmostEqual(nums["D"]["nixl_read_s_median"], 0.012, places=6)
         self.assertAlmostEqual(nums["P"]["nixl_held_s_median"], 0.041, places=6)
-        self.assertEqual(nums["nixl"], {"handshakes": 1, "failed_reads": 0})
+        nx = nums["nixl"]
+        self.assertEqual((nx["handshakes"], nx["failed_reads"], nx["ucx_transports"], nx["gpu_to_gpu"]),
+                         (1, 0, {}, None))                                # no engine log: nothing said about UCX
+        self.assertGreater(nx["read_gb_s_median"], 0)
         self.assertEqual(nums["chunks"]["pulled"], 0)
         self.assertEqual(nums["chunks"]["stored_by"], {"P": 2})          # D's are the same chunks: one copy
         summary = (out / "summary.md").read_text()
@@ -1010,21 +1031,38 @@ class MatrixTests(unittest.TestCase):
                                           **{"KVPD_LMC_PRESET": "eight", k: v}))
             self.assertEqual(bad.returncode, 2, k)
 
+    def test_nixl_check_runs_own_gpu_and_every_gpu(self):
+        m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_PRESET="nixlcheck"))
+        self.assertEqual(m.returncode, 0, m.stderr)
+        runs = m.stdout.splitlines()
+        self.assertEqual(len(runs), 2)
+        self.assertTrue(all(" LMC_MODE=memory LMC_TRANSFER=nixl LMC_SERVERS=shared MTRAG_LIMIT=1 " in r
+                            and r.endswith(" NIXL_UCX_LOG=debug") for r in runs))
+        self.assertNotIn("NIXL_ALL_GPUS", runs[0])
+        self.assertIn(" NIXL_ALL_GPUS=1 ", runs[1])
+        # the NIXL settings never reach an lmcache run
+        both = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                              env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_TRANSFERS="lmcache,nixl",
+                                       KVPD_LMC_MODES="memory", KVPD_LMC_ALL_GPUS="0,1", KVPD_LMC_UCX_TLS="^tcp"))
+        self.assertEqual([("lmcache" in r.split()[2], "NIXL_" in r) for r in both.stdout.splitlines()],
+                         [(True, False), (False, True), (False, True)])
+
     def test_disk_plan_counts_the_disk_tier(self):
         import pd_campaign
         runs = ["RUNNER=lmc_run.sh LMC_MODE=memory MTRAG_LIMIT=4 STORE_WAIT_MS=500",
                 "RUNNER=lmc_run.sh LMC_MODE=disk MTRAG_LIMIT=4 STORE_WAIT_MS=500"]
-        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs), 1.0 * 4 + 2 * 0.25)
-        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs[:1]), 0.25)
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs), 1.0 * 4 + 2 * 0.1)
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs[:1]), 0.1)
         # a server per engine: P's copy and up to one on each D's server
         pe = runs + ["RUNNER=lmc_run.sh LMC_MODE=disk LMC_TRANSFER=nixl LMC_SERVERS=per_engine MTRAG_LIMIT=4"]
-        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", pe), 1.0 * 4 * 4 + 3 * 0.25)
-        # chat prompts: fewer copies; every passage: 10% more; the largest run counts
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", pe), 1.0 * 4 * 3.6 + 3 * 0.1)
+        # chat prompts: fewer copies; MTRAG's task files (the ten by id): job 30763's size; the largest run counts
         chat = ["RUNNER=lmc_run.sh LMC_MODE=disk LMC_TRANSFER=nixl LMC_SERVERS=per_engine MTRAG_LIMIT=10"
                 " MTRAG_LAYOUT=history_first MTRAG_DOCS=all"]
-        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", chat), 10 * 2.5 * 1.1 + 0.25)
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", chat), 10 * 2.3 * 0.75 + 0.1)
         carry = chat + [chat[0].replace("history_first", "interleaved")]
-        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", carry), 10 * 4 * 1.1 + 2 * 0.25)
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", carry), 10 * 3.6 * 0.75 + 2 * 0.1)
         self.assertIn("lmctrace", pd_campaign.MATRICES)
 
     @staticmethod
