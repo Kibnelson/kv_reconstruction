@@ -1091,7 +1091,7 @@ def turn_story(w, wait_ms):
     return s
 
 
-TL_COLORS = {"wait": "#D3D1C7", "compute": "#7F77DD", "memory": "#EF9F27", "disk": "#1D9E75", "find": "#85B7EB",
+TL_COLORS = {"wait": "#D3D1C7", "compute": "#7F77DD", "reserved": "#FAC775", "memory": "#EF9F27", "disk": "#1D9E75", "find": "#85B7EB",
              "copy": "#185FA5", "decode": "#CECBF6"}
 
 
@@ -1131,7 +1131,8 @@ def timeline_svg(rows, mode, wait_ms):
         text(20, y + LANE - 3, "LMCache")
         if w["chunks"]:
             m_end = w["disk"] if w.get("disk") is not None else A
-            bar(w.get("mem_in"), m_end, y, "memory", f"{_n(w['chunks'], 'chunk')} in memory")
+            bar(w.get("mem_in"), w.get("mem_written"), y, "reserved", "reserved")   # space held, P's copy under way
+            bar(w.get("mem_written"), m_end, y, "memory", f"{_n(w['chunks'], 'chunk')} in memory")
             if w.get("disk") is not None:
                 bar(w["disk"], A, y, "disk", "on disk" + (", out of memory" if w.get("mem_out") else ""))
         else:
@@ -1161,7 +1162,7 @@ def timeline_svg(rows, mode, wait_ms):
          anchor="end", fill="#5F5E5A")
     y += 46
     items = [("wait", "waiting (queue, store wait)"), ("compute", "computing (prefill, D's rest)"),
-             ("memory", "in LMCache memory"), ("disk", "on disk"), ("find", "D finds it" + (" (reads the disk)" if
+             ("reserved", "LMCache memory reserved (P's copy under way)"), ("memory", "in LMCache memory"), ("disk", "on disk"), ("find", "D finds it" + (" (reads the disk)" if
                                                                                            mode != "memory" else "")),
              ("copy", "copy into D's GPU"), ("decode", "decoding the answer")]
     lx = 10
@@ -1438,7 +1439,10 @@ def conversation_views(R, out, conversations=None):
                         f"{', '.join(d_roles) or 'D'}, which finds what LMCache has"
                         + (" (reading it from disk)" if mode != "memory" else "") + ", copies it into its GPU, "
                         "computes the rest and decodes the answer. The lanes: P, LMCache (the chunks P stored this "
-                        "turn) and D.", "", f"![timeline of conversation {conv}]({svg_name})", "",
+                        "turn) and D. P computes the KV into its own GPU slots, where it stays (the next turn reuses "
+                        "it); its LMCache connector, set to store (P runs as kv_both), copies each new whole chunk "
+                        "from those slots to LMCache: LMCache reserves the space when P schedules the prefill (light "
+                        "orange) and has the chunks as P's prefill completes (orange).", "", f"![timeline of conversation {conv}]({svg_name})", "",
                         "| turn | P queued → done | chunks stored | in memory | on disk | D starts | D finds"
                         + (" (+ disk read)" if mode != "memory" else "") + " | copy into D's GPU | D: held / pulled / "
                         "computed | first token | D done |",
