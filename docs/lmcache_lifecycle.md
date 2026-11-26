@@ -5,6 +5,8 @@ engines share one LMCache server**. P computes each prompt and its connector sto
 server; the turn's D engine looks the prompt up there and pulls what it does not already hold. Hooks in our own
 copies of vLLM and LMCache record every step of every block's and chunk's life, and a report puts them back
 together. It runs in two modes: the chunks in the server's memory, or every chunk on disk and read back from disk.
+It can also run as LMCache's own P/D guide has it: P's KV reaches D over NIXL, with LMCache beside it, on one shared
+server or a server per engine ("Transfer and servers", below); the table describes the default, the store path.
 
 | | |
 | --- | --- |
@@ -14,6 +16,75 @@ together. It runs in two modes: the chunks in the server's memory, or every chun
 | Chunk | 256 tokens (16 vLLM blocks); LMCache names it by a hash of its tokens and everything before them (blake3) |
 | Workload | MTRAG's first 4 conversations, interleaved layout (each turn's prompt is the previous prompt, its answer, the new passages and question); routed by conversation, so a conversation's turns go to one D engine |
 | Proxy | store mode: P gets the prompt with one token to generate (its connector stores the chunks), then after `STORE_WAIT_MS` (500 ms) the D engine gets the full request |
+
+## Transfer and servers
+
+Two settings choose how P's KV reaches D and how many LMCache servers there are (`scripts/lmc_run.sh`; for a
+campaign `KVPD_LMC_TRANSFERS` and `KVPD_LMC_SERVERS`, every combination with every mode in `KVPD_LMC_MODES`):
+
+| | `LMC_SERVERS=shared` (default): one server for P, D1, D2, D3 | `LMC_SERVERS=per_engine`: a server per engine, as LMCache's guide |
+| --- | --- | --- |
+| `LMC_TRANSFER=lmcache` (default) | the store path: P stores its chunks, D loads them from the server; the proxy waits `STORE_WAIT_MS`; each conversation on one D | not run: D could not load what P stored on its own server (the run stops, the campaign skips it) |
+| `LMC_TRANSFER=nixl` | D reads P's GPU blocks over NIXL; every engine's LMCache connector stores to the one server | LMCache's P/D guide: D reads P's GPU blocks over NIXL; each engine stores to its own server |
+
+**`nixl`, as LMCache's guide sets it up** ([Disaggregated Prefill, MP mode](https://docs.lmcache.ai/mp/disaggregated_prefill.html)):
+
+- Engines: vLLM's `MultiConnector` with two connectors, in this order: `NixlConnector` (P `kv_producer`, D
+  `kv_consumer`, `kv_load_failure_policy: fail`) for the handoff, and LMCache's `LMCacheMPConnector` (`kv_role:
+  kv_both` on both) to store and load. `MultiConnector` gives a request's load to the first connector that has
+  tokens for it (vLLM 0.32, `multi_connector.py`), so on D NIXL loads the prompt and LMCache's lookup loads nothing
+  (it is still asked, and D waits for its answer); every connector stores. Each engine's NIXL side channel has its
+  own port (`VLLM_NIXL_SIDE_CHANNEL_HOST/PORT`), and each engine sees its own GPU only, as in the guide and vLLM's
+  NIXL tests.
+- The proxy, as `vllm-router --vllm-pd-disaggregation` does it for NIXL's pull mode (read in its source:
+  `src/routers/http/vllm_pd_router.rs` at `c132dbc0cfdf` (2026-11-26)): P gets the request with `max_tokens` and
+  `min_tokens` 1 (`max_completion_tokens` 1 if set), `stream` off and no `stream_options`, and `kv_transfer_params`
+  `{do_remote_decode: true, do_remote_prefill: false, remote_engine_id, remote_block_ids, remote_host, remote_port:
+  null}`; P's reply's `kv_transfer_params` (its blocks, its NIXL agent) go to D as they are, with the original
+  request, as soon as P answers: no wait. D engines round-robin. This is `scripts/pd_proxy.py --mode nixl --policy
+  round_robin`, which also keeps the per-turn times the timelines are built from (`vllm-router` keeps none).
+- Servers: `per_engine` starts four, `LMC_P` and `LMC_D1`-`LMC_D3` (`--instance-id` so named), each seeing its
+  engine's GPU and holding `LMC_L1_GB` (16 GB in memory mode, so 64 GB in all); the run checks the node's free memory
+  first (`LMC_HOST_MARGIN_GB`, 16, for the engines) and stops if they do not fit. Each has its own disk tier folder
+  and its snapshots in `server/<role>/`.
+- What the trace shows: P's request holding its blocks for D (`nixl.request_finished`), D's match and its blocks
+  (`nixl.match`, `nixl.recv_planned`), the handshake (once per pair), D's read of P's blocks (`nixl.read`), D having
+  the KV and P freeing its blocks (`nixl.done`), and every engine's LMCache stores, on its server.
+- What to expect: D never loads from LMCache (NIXL has the tokens first), so in the disk mode the chunks go to disk
+  and leave memory but nothing reads them back unless an engine's own GPU cache no longer holds a prefix
+  (`GPU_BLOCKS` makes that happen). With a server per engine each server keeps its own copy, and with D engines
+  round-robin one conversation's chunks can end up on all three D servers.
+
+### Differences from LMCache's documented P/D, in the `nixl` runs
+
+What the `nixl` runs do differently from the guide, kept here to change later:
+
+| | the guide | our `nixl` runs | why |
+| --- | --- | --- | --- |
+| LMCache's connector class | `"kv_connector": "LMCacheMPConnector"` only, which in vLLM 0.32 is vLLM's own copy | LMCache 0.5.7's own class (`kv_connector_module_path: lmcache.integration.vllm.lmcache_mp_connector`) | matched to the server's version; our hooks are in it (the store path uses it too) |
+| connector to server | `grpc://` (current LMCache) | `tcp://` (ZMQ, LMCache 0.5.7's default) | the pinned version |
+| hosts | P and D on their own hosts | one node, 4 GPUs (P on the first, D1-D3 on the others) | the card's node |
+| LMCache memory | `--l1-size-gb 100` | 16 GB (memory mode), 4 GB (disk mode) per server | the node's memory |
+| disk tier | none | disk mode: `fs` adapter with O_DIRECT, `skip_l1`, eviction `noop` | to see the disk path (memory mode has none) |
+| `--max-workers`, `--l1-init-size-gb` | defaults (1, 20) | 4, equal to the memory size | as the store-path runs |
+| proxy | `vllm-router` | `scripts/pd_proxy.py --mode nixl` with the router's requests (above); our request id (`X-Request-Id`, the same on P and D) in place of the router's `___prefill_addr_..._decode_addr_...` ids, which only other connectors read | the per-turn times |
+| vLLM settings | defaults | `--gpu-memory-utilization 0.80` (0.90), `--max-model-len 32768`, `--max-num-batched-tokens 8192`, `VLLM_USE_FLASHINFER_SAMPLER=0`, `VLLM_SERVER_DEV_MODE=1`, `PYTHONHASHSEED=0` (vLLM's SHA-256 block hashes already match across engines without it), `UCX_PROTO_INFO=y` (a log line) | as the store-path runs |
+| LMCache's compiled modules | the wheel's | built from our copy's sources | the wheel's do not load beside vLLM 0.32's torch (job 30694) |
+| trace hooks | none | 41 lines in 10 files, recording only | the trace |
+| workload | | MTRAG's first 4 conversations at once, 128-token answers | the lifecycle's workload |
+
+### What a `nixl` run must show (to check it kept to the plan)
+
+1. `env.json`: `transfer: nixl`, `servers` as asked, `routing: round_robin`, `store_wait_ms: 0`, the
+   `kv_transfer_config` of P and D (`MultiConnector`: `NixlConnector` first, `LMCacheMPConnector` `kv_both`), and
+   `engine_server` (all `LMC`, or `LMC_P`, `LMC_D1`...).
+2. The run's log: "proxy (NIXL mode, as vllm-router: D engines round-robin, no wait)", one "LMCache server" line per
+   server, and with `per_engine` the host memory check.
+3. The report: every D request read its prompt from P over NIXL (`nixl_read_tokens`, `requests_reading_nixl` equal
+   to the D requests), LMCache loaded nothing on D, no failed reads, one handshake per P-D pair; P's blocks freed
+   after each read; D's chunks stored on its server (`stored_by`, and with `per_engine` `per_server`).
+4. The pages: a conversation's turns on different D engines; D's chunks `N` (read from P over NIXL); the step by
+   step showing P holding its blocks, the proxy sending D at once, D's read of P's blocks into its own, P freeing.
 
 ## The two modes
 
@@ -98,10 +169,18 @@ kvtrace and the CUDA ops are imported from the tree, and stops otherwise.
 | `lmcache/v1/mp_observability/event_bus.py` | `has_subscribers` | 183 | none: says yes for `mp.lookup`, `mp.tokens` and `l1.keys.accessed`, which LMCache builds only when someone listens |
 | `lmcache/v1/distributed/l2_adapters/fs_l2_adapter.py` | `_execute_load` | 823 | `lmc.l2.read` |
 | `lmcache/v1/distributed/storage_manager.py` | `touch_cached_keys` | 648 | `lmc.touch` |
+| `vllm/distributed/kv_transfer/kv_connector/v1/nixl/pull_scheduler.py` | `get_num_new_matched_tokens` | 65 | `nixl.match` |
+| `vllm/distributed/kv_transfer/kv_connector/v1/nixl/pull_scheduler.py` | `update_state_after_alloc` | 180 | `nixl.recv_planned` |
+| `vllm/distributed/kv_transfer/kv_connector/v1/nixl/pull_scheduler.py` | `request_finished` | 281 | `nixl.request_finished` |
+| `vllm/distributed/kv_transfer/kv_connector/v1/nixl/pull_worker.py` | `_read_blocks` | 417 | `nixl.read` |
+| `vllm/distributed/kv_transfer/kv_connector/v1/nixl/base_worker.py` | `_nixl_handshake` | 997, 1141 | `nixl.handshake` (start, done) |
+| `vllm/distributed/kv_transfer/kv_connector/v1/nixl/base_worker.py` | `get_transfer_results` | 2991 | `nixl.done` |
 
-Plus `import kvtrace  # KVTRACE` at the top of each of the seven files: 31 lines in all. (The last two came after
-job 30728: LMCache publishes `l2.keys.accessed` both for a real read from disk and for a touch, which only refreshes
-the eviction order and moves no bytes, so only these two hooks tell them apart.) Line numbers are in our
+Plus `import kvtrace  # KVTRACE` at the top of each of the ten files: 41 lines in all. (`lmc.l2.read` and `lmc.touch`
+came after job 30728: LMCache publishes `l2.keys.accessed` both for a real read from disk and for a touch, which only
+refreshes the eviction order and moves no bytes, so only these two hooks tell them apart. The `nixl.*` hooks came
+with the `nixl` transfer: vLLM's NIXL connector, pull mode, its scheduler side in each engine's core and its worker
+side.) Line numbers are in our
 copies (`third_party/<copy>/...`).
 
 The event-bus hooks see LMCache's own observability events (`lmcache/v1/mp_observability/event.py`), in the server
@@ -236,17 +315,21 @@ side by side.
 what it computes), `MTRAG_LIMIT` (4), `MTRAG_LAYOUT` (interleaved), `MTRAG_CONCURRENCY` (4), `MAX_TOKENS` (128),
 `STORE_WAIT_MS` (500; 0 shows how often D looks up before P's store has landed), `GPU_MEM` (0.80), `GPU_BLOCKS`
 (a small number shrinks every engine's GPU cache, so blocks are evicted from it and come back from LMCache),
-`D_PREFIX_CACHE` (1; 0 makes every turn pull its whole prefix), `KEEP_L2` (0), `ENGINE_EAGER` (0).
+`D_PREFIX_CACHE` (1; 0 makes every turn pull its whole prefix), `KEEP_L2` (0), `ENGINE_EAGER` (0),
+`LMC_TRANSFER` (lmcache; nixl), `LMC_SERVERS` (shared; per_engine), `LMC_HOST_MARGIN_GB` (16: the host memory kept for
+the engines beside the servers').
 `scripts/lmc_setup.sh`: `LMC_TORCH_BASELINE=1` skips the CUDA ops build (the wheel's ops, or LMCache's torch
 fallback, as job 30694 ran: not for real runs), `CUDA13_HOME` (a toolkit already there, used only if the environment
 has no CUDA 13 compiler of its own; never downloaded by this setup).
 
 The matrix `lmctrace` (`scripts/pd_matrix.sh`) runs one per mode; set before the campaign starts:
-`KVPD_LMC_MODES` (memory,disk), `KVPD_LMC_CONVS` (4), `KVPD_LMC_STORE_WAIT_MS` (500). Its setup is
+`KVPD_LMC_MODES` (memory,disk), `KVPD_LMC_CONVS` (4), `KVPD_LMC_STORE_WAIT_MS` (500), `KVPD_LMC_TRANSFERS` (lmcache;
+nixl; or both), `KVPD_LMC_SERVERS` (shared; per_engine; or both). Its setup is
 `scripts/lmc_setup.sh` only (the LMCache environment, LMCache's CUDA ops, the overlay, MTRAG, the model): no codec
-builds, no toolkit download. The run stage defaults to 3 hours. The disk plan reserves 3 GB for the setup, 1.5 GB a
-conversation for the disk tier (job 30694's first 4 conversations: 3.4 GB in all) and 0.25 GB a run for its records,
-and keeps 10 GB free; each run deletes its disk tier after its report, keeping the file list in `server/l2_files.tsv`.
+builds, no toolkit download; NIXL 1.5.2 is installed in the LMCache environment for the `nixl` runs. The run stage
+defaults to 3 hours. The disk plan reserves 3.5 GB for the setup, 1 GB a conversation for the disk tier (job 30728's
+first 4 conversations: 3.35 GB in all), four times that for a run with a server per engine (P's copy and up to one on
+each D's server), and 0.25 GB a run for its records, and keeps 10 GB free; each run deletes its disk tier after its report, keeping the file list in `server/l2_files.tsv`.
 
 To report again on a published run (no GPU, standard library only), from a checkout with the results:
 
@@ -292,7 +375,8 @@ LOGIN
 ```
 
 Options go before `bash <<'LOGIN'`, exported: for example `export KVPD_LMC_MODES=memory,disk,tiered` or
-`export KVPD_LMC_CONVS=8`. To resume after a stop: `source ~/.kvpd_campaigns/<tag>.sh`, `git switch -q --detach
+`export KVPD_LMC_CONVS=8`. LMCache's documented P/D, with a shared server and with a server per engine, in memory and
+on disk (four runs): `export KVPD_LMC_TRANSFERS=nixl KVPD_LMC_SERVERS=shared,per_engine KVPD_LMC_MODES=memory,disk`. To resume after a stop: `source ~/.kvpd_campaigns/<tag>.sh`, `git switch -q --detach
 "$KVPD_PIN"`, then the remaining stages as in `docs/pd_baselines.md`.
 
 The published branch is `evidence/lmcache-lifecycle/<pin12>/lmctrace/job<run job>`. In it,

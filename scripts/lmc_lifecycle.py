@@ -144,6 +144,12 @@ class Run:
         self.env = json.loads((self.dir / "env.json").read_text()) if (self.dir / "env.json").is_file() else {}
         self.mode = self.env.get("mode", "?")
         self.chunk = int(self.env.get("chunk", 256))
+        # how P's KV reaches D (lmcache: through the shared server; nixl: D reads P's GPU) and the LMCache servers
+        self.transfer = self.env.get("transfer", "lmcache")
+        self.servers = self.env.get("servers", "shared")
+        self.label = f"{self.mode} mode" + ("" if self.transfer == "lmcache" else
+                                             f", NIXL, {self.servers.replace('_', '-')} servers")
+        self.engine_server = self.env.get("engine_server") or {e: "LMC" for e in ENGINES}
         recs, self.load_info = load(self.dir)
         self.recs = dedup_stream(recs)
         self.t0 = self.recs[0]["t"] if self.recs else 0.0
@@ -151,7 +157,8 @@ class Run:
         self.turns = {r["tag"]: r for r in read_jsonl(self.dir / "mtrag.jsonl") if r.get("tag")}
         self.reqs = {}                                    # (role, rid) -> request
         self.lives = {e: collections.defaultdict(list) for e in ENGINES}   # vLLM hash -> [life]
-        self.chunks = {}                                  # chunk hash -> chunk
+        self.chunks = {}                                  # chunk hash (server/hash with a server per engine) -> chunk
+        self.handshakes = []                              # NIXL handshakes (D's worker meets P's agent)
         self.sessions = collections.defaultdict(lambda: collections.defaultdict(list))   # server session -> events
         self.prefetch = []                                # L2 prefetch / load task events (by request_id)
         self.errors = collections.Counter()
@@ -229,28 +236,62 @@ class Run:
                     self.R(role, rid).setdefault("t_received", t)
             elif ev == "lmc.conn.request_finished":
                 self.R(role, r["req"])["conn_final"] = r
+            elif ev == "nixl.match":                  # D: the prompt tokens it will read from P
+                self.R(role, r["req"])["nixl_match"] = r
+            elif ev == "nixl.recv_planned":           # D: its blocks the read goes into, P's it reads
+                self.R(role, r["req"])["nixl_recv"] = r
+            elif ev == "nixl.request_finished":       # P: its blocks held for D
+                self.R(role, r["req"])["nixl_finished"] = r
+            elif ev == "nixl.read":                   # D's worker posts the read
+                self.R(role, r["req"]).setdefault("nixl_reads", []).append(r)
+            elif ev == "nixl.handshake":
+                self.handshakes.append(r)
+            elif ev == "nixl.done":
+                for rid in r.get("sending") or []:      # P: D has read its blocks (P frees them)
+                    self.R(role, rid).setdefault("t_nixl_sent", t)
+                for rid in r.get("recving") or []:      # D: the KV is in its GPU blocks
+                    self.R(role, rid).setdefault("t_nixl_received", t)
+                for rid in r.get("failed") or []:
+                    self.R(role, rid)["nixl_failed"] = t
             elif ev.startswith("lmc."):
                 self.sessions[r.get("session")]["engine:" + ev[4:]].append(r)   # engine-side LMCache events
             else:
                 self.unknown[ev] += 1
 
     # -------------------------------------------------------------------------------- the server
-    def C(self, h):
-        if h not in self.chunks:
-            self.chunks[h] = {"hash": h, "l1": [], "l2": [], "sm": []}
-        return self.chunks[h]
+    def ck(self, h, srv="LMC"):
+        """A chunk's key: its hash, or server/hash when each engine has its own server (each holds its own copy)."""
+        return h if self.servers == "shared" else f"{srv}/{h}"
+
+    def C(self, h, srv="LMC"):
+        k = self.ck(h, srv)
+        if k not in self.chunks:
+            self.chunks[k] = {"hash": h, "server": srv, "l1": [], "l2": [], "sm": []}
+        return self.chunks[k]
+
+    def chunks_of(self, h):
+        """The chunk with this hash on every server that has it."""
+        if self.servers == "shared":
+            return [self.chunks[h]] if h in self.chunks else []
+        return [c for c in self.chunks.values() if c["hash"] == h]
+
+    def chunk_on(self, h, role):
+        """The chunk with this hash on the server an engine (P, D1-D3) talks to."""
+        return self.chunks.get(self.ck(h, self.engine_server.get(role, "LMC"))) if h else None
 
     def _server(self):
         for r in self.recs:
-            if r.get("role") != "LMC" or not r["ev"].startswith("lmc."):
+            srv = r.get("role") or ""
+            if not (srv == "LMC" or srv.startswith("LMC_")) or not r["ev"].startswith("lmc."):
                 continue
             name, t = r["ev"][4:], r["t"]
+            C = lambda h, srv=srv: self.C(h, srv)                 # noqa: E731
             if name == "mp.tokens":
                 hs, offs = r.get("chunk_hashes") or [], r.get("token_offsets") or []
                 ntok, crcs = r.get("chunk_tokens") or [], r.get("chunk_crc") or []
                 par = r.get("parent_hashes") or []
                 for i, h in enumerate(hs):
-                    c = self.C(h)
+                    c = C(h)
                     c.setdefault("bindings", []).append(t)
                     if "offset" not in c:
                         c.update(offset=offs[i] if i < len(offs) else None, ntok=ntok[i] if i < len(ntok) else None,
@@ -263,22 +304,22 @@ class Run:
             elif name == "l2.read":                  # our hook: a real read from disk
                 self.has_read_hook = True
                 for h in r.get("keys") or []:
-                    self.C(h)["l2"].append(("l2.read", t, None))
+                    C(h)["l2"].append(("l2.read", t, None))
             elif name == "touch":                    # our hook: eviction order refreshed, no I/O
                 for h in r.get("keys") or []:
-                    self.C(h).setdefault("touch", []).append(t)
+                    C(h).setdefault("touch", []).append(t)
             elif name in L1_EVENTS:
                 sizes = r.get("sizes") or []
                 for i, h in enumerate(r.get("keys") or []):
-                    self.C(h)["l1"].append((name, t, sizes[i] if i < len(sizes) else None))
+                    C(h)["l1"].append((name, t, sizes[i] if i < len(sizes) else None))
             elif name in L2_EVENTS:
                 sizes = r.get("sizes") or []
                 for i, h in enumerate(r.get("keys") or []):
-                    self.C(h)["l2"].append((name, t, sizes[i] if i < len(sizes) else None))
+                    C(h)["l2"].append((name, t, sizes[i] if i < len(sizes) else None))
             elif name in SM_EVENTS:
                 for k in ("succeeded_keys", "failed_keys"):
                     for h in r.get(k) or []:
-                        self.C(h)["sm"].append((name, k.split("_")[0], t))
+                        C(h)["sm"].append((name, k.split("_")[0], t))
             elif name.startswith(("l2.prefetch", "l2.load_task", "l2.store")):
                 self.prefetch.append(r)
             else:
@@ -371,10 +412,11 @@ class Run:
             req["looked_up_chunks"], req["found_chunks"] = len(hashes), found
             req["l1_hit_tokens"] = (pend or {}).get("l1_hit_tokens")
             req["l2_hit_tokens"] = (pend or {}).get("l2_hit_tokens")
+            srv_role = look.get("role") or "LMC"          # the server this request's lookup went to
             for j, h in enumerate(hashes):
-                c = self.chunks.get(h)
+                c = self.chunks.get(self.ck(h, srv_role))
                 if c is None:                            # looked up, never stored (nor seen in memory or on disk)
-                    c = self.C(h)
+                    c = self.C(h, srv_role)
                     self._derive(c)
                     c["unknown_store"] = True
                 lo, hi = j * ch, (j + 1) * ch
@@ -423,6 +465,17 @@ class Run:
                                          "t_cached": cached[2] if cached else None})
                     c["reads"][-1]["d_blocks"] = d_blocks
 
+    def split(self, q):
+        """A request's prompt: (tokens, held on its own GPU, loaded from LMCache, read from P over NIXL, computed)."""
+        conn = (q["lookups"] or [None])[-1] or {}
+        n = q.get("n_prompt") or 0
+        vh = conn.get("vllm_hit", q.get("local_hit")) or 0
+        lmc = conn.get("load") or 0
+        if self.transfer == "nixl" and not q["retrieves"]:
+            lmc = 0                     # MultiConnector gave the load to NIXL: LMCache's lookup loaded nothing
+        nx = (q.get("nixl_recv") or {}).get("external") or 0
+        return n, vh, lmc, nx, max(0, n - vh - lmc - nx)
+
     # -------------------------------------------------------------------------------- rows and numbers
     def request_rows(self):
         rows = []
@@ -436,7 +489,7 @@ class Run:
             stored = sum(s["end"] - s["start"] for s in r["stores"])
             n = r.get("n_prompt")
             vh = conn.get("vllm_hit", r.get("local_hit"))
-            load = conn.get("load") or 0
+            _n_, _vh, load, nixl_load, computed = self.split(r)
             px = self.proxy.get(r["key"], {})
             reads = collections.Counter()
             tiers = collections.Counter()
@@ -447,8 +500,8 @@ class Run:
                         if rd["tier"]:
                             tiers[rd["tier"]] += 1
             row = {"role": role, "rid": rid, "key": r["key"], "conv": r["conv"], "turn": r["turn"], "n_prompt": n,
-                   "local_hit": vh, "lmc_hit": conn.get("lmc_hit"), "load": load,
-                   "computed": None if n is None else max(0, n - max(vh or 0, (vh or 0) + load)),
+                   "local_hit": vh, "lmc_hit": conn.get("lmc_hit"), "load": load, "nixl_load": nixl_load,
+                   "computed": None if n is None else computed,
                    "looked_up_chunks": r.get("looked_up_chunks"), "found_chunks": r.get("found_chunks"),
                    "l1_hit_tokens": r.get("l1_hit_tokens"), "l2_hit_tokens": r.get("l2_hit_tokens"),
                    "chunks": dict(reads), "pulled_by_tier": dict(tiers),
@@ -466,6 +519,16 @@ class Run:
                    "t_finished": self.rel(r.get("t_finished")), "t_freed": self.rel(r.get("t_freed")),
                    "proxy_t_in": self.rel(px.get("t_in")), "proxy_t_prefill_done": self.rel(px.get("t_prefill_done")),
                    "proxy_t_first_byte": self.rel(px.get("t_first_byte"))}
+            if self.transfer == "nixl":                  # D read P's blocks; P held them for it
+                nr, nf = r.get("nixl_recv") or {}, r.get("nixl_finished") or {}
+                t_read = first([x["t"] for x in r.get("nixl_reads") or []])
+                row.update(nixl_blocks=len(nr.get("local") or []), t_nixl_read=self.rel(t_read),
+                           t_nixl_received=self.rel(r.get("t_nixl_received")), t_nixl_sent=self.rel(r.get("t_nixl_sent")),
+                           nixl_held_blocks=len(nf.get("blocks") or []) if nf.get("delay") else 0)
+                if t_read is not None and r.get("t_nixl_received") is not None:
+                    row["nixl_read_s"] = round(r["t_nixl_received"] - t_read, 6)
+                if r.get("t_finished") is not None and r.get("t_nixl_sent") is not None:
+                    row["nixl_held_s"] = round(r["t_nixl_sent"] - r["t_finished"], 6)
             # the pull: from the server's lookup (its prefetch reads the disk) to the copy on the GPU done
             t_look = first([x["t"] for x in srv.get("mp.lookup") or []]) or first([x["t"] for x in r["lookups"]])
             p_end = first([x["t"] for x in srv.get("mp.lookup_prefetch.end") or []])
@@ -545,6 +608,7 @@ class Run:
         by_tier = collections.Counter(rd["tier"] for rd in pulled)
         never = [c for c in stored if not any(rd["how"] == "pulled" for rd in c["reads"])]
         d_pull = [r for r in D if r.get("load")]
+        d_nixl = [r for r in D if r.get("nixl_load")]
         d_pull_l1 = [r["pull_s"] for r in d_pull if r.get("pull_s") is not None and not r["pulled_by_tier"].get("L2")]
         d_pull_l2 = [r["pull_s"] for r in d_pull if r.get("pull_s") is not None and r["pulled_by_tier"].get("L2")]
         same = [b["same_as_p"] for rd in pulled for b in rd.get("d_blocks") or [] if b["same_as_p"] is not None]
@@ -555,7 +619,8 @@ class Run:
             "mode": self.mode, "env": {k: self.env.get(k) for k in ("mode", "l1_gb", "eviction", "store_policy",
                                                                     "chunk", "odirect", "d_role", "mtrag_limit",
                                                                     "layout", "store_wait_ms", "gpu_blocks",
-                                                                    "d_prefix_cache")},
+                                                                    "d_prefix_cache", "transfer", "servers",
+                                                                    "routing")},
             "trace": dict(self.load_info, hook_errors=dict(self.errors), unknown_events=dict(self.unknown)),
             "requests": {"P": len(P), "D": len(D), "turns": len(self.turns)},
             "prompt_tokens": {"P": sum(r["n_prompt"] or 0 for r in P), "D": sum(r["n_prompt"] or 0 for r in D)},
@@ -565,7 +630,8 @@ class Run:
                   "stored_tokens": sum(r["stored_tokens"] or 0 for r in P),
                   "store_bytes": sum(r["store_bytes"] or 0 for r in P),
                   "store_s_median": q([r.get("store_s") for r in P], 0.5),
-                  "store_s_p90": q([r.get("store_s") for r in P], 0.9)},
+                  "store_s_p90": q([r.get("store_s") for r in P], 0.9),
+                  "nixl_held_s_median": q([r.get("nixl_held_s") for r in P], 0.5)},
             "D": {"local_hit_tokens": sum(r["local_hit"] or 0 for r in D),
                   "lmcache_loaded_tokens": sum(r["load"] or 0 for r in D),
                   "computed_tokens": sum(r["computed"] or 0 for r in D),
@@ -576,8 +642,14 @@ class Run:
                   "retrieve_s_median": q([r.get("retrieve_s") for r in d_pull], 0.5),
                   "prefetch_s_median_l1": q([r.get("prefetch_s") for r in d_pull if not r["pulled_by_tier"].get("L2")], 0.5),
                   "prefetch_s_median_l2": q([r.get("prefetch_s") for r in d_pull if r["pulled_by_tier"].get("L2")], 0.5),
-                  "looked_up_before_p_store_end": len(races)},
+                  "looked_up_before_p_store_end": len(races),
+                  "nixl_read_tokens": sum(r.get("nixl_load") or 0 for r in D), "requests_reading_nixl": len(d_nixl),
+                  "nixl_read_s_median": q([r.get("nixl_read_s") for r in d_nixl], 0.5),
+                  "nixl_read_s_p90": q([r.get("nixl_read_s") for r in d_nixl], 0.9),
+                  "stored_tokens": sum(r["stored_tokens"] or 0 for r in D)},
             "chunks": {"stored": len(stored), "in_memory": sum(1 for c in stored if c.get("t_l1_written") is not None),
+                       "stored_by": dict(collections.Counter(c["store_role"][:1] for c in stored)),
+                       "per_server": dict(collections.Counter(c.get("server") for c in stored)),
                        "stored_bytes": sum(c.get("bytes") or 0 for c in stored),
                        "to_disk": sum(1 for c in stored if c.get("t_l2_stored") is not None),
                        "removed_from_memory": sum(1 for c in stored if c.get("t_l1_removed")),
@@ -599,6 +671,9 @@ class Run:
                        "pulled_blocks_same_hash_as_p": f"{sum(same)} of {len(same)}",
                        "chunks_with_full_chain": f"{len(chain)} of {len(stored)}"},
         }
+        if self.transfer == "nixl":
+            out["nixl"] = {"handshakes": sum(1 for h in self.handshakes if h.get("phase") == "done"),
+                           "failed_reads": sum(1 for r in self.reqs.values() if r.get("nixl_failed"))}
         if self.env.get("store_policy") == "skip_l1":   # the disk mode: on disk, then out of memory, read from disk
             written = [c for c in stored if c.get("t_l1_written") is not None]
             order = [c for c in written if c.get("t_l2_stored") is not None and c.get("t_l1_removed")
@@ -608,19 +683,23 @@ class Run:
             out["checks"]["disk_mode_on_disk_then_out_of_memory"] = f"{len(order)} of {len(written)}"
             out["checks"]["disk_mode_pulls_from_disk"] = f"{by_tier.get('L2', 0)} of {len(pulled)}"
             out["checks"]["disk_mode_pulls_while_still_in_memory"] = len(early)
-            st = self.dir / "server"
-            status = next((f for f in (st / "status.txt", st / "status.json") if f.is_file()), None)
-            if status is not None:
-                try:
-                    l1 = json.loads(status.read_text())["storage_manager"]["l1_managers"]
-                    out["checks"]["disk_mode_server_memory_at_end"] = {
-                        k: f"{v.get('total_object_count')} objects, {v.get('memory_used_bytes')} bytes" for k, v in l1.items()}
-                except (ValueError, KeyError, TypeError):
-                    pass
-            files = st / "l2_files.tsv"
-            if files.is_file():
-                sizes = [int(ln.split("\t", 1)[0]) for ln in files.read_text().splitlines() if ln.strip()]
-                out["checks"]["disk_mode_files_at_end"] = f"{len(sizes)} files, {sum(sizes) / 1e9:.2f} GB"
+            roles = self.env.get("server_roles") or ["LMC"]
+            for srv in roles:                        # each server's folder (the shared one: server/ itself)
+                st = self.dir / "server" if self.servers == "shared" else self.dir / "server" / srv
+                tag = "" if self.servers == "shared" else f" ({srv})"
+                status = next((f for f in (st / "status.txt", st / "status.json") if f.is_file()), None)
+                if status is not None:
+                    try:
+                        l1 = json.loads(status.read_text())["storage_manager"]["l1_managers"]
+                        out["checks"][f"disk_mode_server_memory_at_end{tag}"] = {
+                            k: f"{v.get('total_object_count')} objects, {v.get('memory_used_bytes')} bytes"
+                            for k, v in l1.items()}
+                    except (ValueError, KeyError, TypeError):
+                        pass
+                files = st / "l2_files.tsv"
+                if files.is_file():
+                    sizes = [int(ln.split("\t", 1)[0]) for ln in files.read_text().splitlines() if ln.strip()]
+                    out["checks"][f"disk_mode_files_at_end{tag}"] = f"{len(sizes)} files, {sum(sizes) / 1e9:.2f} GB"
         return out
 
 
@@ -701,7 +780,7 @@ def health(run, t0):
     out = {"server_fatal": None, "server_last_log_s": None, "degraded": {}, "server_errors": 0,
            "server_error_kinds": {}}
     kinds = collections.Counter()
-    for f in logs("lmcache_server"):
+    for f in logs("lmcache_server") + logs("lmcache_server_LMC_*"):
         last, pending = None, None
         for ln in text(f).splitlines():
             if LOG_T.search(ln):
@@ -747,7 +826,7 @@ def write_report(run, out, conversations=None):
             for row in rows:
                 fh.write(json.dumps(row, separators=(",", ":")) + "\n")
     (out / "results.json").write_text(json.dumps(nums, indent=1))
-    md = [f"# LMCache lifecycle: {R.mode}", ""]
+    md = [f"# LMCache lifecycle: {R.label}", ""]
     if hl["server_errors"] and not hl["server_crashed"]:
         md += [f"**The LMCache server logged {hl['server_errors']} errors** (the first at "
                f"{fmt(hl.get('server_first_error_s'))} s): "
@@ -760,11 +839,20 @@ def write_report(run, out, conversations=None):
                + f"; {hl.get('requests_after_degraded', '–')} engine requests came after that and ran without LMCache. "
                "Everything below is what happened before.", ""]
     e = R.env
-    md += [f"1 prefill engine (P) and 3 decode engines (D1-D3), one LMCache server shared by all four; mode **{R.mode}**"
-           f" (memory {e.get('l1_gb')} GB, eviction {e.get('eviction')}, store policy {e.get('store_policy')}, chunk "
-           f"{e.get('chunk')} tokens); MTRAG's first {e.get('mtrag_limit')} conversations, {e.get('layout')}; the "
-           f"proxy waits {e.get('store_wait_ms')} ms between P's answer and D's request. D's role {e.get('d_role')}. "
-           f"Commit {str(e.get('commit'))[:12]}.", ""]
+    servers = ("one LMCache server shared by all four" if R.servers == "shared" else
+               "an LMCache server per engine (LMC_P, LMC_D1-3)")
+    if R.transfer == "nixl":
+        how = ("P's KV reaches D over NIXL (vLLM's MultiConnector on both engines: NixlConnector, D reading P's GPU "
+               "blocks, and LMCache's connector, kv_both, storing and loading beside it); the proxy sends D the turn "
+               "with P's reply's kv_transfer_params as soon as P answers (as vllm-router does), D engines round-robin")
+    else:
+        how = (f"P stores its chunks in the server and D loads them from there; the proxy waits "
+               f"{e.get('store_wait_ms')} ms between P's answer and D's request, each conversation on one D; D's role "
+               f"{e.get('d_role')}")
+    md += [f"1 prefill engine (P) and 3 decode engines (D1-D3), {servers}; mode **{R.mode}**"
+           f" (memory {e.get('l1_gb')} GB each, eviction {e.get('eviction')}, store policy {e.get('store_policy')}, "
+           f"chunk {e.get('chunk')} tokens); MTRAG's first {e.get('mtrag_limit')} conversations, {e.get('layout')}. "
+           f"{how}. Commit {str(e.get('commit'))[:12]}.", ""]
     t = nums["trace"]
     md += [f"Trace: {t['records']} records from {t['files']} processes ({', '.join(f'{k} {v}' for k, v in sorted((t['by_role'] or {}).items(), key=lambda kv: str(kv[0])))}); "
            f"hook errors {sum(t['hook_errors'].values()) if t['hook_errors'] else 0}"
@@ -776,10 +864,22 @@ def write_report(run, out, conversations=None):
            f"| prompt tokens | {nums['prompt_tokens']['P']} | {nums['prompt_tokens']['D']} |",
            f"| from the engine's own GPU prefix cache | {nums['P']['local_hit_tokens']} | {nums['D']['local_hit_tokens']} |",
            f"| loaded from LMCache | {nums['P']['lmcache_loaded_tokens']} | {nums['D']['lmcache_loaded_tokens']} |",
+           *([f"| read from P's GPU over NIXL | – | {nums['D']['nixl_read_tokens']} |"] if R.transfer == "nixl" else []),
            f"| computed | {nums['P']['computed_tokens']} | {nums['D']['computed_tokens']} |",
-           f"| stored to LMCache (tokens) | {nums['P']['stored_tokens']} | – |", ""]
+           f"| stored to LMCache (tokens) | {nums['P']['stored_tokens']} | {nums['D']['stored_tokens'] or '–'} |", ""]
+    if R.transfer == "nixl":
+        dn, nx = nums["D"], nums.get("nixl", {})
+        md += ["## NIXL", "",
+               f"- D requests that read from P: {dn['requests_reading_nixl']}, {dn['nixl_read_tokens']} tokens; the read "
+               f"(D's worker posts it, to the KV in D's GPU blocks): median {fmt(ms(dn['nixl_read_s_median']))} ms, "
+               f"p90 {fmt(ms(dn['nixl_read_s_p90']))} ms",
+               f"- P held its blocks for D from its request's end to D's read done: median "
+               f"{fmt(ms(nums['P']['nixl_held_s_median']))} ms",
+               f"- handshakes (D's worker meets P's agent, once a pair): {nx.get('handshakes')}; failed reads: "
+               f"{nx.get('failed_reads')}", ""]
     md += ["## Chunks", "",
-           f"- bound to their tokens by P's stores: {ck['stored']} chunks; written to the server's memory "
+           f"- bound to their tokens by the engines' stores: {ck['stored']} chunks (by {ck['stored_by'] or '–'}"
+           + (f"; per server {ck['per_server']}" if R.servers != "shared" else "") + "); written to memory "
            f"{ck['in_memory']} ({ck['stored_bytes'] / 1e6:.1f} MB); to disk {ck['to_disk']}; removed from memory "
            f"{ck['removed_from_memory']}",
            f"- pulled by D or P: {ck['pulled']} times, from {ck['pulled_from'] or '–'}; never pulled: {ck['never_pulled']}"
@@ -793,7 +893,10 @@ def write_report(run, out, conversations=None):
            f"{fmt(ms(ck['created_to_l1_s_median']))} ms; memory to disk: {fmt(ms(ck['l1_to_l2_s_median']))} ms",
            f"- lookups of chunks never seen stored: {ck['lookups_of_unknown_chunks']}", ""]
     d = nums["D"]
-    md += ["## Pulls", "",
+    if R.transfer == "nixl":                         # D's KV came over NIXL: LMCache's pulls only if any happened
+        md += [f"D's loads from LMCache: {d['requests_pulling']} requests (NIXL gives the load to D first; LMCache "
+               "loads only what an engine's own GPU and NIXL do not have).", ""]
+    md += [] if R.transfer == "nixl" and not d["requests_pulling"] else ["## Pulls", "",
            f"- D requests that loaded from LMCache: {d['requests_pulling']}; bytes {d['retrieve_bytes'] / 1e6:.1f} MB",
            f"- the server's lookup to the copy on D's GPU done, all from memory: median {fmt(ms(d['pull_s_median_l1']))} ms, p90 "
            f"{fmt(ms(d['pull_s_p90_l1']))} ms; with chunks from disk: median {fmt(ms(d['pull_s_median_l2']))} ms, "
@@ -804,12 +907,17 @@ def write_report(run, out, conversations=None):
            f"- D requests whose lookup finished before P's store of the same turn: {d['looked_up_before_p_store_end']}",
            f"- P's stores (planned to stored): median {fmt(ms(nums['P']['store_s_median']))} ms, p90 "
            f"{fmt(ms(nums['P']['store_s_p90']))} ms", ""]
+    if R.transfer == "nixl":
+        md += [f"P's stores (planned to stored): median {fmt(ms(nums['P']['store_s_median']))} ms, p90 "
+               f"{fmt(ms(nums['P']['store_s_p90']))} ms.", ""]
     md += ["## Checks", ""] + [f"- {k.replace('_', ' ')}: {v}" for k, v in nums["checks"].items()] + [""]
-    md += ["## Requests", "", "| engine | conv | turn | prompt | own GPU | LMCache hit | loaded | computed | "
+    md += ["## Requests", "", "| engine | conv | turn | prompt | own GPU | LMCache hit | "
+           + ("loaded (LMCache / NIXL)" if R.transfer == "nixl" else "loaded") + " | computed | "
            "chunks (outcome) | from | pull ms | stored |", "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: |"]
     for r in reqs:
         md.append(f"| {r['role']} | {fmt(r['conv'])} | {fmt(r['turn'])} | {fmt(r['n_prompt'])} | {fmt(r['local_hit'])} | "
-                  f"{fmt(r['lmc_hit'])} | {fmt(r['load'])} | {fmt(r['computed'])} | "
+                  f"{fmt(r['lmc_hit'])} | {fmt(r['load'])}"
+                  + (f" / {fmt(r.get('nixl_load'))}" if R.transfer == "nixl" else "") + f" | {fmt(r['computed'])} | "
                   f"{', '.join(f'{k} {v}' for k, v in r['chunks'].items()) or '–'} | "
                   f"{', '.join(f'{k} {v}' for k, v in r['pulled_by_tier'].items()) or '–'} | "
                   f"{fmt(ms(r.get('pull_s')))} | {fmt(r['stored_tokens'])} |")
@@ -850,7 +958,7 @@ def write_report(run, out, conversations=None):
     md += ["One page per conversation, from its prompt's pieces to its chunks and blocks: conversations/index.md.", ""]
     (out / "summary.md").write_text("\n".join(md))
     conversation_views(R, out / "conversations", conversations)
-    print(f"lifecycle {R.mode}: {nums['requests']} requests, {ck['stored']} chunks stored, {ck['pulled']} pulls "
+    print(f"lifecycle {R.label}: {nums['requests']} requests, {ck['stored']} chunks stored, {ck['pulled']} pulls "
           f"({ck['pulled_from']}), checks {nums['checks']} -> {out}")
     return nums
 
@@ -1033,13 +1141,7 @@ def turn_times(R, P, D, px):
     lo = lambda xs: min(xs) if xs else None                          # noqa: E731
     hi = lambda xs: max(xs) if xs else None                          # noqa: E731
 
-    def split(q):
-        conn = (q["lookups"] or [None])[-1] or {}
-        n = q.get("n_prompt") or 0
-        vh = conn.get("vllm_hit", q.get("local_hit")) or 0
-        load = conn.get("load") or 0
-        return n, vh, load, max(0, n - vh - load)
-    n, p_held, p_load, p_comp = split(P)
+    n, p_held, _p_load, _p_nixl, p_comp = R.split(P)
     ch = [c for c in R.chunks.values() if c.get("key") == P["key"] and c.get("store_role") == "P"]
     w = {"n": n, "p_held": p_held, "p_computed": p_comp, "chunks": len(ch),
          "p_added": ms(P.get("t_added")), "p_start": ms(P["allocs"][0]["t"] if P["allocs"] else None),
@@ -1047,10 +1149,16 @@ def turn_times(R, P, D, px):
          "mem_in": ms(lo([c["t_l1_reserved"] for c in ch if c.get("t_l1_reserved")])),
          "mem_written": ms(hi([c["t_l1_written"] for c in ch if c.get("t_l1_written")])),
          "disk": ms(hi([c["t_l2_stored"] for c in ch if c.get("t_l2_stored")])),
-         "mem_out": ms(hi([c["t_l1_removed"][0] for c in ch if c.get("t_l1_removed")]))}
+         "mem_out": ms(hi([c["t_l1_removed"][0] for c in ch if c.get("t_l1_removed")])),
+         "p_nixl_sent": ms(P.get("t_nixl_sent"))}
     if D is not None:
         srv = D.get("server") or {}
-        _n, d_held, d_load, d_comp = split(D)
+        _n, d_held, d_load, d_nixl, d_comp = R.split(D)
+        dch = [c for c in R.chunks.values() if c.get("key") == D["key"] and c.get("store_role") == D["role"]]
+        w.update(d_nixl=d_nixl, d_nixl_read=ms(first([x["t"] for x in D.get("nixl_reads") or []])),
+                 d_nixl_received=ms(D.get("t_nixl_received")), d_chunks=len(dch),
+                 d_mem_written=ms(hi([c["t_l1_written"] for c in dch if c.get("t_l1_written")])),
+                 d_disk=ms(hi([c["t_l2_stored"] for c in dch if c.get("t_l2_stored")])))
         tiers = collections.Counter(rd.get("tier") for c in R.chunks.values() for rd in c.get("reads") or []
                                     if rd["key"] == D["key"] and rd["role"] == D["role"] and rd["how"] == "pulled")
         w.update(d_role=D["role"], d_held=d_held, d_loaded=d_load, d_computed=d_comp, n_out=D.get("n_out"),
@@ -1070,8 +1178,8 @@ def _f(x):
 
 def turn_events(R, P, D, px, wait_ms):
     """Every step of one turn's KV, in time order, in ms from the proxy sending the turn to P: P's GPU memory, the
-    copy into LMCache (LMCache's server reads P's GPU slots itself, through CUDA IPC handles P registered: no NIXL
-    here), LMCache's memory and disk, D's lookup and read, the copy into D's GPU slots, and the answer."""
+    copy into LMCache (LMCache's server reads P's GPU blocks itself, through CUDA IPC handles P registered: no NIXL
+    here), LMCache's memory and disk, D's lookup and read, the copy into D's GPU blocks, and the answer."""
     T = px.get("t_in")
     if T is None or P is None:
         return []
@@ -1088,7 +1196,7 @@ def turn_events(R, P, D, px, wait_ms):
         held = [q["cached"][i][0] for i in sorted(q["cached"]) if i < vh // BLOCK] if vh else []
         r = _ranges(held or q.get("prefix_blocks") or [])
         add(q.get("t_prefix"), f"{name} GPU", f"its prefix cache holds {vh:,} of the prompt's tokens"
-            + ((f": {_n(vh // BLOCK, 'block')} in slots {r}" if "(" not in r else f": slots {r}") if vh else ""))
+            + ((f": {_n(vh // BLOCK, 'block')} in GPU blocks {r}" if "(" not in r else f": GPU blocks {r}") if vh else ""))
         return conn, vh
 
     def mb(b):
@@ -1102,7 +1210,7 @@ def turn_events(R, P, D, px, wait_ms):
             f"{conn.get('load') or 0:,} and computes the rest")
     for a in P["allocs"]:
         if a.get("blocks"):
-            add(a["t"], "P GPU", f"{_n(len(a['blocks']), 'new slot')} for the {a.get('new', 0):,} tokens it computes: "
+            add(a["t"], "P GPU", f"{_n(len(a['blocks']), 'new GPU block')} for the {a.get('new', 0):,} tokens it computes: "
                 f"{_ranges(a['blocks'])}; the prefill runs")
     srv = P.get("server") or {}
     s0 = (P["stores"] or [None])[0]
@@ -1117,13 +1225,18 @@ def turn_events(R, P, D, px, wait_ms):
         f"({mb(sum(c.get('bytes') or 0 for c in chunks))})")
     st0, st1 = first(srv.get("mp.store.start") or []), (srv.get("mp.store.end") or [None])[-1]
     if st0:
-        add(st0["t"], "P GPU → LMCache memory", "the copy starts: LMCache reads P's GPU slots (CUDA IPC)")
+        add(st0["t"], "P GPU → LMCache memory", "the copy starts: LMCache reads P's GPU blocks (CUDA IPC)")
     if st1:
         add(st1["t"], "P GPU → LMCache memory", f"copy done: {_n(st1.get('stored_count') or 0, 'chunk')}, "
             f"{mb(st1.get('total_bytes'))}" + (f" in {(st1['t'] - st0['t']) * 1000:.1f} ms" if st0 else ""))
     wr = [c["t_l1_written"] for c in chunks if c.get("t_l1_written")]
-    add(max(wr) if wr else None, "LMCache memory", f"{_n(len(wr), 'chunk')} in memory, ready for D; P keeps its copy "
-        "in its GPU slots")
+    add(max(wr) if wr else None, "LMCache memory", f"{_n(len(wr), 'chunk')} in memory, "
+        + ("kept for later requests (D gets this turn's KV from P over NIXL)" if R.transfer == "nixl" else "ready for D")
+        + "; P keeps its copy in its GPU blocks")
+    nf = P.get("nixl_finished") or {}
+    if nf.get("delay"):
+        add(nf["t"], "P GPU", f"the request is done: P holds its {_n(len(nf.get('blocks') or []), 'block')} for D to "
+            "read over NIXL, and its reply carries them (kv_transfer_params: the blocks, its NIXL agent)")
     add(px.get("t_prefill_done"), "P → proxy", "P answers its one token: the prefill is done")
     disk = [c["t_l2_stored"] for c in chunks if c.get("t_l2_stored")]
     add(max(disk) if disk else None, "LMCache disk", f"{_n(len(disk), 'chunk')} written to disk (one file each)")
@@ -1133,7 +1246,11 @@ def turn_events(R, P, D, px, wait_ms):
         f"{len(gone)} memory cop{'y' if len(gone) == 1 else 'ies'} dropped: on disk only now")
     if D is not None:
         role = D["role"]
-        add(D.get("t_added"), f"proxy → {role}", f"after the {wait_ms:,.0f} ms store wait, sends the turn to {role}")
+        if R.transfer == "nixl":
+            add(D.get("t_added"), f"proxy → {role}", f"sends the turn to {role} at once, with P's kv_transfer_params "
+                "(round-robin; no wait)")
+        else:
+            add(D.get("t_added"), f"proxy → {role}", f"after the {wait_ms:,.0f} ms store wait, sends the turn to {role}")
         dconn, dvh = gpu_side(D, role)
         dsrv = D.get("server") or {}
         add(first([x["t"] for x in dsrv.get("mp.lookup") or []]), f"{role} ↔ LMCache",
@@ -1145,16 +1262,40 @@ def turn_events(R, P, D, px, wait_ms):
                 f"found {pe.get('hit_tokens') or 0:,} tokens it lacks"
                 + (f": {_n(l2, 'chunk')} read from disk into a memory buffer" if l2 else
                    (f": {_n(pe.get('l1_hit_keys') or 0, 'chunk')} in memory" if pe.get("l1_hit_keys") else "")))
+        _n_, _vh, d_lmc, d_nixl, d_comp = R.split(D)
+        nm = D.get("nixl_match")
+        if nm:
+            add(nm["t"], f"{role} ↔ P (NIXL)", f"will read {max(0, nm.get('count') or 0):,} prompt tokens from P's GPU "
+                f"(beyond the {nm.get('computed') or 0:,} its own cache holds)")
         if dconn:
-            add(dconn.get("t"), role, f"will load {dconn.get('load') or 0:,} tokens and compute "
-                f"{max(0, (D.get('n_prompt') or 0) - dvh - (dconn.get('load') or 0)):,}")
+            if R.transfer == "nixl":
+                add(dconn.get("t"), f"{role} ↔ LMCache", f"LMCache has {dconn.get('lmc_hit') or 0:,} of its tokens; "
+                    + ("it loads from LMCache" if d_lmc else "NIXL loads it (MultiConnector: the first connector "
+                                                             "with tokens)"))
+            else:
+                add(dconn.get("t"), role, f"will load {dconn.get('load') or 0:,} tokens and compute "
+                    f"{max(0, (D.get('n_prompt') or 0) - dvh - (dconn.get('load') or 0)):,}")
+        nr = D.get("nixl_recv")
+        if nr:
+            add(nr["t"], f"{role} GPU", f"{_n(len(nr.get('local') or []), 'GPU block')} for the KV from P: "
+                f"{_ranges(nr.get('local') or [])}")
+        for h in R.handshakes:
+            if h.get("role") == role and (D.get("t_added") or 0) - 1 <= h["t"] <= (D.get("t_finished") or 9e18):
+                add(h["t"], f"{role} ↔ P (NIXL)", "handshake " + ("starts: first contact with P's NIXL agent"
+                                                                  if h.get("phase") == "start" else "done"))
+        for rd in D.get("nixl_reads") or []:
+            add(rd["t"], f"P GPU → {role} GPU (NIXL)", f"{role} reads P's GPU blocks {_ranges(rd.get('remote') or [])} "
+                f"into its {_ranges(rd.get('local') or [])} (a NIXL READ)" if rd.get("local") else
+                "nothing to read (all on its GPU): notifies P")
+        add(D.get("t_nixl_received"), role, f"the KV from P is in its GPU blocks ({d_nixl:,} tokens)")
+        add(P.get("t_nixl_sent"), "P GPU", f"{role} has read: P frees its blocks (they stay in its prefix cache)")
         r0 = (D["retrieves"] or [None])[-1]
         if r0:
             skip = (r0.get("skip") or 0) // BLOCK
-            add(r0["t"], f"{role} GPU", f"slots for the loaded blocks: {_ranges((r0.get('blocks') or [])[skip:])}")
+            add(r0["t"], f"{role} GPU", f"GPU blocks for the loaded KV: {_ranges((r0.get('blocks') or [])[skip:])}")
         rs, re_ = first(dsrv.get("mp.retrieve.start") or []), (dsrv.get("mp.retrieve.end") or [None])[-1]
         if rs:
-            add(rs["t"], f"LMCache memory → {role} GPU", f"the copy starts: LMCache writes {role}'s GPU slots (CUDA IPC)")
+            add(rs["t"], f"LMCache memory → {role} GPU", f"the copy starts: LMCache writes {role}'s GPU blocks (CUDA IPC)")
         if re_:
             add(re_["t"], f"LMCache memory → {role} GPU", f"copy done: {_n(re_.get('retrieved_count') or 0, 'chunk')}, "
                 f"{mb(re_.get('total_bytes'))}" + (f" in {(re_['t'] - rs['t']) * 1000:.1f} ms" if rs else ""))
@@ -1162,24 +1303,35 @@ def turn_events(R, P, D, px, wait_ms):
         buf = [t for c in R.chunks.values() for t in (c.get("t_l1_removed") or [])[1:] if t_lo <= t <= t_hi
                and any(rd["key"] == D["key"] and rd["role"] == role for rd in c.get("reads") or [])]
         add(max(buf) if buf else None, "LMCache memory", f"the read buffer dropped ({_n(len(buf), 'chunk')})")
-        add(D.get("t_received"), role, "has the KV in its GPU slots")
+        add(D.get("t_received"), role, "has the KV in its GPU blocks")
+        dst = [s_ for s_ in D["stores"]]
+        if dst:                                      # D's own LMCache connector stores (kv_both)
+            dch = [c for c in R.chunks.values() if c.get("key") == D["key"] and c.get("store_role") == role]
+            add(dst[0]["t"], f"{role} → LMCache", f"store planned: tokens {dst[0]['start']:,}-{dst[0]['end']:,}"
+                + (f"; {_n(len(dch), 'chunk')} new to its server" if dch else "; its server has them all already"))
+            wr_d = [c["t_l1_written"] for c in dch if c.get("t_l1_written")]
+            add(max(wr_d) if wr_d else None, "LMCache memory", f"{_n(len(wr_d), 'chunk')} from {role} in memory")
+            dk = [c["t_l2_stored"] for c in dch if c.get("t_l2_stored")]
+            add(max(dk) if dk else None, "LMCache disk", f"{_n(len(dk), 'chunk')} from {role} written to disk")
         grows = [a for a in D["allocs"] if a.get("blocks")]
-        if grows:                                    # the first: the prompt's rest; then one slot per 16 answer tokens
+        if grows:                                    # the first: the prompt's rest; then one block per 16 answer tokens
             a = grows[0]
-            add(a["t"], f"{role} GPU", f"{_n(len(a['blocks']), 'new slot')} for the {a.get('new', 0):,} prompt tokens "
-                f"it computes: {_ranges(a['blocks'])}")
+            what = (f"the {a['external']:,} tokens it loads" + (f" and the {a.get('new', 0):,} it computes"
+                                                                if a.get("new") else "")) if a.get("external") else \
+                f"the {a.get('new', 0):,} prompt tokens it computes"
+            add(a["t"], f"{role} GPU", f"{_n(len(a['blocks']), 'new GPU block')} for {what}: {_ranges(a['blocks'])}")
             later = [b for g in grows[1:] for b in g["blocks"]]
             if later:
-                add(grows[1]["t"], f"{role} GPU", f"decoding: the answer's KV takes {_n(len(later), 'new slot')} as it "
+                add(grows[1]["t"], f"{role} GPU", f"decoding: the answer's KV takes {_n(len(later), 'new GPU block')} as it "
                     f"grows, one per 16 tokens: {_ranges(later)}, until {(grows[-1]['t'] - px['t_in']) * 1000:,.0f} ms")
         add(px.get("t_first_byte"), f"{role} → proxy", "the first answer token")
         add(D.get("t_finished"), role, "done" + (f": {D['n_out']} tokens decoded" if D.get("n_out") else "")
-            + "; its blocks stay cached in its GPU slots for the next turn")
+            + "; its blocks stay cached in its GPU for the next turn")
         add(px.get("t_out"), "proxy", "the response is complete")
     return [(round((t - T) * 1000, 1), where, what) for t, where, what in sorted(ev, key=lambda e: e[0])]
 
 
-def turn_story(w, wait_ms):
+def turn_story(w, wait_ms, nixl=False):
     """A turn in one sentence: what P did, where its chunks went, what D did with them."""
     if not w:
         return ""
@@ -1191,6 +1343,16 @@ def turn_story(w, wait_ms):
                  if w.get("disk") is not None else ""))
     else:
         s += "; no new chunk to store"
+    if w.get("d_role") and w.get("d_nixl") is not None and nixl:
+        s += (f". {w['d_role']} started at {_f(w['d_added'])} ms (no wait) holding {w['d_held']:,} tokens, read "
+              f"{w['d_nixl']:,} from P's GPU over NIXL (posted at {_f(w.get('d_nixl_read'))} ms, in its GPU at "
+              f"{_f(w.get('d_nixl_received'))} ms; P freed its blocks at {_f(w.get('p_nixl_sent'))} ms)")
+        if w["d_loaded"]:
+            s += f", loaded {w['d_loaded']:,} from LMCache"
+        s += (f", computed {w['d_computed']:,} and gave its first token at {_f(w['d_first'])} ms; it decoded "
+              + (f"{w['n_out']} tokens " if w.get("n_out") else "") + f"until {_f(w['d_done'])} ms")
+        s += (f"; its LMCache connector stored {_n(w['d_chunks'], 'new chunk')}" if w.get("d_chunks") else "") + "."
+        return s
     if w.get("d_role"):
         s += (f". After the {wait_ms:,.0f} ms store wait, {w['d_role']} started at {_f(w['d_added'])} ms holding "
               f"{w['d_held']:,} tokens")
@@ -1202,11 +1364,11 @@ def turn_story(w, wait_ms):
     return s
 
 
-TL_COLORS = {"wait": "#D3D1C7", "compute": "#7F77DD", "reserved": "#FAC775", "memory": "#EF9F27", "disk": "#1D9E75", "find": "#85B7EB",
-             "copy": "#185FA5", "decode": "#CECBF6"}
+TL_COLORS = {"wait": "#D3D1C7", "compute": "#7F77DD", "reserved": "#FAC775", "memory": "#EF9F27", "disk": "#1D9E75",
+             "find": "#85B7EB", "copy": "#185FA5", "nixl": "#D85A30", "decode": "#CECBF6"}
 
 
-def timeline_svg(rows, mode, wait_ms):
+def timeline_svg(rows, mode, wait_ms, nixl=False):
     """One conversation's turns as lanes (P, LMCache, D) on one time axis: ms from the turn's send to P. An SVG
     GitHub shows as an image: fixed colors on a white ground."""
     import html
@@ -1225,7 +1387,7 @@ def timeline_svg(rows, mode, wait_ms):
         if label and xb - xa <= len(label) * 6.2 + 8 and " " in label:
             label = label.rsplit(" ", 1)[1]          # "compute 32" -> "32" where only the number fits
         if label and xb - xa > len(label) * 6.2 + 8:
-            fg = "#ffffff" if kind in ("compute", "disk", "copy") else "#2C2C2A"
+            fg = "#ffffff" if kind in ("compute", "disk", "copy", "nixl") else "#2C2C2A"
             out.append(f'<text x="{(xa + xb) / 2:.1f}" y="{yy + LANE - 3.5}" text-anchor="middle" font-size="10.5" '
                        f'fill="{fg}">{html.escape(label)}</text>')
 
@@ -1251,17 +1413,26 @@ def timeline_svg(rows, mode, wait_ms):
         y += LANE + GAP
         if w.get("d_role"):
             text(20, y + LANE - 3, w["d_role"])
-            bar(w.get("p_done"), w.get("d_added"), y, "wait", "store wait")
+            bar(w.get("p_done"), w.get("d_added"), y, "wait", "store wait" if not nixl else "")
             bar(w.get("d_added"), w.get("d_find"), y, "wait")
-            bar(w.get("d_find"), w.get("d_found"), y, "find", "find" + ("+read" if mode != "memory" else ""))
+            bar(w.get("d_find"), w.get("d_found"), y, "find", "find" + ("+read" if mode != "memory" and not nixl else ""))
             bar(w.get("d_found"), w.get("d_copy"), y, "wait")              # D's scheduler picks the answer up
             bar(w.get("d_copy"), w.get("d_received"), y, "copy", "copy")
-            start = w.get("d_received") or w.get("d_found") or w.get("d_added")
+            bar(w.get("d_nixl_read"), w.get("d_nixl_received"), y, "nixl", "NIXL")
+            start = (w.get("d_nixl_received") or w.get("d_received") or w.get("d_found") or w.get("d_added"))
             bar(start, w.get("d_first"), y, "compute", f"compute {w['d_computed']:,}")
             if w.get("d_first") is not None and w.get("d_done") is not None:
                 bar(w["d_first"], min(w["d_done"], A), y, "decode")
                 text(X1 + 4, y + LANE - 3, f"→ {w['d_done'] / 1000:.2f} s", 10.5, fill="#5F5E5A")
             y += LANE + GAP
+            if w.get("d_chunks"):                    # D's own LMCache connector stored chunks too
+                text(20, y + LANE - 3, f"LMCache ({w['d_role']})")
+                if w.get("d_mem_written") is not None:
+                    bar(w["d_mem_written"], w["d_disk"] if w.get("d_disk") is not None else A, y, "memory",
+                        f"{_n(w['d_chunks'], 'chunk')} in memory")
+                if w.get("d_disk") is not None:
+                    bar(w["d_disk"], A, y, "disk", "on disk")
+                y += LANE + GAP
         y += 10
     # the axis
     out.append(f'<line x1="{X0}" y1="{y}" x2="{X1}" y2="{y}" stroke="#888780" stroke-width="0.7"/>')
@@ -1273,9 +1444,10 @@ def timeline_svg(rows, mode, wait_ms):
          anchor="end", fill="#5F5E5A")
     y += 46
     items = [("wait", "waiting (queue, store wait)"), ("compute", "computing (prefill, D's rest)"),
-             ("reserved", "LMCache memory reserved (P's copy under way)"), ("memory", "in LMCache memory"), ("disk", "on disk"), ("find", "D finds it" + (" (reads the disk)" if
-                                                                                           mode != "memory" else "")),
-             ("copy", "copy into D's GPU"), ("decode", "decoding the answer")]
+             ("reserved", "LMCache memory reserved (P's copy under way)"), ("memory", "in LMCache memory"), ("disk", "on disk"), ("find", "D asks LMCache (its lookup)" if nixl else
+                                                     "D finds it" + (" (reads the disk)" if mode != "memory" else "")),
+             ("copy", "copy into D's GPU"), *([("nixl", "D reads P's GPU over NIXL")] if nixl else []),
+             ("decode", "decoding the answer")]
     lx = 10
     for kind, label in items:
         if kind == "disk" and mode == "memory":
@@ -1321,7 +1493,10 @@ def conversation_views(R, out, conversations=None):
         key = next((k for k, px in R.proxy.items() if px.get("tag") == tag), None)
         convs[t.get("conv")].append((t, by_key.get(key, {}), key))
     mode = R.mode
-    index = [f"# The conversations, one by one: {mode} mode", "",
+    nixl = R.transfer == "nixl"
+    routing = ("round-robin: each turn to the next D engine" if R.env.get("routing") == "round_robin" else
+               "routed by conversation")
+    index = [f"# The conversations, one by one: {R.label}", "",
              "Each page follows one MTRAG conversation turn by turn: the prompt's pieces, the 256-token chunks LMCache "
              "keeps them in, each chunk's 16 vLLM blocks, and what happened to every chunk on P, in LMCache and on the "
              "conversation's D engine. Built by scripts/lmc_lifecycle.py from the run's trace. " + src_txt, "",
@@ -1332,22 +1507,26 @@ def conversation_views(R, out, conversations=None):
         turns = sorted(convs[conv], key=lambda x: x[0].get("turn", 0))
         head = turns[0][0]
         d_roles = sorted({x[1]["D"]["role"] for x in turns if "D" in x[1]})
-        md = [f"# Conversation {conv}: {head.get('domain')} ({mode} mode)", "",
-              f"{len(turns)} turns on {', '.join(d_roles) or '–'} (routed by conversation); prompts grow from "
+        md = [f"# Conversation {conv}: {head.get('domain')} ({R.label})", "",
+              (f"P's KV reaches D over NIXL (D reads P's GPU blocks); every engine's LMCache connector stores beside "
+               f"it, to {'the one shared server' if R.servers == 'shared' else 'its own server'}. " if nixl else "") +
+              f"{len(turns)} turns on {', '.join(d_roles) or '–'} ({routing}); prompts grow from "
               f"{head['prompt_tokens']:,} to {turns[-1][0]['prompt_tokens']:,} tokens (interleaved: each turn's prompt "
               "is the previous one, its answer, then this turn's documents and question). Chunks are 256 tokens "
               f"({ch // BLOCK} vLLM blocks of {BLOCK}); a chunk's name is LMCache's hash of its tokens and everything "
               "before them, so the same prefix has the same chunks on every turn and engine.", "",
               "Legend for the strips (one character a chunk): P: `=` on P's GPU from an earlier turn, `#` computed "
               "and stored now, `+` computed, not stored (a partial chunk). D: `=` on D's GPU from an earlier turn, "
-              "`M` pulled from memory, `S` pulled from disk, `+` computed by D (a partial chunk), `?` missed.", "",
-              "GPU blocks (the chunk tables): the slots in each engine's GPU KV cache (vLLM's block pool ids; slot 0 is "
-              "its reserved null block) that hold the chunk's 16 vLLM blocks, in block order, a run of consecutive "
-              "slots written as a range: `P 1, 138-152` is block 0 in slot 1 and blocks 1-15 in slots 138-152. An "
-              "engine hands a block a slot from its free list when it first computes or loads it, and the block keeps "
-              "it while cached, so a later turn that reuses the block shows the same slot. Blocks that are the same "
-              "in several prompts (the same tokens and everything before them) share one slot once the first is "
-              "cached: the system prompt's first block, the same in every conversation, is the usual one. "
+              "`M` pulled from memory, `S` pulled from disk, `N` read from P's GPU over NIXL, `+` computed by D (a "
+              "partial chunk), `?` missed.", "",
+              "GPU blocks (the chunk tables): where each engine keeps the chunk's 16 vLLM blocks in its GPU KV cache, "
+              "by vLLM's block ids (vLLM's paged KV cache: a block, or page, holds 16 tokens; block 0 is its reserved "
+              "null block), in the prompt's block order, a run of consecutive ids written as a range: `P 1, 138-152` "
+              "is the prompt's block 0 in GPU block 1 and its blocks 1-15 in GPU blocks 138-152. An engine takes a "
+              "GPU block from its free list when it first computes or loads a block, and the block keeps it while "
+              "cached, so a later turn that reuses the block shows the same id. Blocks that are the same in several "
+              "prompts (the same tokens and everything before them) share one GPU block once the first is cached: the "
+              "system prompt's first block, the same in every conversation, is the usual one. "
               "`16/16 hashes = P's`: of the blocks D pulled, how many have the same vLLM hash on D as on P.", "",
               src_txt, "",
               "| turn | prompt | chunks + tail | P: own GPU / computed / stored | D: own GPU / loaded / computed | "
@@ -1399,6 +1578,16 @@ def conversation_views(R, out, conversations=None):
             if ret is not None:                      # D's blocks that LMCache loaded into
                 for k, b in enumerate(ret.get("blocks") or []):
                     d_gpu.setdefault(ret["start"] // BLOCK + k, b)
+            d_nixl = 0
+            nx_read = first((D or {}).get("nixl_reads") or [], lambda r_: r_.get("local"))
+            if D is not None:
+                _a, _b, d_lmc_, d_nixl, _c = R.split(D)
+                if not ret:
+                    d_load = d_lmc_
+                nx_local = ((D.get("nixl_recv") or {}).get("local") or [])
+                for k, b in enumerate(nx_local):     # D's blocks the NIXL read went into, from its first one it lacks
+                    d_gpu.setdefault(d_hit // BLOCK + k, b)
+            nx_lo, nx_hi = d_hit, d_hit + d_nixl     # the prompt's tokens D read from P
             rows, p_strip, d_strip = [], [], []
             stored_now = pulled = held = 0
             tiers = collections.Counter()
@@ -1406,13 +1595,14 @@ def conversation_views(R, out, conversations=None):
                 lo, hi = j * ch, min((j + 1) * ch, n)
                 whole = hi - lo == ch
                 h = hashes[j] if whole and j < len(hashes) else None
-                c = R.chunks.get(h) if h else None
+                c = R.chunk_on(h, "P")                       # the chunk on P's server, and on D's
+                c_d = R.chunk_on(h, (D or {}).get("role", "P"))
                 inside = []
                 for p in pieces:
                     a, b = max(p[2], lo), min(p[3], hi)
                     if a < b:
                         inside.append(f"{_piece(p)}{' (new)' if p[2] >= prev_len and t.get('turn') else ''}: {b - a}")
-                prd, drd = read_of(c, True), read_of(c, False)
+                prd, drd = read_of(c, True), read_of(c_d, False)
                 # P
                 if not whole:
                     p_txt, p_ch = "computed (partial chunk: not stored)", "+"
@@ -1425,16 +1615,33 @@ def conversation_views(R, out, conversations=None):
                     p_txt, p_ch = "on P's GPU (earlier turn)", "="
                 else:
                     p_txt, p_ch = (prd or {}).get("how", "computed"), "#"
-                # LMCache
-                if c is not None and c.get("t_l1_written") is not None:
-                    sreq = R.engine_of(c.get("stored_by"))
-                    lmc_txt = f"`{h}` stored on turn {(sreq or {}).get('turn')}"
-                    if c.get("t_l2_stored") is not None:
-                        lmc_txt += ", on disk" + (", out of memory" if c.get("t_l1_removed") else "")
+                # LMCache: the chunk on each server that has it
+                def on_server(cc):
+                    sreq = R.engine_of(cc.get("stored_by"))
+                    txt = f"stored on turn {(sreq or {}).get('turn')}" + (f" by {sreq['role']}" if nixl and sreq else "")
+                    if cc.get("t_l2_stored") is not None:
+                        txt += ", on disk" + (", out of memory" if cc.get("t_l1_removed") else "")
+                    return txt
+                held_by = [cc for cc in R.chunks_of(h) if cc.get("t_l1_written") is not None] if h else []
+                if held_by and R.servers == "shared":
+                    lmc_txt = f"`{h}` {on_server(held_by[0])}"
+                elif held_by:
+                    lmc_txt = f"`{h}`: " + "; ".join(f"{cc['server']}: {on_server(cc)}" for cc in held_by)
                 else:
                     lmc_txt = "–" if not whole else (f"`{h}` not stored" if h else "–")
                 # D
-                if not whole:
+                in_nixl = D is not None and d_nixl and lo < nx_hi and hi > nx_lo
+                if in_nixl:
+                    d_txt, d_ch = "**read from P's GPU over NIXL**", "N"
+                    if lo < nx_lo:
+                        d_txt += f" (its first {nx_lo - lo} tokens on D's GPU already)"
+                    if hi > nx_hi:
+                        d_txt += f" (its last {hi - nx_hi} computed by D)"
+                    if not whole:
+                        d_txt += " (partial chunk)"
+                    pulled += 1
+                    tiers["NIXL"] += 1
+                elif not whole:
                     d_txt, d_ch = "computed by D (partial chunk)", "+"
                 elif drd and drd["how"] == "pulled":
                     tier = drd.get("tier") or "?"
@@ -1459,11 +1666,33 @@ def conversation_views(R, out, conversations=None):
                 if drd and drd.get("d_blocks"):
                     ok = [b["same_as_p"] for b in drd["d_blocks"] if b["same_as_p"] is not None]
                     same = f"; {sum(ok)}/{len(ok)} hashes = P's" if ok else ""
+                elif in_nixl and P is not None:      # D cached the blocks it read under the hashes P gave them
+                    idx = [i for i in range(max(lo, nx_lo) // BLOCK, min(hi, nx_hi) // BLOCK)]
+                    ok = [D["cached"][i][1] == P["cached"][i][1] for i in idx if i in D["cached"] and i in P["cached"]]
+                    same = f"; {sum(ok)}/{len(ok)} hashes = P's" if ok else ""
                 rows.append(f"| {j} | {lo}-{hi} | {'; '.join(inside)} | {blocks} | P {pg}; D {dg}{same} | {lmc_txt} | "
                             f"{p_txt} | {d_txt} |")
                 p_strip.append(p_ch)
                 d_strip.append(d_ch)
-                # one chunk, block by block: the first one pulled in this conversation
+                # one chunk, block by block: the first one D read from P over NIXL in this conversation
+                if (not lineage_done and in_nixl and whole and lo >= nx_lo and hi <= nx_hi and nx_read and P
+                        and D is not None):
+                    lineage_done = True
+                    first_new = d_hit // BLOCK
+                    lin = [f"### One chunk, block by block: chunk {j} of turn {t.get('turn')} (`{h}`)", "",
+                           f"Tokens {lo}-{hi} ({'; '.join(inside)}). P computed its blocks; {D['role']} read them from "
+                           "P's GPU over NIXL, P's block into D's block, one for one:", "",
+                           "| block | tokens | P's GPU block | vLLM hash on P | D's GPU block | same hash on D |",
+                           "| ---: | --- | ---: | --- | ---: | --- |"]
+                    for i in range(lo // BLOCK, hi // BLOCK):
+                        k = i - first_new
+                        loc, rem = nx_read.get("local") or [], nx_read.get("remote") or []
+                        pc, dc = P["cached"].get(i), D["cached"].get(i)
+                        lin.append(f"| {i} | {i * BLOCK}-{(i + 1) * BLOCK} | {fmt(rem[k] if 0 <= k < len(rem) else None)}"
+                                   f" | `{pc[1] if pc else '–'}` | {fmt(loc[k] if 0 <= k < len(loc) else None)} | "
+                                   f"{(pc[1] == dc[1]) if pc and dc else '–'} |")
+                    lin.append("")
+                    lineage = lin
                 if not lineage_done and drd and drd["how"] == "pulled" and drd.get("d_blocks") and c and c.get("p_blocks"):
                     lineage_done = True
                     pb = {b["index"]: b for b in c["p_blocks"]}
@@ -1487,15 +1716,18 @@ def conversation_views(R, out, conversations=None):
                 re_ = (srv.get("mp.retrieve.end") or [None])[-1]
                 if lk is not None and re_ is not None and d_load:
                     pull_ms = (re_["t"] - lk) * 1000
+                t_nr = first([x["t"] for x in D.get("nixl_reads") or []])
+                if d_nixl and t_nr is not None and D.get("t_nixl_received") is not None:
+                    pull_ms = (D["t_nixl_received"] - t_nr) * 1000      # the NIXL read, posted to done
             px = R.proxy.get(key, {})
             ft = None
             if D is not None and px.get("t_first_byte") and D.get("t_added"):
                 ft = (px["t_first_byte"] - D["t_added"]) * 1000
             p_comp = max(0, n - p_hit)
-            d_comp = max(0, n - d_hit - d_load)
+            d_comp = max(0, n - d_hit - d_load - d_nixl)
             md.append(f"| [{t.get('turn')}](#turn-{t.get('turn')}) | {n:,} | {nfull} + {tail} | {p_hit:,} / {p_comp:,} / "
-                      f"{_n(stored_now, 'chunk')} | {d_hit:,} / {d_load:,} / {d_comp:,} | {pulled} chunks"
-                      f"{' (' + ', '.join(('disk' if k == 'L2' else 'memory') + f' {v}' for k, v in tiers.items()) + ')' if tiers else ''}"
+                      f"{_n(stored_now, 'chunk')} | {d_hit:,} / {d_load + d_nixl:,} / {d_comp:,} | {pulled} chunks"
+                      f"{' (' + ', '.join(({'L2': 'disk', 'NIXL': 'NIXL'}.get(k, 'memory')) + f' {v}' for k, v in tiers.items()) + ')' if tiers else ''}"
                       f" | {fmt(pull_ms, 1)} | {fmt(ft, 1)} |")
             totals.update(stored=stored_now, pulled=pulled, held=held)
             g_row, question = growth_row(t, pieces, texts, prev_len, ch)
@@ -1523,19 +1755,25 @@ def conversation_views(R, out, conversations=None):
             if w:
                 tl_rows.append((t.get("turn"), w))
             evs = turn_events(R, rq.get("P"), rq.get("D"), R.proxy.get(key, {}), wait_ms)
+            how_copies = (
+                "P's KV reaches D over NIXL: D's worker reads P's GPU blocks into its own (a NIXL READ, P told when "
+                "D is done); LMCache's copies (to and from each server's memory) its servers do themselves through "
+                "CUDA IPC handles each engine registered at start." if nixl else
+                "The copies are LMCache's: its server reads P's GPU blocks and writes D's through CUDA IPC handles "
+                "each engine registered at start (no NIXL in this setup).")
             events_md = (["### Step by step", "",
-                          "Every move of this turn's KV, ms from the proxy sending the turn to P. The copies are "
-                          "LMCache's: its server reads P's GPU slots and writes D's through CUDA IPC handles each "
-                          "engine registered at start (no NIXL in this setup).", "",
+                          "Every move of this turn's KV, ms from the proxy sending the turn to P. " + how_copies, "",
                           "| ms | where | what |", "| ---: | --- | --- |"]
                          + [f"| {ms:,.1f} | {where} | {what} |" for ms, where, what in evs] + [""]) if evs else []
             detail += [f"## Turn {t.get('turn')}", "",
-                       *(["**Timeline:** " + turn_story(w, wait_ms) + " ([all turns](#timeline))", ""] if w else []),
+                       *(["**Timeline:** " + turn_story(w, wait_ms, nixl) + " ([all turns](#timeline))", ""] if w else []),
                        *events_md,
                        f"{n:,} prompt tokens: {_n(nfull, 'whole chunk')} and {tail} tokens over (the partial chunk, computed "
                        "by both engines and stored only when a later turn completes it). "
                        f"P held {p_hit:,} tokens on its GPU, computed {p_comp:,} and stored {_n(stored_now, 'new chunk')}; "
-                       f"{(D or {}).get('role', 'D')} held {d_hit:,}, loaded {d_load:,} from LMCache and computed {d_comp:,}.",
+                       f"{(D or {}).get('role', 'D')} held {d_hit:,}, "
+                       + (f"read {d_nixl:,} from P over NIXL, " if nixl else "")
+                       + f"loaded {d_load:,} from LMCache and computed {d_comp:,}.",
                        ""] + prompt_md + ["### Pieces, chunks and blocks", "",
                                           "| piece | tokens | length | chunks | |", "| --- | --- | ---: | --- | --- |"]
             for p in pieces:
@@ -1550,35 +1788,61 @@ def conversation_views(R, out, conversations=None):
         timeline = []
         if tl_rows:
             svg_name = f"conversation_{conv}_timeline.svg"
-            (out / svg_name).write_text(timeline_svg(tl_rows, mode, wait_ms))
-            timeline = ["## Timeline", "",
-                        "Every turn on one clock: ms from the moment the proxy sent the turn to P. P prefills it (one "
-                        "token out) and stores its new whole chunks in LMCache; the proxy waits "
-                        f"{wait_ms:,.0f} ms after P is done (the store wait) and sends the turn to "
-                        f"{', '.join(d_roles) or 'D'}, which finds what LMCache has"
-                        + (" (reading it from disk)" if mode != "memory" else "") + ", copies it into its GPU, "
-                        "computes the rest and decodes the answer. The lanes: P, LMCache (the chunks P stored this "
-                        "turn) and D. P computes the KV into its own GPU slots, where it stays (the next turn reuses "
-                        "it); its LMCache connector, set to store (P runs as kv_both), copies each new whole chunk "
-                        "from those slots to LMCache: LMCache reserves the space when P schedules the prefill (light "
-                        "orange) and has the chunks as P's prefill completes (orange).", "", f"![timeline of conversation {conv}]({svg_name})", "",
-                        "| turn | P queued → done | chunks stored | in memory | on disk | D starts | D finds"
-                        + (" (+ disk read)" if mode != "memory" else "") + " | copy into D's GPU | D: held / pulled / "
-                        "computed | first token | D done |",
-                        "| ---: | --- | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | ---: |"]
-            for turn, w in tl_rows:
-                pulled = f"{w.get('d_loaded') or 0:,}" + (f" from {w['d_from']}" if w.get("d_from") else "")
-                timeline.append(
-                    f"| {turn} | {_f(w['p_start'])} → {_f(w['p_done'])} | {w['chunks']} | {_f(w['mem_written'])} | "
-                    f"{_f(w.get('disk'))}{' (out of memory)' if w.get('mem_out') and w.get('disk') is not None else ''} | "
-                    f"{_f(w.get('d_added'))} | {_f(w.get('d_find'))}-{_f(w.get('d_found'))} | "
-                    + (f"{_f(w.get('d_copy'))}-{_f(w.get('d_received'))}" if w.get("d_loaded") else "–")
-                    + f" | {w.get('d_held', 0):,} / {pulled} / {w.get('d_computed', 0):,} | {_f(w.get('d_first'))} | "
-                    f"{_f(w.get('d_done'))} |")
-            timeline += ["", "All times in ms from the turn's send to P. \"in memory\": the last of the turn's chunks "
+            (out / svg_name).write_text(timeline_svg(tl_rows, mode, wait_ms, nixl))
+            nixl_intro = ("Every turn on one clock: ms from the moment the proxy sent the turn to P. P prefills it (one "
+                          "token out) and holds its blocks for D; the proxy sends the turn to the next D engine at once "
+                          "with P's reply's kv_transfer_params (no wait), D reads P's blocks over NIXL (orange-red), "
+                          "computes the rest and decodes the answer. Beside it every engine's LMCache connector stores "
+                          "its new whole chunks (P's lane, and D's own when it stored any). The lanes: P, LMCache (P's "
+                          "chunks), D, and LMCache (D's chunks).")
+            store_intro = (
+                "Every turn on one clock: ms from the moment the proxy sent the turn to P. P prefills it (one "
+                "token out) and stores its new whole chunks in LMCache; the proxy waits "
+                f"{wait_ms:,.0f} ms after P is done (the store wait) and sends the turn to "
+                f"{', '.join(d_roles) or 'D'}, which finds what LMCache has"
+                + (" (reading it from disk)" if mode != "memory" else "") + ", copies it into its GPU, "
+                "computes the rest and decodes the answer. The lanes: P, LMCache (the chunks P stored this "
+                "turn) and D. P computes the KV into its own GPU blocks, where it stays (the next turn reuses "
+                "it); its LMCache connector, set to store (P runs as kv_both), copies each new whole chunk "
+                "from those blocks to LMCache: LMCache reserves the space when P schedules the prefill (light "
+                "orange) and has the chunks as P's prefill completes (orange).")
+            timeline = ["## Timeline", "", nixl_intro if nixl else store_intro, "",
+                        f"![timeline of conversation {conv}]({svg_name})", ""]
+            if nixl:
+                timeline += ["| turn | P queued → done | P's chunks: in memory / on disk | D | D starts | NIXL read | "
+                             "D: held / from P / from LMCache / computed | D's chunks stored | first token | P freed | "
+                             "D done |",
+                             "| ---: | --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: |"]
+                for turn, w in tl_rows:
+                    timeline.append(
+                        f"| {turn} | {_f(w['p_start'])} → {_f(w['p_done'])} | {w['chunks']}: {_f(w['mem_written'])} / "
+                        f"{_f(w.get('disk'))} | {w.get('d_role', '–')} | {_f(w.get('d_added'))} | "
+                        f"{_f(w.get('d_nixl_read'))}-{_f(w.get('d_nixl_received'))} | {w.get('d_held', 0):,} / "
+                        f"{w.get('d_nixl') or 0:,} / {w.get('d_loaded') or 0:,} / {w.get('d_computed', 0):,} | "
+                        f"{w.get('d_chunks') or 0} | {_f(w.get('d_first'))} | {_f(w.get('p_nixl_sent'))} | "
+                        f"{_f(w.get('d_done'))} |")
+                timeline += ["", "All times in ms from the turn's send to P. NIXL read: D's worker posts the read of "
+                             "P's blocks to the KV in D's GPU blocks; P freed: D has read, P's blocks go back to its "
+                             "free queue (still cached). Each turn's section below tells it in a sentence and step by "
+                             "step."]
+            else:
+                timeline += ["| turn | P queued → done | chunks stored | in memory | on disk | D starts | D finds"
+                             + (" (+ disk read)" if mode != "memory" else "") + " | copy into D's GPU | D: held / pulled / "
+                             "computed | first token | D done |",
+                             "| ---: | --- | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | ---: |"]
+                for turn, w in tl_rows:
+                    pulled = f"{w.get('d_loaded') or 0:,}" + (f" from {w['d_from']}" if w.get("d_from") else "")
+                    timeline.append(
+                        f"| {turn} | {_f(w['p_start'])} → {_f(w['p_done'])} | {w['chunks']} | {_f(w['mem_written'])} | "
+                        f"{_f(w.get('disk'))}{' (out of memory)' if w.get('mem_out') and w.get('disk') is not None else ''} | "
+                        f"{_f(w.get('d_added'))} | {_f(w.get('d_find'))}-{_f(w.get('d_found'))} | "
+                        + (f"{_f(w.get('d_copy'))}-{_f(w.get('d_received'))}" if w.get("d_loaded") else "–")
+                        + f" | {w.get('d_held', 0):,} / {pulled} / {w.get('d_computed', 0):,} | {_f(w.get('d_first'))} | "
+                        f"{_f(w.get('d_done'))} |")
+                timeline += ["", "All times in ms from the turn's send to P. \"in memory\": the last of the turn's chunks "
                          "written into LMCache's memory; \"on disk\": the last one written to disk (then dropped from "
                          "memory, in the disk mode); D finds: from LMCache's lookup to its prefetch done (in the disk "
-                         "mode that is the read from disk); copy: LMCache's retrieve into D's GPU slots until D's "
+                         "mode that is the read from disk); copy: LMCache's retrieve into D's GPU blocks until D's "
                          "connector has it. Each turn's section below tells it in a sentence."]
         md += [""] + growth + [""] + timeline + [""] + (lineage if lineage_done else []) + detail
         name = f"conversation_{conv}.md"
@@ -1600,7 +1864,10 @@ def compare(dirs, out):
             runs.append((pathlib.Path(d).name, json.loads(p.read_text())))
     rows = [("LMCache server lasted the run", lambda n: not (n.get("health") or {}).get("server_crashed")),
             ("LMCache server errors", lambda n: (n.get("health") or {}).get("server_errors")),
-            ("chunks bound by P's stores", lambda n: n["chunks"]["stored"]),
+            ("P to D", lambda n: (n.get("env") or {}).get("transfer") or "lmcache"),
+            ("LMCache servers", lambda n: (n.get("env") or {}).get("servers") or "shared"),
+            ("chunks bound by the engines' stores", lambda n: n["chunks"]["stored"]),
+            ("chunks stored by", lambda n: n["chunks"].get("stored_by")),
             ("chunks written to memory", lambda n: n["chunks"].get("in_memory")),
             ("stored MB", lambda n: round(n["chunks"]["stored_bytes"] / 1e6, 1)),
             ("chunks to disk", lambda n: n["chunks"]["to_disk"]),
@@ -1609,7 +1876,11 @@ def compare(dirs, out):
             ("pulled from", lambda n: n["chunks"]["pulled_from"]),
             ("never pulled", lambda n: n["chunks"]["never_pulled"]),
             ("D tokens from own GPU", lambda n: n["D"]["local_hit_tokens"]),
-            ("D tokens loaded", lambda n: n["D"]["lmcache_loaded_tokens"]),
+            ("D tokens loaded from LMCache", lambda n: n["D"]["lmcache_loaded_tokens"]),
+            ("D tokens read from P over NIXL", lambda n: n["D"].get("nixl_read_tokens")),
+            ("NIXL read ms (median)", lambda n: ms(n["D"].get("nixl_read_s_median"))),
+            ("NIXL read ms (p90)", lambda n: ms(n["D"].get("nixl_read_s_p90"))),
+            ("P held its blocks for D, ms (median)", lambda n: ms(n["P"].get("nixl_held_s_median"))),
             ("D tokens computed", lambda n: n["D"]["computed_tokens"]),
             ("pull ms, memory (median)", lambda n: ms(n["D"]["pull_s_median_l1"])),
             ("pull ms, disk (median)", lambda n: ms(n["D"]["pull_s_median_l2"])),
@@ -1621,7 +1892,11 @@ def compare(dirs, out):
             ("memory to disk ms (median)", lambda n: ms(n["chunks"]["l1_to_l2_s_median"])),
             ("D lookups before P's store ended", lambda n: n["D"]["looked_up_before_p_store_end"]),
             ("checks", lambda n: "; ".join(f"{v}" for v in n["checks"].values()))]
-    md = ["# LMCache lifecycle: the modes side by side", "", "| | " + " | ".join(n["mode"] for _, n in runs) + " |",
+    def label(n):
+        e = n.get("env") or {}
+        return n["mode"] + ("" if (e.get("transfer") or "lmcache") == "lmcache" else
+                            f", NIXL, {(e.get('servers') or 'shared').replace('_', '-')}")
+    md = ["# LMCache lifecycle: the runs side by side", "", "| | " + " | ".join(label(n) for _, n in runs) + " |",
           "| --- |" + " ---: |" * len(runs)]
     table = {}
     for label, fn in rows:

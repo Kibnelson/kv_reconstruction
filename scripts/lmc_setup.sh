@@ -13,6 +13,7 @@
 #                              and our build of lmcache.cuda_ops in place of the wheel's
 #   $KV_RUNS/mtrag/conversations.json   IBM's MTRAG conversations (pinned commit, SHA-256 checked)
 #   the model, unsloth/Llama-3.2-3B at its pinned revision, in HF_HOME
+#   NIXL 1.5.2 in that environment (nixl-cu13 + nixl), for LMC_TRANSFER=nixl
 #
 # then checks that the overlay is what the engines will import (each hooked module from the overlay, with its hooks,
 # and kvtrace writing a record, and LMCache's compiled ops loading: ours). Options: KV_HOME, KV_RUNS, KV_HF_HOME, KV_UV
@@ -47,6 +48,14 @@ if ! "$LPY" -c "import vllm, lmcache, sys; sys.exit(0 if (vllm.__version__, lmca
     pip_in "$LPY" -q "vllm==0.32.0" "lmcache==0.5.7.post1" "aiohttp>=3.10" ninja
 fi
 "$LPY" -c "import vllm, lmcache, torch; print(f'   vllm {vllm.__version__}, lmcache {lmcache.__version__}, torch {torch.__version__} (CUDA {torch.version.cuda})')"
+# NIXL, for LMC_TRANSFER=nixl (vLLM's NixlConnector): the version our other vLLM 0.32 runs use (scripts/pd_setup.sh).
+# NIXL 1.5.2 is two wheels: nixl-cu13 (the library) and nixl (the module vLLM imports, which picks nixl_cuXX by
+# torch's CUDA); the nixl wheel requires nixl-cu12 too, and --no-deps keeps CUDA 12's copy out
+if ! "$LPY" -c "import torch; from nixl._api import nixl_agent" 2>/dev/null; then
+    pip_in "$LPY" -q "nixl-cu13==1.5.2" && pip_in "$LPY" -q --no-deps "nixl==1.5.2" || true
+fi
+"$LPY" -c "import torch; from nixl._api import nixl_agent; print('   NIXL 1.5.2 (nixl_cu13)')" 2>&1 | tail -n 3 || \
+    echo "WARNING: NIXL does not import (above): runs with LMC_TRANSFER=nixl will stop"
 pip_freeze "$LPY" > "$KV_HOME/pip_freeze_lmcache.txt" || true
 
 EXT=() NEED_OPS=()

@@ -108,6 +108,10 @@ class Proxy:
             if "max_completion_tokens" in p_body:
                 p_body["max_completion_tokens"] = 1
             if cfg["mode"] == "nixl":
+                # as vllm-router's prepare_prefill_request (src/routers/http/vllm_pd_router.rs): max_tokens and
+                # min_tokens 1, max_completion_tokens 1 when set, stream off, no stream_options; then its
+                # build_prefill_kv_transfer_params for NIXL, below, and P's reply's kv_transfer_params to D as they are
+                p_body["min_tokens"] = 1
                 p_body["kv_transfer_params"] = {"do_remote_decode": True, "do_remote_prefill": False,
                                                 "remote_engine_id": None, "remote_block_ids": None,
                                                 "remote_host": None, "remote_port": None}

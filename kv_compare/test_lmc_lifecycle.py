@@ -146,7 +146,8 @@ class Sim:
             rec["t"], rec["t_hook"] = rec.pop("_t"), t
         else:
             rec["t"] = t
-        rec["role"], rec["pid"] = role, {"P": 1, "D1": 2, "D2": 3, "D3": 4, "LMC": 5}[role]
+        rec["role"], rec["pid"] = role, {"P": 1, "D1": 2, "D2": 3, "D3": 4, "LMC": 5, "LMC_P": 6, "LMC_D1": 7,
+                                         "LMC_D2": 8, "LMC_D3": 9}[role]
         with open(self.d / "kvtrace" / f"kvtrace_{role}_{rec['pid']}.jsonl", "a") as fh:
             fh.write(json.dumps(rec, default=events_default) + "\n")
 
@@ -254,6 +255,154 @@ def simulate(d, mode="disk", race=False, reads_hook=True):
                                                    "store_policy": "skip_l1", "mtrag_limit": 1, "layout": "interleaved",
                                                    "store_wait_ms": 500, "d_role": "kv_consumer", "commit": "x"}))
     return key
+
+
+def simulate_nixl(d, mode="memory", servers="shared"):
+    """One turn as LMCache's P/D guide runs it: P computes a 69-token prompt and its LMCache connector stores 2
+    chunks; P holds its blocks for D; D1 reads them from P's GPU over NIXL (MultiConnector: NIXL has the tokens
+    first, so LMCache's lookup loads nothing) and its LMCache connector stores the prompt's chunks too: to the shared
+    server (which has them already) or to its own (a second copy)."""
+    s = Sim(d)
+    key = "cd" * 16
+    prid, drid = f"cmpl-{key}-0-11112222", f"cmpl-{key}-0-33334444"
+    ids = list(range(2000, 2069))
+    hashes = [hb(i + 1) for i in range(4)]
+    c0, c1 = hb(0x50, 32), hb(0x51, 32)
+    pr = Req(prid, 69, hashes)
+    dr = Req(drid, 69, hashes)
+    dr.kv_transfer_params = {"do_remote_prefill": True, "remote_block_ids": [[10, 11, 12, 13, 14]],
+                             "remote_engine_id": "engP", "remote_request_id": prid, "remote_num_tokens": 69}
+    sp, sd = ("LMC", "LMC") if servers == "shared" else ("LMC_P", "LMC_D1")
+    t = 100.0
+    s.hook("P", t, "vllm.request.added", request=pr)
+    s.hook("P", t + .001, "vllm.gpu.prefix_hit", request=pr, tokens=0, blocks=Blocks([]))
+    s.hook(sp, t + .0012, "lmc.bus", event=Ev("mp.lookup", prid, request_id=prid, chunk_hashes=[c0, c1],
+                                               model_name="m", chunk_size=32, seq_len=69, token_ids=ids))
+    s.hook(sp, t + .0015, "lmc.bus", event=Ev("mp.lookup_prefetch.end", prid, found_count=0, l1_hit_tokens=0,
+                                               l2_hit_tokens=0, hit_tokens=0))
+    s.hook("P", t + .002, "lmc.conn.lookup", request=pr, vllm_hit=0, lmc_hit=0, load=0)
+    s.hook("P", t + .003, "vllm.gpu.allocated", request=pr, new_blocks=([Blk(10), Blk(11), Blk(12), Blk(13), Blk(14)],),
+           num_new_tokens=69, num_new_computed_tokens=0, num_external_computed_tokens=0, delay=False)
+    s.hook("P", t + .050, "vllm.gpu.cached", request=pr, blocks=[Blk(10), Blk(11), Blk(12), Blk(13)], first=0,
+           hashes=hashes, group=0, mask=None, block_size=16)
+    s.hook("P", t + .051, "lmc.conn.store_planned", meta=Meta(prid, Op(0, 64, [10, 11, 12, 13])))
+    s.hook("P", t + .052, "lmc.conn.store_submitted", request_ids=[prid])
+    s.hook(sp, t + .053, "lmc.bus", event=Ev("mp.store.submitted", prid, device="cuda:0"))
+    s.hook(sp, t + .055, "lmc.bus", event=Ev("mp.tokens", prid, chunk_hashes=[c0, c1],
+                                              token_chunks=[ids[0:32], ids[32:64]], token_offsets=[0, 32],
+                                              parent_hashes=[None, c0]))
+    s.hook(sp, t + .056, "lmc.bus", event=Ev("l1.write.reserved", keys=[ObjKey(c0), ObjKey(c1)], l1_tag="l1", tag=None))
+    s.hook(sp, t + .070, "lmc.bus", event=Ev("l1.write.finished", keys=[ObjKey(c0), ObjKey(c1)], l1_tag="l1",
+                                              meta=[Size(1000), Size(1000)]))
+    s.hook(sp, t + .071, "lmc.bus", event=Ev("mp.store.end", prid, stored_count=2, total_bytes=2000, num_tokens=64))
+    s.hook("P", t + .060, "nixl.request_finished", request=pr, delay=True, blocks=([10, 11, 12, 13, 14],),
+           num_tokens=69, is_p=True)
+    s.hook("P", t + .060, "vllm.request.finished", request=pr, delay=True)
+    # D1, as soon as P answered: NIXL first in MultiConnector, so it loads; LMCache is asked too
+    t2 = t + .070
+    s.hook("D1", t2, "vllm.request.added", request=dr)
+    s.hook("D1", t2 + .001, "vllm.gpu.prefix_hit", request=dr, tokens=0, blocks=Blocks([]))
+    s.hook(sd, t2 + .0012, "lmc.bus", event=Ev("mp.lookup", drid, request_id=drid, chunk_hashes=[c0, c1],
+                                                model_name="m", chunk_size=32, seq_len=69, token_ids=ids))
+    found = 2 if servers == "shared" else 0
+    s.hook(sd, t2 + .003, "lmc.bus", event=Ev("mp.lookup_prefetch.end", drid, found_count=found,
+                                               l1_hit_tokens=32 * found, l2_hit_tokens=0, hit_tokens=32 * found))
+    s.hook("D1", t2 + .004, "nixl.match", request=dr, count=69, computed=0)
+    s.hook("D1", t2 + .004, "lmc.conn.lookup", request=dr, vllm_hit=0, lmc_hit=32 * found, load=32 * found)
+    s.hook("D1", t2 + .005, "vllm.gpu.allocated", request=dr, new_blocks=([Blk(20), Blk(21), Blk(22), Blk(23),
+                                                                          Blk(24)],),
+           num_new_tokens=0, num_new_computed_tokens=0, num_external_computed_tokens=69, delay=True)
+    s.hook("D1", t2 + .006, "nixl.recv_planned", request=dr, local=([20, 21, 22, 23, 24],), computed_blocks=(0,),
+           external=69, params=dr.kv_transfer_params)
+    s.hook("D1", t2 + .007, "nixl.handshake", phase="start", host="127.0.0.1", port=5600, engine="engP")
+    s.hook("D1", t2 + .017, "nixl.handshake", phase="done", host="127.0.0.1", port=5600, engine="engP")
+    s.hook("D1", t2 + .018, "nixl.read", req_id=drid, local=([20, 21, 22, 23, 24],), remote=([10, 11, 12, 13, 14],),
+           engine="engP")
+    s.hook("D1", t2 + .030, "nixl.done", sending=set(), recving={drid}, failed=set())
+    s.hook("P", t2 + .031, "nixl.done", sending={prid}, recving=set(), failed=set())
+    s.hook("D1", t2 + .032, "vllm.gpu.cached", request=dr, blocks=[Blk(20), Blk(21), Blk(22), Blk(23)], first=0,
+           hashes=hashes, group=0, mask=None, block_size=16)
+    s.hook("D1", t2 + .033, "lmc.conn.store_planned", meta=Meta(drid, Op(0, 64, [20, 21, 22, 23])))
+    s.hook(sd, t2 + .035, "lmc.bus", event=Ev("mp.tokens", drid, chunk_hashes=[c0, c1],
+                                               token_chunks=[ids[0:32], ids[32:64]], token_offsets=[0, 32],
+                                               parent_hashes=[None, c0]))
+    if servers != "shared":                                            # D's own server: a second copy
+        s.hook(sd, t2 + .036, "lmc.bus", event=Ev("l1.write.reserved", keys=[ObjKey(c0), ObjKey(c1)], l1_tag="l1",
+                                                   tag=None))
+        s.hook(sd, t2 + .045, "lmc.bus", event=Ev("l1.write.finished", keys=[ObjKey(c0), ObjKey(c1)], l1_tag="l1",
+                                                   meta=[Size(1000), Size(1000)]))
+        if mode == "disk":
+            s.hook(sd, t2 + .060, "lmc.bus", event=Ev("l2.keys.stored", keys=[ObjKey(c0), ObjKey(c1)],
+                                                       sizes=[1000, 1000], backend="fs", shared=False))
+    s.hook("D1", t2 + .200, "vllm.request.finished", request=dr, delay=False)
+    tag = "lmc_memory_nixl_shared|0|0"
+    (Path(d) / "proxy.jsonl").write_text(json.dumps({"key": key, "dest": 0, "prefill": 0, "conv": "lmc:0", "tag": tag,
+                                                      "t_in": t - .01, "t_prefill_done": t + .065,
+                                                      "t_first_byte": t2 + .05}) + "\n")
+    (Path(d) / "mtrag.jsonl").write_text(json.dumps({"tag": tag, "conv": 0, "turn": 0, "prompt_tokens": 69,
+                                                      "pieces": [["system", None, 0, 10], ["doc", "d1", 10, 60],
+                                                                 ["user", 0, 60, 69]], "ids": ids}) + "\n")
+    roles = ["LMC"] if servers == "shared" else ["LMC_P", "LMC_D1", "LMC_D2", "LMC_D3"]
+    eng = {e: (roles[0] if servers == "shared" else f"LMC_{e}") for e in ("P", "D1", "D2", "D3")}
+    (Path(d) / "env.json").write_text(json.dumps({
+        "mode": mode, "chunk": 32, "l1_gb": 16, "eviction": "LRU", "store_policy": "default", "mtrag_limit": 1,
+        "layout": "interleaved", "store_wait_ms": 0.0, "d_role": "kv_both", "commit": "x", "transfer": "nixl",
+        "servers": servers, "server_roles": roles, "engine_server": eng, "routing": "round_robin"}))
+    return key
+
+
+class NixlReportTests(unittest.TestCase):
+    def run_nixl(self, servers):
+        run, out = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate_nixl(run, servers=servers)
+        nums = lmc_lifecycle.write_report(run, out)
+        return nums, out
+
+    def test_d_reads_p_over_nixl_and_loads_nothing_from_lmcache(self):
+        nums, out = self.run_nixl("shared")
+        self.assertEqual(nums["D"]["nixl_read_tokens"], 69)
+        self.assertEqual(nums["D"]["requests_reading_nixl"], 1)
+        self.assertEqual(nums["D"]["lmcache_loaded_tokens"], 0)         # LMCache's lookup found it; NIXL loaded it
+        self.assertEqual(nums["D"]["computed_tokens"], 0)
+        self.assertAlmostEqual(nums["D"]["nixl_read_s_median"], 0.012, places=6)
+        self.assertAlmostEqual(nums["P"]["nixl_held_s_median"], 0.041, places=6)
+        self.assertEqual(nums["nixl"], {"handshakes": 1, "failed_reads": 0})
+        self.assertEqual(nums["chunks"]["pulled"], 0)
+        self.assertEqual(nums["chunks"]["stored_by"], {"P": 2})          # D's are the same chunks: one copy
+        summary = (out / "summary.md").read_text()
+        self.assertIn("# LMCache lifecycle: memory mode, NIXL, shared servers", summary)
+        self.assertIn("| read from P's GPU over NIXL | – | 69 |", summary)
+        page = (out / "conversations" / "conversation_0.md").read_text()
+        self.assertIn("**read from P's GPU over NIXL**", page)
+        self.assertIn("D  NNN", page)                                    # 2 whole chunks and the partial one
+        self.assertIn("P 10-11; D 20-21; 2/2 hashes = P's", page)
+        self.assertIn("| P GPU | the request is done: P holds its 5 blocks for D to read over NIXL", page)
+        self.assertIn("| proxy → D1 | sends the turn to D1 at once, with P's kv_transfer_params (round-robin; no wait) |",
+                      page)
+        self.assertIn("| P GPU → D1 GPU (NIXL) | D1 reads P's GPU blocks 10-14 into its 20-24 (a NIXL READ) |", page)
+        self.assertIn("| P GPU | D1 has read: P frees its blocks (they stay in its prefix cache) |", page)
+        self.assertIn("| D1 ↔ P (NIXL) | handshake starts: first contact with P's NIXL agent |", page)
+        self.assertIn("| 0 | 0-16 | 10 | `0101010101010101` | 20 | True |", page)   # P's block 10 into D's 20
+        self.assertIn("| D1 GPU | 5 new GPU blocks for the 69 tokens it loads: 20-24 |", page)
+        self.assertIn("2 chunks in memory, kept for later requests (D gets this turn's KV from P over NIXL)", page)
+
+    def test_a_server_per_engine_keeps_its_own_copy(self):
+        nums, out = self.run_nixl("per_engine")
+        ck = nums["chunks"]
+        self.assertEqual(ck["per_server"], {"LMC_P": 2, "LMC_D1": 2})
+        self.assertEqual(ck["stored_by"], {"P": 2, "D": 2})
+        page = (out / "conversations" / "conversation_0.md").read_text()
+        self.assertIn("LMC_P: stored on turn 0 by P; LMC_D1: stored on turn 0 by D1", page)
+        self.assertIn("its LMCache connector stored 2 new chunks", page)
+        self.assertIn("| D1 → LMCache | store planned: tokens 0-64; 2 chunks new to its server |", page)
+
+    def test_the_nixl_extractors_take_vllms_objects(self):
+        r = Req("r1", 40, [])
+        self.assertEqual(events.nixl_match(r, 39, 16), {"req": "r1", "count": 39, "computed": 16, "n_prompt": 40})
+        rec = events.nixl_recv_planned(r, ([5, 6],), (1,), 32, {"remote_block_ids": [[1, 2, 3]],
+                                                                 "remote_engine_id": "e", "remote_request_id": "p1"})
+        self.assertEqual((rec["local"], rec["remote"], rec["remote_engine"], rec["external"]), ([5, 6], [1, 2, 3], "e", 32))
+        self.assertEqual(events.nixl_done({"a"}, set(), None), {"sending": ["a"], "recving": [], "failed": []})
 
 
 class LifecycleReportTests(unittest.TestCase):
@@ -417,18 +566,18 @@ class LifecycleReportTests(unittest.TestCase):
         for want in ("turn 0 · 69 tokens", "P", "LMCache", "D1", "on disk"):
             self.assertIn(want, texts)
         self.assertTrue(any(t and t.startswith("→ 0.81 s") for t in texts))     # D's end, past the axis
-        # step by step: every move of the turn's KV in time order, P's GPU slots to LMCache to D's
+        # step by step: every move of the turn's KV in time order, P's GPU blocks to LMCache to D's
         steps = page.split("### Step by step")[1].split("\n\n69 prompt tokens")[0]
         rows = [r for r in steps.splitlines() if r.startswith("| ") and not r.startswith(("| ms", "| ---"))]
         ms = [float(r.split("|")[1].replace(",", "")) for r in rows]
         self.assertEqual(ms, sorted(ms))
-        for want in ("| 13.0 | P GPU | 5 new slots for the 69 tokens it computes: 10-14; the prefill runs |",
+        for want in ("| 13.0 | P GPU | 5 new GPU blocks for the 69 tokens it computes: 10-14; the prefill runs |",
                      "| 61.0 | P → LMCache | store planned: tokens 0-64, chunks 0-1 (4 blocks) |",
                      "| 82.0 | P GPU → LMCache memory | copy done: 2 chunks, 0 MB in 18.0 ms |",
                      "| 90.0 | LMCache disk | 2 chunks written to disk (one file each) |",
                      "| 91.0 | LMCache memory | 2 memory copies dropped: on disk only now |",
                      "| 610.0 | proxy → D1 | after the 500 ms store wait, sends the turn to D1 |",
-                     "| 633.0 | D1 GPU | slots for the loaded blocks: 20-23 |",
+                     "| 633.0 | D1 GPU | GPU blocks for the loaded KV: 20-23 |",
                      "| 641.0 | LMCache memory → D1 GPU | copy done: 2 chunks, 0 MB in 6.0 ms |",
                      "| 710.0 | D1 → proxy | the first answer token |"):
             self.assertIn(want, rows)
@@ -520,7 +669,7 @@ class HookTests(unittest.TestCase):
     def test_the_copies_are_the_import_plus_hooks(self):
         problems, hooked = lmc_overlay.check(ROOT)
         self.assertEqual(problems, [])
-        self.assertEqual(len(hooked), 7)
+        self.assertEqual(len(hooked), 10)          # 7, and vLLM's NIXL pull scheduler and workers
 
     def test_every_hook_calls_its_extractor_with_the_names_it_takes(self):
         n = 0
@@ -656,11 +805,11 @@ class OverlayTests(unittest.TestCase):
 class _Fake:
     """A fake prefill and decode engine (aiohttp) recording bodies, headers and arrival times."""
 
-    def __init__(self):
+    def __init__(self, names=("p", "d"), ktp=None):
         import asyncio
         import threading
         from aiohttp import web
-        self.seen = {"p": [], "d": []}
+        self.seen = {n: [] for n in names}
         self.ports = {}
         self.loop = asyncio.new_event_loop()
         ready = threading.Event()
@@ -670,7 +819,10 @@ class _Fake:
                 body = await request.json()
                 self.seen[name].append((time.time(), dict(request.headers), body))
                 if name == "p":
-                    return web.json_response({"choices": [{"text": "x"}]})
+                    out = {"choices": [{"text": "x"}]}
+                    if ktp is not None:                 # as vLLM's NixlConnector answers a do_remote_decode prefill
+                        out["kv_transfer_params"] = ktp
+                    return web.json_response(out)
                 resp = web.StreamResponse(headers={"content-type": "text/event-stream"})
                 await resp.prepare(request)
                 await resp.write(b"data: {\"i\": 0}\n\ndata: [DONE]\n\n")
@@ -681,7 +833,7 @@ class _Fake:
             asyncio.set_event_loop(self.loop)
 
             async def start():
-                for name in ("p", "d"):
+                for name in names:
                     app = web.Application()
                     app.router.add_post("/v1/completions", handler(name))
                     runner = web.AppRunner(app)
@@ -738,24 +890,98 @@ class ProxyStoreModeTests(unittest.TestCase):
         self.assertEqual((rec["key"], rec["tag"], rec["mode"]), (key, "lmc|0|0", "store"))
 
 
+    def test_nixl_mode_is_vllm_routers(self):
+        """The NIXL handoff as vllm-router does it (src/routers/http/vllm_pd_router.rs): P gets max_tokens and
+        min_tokens 1, no stream, kv_transfer_params do_remote_decode; its reply's kv_transfer_params go to D as they
+        are, at once; the D engines round-robin."""
+        import socket
+        import urllib.request
+        ktp = {"do_remote_prefill": True, "do_remote_decode": False, "remote_block_ids": [[3, 4]],
+               "remote_engine_id": "e1", "remote_request_id": "r1", "remote_host": "127.0.0.1", "remote_port": 5600,
+               "tp_size": 1, "remote_num_tokens": 3, "transfer_mode": "pull"}
+        eng = _Fake(("p", "d", "d2"), ktp=ktp)
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+        log = Path(tempfile.mkdtemp()) / "proxy.jsonl"
+        proc = subprocess.Popen([sys.executable, str(ROOT / "scripts" / "pd_proxy.py"), "--port", str(port),
+                                 "--prefill", f"http://127.0.0.1:{eng.ports['p']}",
+                                 "--decode", f"http://127.0.0.1:{eng.ports['d']}",
+                                 "--decode", f"http://127.0.0.1:{eng.ports['d2']}", "--mode", "nixl",
+                                 "--policy", "round_robin", "--log", str(log)],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        self.addCleanup(lambda: (proc.kill(), proc.wait(), proc.stderr.close()))
+        url = f"http://127.0.0.1:{port}"
+        for _ in range(100):
+            try:
+                urllib.request.urlopen(url + "/health", timeout=1)
+                break
+            except Exception:
+                time.sleep(0.1)
+        for i in range(2):                                    # one conversation's two turns
+            body = {"model": "m", "prompt": [1, 2, 3], "max_tokens": 9, "min_tokens": 4, "stream": True,
+                    "stream_options": {"include_usage": True}, "conversation_id": "c1", "t_tag": f"lmc|0|{i}"}
+            r = urllib.request.Request(url + "/v1/completions", data=json.dumps(body).encode(),
+                                       headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(r, timeout=30) as f:
+                self.assertIn("[DONE]", f.read().decode())
+        (tp, hp, p) = eng.seen["p"][0]
+        self.assertEqual((p["max_tokens"], p["min_tokens"], p["stream"]), (1, 1, False))
+        self.assertNotIn("stream_options", p)
+        self.assertEqual(p["kv_transfer_params"], {"do_remote_decode": True, "do_remote_prefill": False,
+                                                   "remote_engine_id": None, "remote_block_ids": None,
+                                                   "remote_host": None, "remote_port": None})
+        self.assertEqual((len(eng.seen["d"]), len(eng.seen["d2"])), (1, 1))   # round-robin, not by conversation
+        (td, hd, d) = eng.seen["d"][0]
+        self.assertEqual(d["kv_transfer_params"], ktp)                         # P's reply's, as they are
+        self.assertEqual((d["max_tokens"], d["min_tokens"], d["stream"]), (9, 4, True))
+        self.assertLess(td - tp, 0.25)                                         # no wait
+        key = {k.lower(): v for k, v in hp.items()}["x-request-id"]
+        self.assertEqual({k.lower(): v for k, v in hd.items()}["x-request-id"], key)
+
+
 class MatrixTests(unittest.TestCase):
     def test_lmctrace_runs(self):
         m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                            env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1"))
         self.assertEqual(m.returncode, 0, m.stderr)
         self.assertEqual(m.stdout.splitlines(), [
-            "RUNNER=lmc_run.sh LMC_MODE=memory MTRAG_LIMIT=4 STORE_WAIT_MS=500",
-            "RUNNER=lmc_run.sh LMC_MODE=disk MTRAG_LIMIT=4 STORE_WAIT_MS=500"])
+            "RUNNER=lmc_run.sh LMC_MODE=memory LMC_TRANSFER=lmcache LMC_SERVERS=shared MTRAG_LIMIT=4 STORE_WAIT_MS=500",
+            "RUNNER=lmc_run.sh LMC_MODE=disk LMC_TRANSFER=lmcache LMC_SERVERS=shared MTRAG_LIMIT=4 STORE_WAIT_MS=500"])
         bad = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
                              env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_CONVS="0"))
         self.assertEqual(bad.returncode, 2)
+
+    def test_lmctrace_nixl_runs_every_server_setting_and_mode(self):
+        """The four runs of LMCache's documented P/D: NIXL with a shared server and a server per engine, in memory
+        and on disk; lmcache with per_engine is left out (D could not load what P stored)."""
+        m = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                           env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_TRANSFERS="nixl",
+                                    KVPD_LMC_SERVERS="shared,per_engine"))
+        self.assertEqual(m.returncode, 0, m.stderr)
+        self.assertEqual(m.stdout.splitlines(), [
+            f"RUNNER=lmc_run.sh LMC_MODE={x} LMC_TRANSFER=nixl LMC_SERVERS={sv} MTRAG_LIMIT=4 STORE_WAIT_MS=500"
+            for sv in ("shared", "per_engine") for x in ("memory", "disk")])
+        both = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                              env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", KVPD_LMC_TRANSFERS="lmcache,nixl",
+                                       KVPD_LMC_SERVERS="per_engine", KVPD_LMC_MODES="memory"))
+        self.assertEqual(both.stdout.splitlines(), [
+            "RUNNER=lmc_run.sh LMC_MODE=memory LMC_TRANSFER=nixl LMC_SERVERS=per_engine MTRAG_LIMIT=4 STORE_WAIT_MS=500"])
+        for k, v in (("KVPD_LMC_TRANSFERS", "rdma"), ("KVPD_LMC_SERVERS", "two")):
+            bad = subprocess.run(["bash", "scripts/pd_matrix.sh"], cwd=ROOT, capture_output=True, text=True,
+                                 env=dict(os.environ, MATRIX="lmctrace", PRINT_RUNS="1", **{k: v}))
+            self.assertEqual(bad.returncode, 2, k)
 
     def test_disk_plan_counts_the_disk_tier(self):
         import pd_campaign
         runs = ["RUNNER=lmc_run.sh LMC_MODE=memory MTRAG_LIMIT=4 STORE_WAIT_MS=500",
                 "RUNNER=lmc_run.sh LMC_MODE=disk MTRAG_LIMIT=4 STORE_WAIT_MS=500"]
-        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs), 1.5 * 4 + 2 * 0.25)
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs), 1.0 * 4 + 2 * 0.25)
         self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", runs[:1]), 0.25)
+        # a server per engine: P's copy and up to one on each D's server
+        pe = runs + ["RUNNER=lmc_run.sh LMC_MODE=disk LMC_TRANSFER=nixl LMC_SERVERS=per_engine MTRAG_LIMIT=4"]
+        self.assertAlmostEqual(pd_campaign.extra_gb("lmctrace", pe), 1.0 * 4 * 4 + 3 * 0.25)
         self.assertIn("lmctrace", pd_campaign.MATRICES)
 
     @staticmethod

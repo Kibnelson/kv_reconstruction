@@ -53,12 +53,15 @@ SETUP_DROPPED_GB = 6.6     # setup's captures, deleted before the matrix runs (D
 CAPTURE_GB_PER_CONV = 2.0  # MATRIX=capture: P's store a conversation (job 30555: 10.3 GB for 6), as pd_matrix.sh sets
 CAPTURE_D_GB = 2.0         # and each D engine's (KVPD_CAPTURE_D_GB): its copies of held blocks that differ
 CAPTURE_D_ENGINES = 3      # MATRIX=capture runs 1p3d
-LMC_GB_PER_CONV = 1.5      # MATRIX=lmctrace: the disk tier's files for one interleaved MTRAG conversation (its longest
-                           # prompt's whole chunks, 112 KB a token, each stored once: job 30694's first 4 had 9,765,
-                           # 9,097, 7,503 and 2,974 tokens, 3.4 GB in all), one mode's run at a time (scripts/lmc_run.sh
-                           # deletes them after its report)
+LMC_GB_PER_CONV = 1.0      # MATRIX=lmctrace: the disk tier's files for one interleaved MTRAG conversation (its longest
+                           # prompt's whole chunks, 112 KB a token, each stored once: job 30728's first 4 had 9,765,
+                           # 9,097, 7,503 and 3,102 tokens, 114 chunks, 3.35 GB in all), one run at a time
+                           # (scripts/lmc_run.sh deletes them after its report)
+LMC_PER_ENGINE_COPIES = 4  # LMC_SERVERS=per_engine: P's server and each D's own (D engines round-robin, so a
+                           # conversation's chunks can land on all three D servers): at most 4 copies
 LMC_RECORDS_GB = 0.25      # and the traces, logs and results a run keeps (job 30694: about 15 MB a run)
-LMC_SETUP_GB = 3.0         # MATRIX=lmctrace's setup: the environments are links into uv's cache; the CUDA ops' build
+LMC_SETUP_GB = 3.5         # MATRIX=lmctrace's setup: the environments are links into uv's cache (NIXL's wheels too);
+                           # the CUDA ops' build
                            # (its objects), the overlay's few copies, the job's caches (not the codec setup's 14 GB)
 MODEL_DIR = "hub/models--unsloth--Llama-3.2-3B"
 CUDA12_CANDIDATES = ("/usr/local/pkgs/cuda/cuda-12.6", "/usr/local/pkgs/cuda/12.6", "/usr/local/cuda-12.6",
@@ -354,7 +357,8 @@ def extra_gb(matrix, runs=()):
     (KVPD_CAPTURE_D_GB, 2). MATRIX=lmctrace: its runs' disk tier (the most conversations of a run with one) and
     records."""
     if matrix == "lmctrace":
-        disk = [int(m.group(1)) for r in runs if re.search(r"LMC_MODE=(disk|tiered)\b", r)
+        disk = [int(m.group(1)) * (LMC_PER_ENGINE_COPIES if re.search(r"LMC_SERVERS=per_engine\b", r) else 1)
+                for r in runs if re.search(r"LMC_MODE=(disk|tiered)\b", r)
                 for m in [re.search(r"MTRAG_LIMIT=(\d+)", r)] if m]
         return (LMC_GB_PER_CONV * max(disk) if disk else 0.0) + LMC_RECORDS_GB * max(1, len(runs))
     if matrix != "capture":

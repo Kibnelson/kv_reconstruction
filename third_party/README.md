@@ -40,5 +40,5 @@ git diff b2189bd -- third_party/          # b2189bd: the import, unchanged
 python3 scripts/lmc_overlay.py hooks      # file, line and event of each
 ```
 
-The hooks (31 lines in 7 files: vLLM's scheduler, KV cache manager and block pool; LMCache's vLLM connector, event
-bus, file-system adapter and storage manager), the records they write and how the lifecycle report joins them: `docs/lmcache_lifecycle.md`.
+The hooks (41 lines in 10 files: vLLM's scheduler, KV cache manager and block pool, and its NIXL connector's pull
+scheduler and workers; LMCache's vLLM connector, event bus, file-system adapter and storage manager), the records they write and how the lifecycle report joins them: `docs/lmcache_lifecycle.md`.

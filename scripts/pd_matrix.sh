@@ -58,7 +58,11 @@
 #               them, once per mode in KVPD_LMC_MODES (memory,disk; or tiered): the chunks in the server's memory,
 #               or every chunk on disk (read back from disk for every pull). The proxy waits KVPD_LMC_STORE_WAIT_MS
 #               (500) between P's answer and D's request. scripts/lmc_run.sh per mode, then the modes compared
-#               (scripts/lmc_lifecycle.py; docs/lmcache_lifecycle.md). Its own setup: scripts/lmc_setup.sh
+#               (scripts/lmc_lifecycle.py; docs/lmcache_lifecycle.md). Its own setup: scripts/lmc_setup.sh.
+#               KVPD_LMC_TRANSFERS (lmcache; or nixl, or both by commas) and KVPD_LMC_SERVERS (shared; or
+#               per_engine, or both): every combination with every mode, lmcache with per_engine left out (D could
+#               not load what P stored). nixl is LMCache's documented P/D (MultiConnector: NixlConnector and
+#               LMCache's connector; the proxy as vllm-router, no wait, D engines round-robin)
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh, or with
 # RUNNER=lmc_run.sh those of scripts/lmc_run.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
@@ -128,6 +132,8 @@ WLLONG="LAYOUT=1p3d STAGES=check,shapes,report SHAPES=$WLONG RUN_TIMEOUT_S=10800
 LMCN=${KVPD_LMC_CONVS:-4}
 LMCM=${KVPD_LMC_MODES:-memory,disk}
 LMCW=${KVPD_LMC_STORE_WAIT_MS:-500}
+LMCT=${KVPD_LMC_TRANSFERS:-lmcache}           # how P's KV reaches D: lmcache (the shared server) and/or nixl
+LMCS=${KVPD_LMC_SERVERS:-shared}              # LMCache servers: shared and/or per_engine (NIXL only)
 MATRIX=${MATRIX:-smoke}
 if [ -z "${RUNS:-}" ]; then
     case "$MATRIX" in
@@ -201,12 +207,22 @@ if [ -z "${RUNS:-}" ]; then
             fi
             [[ "$LMCW" =~ ^[0-9]+$ ]] || { echo "STOP: KVPD_LMC_STORE_WAIT_MS=$LMCW: whole milliseconds" >&2; exit 2; }
             RUNS=""
-            for x in $(echo "$LMCM" | tr ',' ' '); do
-                case "$x" in memory|disk|tiered) ;;
-                    *) echo "STOP: KVPD_LMC_MODES=$LMCM: memory, disk or tiered, by commas" >&2; exit 2 ;; esac
-                RUNS+="RUNNER=lmc_run.sh LMC_MODE=$x MTRAG_LIMIT=$LMCN STORE_WAIT_MS=$LMCW;"
+            for tx in $(echo "$LMCT" | tr ',' ' '); do
+                case "$tx" in lmcache|nixl) ;;
+                    *) echo "STOP: KVPD_LMC_TRANSFERS=$LMCT: lmcache or nixl, by commas" >&2; exit 2 ;; esac
+                for sv in $(echo "$LMCS" | tr ',' ' '); do
+                    case "$sv" in shared|per_engine) ;;
+                        *) echo "STOP: KVPD_LMC_SERVERS=$LMCS: shared or per_engine, by commas" >&2; exit 2 ;; esac
+                    # the lmcache transfer needs the shared server (D loads what P stored there): skipped, not stopped
+                    [ "$tx" = lmcache ] && [ "$sv" = per_engine ] && continue
+                    for x in $(echo "$LMCM" | tr ',' ' '); do
+                        case "$x" in memory|disk|tiered) ;;
+                            *) echo "STOP: KVPD_LMC_MODES=$LMCM: memory, disk or tiered, by commas" >&2; exit 2 ;; esac
+                        RUNS+="RUNNER=lmc_run.sh LMC_MODE=$x LMC_TRANSFER=$tx LMC_SERVERS=$sv MTRAG_LIMIT=$LMCN STORE_WAIT_MS=$LMCW;"
+                    done
+                done
             done
-            [ -n "$RUNS" ] || { echo "STOP: KVPD_LMC_MODES is empty" >&2; exit 2; } ;;
+            [ -n "$RUNS" ] || { echo "STOP: no run: KVPD_LMC_MODES, KVPD_LMC_TRANSFERS ($LMCT) and KVPD_LMC_SERVERS ($LMCS) leave none" >&2; exit 2; } ;;
         wlong) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=ring LINKS=10,100 CODECS=$XKV $WLLONG;
