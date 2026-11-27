@@ -25,6 +25,8 @@ driver's warm-up sends one request over every prefill-decode pair. "t_tag" (logg
 "t_trace" (the prefill engine hashes the request's pages and relates them to earlier ones, kv_compare/pd/trace.py)
 "t_pieces" (a traced prompt's pieces, [[kind, start, end]], passed to the prefill engine) and "t_capture" (with
 t_trace: both engines store the request's raw pages, kv_compare/pd/trace.py PageStore) are taken out the same way.
+"t_rid" (scripts/lmc_pool.py: a label) gives each stage its own request id, the key first: <key>.<label>.P for the
+prefill engine and <key>.<label>.D for the decode engine (logged as "rid").
 """
 from __future__ import annotations
 
@@ -32,6 +34,7 @@ import argparse
 import asyncio
 import itertools
 import json
+import re
 import time
 import uuid
 
@@ -89,6 +92,7 @@ class Proxy:
         tag, trace = body.pop("t_tag", None), bool(body.pop("t_trace", False))     # the MTRAG driver's (pd_mtrag.py)
         pieces = body.pop("t_pieces", None)          # a traced prompt's pieces [[kind, start, end]]: the probe's groups
         capture = bool(body.pop("t_capture", False)) and trace   # both engines store this request's raw pages
+        label = body.pop("t_rid", None)              # the pool driver's (lmc_pool.py): in P's and D's request ids
         key = uuid.uuid4().hex
         i = int(pin_d) % len(self.decodes) if pin_d is not None else self.pick(conv)
         durl, kvaddr = self.decodes[i]
@@ -97,6 +101,13 @@ class Proxy:
         if tag is not None:
             rec["tag"] = tag
         headers = {"X-Request-Id": key}
+        p_headers = headers
+        if label is not None:
+            # each stage's own id, the key first (the reports find it there): <key>.<label>.P and <key>.<label>.D;
+            # NIXL's D finds P's request by the id in P's reply (remote_request_id), not by the two being equal
+            label = re.sub(r"[^A-Za-z0-9_.-]", "_", str(label))[:120]
+            p_headers, headers = {"X-Request-Id": f"{key}.{label}.P"}, {"X-Request-Id": f"{key}.{label}.D"}
+            rec["rid"] = label
         d_body = dict(body)
         p_task = None
         if cfg["mode"] in ("nixl", "store"):
@@ -117,7 +128,7 @@ class Proxy:
                                                 "remote_host": None, "remote_port": None}
             self.p_inflight[j] += 1
             try:
-                async with self.session.post(self.prefills[j] + path, json=p_body, headers=headers) as r:
+                async with self.session.post(self.prefills[j] + path, json=p_body, headers=p_headers) as r:
                     txt = await r.read()
                     rec["t_prefill_done"] = time.time()
                     if r.status != 200:
@@ -151,7 +162,7 @@ class Proxy:
             self.p_inflight[j] += 1
 
             async def prefill(j=j):
-                async with self.session.post(self.prefills[j] + path, json=p_body, headers=headers) as r:
+                async with self.session.post(self.prefills[j] + path, json=p_body, headers=p_headers) as r:
                     txt = await r.read()
                     rec["t_prefill_done"] = time.time()
                     if r.status != 200:

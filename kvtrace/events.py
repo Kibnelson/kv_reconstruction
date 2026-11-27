@@ -9,7 +9,19 @@ Names (docs/lmcache_lifecycle.md has each with the file and function of its hook
   vllm.request.blocks_freed a finished request's GPU blocks go back to the free queue (still cached)
   vllm.request.finished     a request leaves the scheduler
   vllm.gpu.reset            the prefix cache emptied
-  lmc.conn.lookup           LMCache's connector (in the engine) learns how many tokens LMCache holds
+  vllm.sched.wait           why the scheduler left a waiting request waiting this step (no record of its own: the
+                            step's record has it): max_num_seqs, kv_load_in_flight (blocked: its KV load, NIXL's or
+                            LMCache's, not done), connector_lookup_pending, no_free_blocks (with the free blocks)
+  vllm.sched.step           a scheduler step, written when it differs from the last one written: the requests
+                            scheduled (tokens each), running, waiting (status and reason; behind a request that
+                            stopped the queue: queued_behind_<its reason>), finished but holding blocks (P's, for
+                            NIXL), and the GPU pool: blocks in use (referenced), cached and free, empty
+                            (KVTRACE_SCHED=0: no step or wait records)
+  vllm.request.preempted    a running request preempted (its blocks freed; it computes again)
+  kv.connector.chosen       MultiConnector's answer for a request: each connector's matched tokens (asked, in its
+                            order: None while a lookup is pending) and the one that loads (the first with tokens);
+                            written when it differs from the last for that request (kv.connector.match: each answer)
+  lmc.conn.lookup          LMCache's connector (in the engine) learns how many tokens LMCache holds
   lmc.conn.alloc            the connector is told the request's blocks; whether it will load into them
   lmc.conn.retrieve_planned the tokens and blocks the connector will load this step
   lmc.conn.store_planned    the tokens and blocks the connector will store this step
@@ -148,6 +160,108 @@ def request_blocks_freed(manager, request):
 
 def gpu_reset():
     return {}
+
+
+# vLLM's scheduler: the reasons a waiting request stayed waiting this step, folded into the step's record
+SCHED_ON = os.environ.get("KVTRACE_SCHED", "1") != "0"
+POOL_SCAN_MAX = int(os.environ.get("KVTRACE_POOL_SCAN_MAX", "8192") or 8192)   # cached blocks counted up to this pool
+_WAIT = {}                                            # request id -> {"reason": ..., details}
+_WAIT_STOP = []                                       # the reason that stopped the waiting queue this step
+_STEP_LAST = [None]                                   # the last step record's content (a step like it is not written)
+
+
+def sched_wait(request, reason, stop=False, free=None, hit=None, external=None, new=None):
+    if not SCHED_ON:
+        return None
+    if reason == "blocked":
+        st = getattr(getattr(request, "status", None), "name", str(getattr(request, "status", "")))
+        reason = "kv_load_in_flight" if st == "WAITING_FOR_REMOTE_KVS" else "blocked_" + st.lower()
+    w = {"reason": reason}
+    for k, v in (("free", free), ("hit", hit), ("external", external), ("new", new)):
+        if v is not None:
+            w[k] = int(v)
+    _WAIT[str(request.request_id)] = w
+    if stop:
+        _WAIT_STOP[:] = [reason]
+    return None
+
+
+def pool_counts(scheduler):
+    """The GPU pool (vLLM's null block left out): in use (referenced), free; of the free, cached (a prefix hit until
+    reused) and empty, counted when the pool has at most POOL_SCAN_MAX blocks."""
+    bp = getattr(getattr(scheduler, "kv_cache_manager", None), "block_pool", None)
+    if bp is None:
+        return None
+    total = int(bp.num_gpu_blocks) - 1
+    free = int(bp.get_num_free_blocks())
+    out = {"total": total, "in_use": total - free, "free": free}
+    if total + 1 <= POOL_SCAN_MAX:
+        cached = sum(1 for b in bp.blocks if not b.is_null and b.ref_cnt == 0 and b.block_hash is not None)
+        out.update(cached_free=cached, empty=free - cached)
+    return out
+
+
+def sched_step(scheduler, output, token_budget):
+    if not SCHED_ON:
+        return None
+    waits, stop = dict(_WAIT), (_WAIT_STOP[0] if _WAIT_STOP else None)
+    _WAIT.clear()
+    _WAIT_STOP.clear()
+    scheduled = {str(k): int(v) for k, v in (getattr(output, "num_scheduled_tokens", None) or {}).items()}
+    waiting, seen = [], set()
+    for q in (getattr(scheduler, "kv_holding_waiting", None) or (), getattr(scheduler, "waiting", None) or ()):
+        for r in q:
+            rid = str(r.request_id)
+            if rid in seen:
+                continue
+            seen.add(rid)
+            w = waits.get(rid) or {"reason": ("queued_behind_" + stop) if stop else
+                                   "token_budget" if token_budget is not None and token_budget <= 0 else "not_reached"}
+            waiting.append([rid, getattr(r.status, "name", str(r.status)), w])
+    held = [str(rid) for rid, r in (getattr(scheduler, "requests", None) or {}).items() if r.is_finished()]
+    running = [str(r.request_id) for r in getattr(scheduler, "running", ())]
+    rec = {"step": int(getattr(scheduler, "current_step", 0) or 0), "scheduled": scheduled, "running": running,
+           "waiting": waiting, "held": held, "pool": pool_counts(scheduler)}
+    same = (rec["scheduled"], rec["running"], rec["waiting"], rec["held"], rec["pool"])
+    if same == _STEP_LAST[0]:
+        return None
+    _STEP_LAST[0] = same
+    return rec
+
+
+def request_preempted(request):
+    return dict(req_of(request), n_computed=int(getattr(request, "num_computed_tokens", 0) or 0),
+                n_prompt=int(request.num_prompt_tokens), n_out=int(getattr(request, "num_output_tokens", 0) or 0),
+                n_preemptions=int(getattr(request, "num_preemptions", 0) or 0))
+
+
+# MultiConnector: each connector's matched tokens (this call), then its choice
+_MATCH = {}                                           # request id -> [[index, connector, tokens], ...]
+_CHOSEN = {}                                          # request id -> the last choice written
+
+
+def connector_match(request, index, connector, tokens):
+    rid = str(request.request_id)
+    if int(index) == 0:                               # a new call: its own answers
+        _MATCH[rid] = []
+    _MATCH.setdefault(rid, []).append([int(index), type(connector).__name__, None if tokens is None else int(tokens)])
+    return None
+
+
+def connector_chosen(request, connectors, chosen, result, computed=None):
+    rid = str(request.request_id)
+    asked = _MATCH.pop(rid, [])
+    toks, load_async = result
+    name = type(connectors[chosen]).__name__ if chosen is not None and toks else None
+    rec = dict(req_of(request), asked=asked, chosen=name, tokens=None if toks is None else int(toks),
+               load_async=bool(load_async), computed=None if computed is None else int(computed))
+    same = (name, rec["tokens"], rec["computed"], [tuple(x) for x in asked])
+    if _CHOSEN.get(rid) == same:
+        return None
+    if len(_CHOSEN) > 4096:
+        _CHOSEN.clear()
+    _CHOSEN[rid] = same
+    return rec
 
 
 # ---------------------------------------------------------------------------------------- LMCache, engine side
@@ -372,6 +486,11 @@ EXTRACT = {
     "vllm.gpu.evicted": gpu_evicted,
     "vllm.request.blocks_freed": request_blocks_freed,
     "vllm.gpu.reset": gpu_reset,
+    "vllm.sched.wait": sched_wait,
+    "vllm.sched.step": sched_step,
+    "vllm.request.preempted": request_preempted,
+    "kv.connector.match": connector_match,
+    "kv.connector.chosen": connector_chosen,
     "lmc.conn.lookup": conn_lookup,
     "lmc.conn.alloc": conn_alloc,
     "lmc.conn.retrieve_planned": conn_retrieve_planned,

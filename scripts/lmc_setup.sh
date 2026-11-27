@@ -13,7 +13,8 @@
 #                              and our build of lmcache.cuda_ops in place of the wheel's
 #   $KV_RUNS/mtrag/conversations.json   IBM's MTRAG conversations (pinned commit, SHA-256 checked), and its
 #                              generation tasks RAG.jsonl and reference.jsonl (the same commit)
-#   the model, unsloth/Llama-3.2-3B at its pinned revision, in HF_HOME
+#   the model, unsloth/Llama-3.2-3B at its pinned revision, in HF_HOME (and Qwen/Qwen3-4B-Instruct-2507 for the KV
+#                              pool experiment, KVPD_LMC_PRESET=pool or LMC_SETUP_MODELS=qwen3_4b)
 #   NIXL 1.5.2 in that environment (nixl-cu13 + nixl), for LMC_TRANSFER=nixl
 #
 # then checks that the overlay is what the engines will import (each hooked module from the overlay, with its hooks,
@@ -140,6 +141,23 @@ mtrag_fetch mtrag-human/generation_tasks/RAG.jsonl \
 mtrag_fetch mtrag-human/generation_tasks/reference.jsonl \
     b3dde4076f9f692a99513e424a0a39f57591dbe45600a4c1017aaa7a7edcfaac reference.jsonl
 
-echo "== the model"
-"$LPY" -I -c "from huggingface_hub import snapshot_download; print('  ', snapshot_download('unsloth/Llama-3.2-3B', revision='d4446454d87d51aa42e1fb174f25acc5f8762331'))"
+echo "== the model(s)"
+# Llama-3.2-3B always; Qwen3-4B-Instruct-2507 too for the KV pool experiment (KVPD_LMC_PRESET=pool, or
+# LMC_SETUP_MODELS=qwen3_4b), its fixture then checked against its tokenizer (scripts/lmc_pool.py check)
+MODELS=llama32_3b
+case ",${LMC_SETUP_MODELS:-}," in *,qwen3_4b,*) MODELS+=" qwen3_4b" ;; esac
+[ "${KVPD_LMC_PRESET:-}" = pool ] && [[ " $MODELS " != *" qwen3_4b "* ]] && MODELS+=" qwen3_4b"
+for m in $MODELS; do
+    case "$m" in
+        llama32_3b) repo=unsloth/Llama-3.2-3B rev=d4446454d87d51aa42e1fb174f25acc5f8762331 ;;
+        qwen3_4b) repo=Qwen/Qwen3-4B-Instruct-2507 rev=cdbee75f17c01a7cc42f958dc650907174af0554 ;;
+    esac
+    path=$("$LPY" -I -c "import sys; from huggingface_hub import snapshot_download; print(snapshot_download(sys.argv[1], revision=sys.argv[2]))" "$repo" "$rev")
+    echo "   $m: $repo at ${rev:0:12}: $path"
+    if [ "$m" = qwen3_4b ]; then
+        "$LPY" -I scripts/lmc_pool.py check --fixture workloads/kv-pool-concurrency-chat-v1.json --tokenizer "$path" \
+            --output "$KV_HOME/pool_fixture_check.json" || {
+            echo "STOP: the pool fixture does not match $repo's tokenizer ($KV_HOME/pool_fixture_check.json)"; exit 1; }
+    fi
+done
 echo "LMC SETUP DONE"

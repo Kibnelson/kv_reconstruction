@@ -830,7 +830,7 @@ class HookTests(unittest.TestCase):
     def test_the_copies_are_the_import_plus_hooks(self):
         problems, hooked = lmc_overlay.check(ROOT)
         self.assertEqual(problems, [])
-        self.assertEqual(len(hooked), 10)          # 7, and vLLM's NIXL pull scheduler and workers
+        self.assertEqual(len(hooked), 11)          # 7, vLLM's NIXL pull scheduler and workers, its MultiConnector
 
     def test_every_hook_calls_its_extractor_with_the_names_it_takes(self):
         n = 0

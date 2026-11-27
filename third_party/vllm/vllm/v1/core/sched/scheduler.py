@@ -922,6 +922,7 @@ class Scheduler(SchedulerInterface):
                 # in `running` but still hold a model-runner request slot.
                 num_running = len(self.running) + self.num_waiting_for_streaming_input
                 if num_running >= self.max_num_active_reqs:
+                    if kvtrace.ON: kvtrace.hook("vllm.sched.wait", request=request_queue.peek_request(), reason="max_num_seqs", stop=True)  # KVTRACE
                     break
 
                 request = request_queue.peek_request()
@@ -929,6 +930,7 @@ class Scheduler(SchedulerInterface):
 
                 ready_to_schedule = self._handle_blocked_waiting_request(request)
                 if not ready_to_schedule:
+                    if kvtrace.ON: kvtrace.hook("vllm.sched.wait", request=request, reason="blocked")  # KVTRACE
                     skip_request(request_queue)
                     continue
 
@@ -988,6 +990,7 @@ class Scheduler(SchedulerInterface):
                             # The request cannot be scheduled because
                             # the KVConnector couldn't determine
                             # the number of matched tokens.
+                            if kvtrace.ON: kvtrace.hook("vllm.sched.wait", request=request, reason="connector_lookup_pending")  # KVTRACE
                             skip_request(request_queue)
                             continue
 
@@ -1280,6 +1283,7 @@ class Scheduler(SchedulerInterface):
                     # manager
                     if request.has_encoder_inputs:
                         self.encoder_cache_manager.free(request)
+                    if kvtrace.ON: kvtrace.hook("vllm.sched.wait", request=request, reason="no_free_blocks", stop=True, free=self.kv_cache_manager.block_pool.get_num_free_blocks(), hit=num_new_local_computed_tokens, external=num_external_computed_tokens, new=num_tokens_past_hit)  # KVTRACE
                     break
 
                 # KVTransfer: the connector uses this info to determine
@@ -1554,6 +1558,7 @@ class Scheduler(SchedulerInterface):
 
         with record_function_or_nullcontext("schedule: update_after_schedule"):
             self._update_after_schedule(scheduler_output)
+        if kvtrace.ON: kvtrace.hook("vllm.sched.step", scheduler=self, output=scheduler_output, token_budget=token_budget)  # KVTRACE
         return scheduler_output
 
     def _build_kv_connector_meta(
@@ -1582,6 +1587,7 @@ class Scheduler(SchedulerInterface):
         tokens out of order, and for connectors with a pending KV hand-off,
         which the preemption's block free would leave without valid KV.
         """
+        if kvtrace.ON: kvtrace.hook("vllm.request.preempted", request=request)  # KVTRACE
         assert request.status == RequestStatus.RUNNING, (
             "Only running requests can be preempted"
         )

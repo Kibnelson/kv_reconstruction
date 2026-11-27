@@ -70,7 +70,13 @@ LMC_RECORDS_GB = 0.1       # and the traces, logs and results a run keeps (job 3
 LMC_SETUP_GB = 3.5         # MATRIX=lmctrace's setup: the environments are links into uv's cache (NIXL's wheels too);
                            # the CUDA ops' build
                            # (its objects), the overlay's few copies, the job's caches (not the codec setup's 14 GB)
+LMC_POOL_GB_PER_CONV = 0.4  # LMC_WORKLOAD=pool (KVPD_LMC_PRESET=pool): a fixture conversation's chunks, 4 of its first
+                            # turn and 3 new of each later one, 37.7 MB each with Qwen3-4B (256 tokens x 147,456 B):
+                            # 0.38 GB; with a server per engine, D1's copies too (LMC_POOL_PER_ENGINE_COPIES)
+LMC_POOL_PER_ENGINE_COPIES = 2.0
 MODEL_DIR = "hub/models--unsloth--Llama-3.2-3B"
+# models a run may name beyond Llama-3.2-3B (LMC_MODEL): their folder in the cache and their size (bf16 weights)
+EXTRA_MODELS = {"qwen3_4b": ("hub/models--Qwen--Qwen3-4B-Instruct-2507", 8.2)}
 CUDA12_CANDIDATES = ("/usr/local/pkgs/cuda/cuda-12.6", "/usr/local/pkgs/cuda/12.6", "/usr/local/cuda-12.6",
                      "/usr/local/pkgs/cuda/latest", "/usr/local/cuda-12", "/usr/local/cuda-12.3", "/usr/local/cuda")
 # credentials that must never be published (the pattern's name is reported, never the match)
@@ -374,8 +380,13 @@ def extra_gb(matrix, runs=()):
             d = re.search(r"MTRAG_DOCS=(\w+)", r)
             return LMC_GB_PER_CONV_TASKS if d and d.group(1) != "conversations" else LMC_GB_PER_CONV
         disk = [int(m.group(1)) * copies(r) * per_conv(r)
-                for r in runs if re.search(r"LMC_MODE=(disk|tiered)\b", r)
+                for r in runs if re.search(r"LMC_MODE=(disk|tiered)\b", r) and "LMC_WORKLOAD=pool" not in r
                 for m in [re.search(r"MTRAG_LIMIT=(\d+)", r)] if m]
+        # the KV pool experiment: the fixture's conversations offered, P's chunks (and D1's with a server per engine)
+        disk += [int(m.group(1)) * LMC_POOL_GB_PER_CONV
+                 * (LMC_POOL_PER_ENGINE_COPIES if re.search(r"LMC_SERVERS=per_engine\b", r) else 1.0)
+                 for r in runs if "LMC_WORKLOAD=pool" in r and re.search(r"LMC_MODE=(disk|tiered)\b", r)
+                 for m in [re.search(r"POOL_COUNT=(\d+)", r)] if m]
         return (max(disk) if disk else 0.0) + LMC_RECORDS_GB * max(1, len(runs))
     if matrix != "capture":
         return 0.0
@@ -386,6 +397,12 @@ def extra_gb(matrix, runs=()):
     except ValueError:                             # pd_matrix.sh stops on it
         d_gb = CAPTURE_D_GB
     return p_gb + CAPTURE_D_ENGINES * d_gb
+
+
+def model_gb(cache, runs=()):
+    """The models the runs name beyond Llama-3.2-3B (LMC_MODEL=...) that the cache does not hold yet (GB)."""
+    names = {m.group(1) for r in runs for m in [re.search(r"\bLMC_MODEL=(\w+)", r)] if m}
+    return sum(gb for name, (d, gb) in EXTRA_MODELS.items() if name in names and not (cache / "hf" / d).is_dir())
 
 
 def disk_plan(p, want_ibp, extra_gb=0.0, need_cuda13=False, job_peak_gb=None, dropped_gb=None):
@@ -519,8 +536,8 @@ def stage_run(p, a, job):
     want_ibp = ibp_opt == "1" or (ibp_opt == "auto" and uses_ibp)
     # MATRIX=lmctrace: its own setup (no codec captures), and the environment's own CUDA 13 compiler (no runfile)
     lmc = a.matrix == "lmctrace"
-    plan = disk_plan(p, want_ibp, extra_gb(a.matrix, m["runs"]), job_peak_gb=LMC_SETUP_GB if lmc else None,
-                     dropped_gb=0.0 if lmc else None)
+    plan = disk_plan(p, want_ibp, extra_gb(a.matrix, m["runs"]) + model_gb(p.cache, m["runs"]),
+                     job_peak_gb=LMC_SETUP_GB if lmc else None, dropped_gb=0.0 if lmc else None)
     write_json(ev / "disk_plan.json", plan)
     if plan["ibp"] is None:
         rows = biggest(p.root)
@@ -901,7 +918,12 @@ def stage_review(p, a, job):
         call(sys.executable, "-I", "-B", p.tools / "scripts" / "lmc_lifecycle.py", "compare", "--dirs",
              ",".join(str(res / f) for f in folders), "--output", rv)
         parts = [f"# PD matrix {a.matrix} on {run.get('node')}, job {run['run_job']} ({status}), reviewed from the "
-                 "kept results\n", (rv / "compare.md").read_text()]
+                 "kept results\n"]
+        if any((res / f / "pool.json").is_file() for f in folders):    # the KV pool experiment's arms, first
+            call(sys.executable, "-I", "-B", p.tools / "scripts" / "lmc_pool.py", "compare", "--dirs",
+                 ",".join(str(res / f) for f in folders), "--output", rv)
+            parts.append((rv / "pool_compare.md").read_text())
+        parts.append((rv / "compare.md").read_text())
         parts += [(res / f / "summary.md").read_text() for f in folders if (res / f / "summary.md").is_file()]
         write_text(rv / "summary.md", "\n\n".join(parts))
     elif folders:

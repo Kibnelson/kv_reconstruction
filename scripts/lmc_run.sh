@@ -40,6 +40,12 @@
 # are evicted and come back from LMCache), D_PREFIX_CACHE (1; 0: D keeps no prefix cache, every turn pulls all),
 # ENGINE_EAGER (0), KEEP_L2 (0: the disk tier's files are listed, then deleted), RUN_TIMEOUT_S (3600), PORT_BASE,
 # MODEL_PATH, RESULTS_ROOT (the results folder's parent), PD_CARD=1 (scripts/pd_card.sh: no branch checks).
+# LMC_MODEL (llama32_3b: unsloth/Llama-3.2-3B; qwen3_4b: Qwen/Qwen3-4B-Instruct-2507, each at its pinned revision),
+# MAX_NUM_SEQS (empty: vLLM's; the engines' --max-num-seqs).
+# LMC_WORKLOAD=pool (docs/lmcache_lifecycle.md, "The KV pool experiment"; default mtrag): the frozen fixture's first
+# POOL_COUNT conversations (POOL_FIXTURE: workloads/kv-pool-concurrency-chat-v1.json, checked against the model's
+# tokenizer first), every conversation's turn k together, the next turn when all have finished, every request on
+# one D engine (POOL_DECODE: 0, D1), POOL_STAGGER_MS (5) apart in the fixture's order (scripts/lmc_pool.py run)
 set -Eeuo pipefail
 trap 'echo "LMC RUN STOPPED at line $LINENO (exit $?)" >&2' ERR
 cd "$(dirname "$0")/.."
@@ -117,8 +123,35 @@ UCX_LOG_SET=${NIXL_UCX_LOG:-}
    && "$UCX_LOG_SET" =~ ^[a-z]*$ ]] || {
     echo "STOP: NIXL_ALL_GPUS is 0 or 1; NIXL_UCX_GET_ZCOPY on, off or auto; NIXL_UCX_TLS transports by commas;" \
          "NIXL_UCX_LOG a UCX log level"; exit 1; }
+# the workload: MTRAG's conversations (mtrag), or the KV pool experiment's frozen fixture (pool)
+WORKLOAD=${LMC_WORKLOAD:-mtrag}
+POOL_COUNT=${POOL_COUNT:-1}
+POOL_FIXTURE=${POOL_FIXTURE:-workloads/kv-pool-concurrency-chat-v1.json}
+POOL_DECODE=${POOL_DECODE:-0}
+POOL_STAGGER_MS=${POOL_STAGGER_MS:-5}
+case "$WORKLOAD" in
+    mtrag) ;;
+    pool)
+        [ "$TRANSFER" = nixl ] || { echo "STOP: LMC_WORKLOAD=pool runs the NIXL handoff (LMC_TRANSFER=nixl)"; exit 1; }
+        [[ "$POOL_COUNT" =~ ^[1-9][0-9]*$ && "$POOL_DECODE" =~ ^[0-2]$ && "$POOL_STAGGER_MS" =~ ^[0-9]+$ ]] || {
+            echo "STOP: POOL_COUNT is a count of conversations, POOL_DECODE 0, 1 or 2 (D1-D3), POOL_STAGGER_MS whole ms"
+            exit 1; }
+        [ -s "$POOL_FIXTURE" ] || { echo "STOP: no fixture $POOL_FIXTURE"; exit 1; } ;;
+    *) echo "STOP: LMC_WORKLOAD is mtrag or pool"; exit 1 ;;
+esac
+# the model: its folder name in the results, its repository and pinned revision
+LMC_MODEL=${LMC_MODEL:-llama32_3b}
+case "$LMC_MODEL" in
+    llama32_3b) MODEL_REPO=unsloth/Llama-3.2-3B MODEL_REV=d4446454d87d51aa42e1fb174f25acc5f8762331 ;;
+    qwen3_4b) MODEL_REPO=Qwen/Qwen3-4B-Instruct-2507 MODEL_REV=cdbee75f17c01a7cc42f958dc650907174af0554 ;;
+    *) echo "STOP: LMC_MODEL is llama32_3b or qwen3_4b"; exit 1 ;;
+esac
+MAX_NUM_SEQS=${MAX_NUM_SEQS:-}
+[[ "$MAX_NUM_SEQS" =~ ^([1-9][0-9]*)?$ ]] || { echo "STOP: MAX_NUM_SEQS is a whole number"; exit 1; }
 RUN_NAME=lmc_$MODE
 [ "$TRANSFER" = nixl ] && RUN_NAME=lmc_${MODE}_nixl_${SERVERS}_${LAYOUT_LABEL}_${DOCS/conversations/conv}
+# the pool experiment: the GPU pool (its blocks) and the conversations offered at once name the run
+[ "$WORKLOAD" = pool ] && RUN_NAME=lmc_${MODE}_nixl_${SERVERS}_blocks${GPU_BLOCKS:-auto}_n${POOL_COUNT}
 [ "$TRANSFER" = nixl ] && [ "$NIXL_ALL" = 1 ] && RUN_NAME+=_allgpus
 [ "$TRANSFER" = nixl ] && [ -n "$UCX_GZ_SET" ] && RUN_NAME+=_getzcopy-$UCX_GZ_SET
 [ "$TRANSFER" = nixl ] && [ -n "$UCX_TLS_SET" ] && RUN_NAME+=_tls-$(echo "$UCX_TLS_SET" | tr ',^' '+x')
@@ -134,15 +167,16 @@ for v in LIMIT CONC MAX_TOKENS MAXLEN MAXBT CHUNK RUN_TIMEOUT_S; do
 done
 [[ "$L1_GB" =~ ^[0-9]+([.][0-9]+)?$ && "$STORE_WAIT_MS" =~ ^[0-9]+([.][0-9]+)?$ && "$GPU_MEM" =~ ^0?[.][0-9]+$ ]] || {
     echo "STOP: LMC_L1_GB, STORE_WAIT_MS and GPU_MEM are numbers (GPU_MEM a fraction)"; exit 1; }
+[[ "${GPU_BLOCKS:-}" =~ ^([1-9][0-9]*)?$ ]] || { echo "STOP: GPU_BLOCKS is a whole number of blocks"; exit 1; }
 
 ENV_DIR=$KV_HOME/venv_lmcache
 LPY=$ENV_DIR/bin/python
 OVERLAY=$KV_HOME/lmc_overlay
 [ -x "$LPY" ] && [ -s "$OVERLAY/OVERLAY.json" ] || { echo "STOP: no $ENV_DIR or $OVERLAY: run scripts/lmc_setup.sh first"; exit 1; }
 MTRAG_FILE=${MTRAG_FILE:-$KV_RUNS/mtrag/conversations.json}
-[ -s "$MTRAG_FILE" ] || { echo "STOP: no $MTRAG_FILE: run scripts/lmc_setup.sh first"; exit 1; }
+[ "$WORKLOAD" = pool ] || [ -s "$MTRAG_FILE" ] || { echo "STOP: no $MTRAG_FILE: run scripts/lmc_setup.sh first"; exit 1; }
 SEL_ARGS=()
-if [ "$DOCS" != conversations ] || [ -n "$CONV_IDS" ]; then
+if [ "$WORKLOAD" = mtrag ] && { [ "$DOCS" != conversations ] || [ -n "$CONV_IDS" ]; }; then
     # the task file: the passages (rag, reference), or only the conversations' ids (conversations.json's passages)
     MD=$(dirname "$MTRAG_FILE")
     case "$DOCS" in rag) TASKS=$MD/RAG.jsonl ;; all) TASKS=$MD/reference.jsonl,$MD/RAG.jsonl ;; *) TASKS=$MD/reference.jsonl ;; esac
@@ -185,10 +219,15 @@ TRACE=$OUT/kvtrace
 L2DIR=$OUT/l2
 mkdir -p "$OUT" "$TRACE" "$OUT/server"
 GPU_TAG=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n 1p | tr 'A-Z' 'a-z' | sed 's/nvidia//' | tr -cd 'a-z0-9')
-RES=$RESULTS_ROOT/llama32_3b_${RUN_NAME}_${GPU_TAG}_${STAMP}
+RES=$RESULTS_ROOT/${LMC_MODEL}_${RUN_NAME}_${GPU_TAG}_${STAMP}
+if [ "$WORKLOAD" = pool ]; then
+    WL_DESC="the pool fixture's first $POOL_COUNT conversations (turn by turn, all on D$((POOL_DECODE + 1))), GPU pool of ${GPU_BLOCKS:-auto} blocks"
+else
+    WL_DESC="MTRAG $LIMIT conversations $LAYOUT, passages $DOCS${CONV_IDS:+ (by id)}"
+fi
 echo "== LMCache lifecycle run $OUT: mode $MODE (L1 $L1_GB GB, eviction $EVICT, store policy $STORE_POLICY), chunk $CHUNK," \
-     "transfer $TRANSFER, servers $SERVERS, P on GPU ${DEVS[0]}, D1-D3 on ${DEVS[*]:1}; MTRAG $LIMIT conversations" \
-     "$LAYOUT, passages $DOCS${CONV_IDS:+ (by id)}, disk reads $DISK_READS; commit $(git log --oneline -1 2>/dev/null || echo '?')"
+     "transfer $TRANSFER, servers $SERVERS, P on GPU ${DEVS[0]}, D1-D3 on ${DEVS[*]:1}; model $MODEL_REPO; $WL_DESC," \
+     "disk reads $DISK_READS; commit $(git log --oneline -1 2>/dev/null || echo '?')"
 if [ "$TRANSFER" = nixl ] && ! "$LPY" -c "import torch; from nixl._api import nixl_agent" 2>/dev/null; then
     echo "STOP: NIXL does not import in $ENV_DIR (scripts/lmc_setup.sh installs it):"
     "$LPY" -c "import torch; from nixl._api import nixl_agent" 2>&1 | tail -n 3 || true
@@ -255,8 +294,16 @@ if b:
     sys.exit(f"STOP: port(s) {b} already in use on this node (another job?): start again with PORT_BASE=<another>")
 print(f"   ports {min(map(int, sys.argv[1:]))}-{max(map(int, sys.argv[1:]))} free")
 EOF
-MP=${MODEL_PATH:-$("$LPY" -I -c "from huggingface_hub import snapshot_download; print(snapshot_download('unsloth/Llama-3.2-3B', revision='d4446454d87d51aa42e1fb174f25acc5f8762331'))")}
+MP=${MODEL_PATH:-$("$LPY" -I -c "import sys; from huggingface_hub import snapshot_download; print(snapshot_download(sys.argv[1], revision=sys.argv[2]))" "$MODEL_REPO" "$MODEL_REV")}
 echo "   model folder $MP"
+# the KV bytes a token takes (K and V, every layer, the config's dtype: 2 bytes for bf16/fp16), for the reports
+KV_BYTES_PER_TOKEN=$("$LPY" -I scripts/lmc_pool.py kv-bytes --config "$MP/config.json")
+echo "   KV: $KV_BYTES_PER_TOKEN bytes a token, $((KV_BYTES_PER_TOKEN * 16)) a 16-token block"
+if [ "$WORKLOAD" = pool ]; then
+    # the fixture against this model's tokenizer: every prompt's ids, lengths and hashes, before any engine starts
+    "$LPY" -I scripts/lmc_pool.py check --fixture "$POOL_FIXTURE" --tokenizer "$MP" --output "$OUT/pool_fixture_check.json" || {
+        echo "STOP: the fixture does not match the model's tokenizer ($OUT/pool_fixture_check.json)"; exit 1; }
+fi
 
 PIDS=()
 stop_all() {   # SIGINT first (each process flushes its trace on exit), then what is left
@@ -315,6 +362,7 @@ done
 ENGINE_ARGS=()
 [ "${ENGINE_EAGER:-0}" = 1 ] && ENGINE_ARGS+=(--enforce-eager)
 [ -n "${GPU_BLOCKS:-}" ] && ENGINE_ARGS+=(--num-gpu-blocks-override "$GPU_BLOCKS")
+[ -n "$MAX_NUM_SEQS" ] && ENGINE_ARGS+=(--max-num-seqs "$MAX_NUM_SEQS")
 lmc_connector() {   # kv_role lmcache_port: LMCache's connector (LMCache 0.5.7's own class, beside its server)
     echo "{\"kv_connector\":\"LMCacheMPConnector\",\"kv_connector_module_path\":\"lmcache.integration.vllm.lmcache_mp_connector\",\"kv_role\":\"$1\",\"kv_connector_extra_config\":{\"lmcache.mp.host\":\"tcp://127.0.0.1\",\"lmcache.mp.port\":$2,\"lmcache.mp.save_decode_cache\":$SAVE_DECODE}}"
 }
@@ -382,7 +430,11 @@ if [ "$UP" = 1 ]; then
     if [ "$TRANSFER" = nixl ]; then
         # as vllm-router does it for NIXL (pull): P first (one token), its reply's kv_transfer_params to D, no wait
         PX_ARGS=(--policy round_robin --mode nixl)
-        echo "== proxy (NIXL mode, as vllm-router: D engines round-robin, no wait) and MTRAG"
+        if [ "$WORKLOAD" = pool ]; then
+            echo "== proxy (NIXL mode, as vllm-router, no wait; each request names D$((POOL_DECODE + 1))) and the pool fixture"
+        else
+            echo "== proxy (NIXL mode, as vllm-router: D engines round-robin, no wait) and MTRAG"
+        fi
     else
         PX_ARGS=(--policy conversation --mode store --store-wait-ms "$STORE_WAIT_MS")
         echo "== proxy (store mode, wait $STORE_WAIT_MS ms) and MTRAG"
@@ -394,11 +446,19 @@ if [ "$UP" = 1 ]; then
     PIDS+=($!)
     for _ in $(seq 1 30); do curl -sf "http://127.0.0.1:$PROXY_PORT/health" >/dev/null && break; sleep 1; done
     set +e
-    timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" "$LPY" -I -u scripts/pd_mtrag.py \
-        --conversations "$MTRAG_FILE" --proxy "http://127.0.0.1:$PROXY_PORT" --tokenize "http://127.0.0.1:$P_PORT" \
-        --model llama --layout "$LAYOUT" --policy conversation --run "$RUN_NAME" --concurrency "$CONC" \
-        --max-tokens "$MAX_TOKENS" --max-len "$MAXLEN" --limit "$LIMIT" "${SEL_ARGS[@]}" --trace \
-        --output "$OUT/mtrag.jsonl" --summary "$OUT/mtrag_summary.json" 2>&1 | tee "$OUT/mtrag.log"
+    if [ "$WORKLOAD" = pool ]; then
+        # the driver's records in mtrag.jsonl's format (the lifecycle report and the local check read them)
+        timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" "$LPY" -I -u scripts/lmc_pool.py run \
+            --fixture "$POOL_FIXTURE" --count "$POOL_COUNT" --proxy "http://127.0.0.1:$PROXY_PORT" --model llama \
+            --run "$RUN_NAME" --decode "$POOL_DECODE" --stagger-ms "$POOL_STAGGER_MS" --max-tokens "$MAX_TOKENS" \
+            --output "$OUT/mtrag.jsonl" --summary "$OUT/mtrag_summary.json" 2>&1 | tee "$OUT/mtrag.log"
+    else
+        timeout --signal=TERM --kill-after=60 "$RUN_TIMEOUT_S" "$LPY" -I -u scripts/pd_mtrag.py \
+            --conversations "$MTRAG_FILE" --proxy "http://127.0.0.1:$PROXY_PORT" --tokenize "http://127.0.0.1:$P_PORT" \
+            --model llama --layout "$LAYOUT" --policy conversation --run "$RUN_NAME" --concurrency "$CONC" \
+            --max-tokens "$MAX_TOKENS" --max-len "$MAXLEN" --limit "$LIMIT" "${SEL_ARGS[@]}" --trace \
+            --output "$OUT/mtrag.jsonl" --summary "$OUT/mtrag_summary.json" 2>&1 | tee "$OUT/mtrag.log"
+    fi
     STATUS=${PIPESTATUS[0]}
     set -e
     sleep "${KVTRACE_SETTLE_S:-3}"                # the last stores land and every process flushes its trace
@@ -482,9 +542,12 @@ cp "$KV_HOME/lmc_verify.json" "$OUT/server/lmc_verify.json" 2>/dev/null || true
     "$OVERLAY/OVERLAY.json" "$ALL_GPUS" "$(git rev-parse HEAD 2>/dev/null || echo '?')" "$SERVER_ALIVE" \
     "$TRANSFER" "$SERVERS" "$RUN_NAME" "$(IFS=,; echo "${SRV_ROLES[*]}")" "$(IFS=,; echo "${ENGINE_SRV[*]}")" \
     "$(kv_config 0)" "$(kv_config 1)" "${PX_ARGS[*]:-}" "$DOCS" "$CONV_IDS" "$DISK_READS" "$PREFETCH_POLICY" \
-    "$LAYOUT_LABEL" "$NIXL_ALL" "$UCX_TLS_SET" "$UCX_LOG_SET" "$UCX_GZ_SET" <<'EOF'
-import json, subprocess, sys
+    "$LAYOUT_LABEL" "$NIXL_ALL" "$UCX_TLS_SET" "$UCX_LOG_SET" "$UCX_GZ_SET" "$WORKLOAD" "$LMC_MODEL" "$MODEL_REPO" \
+    "$MODEL_REV" "$MAX_NUM_SEQS" "$MAXLEN" "$MAXBT" "$KV_BYTES_PER_TOKEN" "$POOL_COUNT" "$POOL_FIXTURE" \
+    "$POOL_DECODE" "$POOL_STAGGER_MS" <<'EOF'
+import hashlib, json, subprocess, sys
 a = sys.argv[1:]
+pool = a[38] == "pool"
 gpus = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True).stdout
 srv = a[24].split(",")
 transfer = a[21]
@@ -498,7 +561,15 @@ json.dump({"mode": a[1], "l1_gb": float(a[2]), "eviction": a[3], "store_policy":
            "transfer": transfer, "servers": a[22], "run": a[23], "server_roles": srv,
            "engine_server": dict(zip(["P", "D1", "D2", "D3"], (srv[int(i)] for i in a[25].split(",")))),
            "kv_transfer_config": {"P": json.loads(a[26]), "D": json.loads(a[27])},
-           "proxy": a[28], "routing": "round_robin" if transfer == "nixl" else "conversation",
+           "proxy": a[28], "routing": (f"pinned:D{int(a[48]) + 1}" if pool else
+                                       "round_robin" if transfer == "nixl" else "conversation"),
+           "workload": a[38], "model_tag": a[39], "model": a[40], "model_revision": a[41],
+           "max_num_seqs": int(a[42]) if a[42] else None, "max_model_len": int(a[43]),
+           "max_num_batched_tokens": int(a[44]), "kv_bytes_per_token": int(a[45]),
+           "pool": {"count": int(a[46]), "fixture": a[47], "decode": f"D{int(a[48]) + 1}", "stagger_ms": int(a[49]),
+                    "fixture_sha256": hashlib.sha256(open(a[47], "rb").read()).hexdigest(),
+                    "gpu_blocks": int(a[15]) if a[15] else None,
+                    "usable_blocks": int(a[15]) - 1 if a[15] else None} if pool else None,
            "mtrag_docs": a[29], "conv_ids": [x for x in a[30].split(",") if x], "disk_reads": a[31],
            "prefetch_policy": a[32], "layout_label": a[33],
            "nixl_all_gpus": a[34] == "1", "ucx_tls": a[35] or None, "ucx_log_level": a[36] or None,
@@ -523,6 +594,15 @@ mkdir -p "$RES"
 if ! "$LPY" -I scripts/lmc_lifecycle.py report --run "$OUT" --output "$RES"; then
     echo "WARNING: the lifecycle report failed (the raw traces are packaged all the same)"
     [ "$STATUS" != 0 ] || STATUS=2
+fi
+if [ "$WORKLOAD" = pool ]; then
+    # overlap, queue reasons, slot occupancy, LMCache's part, NIXL per request: pool.json, pool.md (in summary.md)
+    echo "== pool report"
+    if ! "$LPY" -I scripts/lmc_pool.py report --run "$OUT" --output "$RES"; then
+        echo "WARNING: the pool report failed (the raw traces are packaged all the same)"
+        [ "$STATUS" != 0 ] || STATUS=2
+    fi
+    [ -s "$OUT/pool_fixture_check.json" ] && cp "$OUT/pool_fixture_check.json" "$RES/"
 fi
 # the evidence beside the report: the raw traces, the run's records, the logs' tails
 tar -C "$OUT" -czf "$RES/kvtrace.tar.gz" kvtrace

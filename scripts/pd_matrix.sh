@@ -65,7 +65,9 @@
 #               LMCache's connector; the proxy as vllm-router, no wait, D engines round-robin). KVPD_LMC_LAYOUTS
 #               (interleaved; history_first), KVPD_LMC_DOCS (conversations; rag, reference, all), KVPD_LMC_CONV_IDS,
 #               KVPD_LMC_CONCURRENCY, KVPD_LMC_DISK_READS, KVPD_LMC_L1_SHARED_GB, KVPD_LMC_L1_PER_ENGINE_GB: by
-#               commas where a list. KVPD_LMC_PRESET=eight: the eight configurations (below, and the doc's runbook)
+#               commas where a list. KVPD_LMC_PRESET=eight: the eight configurations (below, and the doc's runbook);
+#               KVPD_LMC_PRESET=pool: the KV pool experiment (KVPD_LMC_POOL_COUNTS, KVPD_LMC_POOL_BLOCKS,
+#               KVPD_LMC_POOL_STAGGER_MS, KVPD_LMC_POOL_DECODE; below)
 # or RUNS="VAR=value VAR=value; VAR=value ...": one run per ';' (the variables of scripts/run_pd_vllm.sh, or with
 # RUNNER=lmc_run.sh those of scripts/lmc_run.sh).
 # Extra variables in the environment (SMOKE, RATES, NUM_PROMPTS, PREFILL_GPUS, ...) apply to every run.
@@ -150,8 +152,19 @@ case "${KVPD_LMC_PRESET:-}" in
            P_R=retain P_SH=8 P_PE=2 ;;
     nixlcheck) P_T=nixl P_S=shared P_M=memory P_L=interleaved P_D=all P_I=$LMC_TEN P_C=1 P_R=retain P_SH=8 P_PE=2
                P_N=1 P_G=0,1 P_UL=debug P_GZ=on ;;
-    *) echo "STOP: KVPD_LMC_PRESET=$KVPD_LMC_PRESET: eight, nixlcheck, or none" >&2; exit 2 ;;
+    # KVPD_LMC_PRESET=pool: the KV pool experiment (docs/lmcache_lifecycle.md, "The KV pool experiment"): the frozen
+    # fixture's first KVPD_LMC_POOL_COUNTS conversations (1-6, by commas) offered together turn by turn, all on D1,
+    # in GPU pools of KVPD_LMC_POOL_BLOCKS (131, 261, 391: 2, 4, 6 requests of 65 blocks, and vLLM's reserved one),
+    # Qwen3-4B, per engine and shared, memory and disk; disk reads not kept (each restore reads the disk); LMCache
+    # memory 8 GB shared, 4 GB per engine (no LMCache eviction: the GPU pool is the only limit)
+    pool) P_T=nixl P_S=per_engine,shared P_M=memory,disk P_L=history_first P_D=conversations P_I='' P_C='' P_R=temporary
+          P_SH=8 P_PE=4 ;;
+    *) echo "STOP: KVPD_LMC_PRESET=$KVPD_LMC_PRESET: eight, nixlcheck, pool, or none" >&2; exit 2 ;;
 esac
+POOLN=${KVPD_LMC_POOL_COUNTS:-1,2,3,4,5,6}    # pool: conversations offered at once, by commas
+POOLB=${KVPD_LMC_POOL_BLOCKS:-131,261,391}    # pool: each engine's GPU blocks (--num-gpu-blocks-override), by commas
+POOLS=${KVPD_LMC_POOL_STAGGER_MS:-5}          # pool: ms between a turn's requests, in the fixture's order
+POOLD=${KVPD_LMC_POOL_DECODE:-0}              # pool: the D engine every request goes to (0: D1)
 LMCN=${KVPD_LMC_CONVS:-$P_N}
 LMCG=${KVPD_LMC_ALL_GPUS:-$P_G}               # NIXL: each engine sees its own GPU (0) and/or every GPU (1), by commas
 LMCUT=${KVPD_LMC_UCX_TLS:-}                   # NIXL: UCX_TLS for the engines (empty: UCX's default, all)
@@ -254,6 +267,36 @@ if [ -z "${RUNS:-}" ]; then
                 echo "STOP: KVPD_LMC_ALL_GPUS 0 and/or 1; KVPD_LMC_UCX_GET_ZCOPY auto, on and/or off;" \
                      "KVPD_LMC_UCX_TLS transports by commas; KVPD_LMC_UCX_LOG a level" >&2; exit 2; }
             RUNS=""
+            if [ "${KVPD_LMC_PRESET:-}" = pool ]; then
+            # the KV pool experiment (docs/lmcache_lifecycle.md, "The KV pool experiment"): offered conversations,
+            # then GPU pools, then the four LMCache settings (per engine memory and disk, shared memory and disk)
+            [[ "$POOLN" =~ ^[1-6](,[1-6])*$ ]] || { echo "STOP: KVPD_LMC_POOL_COUNTS=$POOLN: 1 to 6 conversations, by commas" >&2; exit 2; }
+            [[ "$POOLB" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "STOP: KVPD_LMC_POOL_BLOCKS=$POOLB: GPU blocks, by commas" >&2; exit 2; }
+            for b in $(echo "$POOLB" | tr ',' ' '); do
+                [ "$b" -ge 66 ] || { echo "STOP: KVPD_LMC_POOL_BLOCKS: $b blocks; one request needs 65 and vLLM keeps 1" >&2; exit 2; }
+            done
+            [[ "$POOLS" =~ ^[0-9]+$ && "$POOLD" =~ ^[0-2]$ ]] || {
+                echo "STOP: KVPD_LMC_POOL_STAGGER_MS whole ms; KVPD_LMC_POOL_DECODE 0, 1 or 2 (D1-D3)" >&2; exit 2; }
+            [ "$LMCT" = nixl ] || { echo "STOP: KVPD_LMC_PRESET=pool runs NIXL only (KVPD_LMC_TRANSFERS=$LMCT)" >&2; exit 2; }
+            for n in $(echo "$POOLN" | tr ',' ' '); do
+                for b in $(echo "$POOLB" | tr ',' ' '); do
+                    for sv in $(echo "$LMCS" | tr ',' ' '); do
+                        case "$sv" in shared|per_engine) ;;
+                            *) echo "STOP: KVPD_LMC_SERVERS=$LMCS: shared or per_engine, by commas" >&2; exit 2 ;; esac
+                        l1=$([ "$sv" = shared ] && echo "$LMCSH" || echo "$LMCPE")
+                        for x in $(echo "$LMCM" | tr ',' ' '); do
+                            case "$x" in memory|disk) ;;
+                                *) echo "STOP: KVPD_LMC_MODES=$LMCM: memory or disk, by commas" >&2; exit 2 ;; esac
+                            RUNS+="RUNNER=lmc_run.sh LMC_MODE=$x LMC_TRANSFER=nixl LMC_SERVERS=$sv LMC_WORKLOAD=pool"
+                            RUNS+=" POOL_COUNT=$n GPU_BLOCKS=$b LMC_MODEL=qwen3_4b MAXLEN=1040 MAXBT=6240 MAX_NUM_SEQS=6"
+                            RUNS+=" GPU_MEM=0.75 MAX_TOKENS=8 LMC_DISK_READS=$LMCR LMC_L1_GB=$l1 LMC_LOCAL_CHECK=0"
+                            RUNS+=" POOL_DECODE=$POOLD POOL_STAGGER_MS=$POOLS"
+                            RUNS+="${LMCUT:+ NIXL_UCX_TLS=$LMCUT}${LMCUL:+ NIXL_UCX_LOG=$LMCUL};"
+                        done
+                    done
+                done
+            done
+            else
             for tx in $(echo "$LMCT" | tr ',' ' '); do
                 case "$tx" in lmcache|nixl) ;;
                     *) echo "STOP: KVPD_LMC_TRANSFERS=$LMCT: lmcache or nixl, by commas" >&2; exit 2 ;; esac
@@ -292,6 +335,7 @@ if [ -z "${RUNS:-}" ]; then
                     done
                 done
             done
+            fi
             [ -n "$RUNS" ] || { echo "STOP: no run: KVPD_LMC_MODES, KVPD_LMC_TRANSFERS ($LMCT) and KVPD_LMC_SERVERS ($LMCS) leave none" >&2; exit 2; } ;;
         wlong) RUNS="TRANSPORT=ring LINKS=10,100 CODECS=$BASE,aquakv-2 $WLLONG;
                      TRANSPORT=p2p LINKS=native CODECS=$BASE,aquakv-2 $WLLONG;
@@ -353,6 +397,15 @@ if [ "$MATRIX" = lmctrace ]; then                 # the modes side by side (each
         cp "$DEST/compare.md" "$DEST/summary.md"
     else
         echo "WARNING: the comparison failed; every run's own summary.md is in its folder"
+    fi
+    # the KV pool experiment's arms side by side (scripts/lmc_pool.py: each arm's pool.json), first in the summary
+    if [ "${KVPD_LMC_PRESET:-}" = pool ]; then
+        if python3 -I scripts/lmc_pool.py compare --dirs "$LMC_DIRS" --output "$DEST"; then
+            { cat "$DEST/pool_compare.md"; echo; [ -s "$DEST/summary.md" ] && cat "$DEST/summary.md"; } > "$DEST/summary.md.new"
+            mv "$DEST/summary.md.new" "$DEST/summary.md"
+        else
+            echo "WARNING: the pool comparison failed; every arm's own pool.md is in its folder"
+        fi
     fi
 else
     "$MPY" scripts/pd_matrix_report.py --runs "$NEW" --root "$RESULTS_ROOT" \

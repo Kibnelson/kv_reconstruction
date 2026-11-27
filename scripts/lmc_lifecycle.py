@@ -50,6 +50,8 @@ SM_EVENTS = {"sm.write.reserved", "sm.write.finished", "sm.read.prefetched_finis
 # LMCache events the report reads nothing from: the connector's report of vLLM's block allocations, for the server's
 # metrics (vLLM's own hooks record the allocations)
 LMC_IGNORED = {"mp.vllm.block_allocation"}
+# the scheduler's records (scripts/lmc_pool.py reads them: queue reasons, slot occupancy)
+SCHED_EVENTS = {"vllm.sched.step", "vllm.sched.wait", "kv.connector.match"}
 SESSION_EVENTS = {"mp.request.start", "mp.request.end", "mp.store.submitted", "mp.store.start", "mp.store.end",
                   "mp.retrieve.submitted", "mp.retrieve.start", "mp.retrieve.end", "mp.lookup_prefetch.start",
                   "mp.lookup_prefetch.end", "mp.vllm.end_session"}
@@ -329,6 +331,12 @@ class Run:
                     self.R(role, rid)["kv_sums"] = sums
             elif ev.startswith("lmc."):
                 self.sessions[r.get("session")]["engine:" + ev[4:]].append(r)   # engine-side LMCache events
+            elif ev == "kv.connector.chosen":           # MultiConnector's choice: the connector that loads, if any
+                self.R(role, r["req"])["connector"] = r.get("chosen")
+            elif ev == "vllm.request.preempted":
+                self.R(role, r["req"]).setdefault("preempted", []).append(t)
+            elif ev in SCHED_EVENTS:                     # the scheduler's steps: the pool report reads them
+                pass
             else:
                 self.unknown[ev] += 1
 

@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
+import kvtrace  # KVTRACE
 import torch
 
 from vllm.config import VllmConfig
@@ -441,6 +442,7 @@ class MultiConnector(KVConnectorBase_V1, SupportsHMA):
             toks, load_async = c.get_num_new_matched_tokens(
                 request, num_computed_tokens
             )
+            if kvtrace.ON: kvtrace.hook("kv.connector.match", request=request, index=i, connector=c, tokens=toks)  # KVTRACE
             # If there is a connector still looking up the matches,
             # we return None to indicate that we are not done yet.
             if toks is None:
@@ -450,6 +452,7 @@ class MultiConnector(KVConnectorBase_V1, SupportsHMA):
             if to_return[0] == 0 and toks > 0:
                 self._requests_to_connector[request.request_id] = i
                 to_return = (toks, load_async)
+        if kvtrace.ON: kvtrace.hook("kv.connector.chosen", request=request, connectors=self._connectors, chosen=self._requests_to_connector.get(request.request_id), result=to_return, computed=num_computed_tokens)  # KVTRACE
         return to_return
 
     def get_external_cache_hit_sources(

@@ -203,8 +203,12 @@ kvtrace and the CUDA ops are imported from the tree, and stops otherwise.
 
 | File | Function | Line | Event |
 | --- | --- | ---: | --- |
-| `vllm/v1/core/sched/scheduler.py` | `add_request` | 2636 | `vllm.request.added` |
-| `vllm/v1/core/sched/scheduler.py` | `_free_request` | 2743 | `vllm.request.finished` |
+| `vllm/v1/core/sched/scheduler.py` | `add_request` | 2642 | `vllm.request.added` |
+| `vllm/v1/core/sched/scheduler.py` | `_free_request` | 2749 | `vllm.request.finished` |
+| `vllm/v1/core/sched/scheduler.py` | `schedule` (the waiting queue) | 925, 933, 993, 1286 | `vllm.sched.wait` (`max_num_seqs`, blocked, `connector_lookup_pending`, `no_free_blocks`) |
+| `vllm/v1/core/sched/scheduler.py` | `schedule` (its end) | 1561 | `vllm.sched.step` |
+| `vllm/v1/core/sched/scheduler.py` | `_preempt_request` | 1590 | `vllm.request.preempted` |
+| `vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py` | `get_num_new_matched_tokens` | 445, 455 | `kv.connector.match`, `kv.connector.chosen` |
 | `vllm/v1/core/kv_cache_manager.py` | `get_computed_blocks` | 322 | `vllm.gpu.prefix_hit` |
 | `vllm/v1/core/kv_cache_manager.py` | `allocate_slots` | 604 | `vllm.gpu.allocated` |
 | `vllm/v1/core/kv_cache_manager.py` | `free` | 632 | `vllm.request.blocks_freed` |
@@ -232,7 +236,7 @@ kvtrace and the CUDA ops are imported from the tree, and stops otherwise.
 | `vllm/distributed/kv_transfer/kv_connector/v1/nixl/base_worker.py` | `_nixl_handshake` | 997, 1141 | `nixl.handshake` (start, done) |
 | `vllm/distributed/kv_transfer/kv_connector/v1/nixl/base_worker.py` | `get_transfer_results` | 2991 | `nixl.done` |
 
-Plus `import kvtrace  # KVTRACE` at the top of each of the ten files: 41 lines in all. (`lmc.l2.read` and `lmc.touch`
+Plus `import kvtrace  # KVTRACE` at the top of each of the eleven files: 50 lines in all (the scheduler's waits, steps and preemptions and MultiConnector's two came with the KV pool experiment). (`lmc.l2.read` and `lmc.touch`
 came after job 30728: LMCache publishes `l2.keys.accessed` both for a real read from disk and for a touch, which only
 refreshes the eviction order and moves no bytes, so only these two hooks tell them apart. The `nixl.*` hooks came
 with the `nixl` transfer: vLLM's NIXL connector, pull mode, its scheduler side in each engine's core and its worker
@@ -257,7 +261,9 @@ every second and at exit. Every record has:
 
 Hashes and keys are written as 16 hex characters: the first 8 bytes of vLLM's block hash (sha256; the 4-byte group
 id dropped), or of LMCache's chunk hash. Requests are vLLM's request ids, `cmpl-<key>-0-<random>`, where `<key>` is
-the proxy's 32-hex key for the turn, the same for P and D (the proxy sends it as `X-Request-Id`).
+the proxy's 32-hex key for the turn, the same for P and D (the proxy sends it as `X-Request-Id`). The KV pool
+experiment's requests carry a label after the key, each stage its own: `cmpl-<key>.<run>.<conversation>.T<turn>.P-0-<random>`
+on P and `...D-0-<random>` on D (`t_rid`, scripts/pd_proxy.py); NIXL's D finds P's request by the id in P's reply.
 
 ### vLLM (scheduler and KV cache manager, in each engine's core process)
 
@@ -271,6 +277,9 @@ the proxy's 32-hex key for the turn, the same for P and D (the proxy sends it as
 | `vllm.gpu.reset` | the prefix cache emptied | none |
 | `vllm.request.blocks_freed` | a finished request's blocks go back to the free queue (they stay cached until reused) | `req`; `blocks` |
 | `vllm.request.finished` | the request leaves the scheduler | `req`; `status`; `n_out`; `n_tokens`; `delay_free` (true while a store is still in flight) |
+| `vllm.sched.step` | a scheduler step, written only when it differs from the last one written (`KVTRACE_SCHED=0`: never) | `step` (the scheduler's count: the steps between two records were the same as the first); `scheduled`, tokens per request; `running`; `waiting`, each `[req, status, {reason, ...}]`: `no_free_blocks` (with `free`, `hit`, `external`, `new` tokens), `kv_load_in_flight` (its KV load, NIXL's or LMCache's, not done), `connector_lookup_pending`, `max_num_seqs`, `queued_behind_<reason>` (behind the request that stopped the queue), `token_budget`, `not_reached`; `held`, finished requests still holding blocks (P's, for NIXL); `pool`: `total`, `in_use` (referenced), `free`, and of the free `cached_free` (a prefix hit until reused) and `empty`, counted when the pool has at most `KVTRACE_POOL_SCAN_MAX` (8192) blocks |
+| `vllm.request.preempted` | a running request is preempted (its blocks freed; it computes again) | `req`; `n_computed` (the tokens it loses); `n_prompt`; `n_out`; `n_preemptions` |
+| `kv.connector.chosen` | MultiConnector answers how many tokens a connector loads (written when the answer changed for that request) | `req`; `asked`, each connector's `[index, class, tokens]` (`tokens` null while its lookup is pending); `chosen`, the class that loads (the first with tokens; null for none); `tokens`; `load_async`; `computed` (the engine's own hit it was given) |
 
 ### LMCache's connector inside each engine
 
@@ -506,6 +515,116 @@ is `llama32_3b_lmc_<mode>_nixl_<servers>_<chat|carry>_<docs>_rtxa5000_<time>/`.
 5. Disk mode: every chunk on disk and then out of memory; "disk reads kept in memory": N of N still in memory at the
    end unless LRU evicted them (with the default policy they leave about 80 ms after the read: job 30728, 102 of
    102); the server's memory at the end holds what was read back.
+
+## The KV pool experiment
+
+A controlled concurrency test at fixed GPU pool sizes: a frozen workload of six synthetic three-turn chat
+conversations, offered 1 to 6 at a time, every request decoded on one D engine, in GPU pools that fit 2, 4 or 6
+requests, for each of the four LMCache settings (a server per engine or one shared, memory or disk). The trace says
+how many requests actually overlapped on P and on D, why the others waited (GPU capacity, a KV load in flight, an
+LMCache lookup, the request limit), what the pool's slots held at each scheduler step, what LMCache restored, and
+NIXL's part per request. `KVPD_LMC_PRESET=pool` (`scripts/pd_matrix.sh`), `LMC_WORKLOAD=pool` (`scripts/lmc_run.sh`),
+`scripts/lmc_pool.py` (the fixture's check, the driver, the reports).
+
+### The fixture
+
+`workloads/kv-pool-concurrency-chat-v1.json` (SHA-256 `5a7ff21f1578906903ece680e7ca1b401c07eae2664e1a9ac9be51fad0d27649`):
+six fictional cases (`alder-17`, `beacon-26`, `cedar-34`, `dune-43`, `ember-52`, `flint-61`), each turn with its
+question, evidence (one answer and a distractor), reference answer, rendered prompt and token ids for
+`Qwen/Qwen3-4B-Instruct-2507` at `cdbee75f17c0`. Checked (`python3 scripts/lmc_pool.py check --fixture ...`):
+
+- 18 prompts of exactly 1,032 tokens: 4 full LMCache chunks of 256 and 8 tail tokens; with the 8 output tokens, 1,040
+  tokens, 65 GPU blocks of 16 (the KV of 1,039 of them is kept).
+- Each prompt's token ids hash (SHA-256 of the compact JSON array) to its `prompt_sha256`.
+- The three turns of a conversation share their first 288 tokens: 18 GPU blocks and 1 LMCache chunk (tokens 0-255);
+  turn 3 shares 301-306 with turn 2 (19 blocks). Two conversations share at most 1 token: no block.
+- The earlier Q&A in turns 2 and 3 are the fixture's reference answers, not D's: the prompts are frozen.
+- With `--tokenizer <model folder>`: the model's `tokenizer.json` hashes to the fixture's `tokenizer_sha256`, and every
+  prompt's text tokenizes again to its ids. `scripts/lmc_setup.sh` does this when it downloads Qwen3-4B, and every arm
+  again before its engines start (`pool_fixture_check.json`); either stops on a difference.
+
+### The arms
+
+| Setting | Value |
+| --- | --- |
+| Model | `Qwen/Qwen3-4B-Instruct-2507` at `cdbee75f17c01a7cc42f958dc650907174af0554` (`LMC_MODEL=qwen3_4b`; 147,456 KV bytes a token, 2,359,296 a block) |
+| Engines | 1 P and 3 D (D1-D3), vLLM 0.32.0, block 16, `--gpu-memory-utilization 0.75`, `--max-num-seqs 6`, `--max-num-batched-tokens 6240`, `--max-model-len 1040` |
+| GPU pool | `--num-gpu-blocks-override` 131, 261 or 391 on every engine: 130, 260, 390 usable (vLLM keeps one, its null block), 2, 4 or 6 requests of 65 blocks (309,067,776, 615,776,256 and 922,484,736 bytes of KV) |
+| Handoff | NIXL (MultiConnector: NixlConnector, then LMCache's connector, `kv_both`); the proxy as vllm-router; every request decoded on D1 (the plan's D0; `t_decode`); D2 and D3 started and idle |
+| LMCache | per engine or shared; memory (LRU) or disk (`skip_l1` store; disk reads not kept, each restore reads the disk); 8 GB for the shared server, 4 GB for each per-engine one: P stores at most 60 chunks (2.3 GB) at 6 conversations, so LMCache never evicts and the GPU pool is the only limit |
+| Requests | the fixture's token ids, 8 tokens out (`ignore_eos`), temperature 0, streamed |
+| Schedule | the first n conversations in the fixture's order; turn k of all n sent together, 5 ms apart in that order (recorded: over capacity the order decides which conversations keep their prefix); turn k+1 once every turn k has finished; caches kept between turns; fresh servers and engines for every arm |
+| Not run | the local check (one engine answering each prompt): the reference answers are checked instead |
+
+72 arms: offered counts 1-6, then pools 131, 261, 391, then per-engine memory, per-engine disk, shared memory, shared
+disk. `KVPD_LMC_POOL_COUNTS`, `KVPD_LMC_POOL_BLOCKS`, `KVPD_LMC_SERVERS`, `KVPD_LMC_MODES` pick a stage of it;
+`KVPD_LMC_POOL_STAGGER_MS` (5) and `KVPD_LMC_POOL_DECODE` (0: D1) change the schedule; `KVPD_LMC_DISK_READS`,
+`KVPD_LMC_L1_SHARED_GB`, `KVPD_LMC_L1_PER_ENGINE_GB`, `KVPD_LMC_UCX_TLS`, `KVPD_LMC_UCX_LOG` as for the other presets.
+Each arm's folder: `qwen3_4b_lmc_<mode>_nixl_<servers>_blocks<b>_n<count>_rtxa5000_<time>/`.
+
+### What the trace adds for it
+
+- `vllm.sched.step` and `vllm.sched.wait` (scheduler.py): at each step that changed, the requests scheduled, running,
+  waiting with the reason, finished and still holding blocks (P's, until D has read them), and the pool's blocks in
+  use, cached and free, empty. A full pool can queue a request without preempting one: the reasons tell them apart.
+- `vllm.request.preempted`: preemptions and the tokens they recompute, apart from evictions (`vllm.gpu.evicted`).
+- `kv.connector.chosen` (MultiConnector): each connector's matched tokens and the one that loads.
+- Each stage's own request id (`<key>.<run>.<conversation>.T<turn>.P` / `.D`), the proxy's key first.
+- Already there: LMCache's lookups with zero hits (`lmc.conn.lookup`, `lmc_hit` 0), reads from disk into memory
+  (`lmc.l2.read`) apart from restores to the GPU (`lmc.conn.retrieve_planned`), NIXL's read and its end per request
+  (`nixl.read`, `nixl.done`).
+- Not done: NIXL's native counters per worker. A request's NIXL bytes are its blocks times the model's KV bytes a
+  block; its time is from posting the read to its end, which overlaps another request's on the same D.
+
+### What to expect (from the code; the runs measure it)
+
+- D never loads from LMCache: NIXL comes first in MultiConnector and claims every D request. On D the four LMCache
+  settings differ only in D's own stores (per engine) and in its lookups (shared: they find P's chunks and, on disk,
+  read them into memory, unused).
+- LMCache can restore only on P, only chunk 0 (tokens 0-255, inside the 288-token prefix), and only when P's GPU has
+  lost the first blocks. Freed blocks go back last block first (LRU), so a request's prefix outlives its tail: at or
+  under capacity turn 2 takes turn 1's tails and keeps every prefix. Only over capacity (3-6 offered at 131 blocks, 5-6
+  at 261) does a request with no hit take a whole cached conversation, prefix and all; which ones depends on the
+  arrival order.
+- P frees a request's blocks only when D1 has read them over NIXL (TCP here, about 0.55 GB/s: about 280 ms for 65
+  blocks of 2.36 MB, longer when reads overlap on D1), so most of P's capacity waits are NIXL's hold.
+
+### Each arm's report
+
+`scripts/lmc_run.sh` writes `pool.json` and `pool.md` beside the lifecycle report and puts `pool.md` first in
+`summary.md`; the matrix's `pd_matrix_lmctrace_*/summary.md` starts with `pool_compare.md`, the arms side by side.
+
+- Checks: one answer per request; every prompt's hash; turn k+1 sent after every turn k finished; every request on
+  D1; every D request read its KV over NIXL, none failed; LMCache loaded nothing on D; the scheduler's steps present.
+- Per engine: the peak of requests resident at one step (running, loading, or holding blocks for NIXL), running,
+  waiting, batched, held for NIXL; the peak of blocks in use, the fewest free, the most cached and free; evictions,
+  preemptions; the seconds requests waited, by reason.
+- The first wait for GPU capacity: the request, the engine, how long and why, and the releases (P: D read it over
+  NIXL; D: it finished) before it was admitted.
+- LMCache (who loaded, P's lookups with hits, tokens restored, disk reads, stores), the GPU's prefix hits, NIXL per
+  request (blocks, ms, GB/s, how long P held its blocks), the answers against the reference, TTFT.
+
+Again offline: `python3 -I scripts/lmc_pool.py report --results <arm folder> --output /tmp/x`, and
+`python3 -I scripts/lmc_pool.py compare --dirs /tmp/x,/tmp/y --output /tmp/cmp`.
+
+### Running it
+
+The runbook below, one campaign per stage, with these exported before `bash <<'LOGIN'` (inspect each before the
+next):
+
+```bash
+# 1. the smoke: one conversation, the 2-request pool, a shared server in memory (1 arm; setup downloads Qwen3-4B)
+export KVPD_LMC_PRESET=pool KVPD_LMC_POOL_COUNTS=1 KVPD_LMC_POOL_BLOCKS=131 KVPD_LMC_SERVERS=shared KVPD_LMC_MODES=memory
+# 2. 1 and 2 offered: 24 arms
+export KVPD_LMC_PRESET=pool KVPD_LMC_POOL_COUNTS=1,2 KVPD_TIME=04:00:00
+# 3. 3 to 6 offered: 48 arms
+export KVPD_LMC_PRESET=pool KVPD_LMC_POOL_COUNTS=3,4,5,6 KVPD_TIME=08:00:00
+```
+
+To see a stage's arms first: `MATRIX=lmctrace KVPD_LMC_PRESET=pool KVPD_LMC_POOL_COUNTS=1,2 PRINT_RUNS=1 bash
+scripts/pd_matrix.sh`. The disk plan adds Qwen3-4B (8.2 GB, once, in the node's cache) and the largest arm's disk
+tier (6 conversations with a server per engine: 4.8 GB, deleted after the arm). Start a new shell for each stage (or
+`unset` the stage's `KVPD_LMC_*` first): the runbook saves every exported `KVPD_LMC_*` with the campaign.
 
 ## Runbook (gpu-grad-01, the card)
 
