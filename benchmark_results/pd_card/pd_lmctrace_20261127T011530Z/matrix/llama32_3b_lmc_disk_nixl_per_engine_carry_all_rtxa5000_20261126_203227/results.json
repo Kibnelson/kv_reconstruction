@@ -1,0 +1,222 @@
+{
+ "mode": "disk",
+ "env": {
+  "mode": "disk",
+  "l1_gb": 2.0,
+  "eviction": "LRU",
+  "store_policy": "skip_l1",
+  "chunk": 256,
+  "odirect": true,
+  "d_role": "kv_both",
+  "mtrag_limit": 1,
+  "layout": "interleaved",
+  "store_wait_ms": 0.0,
+  "gpu_blocks": null,
+  "d_prefix_cache": true,
+  "transfer": "nixl",
+  "servers": "per_engine",
+  "routing": "round_robin",
+  "concurrency": 1,
+  "mtrag_docs": "all",
+  "conv_ids": [
+   "1534a095279f2cb888fb0bea17bd70da",
+   "0208bf26ec357a803445290fa88a2e9e",
+   "a2698b2973ea7db1ee5adb5e70ec02e4",
+   "c1e53df98a28f19448f4af244304b89a",
+   "cfbcfa3e382f12aed450b10f87a72aeb",
+   "3f5fa378239f7475baac89fa40288aaa",
+   "5c13daa9432149f6243aa1115629cd1a",
+   "694e275f1a01ad0e8ac448ad809f7930",
+   "aea2634b0e5f1c2444550d31c41adc94",
+   "79f0d0539d9ec0acbf90cb3388b30c17"
+  ],
+  "disk_reads": "retain",
+  "prefetch_policy": "retain",
+  "layout_label": "carry"
+ },
+ "trace": {
+  "files": 8,
+  "records": 1235,
+  "unreadable_lines": 0,
+  "by_role": {
+   "P": 84,
+   "LMC_P": 157,
+   "D1": 320,
+   "LMC_D1": 77,
+   "D2": 322,
+   "LMC_D2": 77,
+   "D3": 161,
+   "LMC_D3": 37
+  },
+  "hook_errors": {},
+  "unknown_events": {}
+ },
+ "requests": {
+  "P": 5,
+  "D": 5,
+  "turns": 5
+ },
+ "prompt_tokens": {
+  "P": 9229,
+  "D": 9229
+ },
+ "P": {
+  "local_hit_tokens": 6000,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 3229,
+  "stored_tokens": 3072,
+  "store_bytes": 352321536,
+  "store_s_median": 0.070474,
+  "store_s_p90": 0.073709,
+  "nixl_held_s_median": 0.378088
+ },
+ "D": {
+  "local_hit_tokens": 1888,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 0,
+  "requests_pulling": 0,
+  "retrieve_bytes": 0,
+  "pull_s_median_l1": null,
+  "pull_s_p90_l1": null,
+  "pull_s_median_l2": null,
+  "pull_s_p90_l2": null,
+  "retrieve_s_median": null,
+  "prefetch_s_median_l1": null,
+  "prefetch_s_median_l2": null,
+  "looked_up_before_p_store_end": 0,
+  "nixl_read_tokens": 7341,
+  "requests_reading_nixl": 5,
+  "nixl_read_s_median": 0.35137,
+  "nixl_read_s_p90": 0.36491,
+  "stored_tokens": 7168
+ },
+ "chunks": {
+  "stored": 40,
+  "in_memory": 40,
+  "stored_by": {
+   "P": 12,
+   "D": 28
+  },
+  "per_server": {
+   "LMC_P": 12,
+   "LMC_D1": 9,
+   "LMC_D2": 12,
+   "LMC_D3": 7
+  },
+  "stored_bytes": 1174405120,
+  "to_disk": 40,
+  "removed_from_memory": 40,
+  "pulled": 0,
+  "pulled_from": {},
+  "read_outcomes": {
+   "new: stored by this request": 40,
+   "held (on GPU already)": 28
+  },
+  "never_pulled": 40,
+  "never_pulled_holding_an_answer": 15,
+  "disk_reads": 0,
+  "touches": 96,
+  "reads_hook": true,
+  "pulls_per_chunk": {
+   "0": 40
+  },
+  "created_to_l1_s_median": 0.0389401912689209,
+  "l1_to_l2_s_median": 0.2659566402435303,
+  "lookups_of_unknown_chunks": 0
+ },
+ "checks": {
+  "chunk_tokens_match_prompt": "40 of 40",
+  "pulled_blocks_same_hash_as_p": "0 of 0",
+  "chunks_with_full_chain": "40 of 40",
+  "d_answers_same_as_one_engine": "3 of 5",
+  "disk_mode_on_disk_then_out_of_memory": "40 of 40",
+  "disk_mode_pulls_from_disk": "0 of 0",
+  "disk_mode_pulls_while_still_in_memory": 0,
+  "disk_mode_reads_kept_in_memory": "0 of 0 disk reads still in memory at the end (prefetch policy retain)",
+  "disk_mode_server_memory_at_end (LMC_P)": {
+   "_default": "0 objects, 0 bytes"
+  },
+  "disk_mode_files_at_end (LMC_P)": "12 files, 0.35 GB",
+  "disk_mode_server_memory_at_end (LMC_D1)": {
+   "_default": "0 objects, 0 bytes"
+  },
+  "disk_mode_files_at_end (LMC_D1)": "9 files, 0.26 GB",
+  "disk_mode_server_memory_at_end (LMC_D2)": {
+   "_default": "0 objects, 0 bytes"
+  },
+  "disk_mode_files_at_end (LMC_D2)": "12 files, 0.35 GB",
+  "disk_mode_server_memory_at_end (LMC_D3)": {
+   "_default": "0 objects, 0 bytes"
+  },
+  "disk_mode_files_at_end (LMC_D3)": "7 files, 0.21 GB"
+ },
+ "local_check": {
+  "turns": 5,
+  "same": 3,
+  "first_diff_turn": "0/0",
+  "differ": [
+   {
+    "conv": 0,
+    "turn": 0,
+    "first_diff": 1,
+    "d_text": " I don't know. I don't know what you mean by \"in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"air\". I don't know what you mean by \"photos of planes in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I ",
+    "local_text": " I am a helpful assistant. Answer the user's last question from the documents. If they do not hold the answer, say so.\n\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking images of aircraft , either in flight , or on the ground . Types of aviation photography include air - to - air , ground - to - air , ground - static , and remote photography . Military "
+   },
+   {
+    "conv": 0,
+    "turn": 1,
+    "first_diff": 9,
+    "d_text": " I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking ",
+    "local_text": " I don't know what you mean by \"in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking images "
+   }
+  ]
+ },
+ "nixl": {
+  "handshakes": 3,
+  "failed_reads": 0,
+  "read_gb_s_median": 0.5974546357092896,
+  "ucx_transports": {
+   "D1": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "D2": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "D3": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "P": {
+    "tcp/bond0": 118,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 6
+   }
+  },
+  "ucx_transport_names": [
+   "cma",
+   "cuda_copy",
+   "tcp"
+  ],
+  "read_path": {},
+  "gpu_to_gpu": false,
+  "ucx_ipc_errors": [],
+  "all_gpus_visible": false,
+  "ucx_tls": null,
+  "ucx_get_zcopy": null
+ },
+ "health": {
+  "server_fatal": null,
+  "server_last_log_s": 15.338,
+  "degraded": {},
+  "server_errors": 0,
+  "server_error_kinds": {},
+  "server_alive_at_end": true,
+  "server_crashed": false,
+  "server_failed": false
+ }
+}
