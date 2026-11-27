@@ -368,6 +368,29 @@ class NixlReportTests(unittest.TestCase):
         nums = lmc_lifecycle.write_report(run, out)
         return nums, out
 
+    def test_turn_timeline_view(self):
+        """scripts/lmc_turnview.py: a turn's rows in time order with the current prompt's residency: P writes its 5
+        blocks, D's 5 come over NIXL, the copies add up; per-engine servers get their own CPU and disk columns."""
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import lmc_turnview
+        for servers, cols in (("shared", 9), ("per_engine", 11)):
+            run = Path(tempfile.mkdtemp())
+            simulate_nixl(run, mode="disk", servers=servers)
+            R = lmc_lifecycle.Run(run)
+            R.analyse()
+            md = lmc_turnview.page(R, run, pair="other.md", pair_label="chat")
+            lines = md.splitlines()
+            self.assertIn("## Turn 1 on D1", lines)
+            head = next(ln for ln in lines if ln.startswith("| Actor / path"))
+            self.assertEqual(head.count("|") - 1, cols, head)
+            rows = [ln for ln in lines if ln.startswith("| ") and " | " in ln and not ln.startswith("| ---")]
+            events = [r.split(" | ")[2] for r in rows if r.split(" | ")[0] in ("| P", "| NIXL", "| D1")]
+            self.assertLess(events.index("Allocate slots and write 5 blocks"), events.index("D reports prompt KV ready"))
+            ready = next(r for r in rows if "D reports prompt KV ready" in r).split(" | ")
+            self.assertEqual((ready[4], ready[5]), ("**0** · 5 ready", "**5** · 0 local + 5 NIXL"))
+            self.assertIn("[Same turn in chat](other.md#turn-1-on-d1)", md)
+            self.assertIn("## The turns together", md)
+
     def test_the_bytes_d_read_are_ps(self):
         """kvtrace sums every block's 16-bit words at nixl.done (P's blocks it held, D's a read filled); the report
         pairs each block D read with P's and says how many are P's bit for bit."""
