@@ -102,6 +102,15 @@ prefix D1 and D2 took from their own GPU caches of blocks NIXL brought on turns 
 and so is turn 2, D3's first read. Job 30774's D gave the engine's answer to turn 0. Item 4 of "What each of the
 eight must show" now checks the bytes themselves and a second engine with NIXL's KV layout.
 
+**Yes (job 30793, the eight, 5 conversations, UCX's defaults, `133bef9`).** Every block D read is P's, bit for bit,
+in every layer, checked when each read was done: 4,541 of 4,541 blocks in each carry-forward run, 2,318 of 2,318
+in each chat run, all eight runs. (The published summaries say 220 and 132: the report paired each read's blocks
+from the front, while vLLM drops the front of P's list, the blocks D's own cache has, and reads into P's last ones;
+fixed.) The answers: 26 of 33 turns are one plain engine's token for token and 24 of 33 the NIXL-layout engine's,
+and those two single engines, neither doing P/D, disagree with each other on 3 (carry-forward) and 5 (chat) of
+the 33. So the answers that differ come from the computation (where the prompt's last token is computed, which KV
+layout the attention reads), not from the transfer: greedy decoding flips at near ties, mostly many tokens in.
+
 ### Differences from LMCache's documented P/D, in the `nixl` runs
 
 What the `nixl` runs do differently from the guide, kept here to change later:

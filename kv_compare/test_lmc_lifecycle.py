@@ -263,7 +263,7 @@ class KVWorker:
         self.device_kv_caches, self.num_blocks = {"layer.0": kv[0], "layer.1": kv[1]}, kv[0].shape[1]
 
 
-def simulate_nixl(d, mode="memory", servers="shared", kv=None):
+def simulate_nixl(d, mode="memory", servers="shared", kv=None, d_cached=0):
     """One turn as LMCache's P/D guide runs it: P computes a 69-token prompt and its LMCache connector stores 2
     chunks; P holds its blocks for D; D1 reads them from P's GPU over NIXL (MultiConnector: NIXL has the tokens
     first, so LMCache's lookup loads nothing) and its LMCache connector stores the prompt's chunks too: to the shared
@@ -322,8 +322,8 @@ def simulate_nixl(d, mode="memory", servers="shared", kv=None):
            external=69, params=dr.kv_transfer_params)
     s.hook("D1", t2 + .007, "nixl.handshake", phase="start", host="127.0.0.1", port=5600, engine="engP")
     s.hook("D1", t2 + .017, "nixl.handshake", phase="done", host="127.0.0.1", port=5600, engine="engP")
-    s.hook("D1", t2 + .018, "nixl.read", req_id=drid, local=([20, 21, 22, 23, 24],), remote=([10, 11, 12, 13, 14],),
-           engine="engP")
+    s.hook("D1", t2 + .018, "nixl.read", req_id=drid, local=([20, 21, 22, 23, 24][d_cached:],),
+           remote=([10, 11, 12, 13, 14],), engine="engP")    # d_cached: D's own cache has P's first blocks
     if kv is None:
         s.hook("D1", t2 + .030, "nixl.done", sending=set(), recving={drid}, failed=set())
         s.hook("P", t2 + .031, "nixl.done", sending={prid}, recving=set(), failed=set())
@@ -394,6 +394,14 @@ class NixlReportTests(unittest.TestCase):
         self.assertIn("4 of 5 blocks D read are P's, bit for bit; DIFFERS: D1 block 23 from P's 13",
                       (out / "summary.md").read_text().replace(", every layer (checksums when each read was done, on "
                                                                "D's stream, and of P's blocks it held)", ""))
+        # D's own cache had P's first block: the hook still lists P's 5 blocks, the read used the last 4
+        d2 = caches()
+        for lp, ld in zip(p, d2):
+            ld[:, 21:25] = lp[:, 11:15]
+        run = Path(tempfile.mkdtemp())
+        simulate_nixl(run, servers="shared", kv=(p, d2), d_cached=1)
+        nx = lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))["nixl"]
+        self.assertEqual((nx["bytes_checked_blocks"], nx["bytes_same_blocks"]), (4, 4))
         run = Path(tempfile.mkdtemp())
         simulate_nixl(run, servers="shared")               # a trace without the sums
         self.assertEqual(lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))["nixl"]["bytes_checked_blocks"], 0)

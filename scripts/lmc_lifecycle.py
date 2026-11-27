@@ -779,7 +779,10 @@ class Run:
                 prq = (rq.get("nixl_recv") or {}).get("remote_req")
                 psum = (self.reqs.get(("P", prq)) or {}).get("kv_sums") if prq else None
                 for rd in rq["nixl_reads"]:
-                    for lb, pb in zip(rd.get("local") or [], rd.get("remote") or []):
+                    # the hook sees P's whole list; vLLM then drops its front, the blocks D's own cache has, so the
+                    # read pairs D's blocks with P's last ones (job 30793: paired from the start, 220 of 4541 alike)
+                    loc, rem = rd.get("local") or [], rd.get("remote") or []
+                    for lb, pb in zip(loc, rem[len(rem) - len(loc):]):
                         a = (dsum or {}).get(str(lb))
                         b = (psum or {}).get(str(pb))
                         if a is None or b is None:
@@ -1881,6 +1884,7 @@ def conversation_views(R, out, conversations=None):
                     for i in range(lo // BLOCK, hi // BLOCK):
                         k = i - first_new
                         loc, rem = nx_read.get("local") or [], nx_read.get("remote") or []
+                        rem = rem[len(rem) - len(loc):]           # P's blocks the read used: its last ones
                         pc, dc = P["cached"].get(i), D["cached"].get(i)
                         lin.append(f"| {i} | {i * BLOCK}-{(i + 1) * BLOCK} | {fmt(rem[k] if 0 <= k < len(rem) else None)}"
                                    f" | `{pc[1] if pc else '–'}` | {fmt(loc[k] if 0 <= k < len(loc) else None)} | "
