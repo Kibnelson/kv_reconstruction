@@ -325,6 +325,8 @@ class Run:
                     self.R(role, rid).setdefault("t_nixl_received", t)
                 for rid in r.get("failed") or []:
                     self.R(role, rid)["nixl_failed"] = t
+                for rid, sums in (r.get("kv_sums") or {}).items():   # the blocks' bytes, P's held and D's read
+                    self.R(role, rid)["kv_sums"] = sums
             elif ev.startswith("lmc."):
                 self.sessions[r.get("session")]["engine:" + ev[4:]].append(r)   # engine-side LMCache events
             else:
@@ -747,22 +749,48 @@ class Run:
                        "pulled_blocks_same_hash_as_p": f"{sum(same)} of {len(same)}",
                        "chunks_with_full_chain": f"{len(chain)} of {len(stored)}"},
         }
-        lc = self.dir / "local_check.json"            # scripts/pd_localcheck.py: D's answers against one engine's
-        if lc.is_file():
+        # scripts/pd_localcheck.py: D's answers against one engine's own (plain: vLLM's own KV layout; nixl: the
+        # layout NIXL sets, as P's and D's)
+        for fname, key, check in (("local_check.json", "local_check", "d_answers_same_as_one_engine"),
+                                  ("local_check_nixl.json", "local_check_nixl",
+                                   "d_answers_same_as_one_engine_nixl_layout")):
+            lc = self.dir / fname
+            if not lc.is_file():
+                continue
             try:
                 j = json.loads(lc.read_text())
-                out["local_check"] = {"turns": j.get("turns"), "same": j.get("same"),
-                                      "first_diff_turn": j.get("first_diff_turn"),
-                                      "differ": [{k: x.get(k) for k in ("conv", "turn", "first_diff", "d_text",
-                                                                         "local_text")}
-                                                 for x in j.get("rows") or [] if not x.get("same")][:5]}
-                out["checks"]["d_answers_same_as_one_engine"] = f"{j.get('same')} of {j.get('turns')}"
             except (OSError, ValueError):
-                pass
+                continue
+            out[key] = {"turns": j.get("turns"), "same": j.get("same"), "first_diff_turn": j.get("first_diff_turn"),
+                        "differ": [{k: x.get(k) for k in ("conv", "turn", "first_diff", "d_text", "local_text")}
+                                   for x in j.get("rows") or [] if not x.get("same")][:5]}
+            out["checks"][check] = f"{j.get('same')} of {j.get('turns')}"
         if self.transfer == "nixl":
             bpt = next((c["bytes"] / self.chunk for c in stored if c.get("bytes")), None)   # KV bytes a token
             rates = [r["nixl_load"] * bpt / r["nixl_read_s"] / 1e9 for r in d_nixl
                      if bpt and r.get("nixl_load") and r.get("nixl_read_s")]
+            # the bytes: each block D read against the block of P's it came from (kvtrace's sums at nixl.done)
+            pairs = same = 0
+            unchecked, differ = 0, []
+            for (role, _rid), rq in list(self.reqs.items()):
+                if role == "P" or not rq.get("nixl_reads"):
+                    continue
+                dsum = rq.get("kv_sums")
+                prq = (rq.get("nixl_recv") or {}).get("remote_req")
+                psum = (self.reqs.get(("P", prq)) or {}).get("kv_sums") if prq else None
+                for rd in rq["nixl_reads"]:
+                    for lb, pb in zip(rd.get("local") or [], rd.get("remote") or []):
+                        a = (dsum or {}).get(str(lb))
+                        b = (psum or {}).get(str(pb))
+                        if a is None or b is None:
+                            unchecked += 1
+                            continue
+                        pairs += 1
+                        if a == b:
+                            same += 1
+                        elif len(differ) < 8:
+                            differ.append({"d": role, "tag": rq.get("tag"), "d_block": lb, "p_block": pb,
+                                           "d_sum": a, "p_sum": b})
             ipc_errors, read_rows = {}, {}
             ucx = ucx_transports(self.dir, ipc_errors, read_rows)
             names = sorted({t.split("/")[0] for v in ucx.values() for t in v})
@@ -771,6 +799,8 @@ class Run:
                            "failed_reads": sum(1 for r in self.reqs.values() if r.get("nixl_failed")),
                            "read_gb_s_median": q(rates, 0.5), "ucx_transports": ucx, "ucx_transport_names": names,
                            "read_path": read_path,
+                           "bytes_checked_blocks": pairs, "bytes_same_blocks": same,
+                           "bytes_unchecked_blocks": unchecked, "bytes_differ": differ,
                            "gpu_to_gpu": (all(any("cuda_ipc" in x for x in v) for v in read_path.values())
                                           if read_path else ("cuda_ipc" in names) if ucx else None),
                            "ucx_ipc_errors": [f"{role}: {line}" for line, role in ipc_errors.items()],
@@ -993,15 +1023,19 @@ def write_report(run, out, conversations=None):
            *([f"| read from P's GPU over NIXL | – | {nums['D']['nixl_read_tokens']} |"] if R.transfer == "nixl" else []),
            f"| computed | {nums['P']['computed_tokens']} | {nums['D']['computed_tokens']} |",
            f"| stored to LMCache (tokens) | {nums['P']['stored_tokens']} | {nums['D']['stored_tokens'] or '–'} |", ""]
-    lc = nums.get("local_check")
-    if lc:
-        md += [f"**D's answers against one engine's own** (the same prompts to one plain engine, no P/D, no connector, "
-               f"temperature 0; `local_check.json`): {lc['same']} of {lc['turns']} the same, token for token"
-               + ("." if lc["same"] == lc["turns"] else
-                  f"; the first that differs: turn {lc['first_diff_turn']}, so D's KV was not its prompt's.") , ""]
+    for key, what, fname in (("local_check", "one plain engine (no P/D, no connector: vLLM's own KV layout)",
+                              "local_check.json"),
+                             ("local_check_nixl", "one engine with NIXL's KV layout (NixlConnector set, unused; no "
+                                                  "P/D)", "local_check_nixl.json")):
+        lc = nums.get(key)
+        if not lc:
+            continue
+        md += [f"**D's answers against {what}** (the same prompts, temperature 0; `{fname}`): {lc['same']} of "
+               f"{lc['turns']} the same, token for token"
+               + ("." if lc["same"] == lc["turns"] else f"; the first that differs: turn {lc['first_diff_turn']}."), ""]
         for x in lc.get("differ") or []:
             md += [f"- turn {x['conv']}/{x['turn']}, from token {x['first_diff']}: D `{(x['d_text'] or '')[:100]!r}`; "
-                   f"one engine `{(x['local_text'] or '')[:100]!r}`"]
+                   f"the engine `{(x['local_text'] or '')[:100]!r}`"]
         if lc.get("differ"):
             md += [""]
     if R.transfer == "nixl":
@@ -1015,6 +1049,14 @@ def write_report(run, out, conversations=None):
                f"- handshakes (D's worker meets P's agent, once a pair): {nx.get('handshakes')}; failed reads: "
                f"{nx.get('failed_reads')}",
                f"- the read's speed: median {fmt(nx.get('read_gb_s_median'))} GB/s (the KV it read over its time)",
+               ("- the bytes: " + (f"{nx['bytes_same_blocks']} of {nx['bytes_checked_blocks']} blocks D read are "
+                                   "P's, bit for bit, every layer (checksums when each read was done, on D's stream, "
+                                   "and of P's blocks it held)"
+                                   if nx.get("bytes_checked_blocks") else "not checked (no checksums in the trace)")
+                + (f"; {nx['bytes_unchecked_blocks']} blocks without both checksums"
+                   if nx.get("bytes_unchecked_blocks") else "")
+                + ("".join(f"; DIFFERS: {x['d']} block {x['d_block']} from P's {x['p_block']}"
+                           for x in nx.get("bytes_differ") or []))),
                "- UCX's transports (its protocol tables in the engines' logs): "
                + (", ".join(nx.get("ucx_transport_names") or []) or "none logged")
                + ("" if nx.get("gpu_to_gpu") is None else
@@ -2037,8 +2079,12 @@ def compare(dirs, out):
             ("NIXL read ms (median)", lambda n: ms(n["D"].get("nixl_read_s_median"))),
             ("NIXL read ms (p90)", lambda n: ms(n["D"].get("nixl_read_s_p90"))),
             ("NIXL read GB/s (median)", lambda n: (n.get("nixl") or {}).get("read_gb_s_median")),
+            ("NIXL blocks = P's bytes", lambda n: (lambda x: f"{x['bytes_same_blocks']} of {x['bytes_checked_blocks']}"
+                                                   if x.get("bytes_checked_blocks") else None)(n.get("nixl") or {})),
             ("D's answers = one engine's", lambda n: (lambda c: f"{c['same']} of {c['turns']}" if c else None)(
                 n.get("local_check"))),
+            ("D's answers = one engine's, NIXL's layout", lambda n: (
+                lambda c: f"{c['same']} of {c['turns']}" if c else None)(n.get("local_check_nixl"))),
             ("UCX transports", lambda n: ", ".join((n.get("nixl") or {}).get("ucx_transport_names") or []) or None),
             ("P held its blocks for D, ms (median)", lambda n: ms(n["P"].get("nixl_held_s_median"))),
             ("D tokens computed", lambda n: n["D"]["computed_tokens"]),
@@ -2091,7 +2137,7 @@ def unpack(results, into):
         if (results / f"{name}.gz").is_file():
             with gzip.open(results / f"{name}.gz", "rb") as g:
                 (into / name).write_bytes(g.read())
-    for name in ("env.json", "local_check.json"):
+    for name in ("env.json", "local_check.json", "local_check_nixl.json"):
         if (results / name).is_file():
             shutil.copyfile(results / name, into / name)
     for sub in ("logs", "server"):

@@ -257,7 +257,13 @@ def simulate(d, mode="disk", race=False, reads_hook=True):
     return key
 
 
-def simulate_nixl(d, mode="memory", servers="shared"):
+class KVWorker:
+    """A NIXL worker's KV caches for kvtrace's byte check: (K/V, blocks, tokens, heads, dim), bf16."""
+    def __init__(self, kv):
+        self.device_kv_caches, self.num_blocks = {"layer.0": kv[0], "layer.1": kv[1]}, kv[0].shape[1]
+
+
+def simulate_nixl(d, mode="memory", servers="shared", kv=None):
     """One turn as LMCache's P/D guide runs it: P computes a 69-token prompt and its LMCache connector stores 2
     chunks; P holds its blocks for D; D1 reads them from P's GPU over NIXL (MultiConnector: NIXL has the tokens
     first, so LMCache's lookup loads nothing) and its LMCache connector stores the prompt's chunks too: to the shared
@@ -318,8 +324,12 @@ def simulate_nixl(d, mode="memory", servers="shared"):
     s.hook("D1", t2 + .017, "nixl.handshake", phase="done", host="127.0.0.1", port=5600, engine="engP")
     s.hook("D1", t2 + .018, "nixl.read", req_id=drid, local=([20, 21, 22, 23, 24],), remote=([10, 11, 12, 13, 14],),
            engine="engP")
-    s.hook("D1", t2 + .030, "nixl.done", sending=set(), recving={drid}, failed=set())
-    s.hook("P", t2 + .031, "nixl.done", sending={prid}, recving=set(), failed=set())
+    if kv is None:
+        s.hook("D1", t2 + .030, "nixl.done", sending=set(), recving={drid}, failed=set())
+        s.hook("P", t2 + .031, "nixl.done", sending={prid}, recving=set(), failed=set())
+    else:                                                  # kv: (P's caches, D1's): the byte check's sums
+        s.hook("D1", t2 + .030, "nixl.done", sending=set(), recving={drid}, failed=set(), worker=KVWorker(kv[1]))
+        s.hook("P", t2 + .031, "nixl.done", sending={prid}, recving=set(), failed=set(), worker=KVWorker(kv[0]))
     s.hook("D1", t2 + .032, "vllm.gpu.cached", request=dr, blocks=[Blk(20), Blk(21), Blk(22), Blk(23)], first=0,
            hashes=hashes, group=0, mask=None, block_size=16)
     s.hook("D1", t2 + .033, "lmc.conn.store_planned", meta=Meta(drid, Op(0, 64, [20, 21, 22, 23])))
@@ -357,6 +367,36 @@ class NixlReportTests(unittest.TestCase):
         simulate_nixl(run, servers=servers)
         nums = lmc_lifecycle.write_report(run, out)
         return nums, out
+
+    def test_the_bytes_d_read_are_ps(self):
+        """kvtrace sums every block's 16-bit words at nixl.done (P's blocks it held, D's a read filled); the report
+        pairs each block D read with P's and says how many are P's bit for bit."""
+        import torch
+        g = torch.Generator().manual_seed(1)
+
+        def caches():
+            return [torch.zeros(2, 32, 16, 2, 8, dtype=torch.bfloat16) for _ in range(2)]
+        p, d = caches(), caches()
+        for lp, ld in zip(p, d):
+            lp[:, 10:15] = torch.randn(2, 5, 16, 2, 8, generator=g).to(torch.bfloat16)
+            ld[:, 20:25] = lp[:, 10:15]                     # what the read copied: P's 10-14 into D's 20-24
+        run = Path(tempfile.mkdtemp())
+        simulate_nixl(run, servers="shared", kv=(p, d))
+        nx = lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))["nixl"]
+        self.assertEqual((nx["bytes_checked_blocks"], nx["bytes_same_blocks"], nx["bytes_differ"]), (5, 5, []))
+        d[1][1, 23, 15, 1, 7] += 1                          # one value of one layer's V in D's block 23
+        run = Path(tempfile.mkdtemp())
+        simulate_nixl(run, servers="shared", kv=(p, d))
+        out = Path(tempfile.mkdtemp())
+        nx = lmc_lifecycle.write_report(run, out)["nixl"]
+        self.assertEqual((nx["bytes_checked_blocks"], nx["bytes_same_blocks"]), (5, 4))
+        self.assertEqual([(x["d_block"], x["p_block"]) for x in nx["bytes_differ"]], [(23, 13)])
+        self.assertIn("4 of 5 blocks D read are P's, bit for bit; DIFFERS: D1 block 23 from P's 13",
+                      (out / "summary.md").read_text().replace(", every layer (checksums when each read was done, on "
+                                                               "D's stream, and of P's blocks it held)", ""))
+        run = Path(tempfile.mkdtemp())
+        simulate_nixl(run, servers="shared")               # a trace without the sums
+        self.assertEqual(lmc_lifecycle.write_report(run, Path(tempfile.mkdtemp()))["nixl"]["bytes_checked_blocks"], 0)
 
     def test_ucx_transports_from_the_engine_logs(self):
         """UCX's protocol tables (UCX_PROTO_INFO=y) name the transports: cuda_ipc is GPU to GPU, tcp with cuda_copy
@@ -440,6 +480,9 @@ class NixlReportTests(unittest.TestCase):
         self.assertEqual(nums["local_check"]["first_diff_turn"], "0/1")
         self.assertIn("1 of 2 the same, token for token; the first that differs: turn 0/1",
                       (out / "summary.md").read_text())
+        (run / "local_check_nixl.json").write_text(json.dumps(dict(j, same=2, first_diff_turn=None)))
+        nums = lmc_lifecycle.write_report(run, out)
+        self.assertEqual(nums["checks"]["d_answers_same_as_one_engine_nixl_layout"], "2 of 2")
 
     def test_d_reads_p_over_nixl_and_loads_nothing_from_lmcache(self):
         nums, out = self.run_nixl("shared")

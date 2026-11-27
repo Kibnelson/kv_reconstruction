@@ -34,6 +34,7 @@ Hashes and keys are written as 16 hex characters (their first 8 bytes); block li
 """
 from __future__ import annotations
 
+import os
 import zlib
 
 KEYS_MAX = 4096                                       # keys written per record (the count is always written)
@@ -287,22 +288,75 @@ def nixl_recv_planned(request, local, computed_blocks, external, params):
                 remote_tokens=p.get("remote_num_tokens"))
 
 
+# The bytes NIXL moved (nixl.done, KVTRACE_KV_SUMS=1, the default): P's blocks held for D (its scheduler's
+# request_finished, in the worker's process with one GPU an engine) and D's blocks a read fills, by request
+_P_HELD = {}
+_D_READ = {}
+
+
 def nixl_request_finished(request, delay, blocks, num_tokens, is_p):
-    return dict(req_of(request), delay=bool(delay), blocks=_blocks(blocks), num_tokens=int(num_tokens or 0),
-                is_p=bool(is_p))
+    rec = dict(req_of(request), delay=bool(delay), blocks=_blocks(blocks), num_tokens=int(num_tokens or 0),
+               is_p=bool(is_p))
+    if is_p and delay:
+        _P_HELD[str(rec["req"])] = rec["blocks"]
+    return rec
 
 
 def nixl_read(req_id, local, remote, engine):
-    return {"req": req_id, "local": _blocks(local), "remote": _blocks(remote), "engine": engine}
+    rec = {"req": req_id, "local": _blocks(local), "remote": _blocks(remote), "engine": engine}
+    _D_READ.setdefault(str(req_id), []).extend(rec["local"])
+    return rec
+
+
+def kv_block_sums(worker, block_ids):
+    """block id -> [s1, s2] over every layer's KV of that block: s1 the sum of its 16-bit words, s2 the same words
+    weighted by their place in the block (a reordering changes it), both exact integers. Run on the engine's
+    current stream, as the model's next step would read the blocks: a copy still landing shows as a difference."""
+    import torch
+    ids = sorted({int(b) for b in block_ids})
+    if not ids:
+        return {}
+    tensors, seen = [], set()
+    for t in (getattr(worker, "device_kv_caches", None) or {}).values():
+        key = (t.data_ptr(), tuple(t.shape), tuple(t.stride()))
+        if key not in seen:                           # a cross-layer cache's views, each once
+            seen.add(key)
+            tensors.append(t)
+    n = getattr(worker, "num_blocks", None)
+    s1 = torch.zeros(len(ids), dtype=torch.int64, device=tensors[0].device)
+    s2 = torch.zeros_like(s1)
+    idx = torch.tensor(ids, device=tensors[0].device)
+    for t in tensors:
+        dims = [d for d, size in enumerate(t.shape) if size == n] if n else []
+        if len(dims) != 1:
+            raise ValueError(f"no single block dimension in KV shape {tuple(t.shape)} for {n} blocks")
+        x = t.index_select(dims[0], idx).movedim(dims[0], 0).contiguous()
+        w = x.view(torch.int16) if x.element_size() == 2 else x.view(torch.uint8)
+        w = w.reshape(len(ids), -1).to(torch.int64)
+        pos = (torch.arange(w.shape[1], device=w.device, dtype=torch.int64) % 65521) + 1
+        s1 += w.sum(1)
+        s2 += (w * pos).sum(1)
+    return {b: [int(a), int(c)] for b, a, c in zip(ids, s1.tolist(), s2.tolist())}
 
 
 def nixl_handshake(phase, host, port, engine):
     return {"phase": phase, "host": host, "port": port, "engine": engine}
 
 
-def nixl_done(sending, recving, failed):
-    return {"sending": sorted(map(str, sending or ())), "recving": sorted(map(str, recving or ())),
-            "failed": sorted(map(str, failed or ()))}
+def nixl_done(sending, recving, failed, worker=None):
+    rec = {"sending": sorted(map(str, sending or ())), "recving": sorted(map(str, recving or ())),
+           "failed": sorted(map(str, failed or ()))}
+    if worker is not None and os.environ.get("KVTRACE_KV_SUMS", "1") != "0":
+        sums = {}
+        for rid in rec["sending"]:                    # P: D has read these blocks; P still holds them
+            if rid in _P_HELD:
+                sums[rid] = kv_block_sums(worker, _P_HELD.pop(rid))
+        for rid in rec["recving"]:                    # D: the read is done; the model reads them next step
+            if rid in _D_READ and rid not in rec["failed"]:
+                sums[rid] = kv_block_sums(worker, _D_READ.pop(rid))
+        if sums:
+            rec["kv_sums"] = {rid: {str(b): v for b, v in m.items()} for rid, m in sums.items()}
+    return rec
 
 
 def generic(**objs):

@@ -95,9 +95,12 @@ the stop signal). The answers do not agree, though. The first turn's prompt is t
 30774 and 30780, and D answered it three ways: "I don't know. I don't know what you mean by "in the air"..."
 (30763, TCP), " I am a helpful assistant. Answer the user's last question from the documents..." (30774, TCP, UCX
 logging at debug) and " other other other..." (30780, cuda_ipc reads). Within each job every run answered the
-same. Greedy decoding of one prompt should give one answer, so at least two of the three had KV that was not their
-prompt's. The local check (item 4 of "What each of the eight must show") now compares every turn of every run
-with one engine's own answer.
+same. Job 30786 (the eight, 1 conversation, UCX's defaults, `eea6fcf`): all eight runs gave the same answers, and 3 of 5
+(carry-forward) or 4 of 5 (chat) were one plain engine's token for token. Turn 0 parts from it at the second token
+(" I don't know..." for " I am a helpful assistant..."), carry-forward's turn 1 at the tenth; turns 3 and 4, whose
+prefix D1 and D2 took from their own GPU caches of blocks NIXL brought on turns 0 and 1, are the engine's exactly,
+and so is turn 2, D3's first read. Job 30774's D gave the engine's answer to turn 0. Item 4 of "What each of the
+eight must show" now checks the bytes themselves and a second engine with NIXL's KV layout.
 
 ### Differences from LMCache's documented P/D, in the `nixl` runs
 
@@ -481,11 +484,16 @@ is `llama32_3b_lmc_<mode>_nixl_<servers>_<chat|carry>_<docs>_rtxa5000_<time>/`.
    failed reads; D's own GPU hits on the turns a D had seen the conversation before (carry-forward: the whole
    earlier prompt; chat: the instructions and the history up to the earlier answers); the chunks on each server
    (`per_server`, per engine).
-4. The local check (`local_check.json`, `checks.d_answers_same_as_one_engine`): after the run, one plain engine on
-   P's GPU (no P/D, no connector, no trace) answers every turn's exact prompt at temperature 0, and D's answers must
-   be the same, token for token. A difference in the first tokens means D's KV was not its prompt's; a late one can
-   be the numerics of a different path (one prefill against P's prefill and D's step), which the first differing
-   token tells apart. `LMC_LOCAL_CHECK=0` leaves it out.
+4. The bytes and the answers. The bytes: kvtrace checksums every block NIXL moved when the read is done, D's copy
+   on D's stream (as the model's next step reads it) and P's original it still holds (`nixl.done`'s `kv_sums`,
+   `KVTRACE_KV_SUMS=1`); the report pairs each block D read with P's (`nixl.bytes_same_blocks` of
+   `nixl.bytes_checked_blocks`, "NIXL blocks = P's bytes") and must find every one the same. The answers
+   (`local_check.json`, `local_check_nixl.json`): after the run, one engine on P's GPU, no P/D and no trace, answers
+   every turn's exact prompt at temperature 0, once with no connector (vLLM's own KV layout) and once with
+   NixlConnector set and unused (the LBHNC layout NIXL sets on P and D); D's answers should be the same, token for
+   token. With the bytes the same, a different answer is the computation's, not the transfer's: D computes the
+   prompt's last token itself, in a step of its own, where one engine computes it inside its prefill.
+   `LMC_LOCAL_CHECK=0` leaves the engines out; `LMC_LOCAL_CHECK_REFS` picks them.
 5. Disk mode: every chunk on disk and then out of memory; "disk reads kept in memory": N of N still in memory at the
    end unless LRU evicted them (with the default policy they leave about 80 ms after the read: job 30728, 102 of
    102); the server's memory at the end holds what was read back.

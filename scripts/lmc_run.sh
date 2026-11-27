@@ -31,7 +31,9 @@
 # LMC_DISK_READS (temporary: what a disk read brings into memory is dropped after the copy, LMCache's default;
 # retain: it stays until evicted, LRU), NIXL_ALL_GPUS (0; 1: each engine sees every GPU, its own first),
 # NIXL_UCX_GET_ZCOPY (on: UCX's cuda_ipc reads without NVLink), NIXL_UCX_TLS and NIXL_UCX_LOG (UCX_TLS and
-# UCX_LOG_LEVEL for the engines; docs "NIXL's transport"),
+# UCX_LOG_LEVEL for the engines; docs "NIXL's transport"), LMC_LOCAL_CHECK (1; 0: no check of D's answers
+# against one engine's), LMC_LOCAL_CHECK_REFS (plain,nixl: the engines that check), KVTRACE_KV_SUMS (1: the
+# checksums of the blocks NIXL moved, P's and D's),
 # MTRAG_CONCURRENCY (4), MAX_TOKENS (128), MAXLEN (32768), MAXBT (8192),
 # STORE_WAIT_MS (500: the proxy's wait between P's answer and D's request, for the store to land; 0 shows the race),
 # GPU_MEM (0.80), GPU_BLOCKS (empty: vLLM's; a number makes every engine's GPU cache that small, so its own blocks
@@ -210,8 +212,10 @@ for k in "${!SRV_ROLES[@]}"; do
     SRV_PORT+=($((PORT_BASE + 50 + 10 * k))) SRV_HTTP+=($((PORT_BASE + 51 + 10 * k))) SRV_PROM+=($((PORT_BASE + 52 + 10 * k)))
 done
 NIXL_PORTS=($((PORT_BASE + 401)) $((PORT_BASE + 451)) $((PORT_BASE + 452)) $((PORT_BASE + 453)))   # side channels
-LC_PORT=$((PORT_BASE + 461))                  # the local check's engine (after the run)
-ALL_PORTS=("$PROXY_PORT" "${SRV_PORT[@]}" "${SRV_HTTP[@]}" "${SRV_PROM[@]}" "$P_PORT" "${D_PORTS[@]}" "$LC_PORT")
+LC_PORT=$((PORT_BASE + 461))                  # the local check's engine (after the run), and its NIXL side channel
+LC_NIXL_PORT=$((PORT_BASE + 462))
+ALL_PORTS=("$PROXY_PORT" "${SRV_PORT[@]}" "${SRV_HTTP[@]}" "${SRV_PROM[@]}" "$P_PORT" "${D_PORTS[@]}" "$LC_PORT"
+           "$LC_NIXL_PORT")
 [ "$TRANSFER" = nixl ] && ALL_PORTS+=("${NIXL_PORTS[@]}")
 # the servers' memory (each preallocates its L1) must fit beside the engines: the node's free memory, checked first
 "$LPY" -I - "${#SRV_ROLES[@]}" "$L1_GB" "${LMC_HOST_MARGIN_GB:-16}" <<'EOF'
@@ -433,15 +437,23 @@ fi
 stop_all
 trap - EXIT
 
-# the local check (LMC_LOCAL_CHECK=1, the default): one plain engine on P's GPU, no P/D, no connector, no trace,
-# answers each turn's exact prompt at temperature 0; D's answers must be the same, token for token
-# (scripts/pd_localcheck.py). Jobs 30763, 30774, 30780: the same first prompt, three different answers from D.
-if [ "${LMC_LOCAL_CHECK:-1}" = 1 ] && [ -s "$OUT/mtrag.jsonl" ] && [ "${UP:-0}" = 1 ]; then
-    echo "== local check: one engine on GPU ${DEVS[0]} (no P/D, no connector) answers every turn's prompt"
+# the local check (LMC_LOCAL_CHECK=1, the default): one engine on P's GPU, no P/D, no trace, answers each turn's
+# exact prompt at temperature 0; D's answers must be the same, token for token (scripts/pd_localcheck.py). Jobs
+# 30763, 30774, 30780: the same first prompt, three different answers from D. LMC_LOCAL_CHECK_REFS: plain (no
+# connector: vLLM's own KV layout) and/or nixl (NixlConnector, unused, for the layout it sets, LBHNC, as P's and D's)
+local_ref() {   # name: an engine for the check, its answers to local_check[_name].json
+    local name=$1 extra=() envx=()
+    if [ "$name" = nixl ]; then
+        extra=(--kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_both"}')
+        envx=(VLLM_NIXL_SIDE_CHANNEL_HOST=127.0.0.1 VLLM_NIXL_SIDE_CHANNEL_PORT="$LC_NIXL_PORT")
+    fi
+    local out=$OUT/local_check$([ "$name" = plain ] || echo "_$name").json log=$OUT/local_check_engine_$name.log
+    echo "== local check ($name): one engine on GPU ${DEVS[0]}, no P/D, answers every turn's prompt"
     ( cd "$OUT" && exec env CUDA_VISIBLE_DEVICES="${DEVS[0]}" PYTHONHASHSEED=0 PATH="$ENV_DIR/bin:$PATH" \
-        VLLM_USE_FLASHINFER_SAMPLER=0 nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$LC_PORT" \
-        --served-model-name llama --block-size 16 --gpu-memory-utilization "$GPU_MEM" --max-model-len "$MAXLEN" \
-        --max-num-batched-tokens "$MAXBT" "${ENGINE_ARGS[@]}" > "$OUT/local_check_engine.log" 2>&1 ) &
+        VLLM_USE_FLASHINFER_SAMPLER=0 "${envx[@]}" nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 \
+        --port "$LC_PORT" --served-model-name llama --block-size 16 --gpu-memory-utilization "$GPU_MEM" \
+        --max-model-len "$MAXLEN" --max-num-batched-tokens "$MAXBT" "${ENGINE_ARGS[@]}" "${extra[@]}" \
+        > "$log" 2>&1 ) &
     PIDS=($!)
     trap stop_all EXIT
     for _ in $(seq 1 120); do
@@ -451,12 +463,17 @@ if [ "${LMC_LOCAL_CHECK:-1}" = 1 ] && [ -s "$OUT/mtrag.jsonl" ] && [ "${UP:-0}" 
     done
     if curl -sf "http://127.0.0.1:$LC_PORT/health" >/dev/null; then
         "$LPY" -I scripts/pd_localcheck.py --mtrag "$OUT/mtrag.jsonl" --engine "http://127.0.0.1:$LC_PORT" \
-            --output "$OUT/local_check.json" || echo "WARNING: the local check failed"
+            --output "$out" || echo "WARNING: the local check ($name) failed"
     else
-        echo "WARNING: the local check's engine did not come up:"; tail -n 30 "$OUT/local_check_engine.log"
+        echo "WARNING: the local check's engine ($name) did not come up:"; tail -n 30 "$log"
     fi
     stop_all
     trap - EXIT
+}
+if [ "${LMC_LOCAL_CHECK:-1}" = 1 ] && [ -s "$OUT/mtrag.jsonl" ] && [ "${UP:-0}" = 1 ]; then
+    for ref in $(echo "${LMC_LOCAL_CHECK_REFS:-plain,nixl}" | tr ',' ' '); do
+        case "$ref" in plain|nixl) local_ref "$ref" ;; *) echo "WARNING: LMC_LOCAL_CHECK_REFS: plain, nixl" ;; esac
+    done
 fi
 
 cp "$KV_HOME/lmc_verify.json" "$OUT/server/lmc_verify.json" 2>/dev/null || true
@@ -514,8 +531,8 @@ cp "$OUT/env.json" "$RES/"
 [ -s "$OUT/mtrag_summary.json" ] && cp "$OUT/mtrag_summary.json" "$RES/"
 mkdir -p "$RES/server" "$RES/logs"
 cp -r "$OUT"/server/* "$RES/server/" 2>/dev/null || true
-[ -s "$OUT/local_check.json" ] && cp "$OUT/local_check.json" "$RES/"
-for f in "$OUT"/engine_*.log "$OUT"/lmcache_server*.log "$OUT/proxy.log" "$OUT/mtrag.log" "$OUT/local_check_engine.log"; do
+for f in "$OUT"/local_check*.json; do [ -s "$f" ] && cp "$f" "$RES/"; done
+for f in "$OUT"/engine_*.log "$OUT"/lmcache_server*.log "$OUT/proxy.log" "$OUT/mtrag.log" "$OUT"/local_check_engine_*.log; do
     [ -f "$f" ] || continue
     tail -n 400 "$f" > "$RES/logs/$(basename "$f" .log)_tail.log"
     gzip -c "$f" > "$RES/logs/$(basename "$f").gz"        # whole (job 30694: the crash was above the tail)

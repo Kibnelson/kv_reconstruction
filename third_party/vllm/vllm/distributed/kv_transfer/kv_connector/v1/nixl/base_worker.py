@@ -2988,7 +2988,7 @@ class NixlBaseConnectorWorker:
         self._reap_expired_send_leases(done_sending)
 
         self._cleanup_remote_engines()
-        if kvtrace.ON and (done_sending or done_recving or failed_recv_reqs): kvtrace.hook("nixl.done", sending=done_sending, recving=done_recving, failed=failed_recv_reqs)  # KVTRACE
+        if kvtrace.ON and (done_sending or done_recving or failed_recv_reqs): kvtrace.hook("nixl.done", sending=done_sending, recving=done_recving, failed=failed_recv_reqs, worker=self)  # KVTRACE
         return KVConnectorTransferResults(
             finished_sending=done_sending,
             finished_recving=done_recving,
