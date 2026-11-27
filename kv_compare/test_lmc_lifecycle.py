@@ -391,6 +391,56 @@ class NixlReportTests(unittest.TestCase):
         self.assertEqual(nums["nixl"]["read_path"], {"D1": ["zero-copy: cuda_ipc/cuda"]})
         self.assertTrue(nums["nixl"]["gpu_to_gpu"])
 
+    def test_local_check_compares_d_with_one_engine(self):
+        """scripts/pd_localcheck.py sends each traced turn's prompt to one plain engine; the report counts the
+        answers that are D's, token for token (jobs 30763, 30774, 30780: one prompt, three answers from D)."""
+        import http.server
+        import threading
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import pd_localcheck
+        answers = {(1, 2, 3): [7, 8, 9], (1, 2, 3, 4): [5, 6]}
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                toks = answers[tuple(body["prompt"])][:body["max_tokens"]]
+                out = json.dumps({"choices": [{"text": "x" * len(toks), "token_ids": toks}]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+
+            def log_message(self, *a):
+                pass
+        srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        d = Path(tempfile.mkdtemp())
+        recs = [{"tag": "r|0|0", "conv": "0", "turn": 0, "prompt_tokens": 3, "ids": [1, 2, 3], "answer_ids": [7, 8, 9],
+                 "answer_text": "xxx"},
+                {"tag": "r|0|1", "conv": "0", "turn": 1, "prompt_tokens": 4, "ids": [1, 2, 3, 4], "answer_ids": [5, 9],
+                 "answer_text": "xx"},
+                {"tag": "r|0|2", "conv": "0", "turn": 2, "error": "over the model's length"}]
+        (d / "mtrag.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs))
+        argv = sys.argv
+        try:
+            sys.argv = ["pd_localcheck.py", "--mtrag", str(d / "mtrag.jsonl"), "--engine",
+                        f"http://127.0.0.1:{srv.server_port}", "--output", str(d / "local_check.json")]
+            self.assertEqual(pd_localcheck.main(), 0)
+        finally:
+            sys.argv = argv
+            srv.shutdown()
+        j = json.loads((d / "local_check.json").read_text())
+        self.assertEqual((j["turns"], j["same"], j["first_diff_turn"]), (2, 1, "0/1"))
+        self.assertEqual([(x["same"], x["first_diff"]) for x in j["rows"]], [(True, None), (False, 1)])
+        run, out = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        simulate_nixl(run, servers="shared")
+        (run / "local_check.json").write_text(json.dumps(j))
+        nums = lmc_lifecycle.write_report(run, out)
+        self.assertEqual(nums["checks"]["d_answers_same_as_one_engine"], "1 of 2")
+        self.assertEqual(nums["local_check"]["first_diff_turn"], "0/1")
+        self.assertIn("1 of 2 the same, token for token; the first that differs: turn 0/1",
+                      (out / "summary.md").read_text())
+
     def test_d_reads_p_over_nixl_and_loads_nothing_from_lmcache(self):
         nums, out = self.run_nixl("shared")
         self.assertEqual(nums["D"]["nixl_read_tokens"], 69)

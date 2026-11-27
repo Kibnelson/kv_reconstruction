@@ -89,6 +89,16 @@ by commas), `KVPD_LMC_ALL_GPUS` (0 and/or 1), `KVPD_LMC_UCX_TLS`, `KVPD_LMC_UCX_
 `NIXL_UCX_GET_ZCOPY`, `NIXL_ALL_GPUS`, `NIXL_UCX_TLS`, `NIXL_UCX_LOG`. (Job 30774's every-GPU run did not get every
 GPU: the run script's switch was overwritten by its own list of the GPUs; fixed.)
 
+**Do the reads deliver the right KV?** The transfer layer says yes in every run: every read done, none failed,
+P freed its blocks after each, no UCX error in any log (the tracebacks in some engine logs come at shutdown, after
+the stop signal). The answers do not agree, though. The first turn's prompt is the same 515 tokens in jobs 30763,
+30774 and 30780, and D answered it three ways: "I don't know. I don't know what you mean by "in the air"..."
+(30763, TCP), " I am a helpful assistant. Answer the user's last question from the documents..." (30774, TCP, UCX
+logging at debug) and " other other other..." (30780, cuda_ipc reads). Within each job every run answered the
+same. Greedy decoding of one prompt should give one answer, so at least two of the three had KV that was not their
+prompt's. The local check (item 4 of "What each of the eight must show") now compares every turn of every run
+with one engine's own answer.
+
 ### Differences from LMCache's documented P/D, in the `nixl` runs
 
 What the `nixl` runs do differently from the guide, kept here to change later:
@@ -471,7 +481,12 @@ is `llama32_3b_lmc_<mode>_nixl_<servers>_<chat|carry>_<docs>_rtxa5000_<time>/`.
    failed reads; D's own GPU hits on the turns a D had seen the conversation before (carry-forward: the whole
    earlier prompt; chat: the instructions and the history up to the earlier answers); the chunks on each server
    (`per_server`, per engine).
-4. Disk mode: every chunk on disk and then out of memory; "disk reads kept in memory": N of N still in memory at the
+4. The local check (`local_check.json`, `checks.d_answers_same_as_one_engine`): after the run, one plain engine on
+   P's GPU (no P/D, no connector, no trace) answers every turn's exact prompt at temperature 0, and D's answers must
+   be the same, token for token. A difference in the first tokens means D's KV was not its prompt's; a late one can
+   be the numerics of a different path (one prefill against P's prefill and D's step), which the first differing
+   token tells apart. `LMC_LOCAL_CHECK=0` leaves it out.
+5. Disk mode: every chunk on disk and then out of memory; "disk reads kept in memory": N of N still in memory at the
    end unless LRU evicted them (with the default policy they leave about 80 ms after the read: job 30728, 102 of
    102); the server's memory at the end holds what was read back.
 

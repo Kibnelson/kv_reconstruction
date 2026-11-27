@@ -747,6 +747,18 @@ class Run:
                        "pulled_blocks_same_hash_as_p": f"{sum(same)} of {len(same)}",
                        "chunks_with_full_chain": f"{len(chain)} of {len(stored)}"},
         }
+        lc = self.dir / "local_check.json"            # scripts/pd_localcheck.py: D's answers against one engine's
+        if lc.is_file():
+            try:
+                j = json.loads(lc.read_text())
+                out["local_check"] = {"turns": j.get("turns"), "same": j.get("same"),
+                                      "first_diff_turn": j.get("first_diff_turn"),
+                                      "differ": [{k: x.get(k) for k in ("conv", "turn", "first_diff", "d_text",
+                                                                         "local_text")}
+                                                 for x in j.get("rows") or [] if not x.get("same")][:5]}
+                out["checks"]["d_answers_same_as_one_engine"] = f"{j.get('same')} of {j.get('turns')}"
+            except (OSError, ValueError):
+                pass
         if self.transfer == "nixl":
             bpt = next((c["bytes"] / self.chunk for c in stored if c.get("bytes")), None)   # KV bytes a token
             rates = [r["nixl_load"] * bpt / r["nixl_read_s"] / 1e9 for r in d_nixl
@@ -981,6 +993,17 @@ def write_report(run, out, conversations=None):
            *([f"| read from P's GPU over NIXL | – | {nums['D']['nixl_read_tokens']} |"] if R.transfer == "nixl" else []),
            f"| computed | {nums['P']['computed_tokens']} | {nums['D']['computed_tokens']} |",
            f"| stored to LMCache (tokens) | {nums['P']['stored_tokens']} | {nums['D']['stored_tokens'] or '–'} |", ""]
+    lc = nums.get("local_check")
+    if lc:
+        md += [f"**D's answers against one engine's own** (the same prompts to one plain engine, no P/D, no connector, "
+               f"temperature 0; `local_check.json`): {lc['same']} of {lc['turns']} the same, token for token"
+               + ("." if lc["same"] == lc["turns"] else
+                  f"; the first that differs: turn {lc['first_diff_turn']}, so D's KV was not its prompt's.") , ""]
+        for x in lc.get("differ") or []:
+            md += [f"- turn {x['conv']}/{x['turn']}, from token {x['first_diff']}: D `{(x['d_text'] or '')[:100]!r}`; "
+                   f"one engine `{(x['local_text'] or '')[:100]!r}`"]
+        if lc.get("differ"):
+            md += [""]
     if R.transfer == "nixl":
         dn, nx = nums["D"], nums.get("nixl", {})
         md += ["## NIXL", "",
@@ -2014,6 +2037,8 @@ def compare(dirs, out):
             ("NIXL read ms (median)", lambda n: ms(n["D"].get("nixl_read_s_median"))),
             ("NIXL read ms (p90)", lambda n: ms(n["D"].get("nixl_read_s_p90"))),
             ("NIXL read GB/s (median)", lambda n: (n.get("nixl") or {}).get("read_gb_s_median")),
+            ("D's answers = one engine's", lambda n: (lambda c: f"{c['same']} of {c['turns']}" if c else None)(
+                n.get("local_check"))),
             ("UCX transports", lambda n: ", ".join((n.get("nixl") or {}).get("ucx_transport_names") or []) or None),
             ("P held its blocks for D, ms (median)", lambda n: ms(n["P"].get("nixl_held_s_median"))),
             ("D tokens computed", lambda n: n["D"]["computed_tokens"]),
@@ -2066,7 +2091,7 @@ def unpack(results, into):
         if (results / f"{name}.gz").is_file():
             with gzip.open(results / f"{name}.gz", "rb") as g:
                 (into / name).write_bytes(g.read())
-    for name in ("env.json",):
+    for name in ("env.json", "local_check.json"):
         if (results / name).is_file():
             shutil.copyfile(results / name, into / name)
     for sub in ("logs", "server"):

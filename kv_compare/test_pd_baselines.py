@@ -1976,6 +1976,9 @@ class MtragDriverTests(unittest.TestCase):
                 for x, y in zip(a, a[1:]):
                     self.assertEqual(y["ids"][:len(x["ids"])], x["ids"])
                 self.assertEqual(a[0]["ids"], by_body[a[0]["tag"]]["prompt"])
+                for r in a:                       # D's own answer, for scripts/pd_localcheck.py
+                    n = [bb["t_tag"] for bb in eng.bodies].index(r["tag"]) + 1
+                    self.assertEqual((r["answer_ids"], r["answer_text"]), ([1000 * n, 1000 * n + 1, 1000 * n + 2], "abc"))
                 for r in a:                       # each piece's text, as sent: it tokenizes to the piece's ids
                     b = by_body[r["tag"]]
                     self.assertEqual(len(r["texts"]), len(r["pieces"]))
@@ -1987,6 +1990,7 @@ class MtragDriverTests(unittest.TestCase):
             else:
                 self.assertNotIn("ids", a[0])
                 self.assertNotIn("texts", a[0])
+                self.assertNotIn("answer_ids", a[0])
 
     def test_answer_text_is_tokenized_again_without_engine_ids(self):
         eng, recs, summ = self.run_driver("docs_first", token_ids=False)

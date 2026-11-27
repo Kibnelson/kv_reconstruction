@@ -210,7 +210,8 @@ for k in "${!SRV_ROLES[@]}"; do
     SRV_PORT+=($((PORT_BASE + 50 + 10 * k))) SRV_HTTP+=($((PORT_BASE + 51 + 10 * k))) SRV_PROM+=($((PORT_BASE + 52 + 10 * k)))
 done
 NIXL_PORTS=($((PORT_BASE + 401)) $((PORT_BASE + 451)) $((PORT_BASE + 452)) $((PORT_BASE + 453)))   # side channels
-ALL_PORTS=("$PROXY_PORT" "${SRV_PORT[@]}" "${SRV_HTTP[@]}" "${SRV_PROM[@]}" "$P_PORT" "${D_PORTS[@]}")
+LC_PORT=$((PORT_BASE + 461))                  # the local check's engine (after the run)
+ALL_PORTS=("$PROXY_PORT" "${SRV_PORT[@]}" "${SRV_HTTP[@]}" "${SRV_PROM[@]}" "$P_PORT" "${D_PORTS[@]}" "$LC_PORT")
 [ "$TRANSFER" = nixl ] && ALL_PORTS+=("${NIXL_PORTS[@]}")
 # the servers' memory (each preallocates its L1) must fit beside the engines: the node's free memory, checked first
 "$LPY" -I - "${#SRV_ROLES[@]}" "$L1_GB" "${LMC_HOST_MARGIN_GB:-16}" <<'EOF'
@@ -432,6 +433,32 @@ fi
 stop_all
 trap - EXIT
 
+# the local check (LMC_LOCAL_CHECK=1, the default): one plain engine on P's GPU, no P/D, no connector, no trace,
+# answers each turn's exact prompt at temperature 0; D's answers must be the same, token for token
+# (scripts/pd_localcheck.py). Jobs 30763, 30774, 30780: the same first prompt, three different answers from D.
+if [ "${LMC_LOCAL_CHECK:-1}" = 1 ] && [ -s "$OUT/mtrag.jsonl" ] && [ "${UP:-0}" = 1 ]; then
+    echo "== local check: one engine on GPU ${DEVS[0]} (no P/D, no connector) answers every turn's prompt"
+    ( cd "$OUT" && exec env CUDA_VISIBLE_DEVICES="${DEVS[0]}" PYTHONHASHSEED=0 PATH="$ENV_DIR/bin:$PATH" \
+        VLLM_USE_FLASHINFER_SAMPLER=0 nohup "$ENV_DIR/bin/vllm" serve "$MP" --host 127.0.0.1 --port "$LC_PORT" \
+        --served-model-name llama --block-size 16 --gpu-memory-utilization "$GPU_MEM" --max-model-len "$MAXLEN" \
+        --max-num-batched-tokens "$MAXBT" "${ENGINE_ARGS[@]}" > "$OUT/local_check_engine.log" 2>&1 ) &
+    PIDS=($!)
+    trap stop_all EXIT
+    for _ in $(seq 1 120); do
+        curl -sf "http://127.0.0.1:$LC_PORT/health" >/dev/null && break
+        kill -0 "${PIDS[0]}" 2>/dev/null || break
+        sleep 3
+    done
+    if curl -sf "http://127.0.0.1:$LC_PORT/health" >/dev/null; then
+        "$LPY" -I scripts/pd_localcheck.py --mtrag "$OUT/mtrag.jsonl" --engine "http://127.0.0.1:$LC_PORT" \
+            --output "$OUT/local_check.json" || echo "WARNING: the local check failed"
+    else
+        echo "WARNING: the local check's engine did not come up:"; tail -n 30 "$OUT/local_check_engine.log"
+    fi
+    stop_all
+    trap - EXIT
+fi
+
 cp "$KV_HOME/lmc_verify.json" "$OUT/server/lmc_verify.json" 2>/dev/null || true
 "$LPY" -I - "$OUT/env.json" "$MODE" "$L1_GB" "$EVICT" "$STORE_POLICY" "$CHUNK" "$ODIRECT" "$SAVE_DECODE" "$D_ROLE" \
     "$LIMIT" "$LAYOUT" "$CONC" "$MAX_TOKENS" "$STORE_WAIT_MS" "$GPU_MEM" "${GPU_BLOCKS:-}" "${D_PREFIX_CACHE:-1}" \
@@ -487,7 +514,8 @@ cp "$OUT/env.json" "$RES/"
 [ -s "$OUT/mtrag_summary.json" ] && cp "$OUT/mtrag_summary.json" "$RES/"
 mkdir -p "$RES/server" "$RES/logs"
 cp -r "$OUT"/server/* "$RES/server/" 2>/dev/null || true
-for f in "$OUT"/engine_*.log "$OUT"/lmcache_server*.log "$OUT/proxy.log" "$OUT/mtrag.log"; do
+[ -s "$OUT/local_check.json" ] && cp "$OUT/local_check.json" "$RES/"
+for f in "$OUT"/engine_*.log "$OUT"/lmcache_server*.log "$OUT/proxy.log" "$OUT/mtrag.log" "$OUT/local_check_engine.log"; do
     [ -f "$f" ] || continue
     tail -n 400 "$f" > "$RES/logs/$(basename "$f" .log)_tail.log"
     gzip -c "$f" > "$RES/logs/$(basename "$f").gz"        # whole (job 30694: the crash was above the tail)

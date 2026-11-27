@@ -272,7 +272,10 @@ async def conversation(session, tok, a, k, conv, out, trace):
                 got, src = await tok(text), "retokenized"
             answers.append(got)
             answer_texts.append(text)
-            out.append(dict(rec, answer_tokens=len(got), answer_ids_from=src, ttft=ttft, latency=lat, t_done=time.time()))
+            done = dict(rec, answer_tokens=len(got), answer_ids_from=src, ttft=ttft, latency=lat, t_done=time.time())
+            if trace:                                # D's answer itself (scripts/pd_localcheck.py compares it)
+                done.update(answer_ids=got, answer_text=text)
+            out.append(done)
         except Exception as exc:
             out.append(dict(rec, error=repr(exc)[:300]))
             break
