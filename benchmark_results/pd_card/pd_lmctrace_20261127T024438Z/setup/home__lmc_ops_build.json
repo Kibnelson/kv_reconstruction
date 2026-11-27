@@ -1,0 +1,55 @@
+{
+ "modules": [
+  {
+   "module": "lmcache.lmcache_native",
+   "file": "lmcache_native.cpython-312-x86_64-linux-gnu.so",
+   "sha256": "c765289e3da189aa3563dcd818aad5795dc07f348b88ccec3b3d8760e609f177"
+  },
+  {
+   "module": "lmcache.lmcache_redis",
+   "file": "lmcache_redis.cpython-312-x86_64-linux-gnu.so",
+   "sha256": "3b9ca33b06419848f253cddb7ab21aea76bd2714561fb37e75034f559a649de4"
+  },
+  {
+   "module": "lmcache.lmcache_fs",
+   "file": "lmcache_fs.cpython-312-x86_64-linux-gnu.so",
+   "sha256": "0882dd8061b366bbfe3a3ac42c1804968bc6fe721d2f50fc7db7787a6495d6e7"
+  },
+  {
+   "module": "lmcache.cuda_ops",
+   "file": "cuda_ops.cpython-312-x86_64-linux-gnu.so",
+   "sha256": "8a0428ab0d6ccd08652073669cd171cd7cdbab3105b185c3e741de522c808f78"
+  }
+ ],
+ "from": "third_party/lmcache/csrc",
+ "sources": {
+  "csrc/cuda/pybind.cpp": "7e2452c0010d9405bde7f704ef7a43958f290eff312ff292825658d6af4aeec9",
+  "csrc/cuda/mem_kernels.cu": "082065bfa7c7ffbf1d90ae5a059c93b7dca77e9d1a9c58a846da4b5ef259f5be",
+  "csrc/cuda/mp_mem_kernels.cu": "5aba75892f93b50619c02bb87200a0f7e2a24b3744e577a8133db61cef8e4cfe",
+  "csrc/cuda/phase_timing_recorder.cu": "27fd4bb922f2c99800b186b909fdbf513083082ce84cd501e59f979b41f7caba",
+  "csrc/cuda/blend_kernels.cu": "e779457cca2de4e9d2f255ee70d286d05d9d56a69147c27f817b8bcf688c634d",
+  "csrc/cuda/cal_cdf.cu": "ef07756d583081d930d362722c5903deb52ceb277cc9bab1cbd50f180f83d900",
+  "csrc/cuda/ac_enc.cu": "e53d871ec76e068aa2dd043af321514fae2b23cf39d3d1003d1738f24249dc2f",
+  "csrc/cuda/ac_dec.cu": "b57373d43ca5f21f304b18387b6698b98a39ad04a5ef4e47d577e52141fcc78c",
+  "csrc/cuda/pos_kernels.cu": "d9aba684db30c9c99aa10d45b7f08e93ddc93fc72983d2ab554f05cc6d2963c4",
+  "csrc/cuda/mem_alloc.cpp": "3e0affced869cb22d244f70a3213090fbac516d127d34cc1fa4927b4b7fd7578",
+  "csrc/cuda/utils.cpp": "dac04bed9a583b695744fe3b96deba4cda9521aa963d0bd5b7c8a00c517d401c",
+  "csrc/cuda/event_recorder.cpp": "45b80acf329240818c54c641490ec2fdf28343bcf968e122cdd0163c7ee9a29d",
+  "csrc/cuda/completion_recorder.cpp": "33d84093edf3c4f0a58307cdd455aecb8a2df05223fead03f625b203b851d391",
+  "csrc/lmcache_native/bitmap.cpp": "d2d80c53af24ab59afc388509eb8228cc2c849561b473d0d2314eb1cdcb71328",
+  "csrc/lmcache_native/fold.cpp": "579d90413a403345df8f987ea13f02843ef9fdb53ba81345ad805724fcf378c7",
+  "csrc/lmcache_native/periodic_event_notifier.cpp": "bc53c19cd9612d1f84c16e5df468218ee2175afa8e1584b04fd3d255c47e111f",
+  "csrc/lmcache_native/pybind.cpp": "73b423d55296a4a727e83b4f2734d89539be0c93562bae5068b03b4460a5836c",
+  "csrc/lmcache_native/ttl_lock.cpp": "dc6ff389c3fd857bc295364687c23bb3f979b8abbde3b95a79e07058e79eb98b",
+  "csrc/lmcache_native/utils.cpp": "7a41fd767fce249d9a6b97c143a13ea03e56e7968651ac0c5dc1be224fd3f6a8",
+  "csrc/storage_backends/redis/pybind.cpp": "1272c3b2ac54afcd4686e1f9eee6be8d02688ea8942e132cd8fe33f7dd806756",
+  "csrc/storage_backends/redis/connector.cpp": "6e71caa71f15c6207c782ae7a97680ad2e5055b093a59b8fb304e626fa51c310",
+  "csrc/storage_backends/fs/pybind.cpp": "ea52f05496e4d09e5b914a56695a553f523e1363e4c19115edc5160e9a5471e1",
+  "csrc/storage_backends/fs/connector.cpp": "6d06a069fad0d5a342822e560f959f286550febf8033e6129a0bcae1395e0827"
+ },
+ "torch": "2.13.0+cu130",
+ "torch_cuda": "13.0",
+ "nvcc": "Build cuda_13.0.r13.0/compiler.36424714_0",
+ "arch": "8.6",
+ "python": "3.12.14"
+}
