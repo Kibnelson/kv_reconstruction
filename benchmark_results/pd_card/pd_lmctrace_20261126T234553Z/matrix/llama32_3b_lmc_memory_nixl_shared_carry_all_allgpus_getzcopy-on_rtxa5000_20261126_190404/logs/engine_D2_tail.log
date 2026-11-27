@@ -1,0 +1,400 @@
+[1795737963.230894] [gpu-grad-01:770559:2]          wireup.c:2213 UCX  DEBUG ep 0x9441a8510c0: send wireup request (flags=0x4041)
+[1795737963.230911] [gpu-grad-01:770559:2]          ucp_ep.c:452  UCX  DEBUG created ep 0x9441a8310c0 to <no debug data> from api call
+[1795737963.231033] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.231240] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.231281] [gpu-grad-01:770559:2]            sock.c:90   UCX  DEBUG   ioctl(req=35142, ifr_name=lo) failed: Operation not supported
+[1795737963.231285] [gpu-grad-01:770559:2]         tcp_net.c:61   UCX  DEBUG   speed of lo is UNKNOWN, assuming 100 Mbps
+[1795737963.231330] [gpu-grad-01:770559:2]            topo.c:1610 UCX  DEBUG   /sys/class/net/lo: sysfs path undetected
+[1795737963.231331] [gpu-grad-01:770559:2]            topo.c:1563 UCX  DEBUG   lo: pci bandwidth undetected, using maximal value
+[1795737963.231359] [gpu-grad-01:770559:2]          wireup.c:1558 UCX  DEBUG   ep 0x9441a8310c0 self/memory cannot reach dst_sys_dev=255 dst_md_index=0: iface mismatch
+[1795737963.231367] [gpu-grad-01:770559:2]          wireup.c:1558 UCX  DEBUG   ep 0x9441a8310c0 tcp/bond0 cannot reach dst_sys_dev=255 dst_md_index=1: local non-loopback remote loopback
+[1795737963.231368] [gpu-grad-01:770559:2]          wireup.c:1558 UCX  DEBUG   ep 0x9441a8310c0 tcp/lo cannot reach dst_sys_dev=8 dst_md_index=1: local loopback remote non-loopback
+[1795737963.231379] [gpu-grad-01:770559:2]          wireup.c:1558 UCX  DEBUG   ep 0x9441a8310c0 cuda_copy/cuda cannot reach dst_sys_dev=4 dst_md_index=4: iface mismatch
+[1795737963.231387] [gpu-grad-01:770559:2]      ucp_worker.c:1997 UCX  INFO    13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2 rma_am(tcp/bond0)  amo_am(tcp/bond0)  device(cuda_ipc/cuda)  am(tcp/bond0 cma/memory cuda_ipc/cuda)  ka(tcp/bond0)
+[1795737963.231397] [gpu-grad-01:770559:2]   +-----------+--------------------+---------+----------------------------------+
+[1795737963.231397] [gpu-grad-01:770559:2]   | Endpoint Config #2 (ctx: 13007839-c392-4552-bdfd-f6ab510, type: intra-node) |
+[1795737963.231397] [gpu-grad-01:770559:2]   +-----------+--------------------+---------+----------------------------------+
+[1795737963.231397] [gpu-grad-01:770559:2]   | Transport | Device (Sys. dev.) | # Lanes | Lane Types                       |
+[1795737963.231397] [gpu-grad-01:770559:2]   +-----------+--------------------+---------+----------------------------------+
+[1795737963.231397] [gpu-grad-01:770559:2]   | cma       | memory             |       1 | rma_bw                           |
+[1795737963.231397] [gpu-grad-01:770559:2]   +-----------+--------------------+---------+----------------------------------+
+[1795737963.231397] [gpu-grad-01:770559:2]   | cuda_ipc  | cuda (GPU0)        |       1 | rma_bw, device                   |
+[1795737963.231397] [gpu-grad-01:770559:2]   +-----------+--------------------+---------+----------------------------------+
+[1795737963.231397] [gpu-grad-01:770559:2]   | tcp       | bond0              |       1 | am, keepalive                    |
+[1795737963.231397] [gpu-grad-01:770559:2]   +-----------+--------------------+---------+----------------------------------+
+[1795737963.231397] [gpu-grad-01:770559:2]   
+[1795737963.231482] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.231590] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.231708] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.231825] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.231936] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232041] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232164] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232271] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232389] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232496] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232615] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232723] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232848] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.232962] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.233024] [gpu-grad-01:770559:2]   +--------+-------------+-----------------------------------+
+[1795737963.233024] [gpu-grad-01:770559:2]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2         |
+[1795737963.233024] [gpu-grad-01:770559:2]   | remote memory write by ucp_put* from host memory to host |
+[1795737963.233024] [gpu-grad-01:770559:2]   +--------+-------------+-----------------------------------+
+[1795737963.233024] [gpu-grad-01:770559:2]   | Range  | Description |              Config               |
+[1795737963.233024] [gpu-grad-01:770559:2]   +--------+-------------+-----------------------------------+
+[1795737963.233024] [gpu-grad-01:770559:2]   | 0..inf | zero-copy   | cma/memory                        |
+[1795737963.233024] [gpu-grad-01:770559:2]   +--------+-------------+-----------------------------------+
+[1795737963.233123] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.233238] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.233349] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.233455] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.233577] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.233698] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.233824] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.233966] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.234093] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.234213] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.234379] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.234487] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.234547] [gpu-grad-01:770559:2]   +--------+--------------------+-----------------------------------+
+[1795737963.234547] [gpu-grad-01:770559:2]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2                |
+[1795737963.234547] [gpu-grad-01:770559:2]   | remote memory write by ucp_put* from host memory to cuda/dev[4] |
+[1795737963.234547] [gpu-grad-01:770559:2]   +--------+--------------------+-----------------------------------+
+[1795737963.234547] [gpu-grad-01:770559:2]   | Range  |    Description     |              Config               |
+[1795737963.234547] [gpu-grad-01:770559:2]   +--------+--------------------+-----------------------------------+
+[1795737963.234547] [gpu-grad-01:770559:2]   | 0..inf | software emulation | tcp/bond0                         |
+[1795737963.234547] [gpu-grad-01:770559:2]   +--------+--------------------+-----------------------------------+
+[1795737963.234633] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.234741] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.234860] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.234967] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.235129] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.235257] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.235393] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.235510] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.235628] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.235758] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.235919] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.236032] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.236173] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.236282] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.236412] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.236536] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.236676] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.236794] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.236913] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.237021] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.237189] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.237309] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.237428] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.237564] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.237680] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.237797] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.237916] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.238027] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.238168] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.238314] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.238435] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.238546] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.238661] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.238782] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.238861] [gpu-grad-01:770559:2]   +------------+----------------------+--------------+
+[1795737963.238861] [gpu-grad-01:770559:2]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2 |
+[1795737963.238861] [gpu-grad-01:770559:2]   | active message by ucp_am_send* from host memory  |
+[1795737963.238861] [gpu-grad-01:770559:2]   +------------+----------------------+--------------+
+[1795737963.238861] [gpu-grad-01:770559:2]   |   Range    |     Description      |    Config    |
+[1795737963.238861] [gpu-grad-01:770559:2]   +------------+----------------------+--------------+
+[1795737963.238861] [gpu-grad-01:770559:2]   |          0 | short                | tcp/bond0    |
+[1795737963.238861] [gpu-grad-01:770559:2]   |   1..65528 | zero-copy            | tcp/bond0    |
+[1795737963.238861] [gpu-grad-01:770559:2]   | 65529..inf | multi-frag zero-copy | tcp/bond0    |
+[1795737963.238861] [gpu-grad-01:770559:2]   +------------+----------------------+--------------+
+[1795737963.238956] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239071] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239209] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239318] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239434] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239539] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239653] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239764] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239878] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.239992] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.240111] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.240230] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.240358] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.240478] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.240594] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.240711] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.240826] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.240940] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.241055] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.241191] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.241303] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.241419] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.241533] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.241605] [gpu-grad-01:770559:2]   +-------------+----------------------+-----------------------------+
+[1795737963.241605] [gpu-grad-01:770559:2]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2                 |
+[1795737963.241605] [gpu-grad-01:770559:2]   | active message by ucp_am_send*(fast-completion) from host memory |
+[1795737963.241605] [gpu-grad-01:770559:2]   +-------------+----------------------+-----------------------------+
+[1795737963.241605] [gpu-grad-01:770559:2]   |    Range    |     Description      |           Config            |
+[1795737963.241605] [gpu-grad-01:770559:2]   +-------------+----------------------+-----------------------------+
+[1795737963.241605] [gpu-grad-01:770559:2]   |     0..8184 | short                | tcp/bond0                   |
+[1795737963.241605] [gpu-grad-01:770559:2]   | 8185..65528 | zero-copy            | tcp/bond0                   |
+[1795737963.241605] [gpu-grad-01:770559:2]   |  65529..inf | multi-frag zero-copy | tcp/bond0                   |
+[1795737963.241605] [gpu-grad-01:770559:2]   +-------------+----------------------+-----------------------------+
+[1795737963.241698] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.241806] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.241927] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.242045] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.242225] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.242333] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.242444] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.242549] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.242667] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.242780] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.242901] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.243014] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.243169] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.243308] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.243425] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.243536] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.243652] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                   /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.243758] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.243880] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG                 /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.244015] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.244144] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.244263] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.244421] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.244538] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.244665] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.244778] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG               /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.244897] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.245013] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.245149] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG             /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.245308] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.245424] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.245539] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.245657] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.245768] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.245883] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.246001] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.246128] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.246249] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.246369] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.246493] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.246571] [gpu-grad-01:770559:2]   +-------------+----------------------+-------------------+
+[1795737963.246571] [gpu-grad-01:770559:2]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2       |
+[1795737963.246571] [gpu-grad-01:770559:2]   | active message by ucp_am_send*(multi) from host memory |
+[1795737963.246571] [gpu-grad-01:770559:2]   +-------------+----------------------+-------------------+
+[1795737963.246571] [gpu-grad-01:770559:2]   |    Range    |     Description      |      Config       |
+[1795737963.246571] [gpu-grad-01:770559:2]   +-------------+----------------------+-------------------+
+[1795737963.246571] [gpu-grad-01:770559:2]   |     0..8184 | short                | tcp/bond0         |
+[1795737963.246571] [gpu-grad-01:770559:2]   | 8185..65528 | zero-copy            | tcp/bond0         |
+[1795737963.246571] [gpu-grad-01:770559:2]   |  65529..inf | multi-frag zero-copy | tcp/bond0         |
+[1795737963.246571] [gpu-grad-01:770559:2]   +-------------+----------------------+-------------------+
+[1795737963.246674] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.246785] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.246904] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.247010] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.247291] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.247403] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.247522] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.247627] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.247746] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.247850] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.247965] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.248078] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.248203] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.248322] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.248438] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.248554] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.248664] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.248777] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.248892] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249009] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249149] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249263] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249381] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249452] [gpu-grad-01:770559:2]   +------------+----------------------+-----------------------------+
+[1795737963.249452] [gpu-grad-01:770559:2]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2                |
+[1795737963.249452] [gpu-grad-01:770559:2]   | active message by ucp_am_send* with reply flag from host memory |
+[1795737963.249452] [gpu-grad-01:770559:2]   +------------+----------------------+-----------------------------+
+[1795737963.249452] [gpu-grad-01:770559:2]   |   Range    |     Description      |           Config            |
+[1795737963.249452] [gpu-grad-01:770559:2]   +------------+----------------------+-----------------------------+
+[1795737963.249452] [gpu-grad-01:770559:2]   |          0 | short                | tcp/bond0                   |
+[1795737963.249452] [gpu-grad-01:770559:2]   |   1..65520 | zero-copy            | tcp/bond0                   |
+[1795737963.249452] [gpu-grad-01:770559:2]   | 65521..inf | multi-frag zero-copy | tcp/bond0                   |
+[1795737963.249452] [gpu-grad-01:770559:2]   +------------+----------------------+-----------------------------+
+[1795737963.249543] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249652] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249768] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249881] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.249998] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.250125] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.250243] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.250349] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.250467] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.250573] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.250683] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.250787] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.250916] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251034] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251176] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251301] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251413] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251529] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251645] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251762] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251871] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.251987] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.252114] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.252217] [gpu-grad-01:770559:2]   +-------------+----------------------+---------------------------------------------+
+[1795737963.252217] [gpu-grad-01:770559:2]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2                                 |
+[1795737963.252217] [gpu-grad-01:770559:2]   | active message by ucp_am_send* with reply flag(fast-completion) from host memory |
+[1795737963.252217] [gpu-grad-01:770559:2]   +-------------+----------------------+---------------------------------------------+
+[1795737963.252217] [gpu-grad-01:770559:2]   |    Range    |     Description      |                   Config                    |
+[1795737963.252217] [gpu-grad-01:770559:2]   +-------------+----------------------+---------------------------------------------+
+[1795737963.252217] [gpu-grad-01:770559:2]   |     0..8176 | short                | tcp/bond0                                   |
+[1795737963.252217] [gpu-grad-01:770559:2]   |  8177..8184 | multi-frag copy-in   | tcp/bond0                                   |
+[1795737963.252217] [gpu-grad-01:770559:2]   | 8185..65520 | zero-copy            | tcp/bond0                                   |
+[1795737963.252217] [gpu-grad-01:770559:2]   |  65521..inf | multi-frag zero-copy | tcp/bond0                                   |
+[1795737963.252217] [gpu-grad-01:770559:2]   +-------------+----------------------+---------------------------------------------+
+[1795737963.252312] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.252422] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.252545] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.252668] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.252790] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.252899] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.253024] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.253270] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.253407] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.253515] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.253632] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.253737] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG         /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.253855] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.253971] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.254093] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.254212] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.254325] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.254442] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.254558] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.254669] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.254785] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.254903] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.255017] [gpu-grad-01:770559:2]            topo.c:1613 UCX  DEBUG           /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.255100] [gpu-grad-01:770559:2]   +-------------+----------------------+-----------------------------------+
+[1795737963.255100] [gpu-grad-01:770559:2]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2                       |
+[1795737963.255100] [gpu-grad-01:770559:2]   | active message by ucp_am_send* with reply flag(multi) from host memory |
+[1795737963.255100] [gpu-grad-01:770559:2]   +-------------+----------------------+-----------------------------------+
+[1795737963.255100] [gpu-grad-01:770559:2]   |    Range    |     Description      |              Config               |
+[1795737963.255100] [gpu-grad-01:770559:2]   +-------------+----------------------+-----------------------------------+
+[1795737963.255100] [gpu-grad-01:770559:2]   |     0..8176 | short                | tcp/bond0                         |
+[1795737963.255100] [gpu-grad-01:770559:2]   | 8177..65520 | zero-copy            | tcp/bond0                         |
+[1795737963.255100] [gpu-grad-01:770559:2]   |  65521..inf | multi-frag zero-copy | tcp/bond0                         |
+[1795737963.255100] [gpu-grad-01:770559:2]   +-------------+----------------------+-----------------------------------+
+[1795737963.255118] [gpu-grad-01:770559:2]          wireup.c:1464 UCX  DEBUG   ep 0x9441a8310c0: am_lane 0 wireup_msg_lane 0 cm_lane <none> keepalive_lane 0 reachable_mds 0x6e
+[1795737963.255121] [gpu-grad-01:770559:2]          wireup.c:1487 UCX  DEBUG   ep 0x9441a8310c0: lane[0]:  1:tcp/bond0.0 md[1]             -> addr[1].md[1]/tcp/sysdev[8] seg 4294967295 am keepalive wireup
+[1795737963.255123] [gpu-grad-01:770559:2]          wireup.c:1487 UCX  DEBUG   ep 0x9441a8310c0: lane[1]:  7:cma/memory.0 md[6]            -> addr[7].md[6]/cma/sysdev[255] seg 4294967295 rma_bw#1
+[1795737963.255124] [gpu-grad-01:770559:2]          wireup.c:1487 UCX  DEBUG   ep 0x9441a8310c0: lane[2]:  6:cuda_ipc/cuda.0 md[5]         -> addr[6].md[5]/cuda_ipc/sysdev[4] seg 4294967295 rma_bw#0 device
+[1795737963.255125] [gpu-grad-01:770559:2]          wireup.c:1490 UCX  DEBUG   ep 0x9441a8310c0: err mode 1, flags 0x2
+[1795737963.255127] [gpu-grad-01:770559:2]          tcp_ep.c:260  UCX  DEBUG   tcp_ep 0x93da43a9b00: created on iface 0x673aaec0, fd -1
+[1795737963.255131] [gpu-grad-01:770559:2]          tcp_cm.c:96   UCX  DEBUG   tcp_ep 0x93da43a9b00: CLOSED -> CONNECTING for the [10.140.16.41:35927]<->[10.140.16.41:57827]:0 connection [-:-]
+[1795737963.255159] [gpu-grad-01:770559:2]          tcp_cm.c:96   UCX  DEBUG   tcp_ep 0x93da43a9b00: CONNECTING -> CONNECTING for the [10.140.16.41:35927]<->[10.140.16.41:57827]:0 connection [-:-]
+[1795737963.255205] [gpu-grad-01:770559:2]            sock.c:365  UCX  DEBUG   connect(fd=228, src_addr=10.140.16.41:42967 dest_addr=10.140.16.41:57827): Success
+[1795737963.255218] [gpu-grad-01:770559:2]          tcp_cm.c:96   UCX  DEBUG   tcp_ep 0x93da43a9b00: CONNECTING -> WAITING_ACK for the [10.140.16.41:35927]<->[10.140.16.41:57827]:0 connection [-:-]
+[1795737963.255260] [gpu-grad-01:770559:2]      ucp_worker.h:494  UCX  DEBUG worker 0x61b0ce30 flush_ops_count 1 -> 2
+[1795737963.255261] [gpu-grad-01:770559:2]       wireup_ep.c:594  UCX  DEBUG ep 0x9441a8310c0: wireup_ep 0x93da43a9ca0 set next_ep 0x93da43a9b00
+[1795737963.255262] [gpu-grad-01:770559:2]          wireup.c:2213 UCX  DEBUG ep 0x9441a8310c0: send wireup request (flags=0x4041)
+[1795737963.268701] [gpu-grad-01:770559:0]             sys.c:954  UCX  DEBUG SHM_HUGETLB are not supported on the system
+[1795737963.268717] [gpu-grad-01:770559:0]           mpool.c:258  UCX  DEBUG mpool ucp_requests: allocated chunk 0x7b874614 of 41044 bytes with 128 elements
+[1795737963.269011] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.269356] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737963.269581] [gpu-grad-01:770559:0]   +--------+-------------+------------------------------------------------+
+[1795737963.269581] [gpu-grad-01:770559:0]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2                      |
+[1795737963.269581] [gpu-grad-01:770559:0]   | remote memory read by ucp_get*(multi) into cuda/GPU0 from cuda/dev[4] |
+[1795737963.269581] [gpu-grad-01:770559:0]   +--------+-------------+------------------------------------------------+
+[1795737963.269581] [gpu-grad-01:770559:0]   | Range  | Description |                     Config                     |
+[1795737963.269581] [gpu-grad-01:770559:0]   +--------+-------------+------------------------------------------------+
+[1795737963.269581] [gpu-grad-01:770559:0]   | 0..inf | zero-copy   | cuda_ipc/cuda                                  |
+[1795737963.269581] [gpu-grad-01:770559:0]   +--------+-------------+------------------------------------------------+
+[1795737963.269648] [gpu-grad-01:770559:0]           mpool.c:122  UCX  DEBUG mpool cuda_event_descriptors: align 64, maxelems 4294967295, elemsize 80
+[1795737963.269681] [gpu-grad-01:770559:0]           mpool.c:258  UCX  DEBUG mpool cuda_event_descriptors: allocated chunk 0x7b6f4b10 of 16472 bytes with 128 elements
+[1795737963.270113] [gpu-grad-01:770559:0]           flush.c:499  UCX  DEBUG flush_nbx ep 0x9441c02a0c0
+[1795737963.270154] [gpu-grad-01:770559:0]           mpool.c:258  UCX  DEBUG mpool cuda_flush_descriptors: allocated chunk 0x7abba000 of 8280 bytes with 128 elements
+[1795737968.121701] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.122160] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.122495] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.122777] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.123087] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.123449] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.123755] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.124022] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.124344] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.124665] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.125017] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG       /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.125299] [gpu-grad-01:770559:0]            topo.c:1613 UCX  DEBUG     /sys/class/net/bond0/lower_enp97s0f1np1: PF sysfs path is '/sys/devices/pci0000:60/0000:60:01.1/0000:61:00.1'
+[1795737968.125490] [gpu-grad-01:770559:0]   +------------+----------------------+------------------+
+[1795737968.125490] [gpu-grad-01:770559:0]   | 13007839-c392-4552-bdfd-f6ab510 intra-node cfg#2     |
+[1795737968.125490] [gpu-grad-01:770559:0]   | active message by ucp_am_send*(egr) from host memory |
+[17957379(APIServer pid=770320) INFO 11-26 19:08:23 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 100.0%
+(APIServer pid=770320) INFO 11-26 19:08:23 [metrics.py:103] KV Transfer metrics: NixlPullConnector={'Num successful transfers': 1, 'Avg xfer time (ms)': 133744.233, 'P90 xfer time (ms)': 133744.233, 'Avg post time (ms)': 1.482, 'P90 post time (ms)': 1.482, 'Avg MB per transfer': 124.25, 'Throughput (MB/s)': 0.929, 'Avg number of descriptors': 28.0, 'Num failed transfers': 0, 'Num KV expired reqs': 0, 'Num notifs after expiry': 0}
+(APIServer pid=770320) INFO 11-26 19:08:33 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%, External prefix cache hit rate: 100.0%
+INFO:     127.0.0.1:60128 - "POST /v1/completions HTTP/1.1" 200 OK
+(APIServer pid=770320) INFO 11-26 19:19:33 [launcher.py:254] [shutdown] API server: shutdown triggered
+(APIServer pid=770320) INFO 11-26 19:19:33 [launcher.py:270] [shutdown] API server: stopping engine client mode=abort timeout=0s
+(APIServer pid=770320) INFO 11-26 19:19:33 [core_client.py:770] [shutdown] MPClient: start timeout=0s
+(APIServer pid=770320) INFO 11-26 19:19:33 [core_client.py:772] [shutdown] MPClient: stopping engine manager
+(APIServer pid=770320) INFO 11-26 19:19:33 [utils.py:628] [shutdown] Process manager: send sigterm to process EngineCore
+(APIServer pid=770320) WARNING 11-26 19:19:33 [utils.py:648] [shutdown] Process manager: force killing remaining processes count=1
+(APIServer pid=770320) WARNING 11-26 19:19:33 [utils.py:653] [shutdown] Process manager: force killing remaining process EngineCore pid 770559
+(EngineCore pid=770559) INFO 11-26 19:19:33 [core.py:1454] [shutdown] EngineCore: trigger received signal=SIGTERM
+(EngineCore pid=770559) INFO 11-26 19:19:33 [core.py:1635] [shutdown] EngineCore: start mode=abort timeout=0s
+(EngineCore pid=770559) INFO 11-26 19:19:33 [core.py:1666] [shutdown] EngineCore: request processing complete; starting resource teardown
+(EngineCore pid=770559) INFO 11-26 19:19:33 [core.py:1499] [shutdown] EngineCore: exiting busy loop
+68.125490] [gpu-grad-01:770559:0]   +------------+----------------------+------------------+
+[1795737968.125490] [gpu-grad-01:770559:0]   |   Range    |     Description      |      Config      |
+[1795737968.125490] [gpu-grad-01:770559:0]   +------------+----------------------+------------------+
+[1795737968.125490] [gpu-grad-01:770559:0]   |          0 | short                | tcp/bond0        |
+[1795737968.125490] [gpu-grad-01:770559:0]   |   1..65528 | zero-copy            | tcp/bond0        |
+[1795737968.125490] [gpu-grad-01:770559:0]   | 65529..inf | multi-frag zero-copy | tcp/bond0        |
+[1795737968.125490] [gpu-grad-01:770559:0]   +------------+----------------------+------------------+
+[1795737968.125607] [gpu-grad-01:770559:0]             sys.c:954  UCX  DEBUG   SHM_HUGETLB are not supported on the system
+[1795737968.125614] [gpu-grad-01:770559:0]         mm_sysv.c:99   UCX  DEBUG   mm failed to allocate 1056872 bytes with hugetlb
+[1795737972.913920] [gpu-grad-01:770559:0]           mpool.c:258  UCX  DEBUG mpool ucp_reg_bufs: allocated chunk 0x940ec99a010 of 1060848 bytes with 128 elements
+[1795738539.794482] [gpu-grad-01:770559:0]           flush.c:499  UCX  DEBUG flush_nbx ep 0x9441c02a0c0
+[1795738773.020423] [gpu-grad-01:770559:0]          ucp_ep.c:2743 UCX  DEBUG ep 0x9441c02a0c0 flags 0x4097 cfg_index 2: close_nbx(flags=0x0)
+[1795738773.020437] [gpu-grad-01:770559:0]           flush.c:499  UCX  DEBUG close ep 0x9441c02a0c0
+[1795738773.020466] [gpu-grad-01:770559:0]          ucp_ep.c:2743 UCX  DEBUG ep 0x9441bde00c0 flags 0x4055 cfg_index 2: close_nbx(flags=0x0)
+[1795738773.020467] [gpu-grad-01:770559:0]           flush.c:499  UCX  DEBUG close ep 0x9441bde00c0
+[1795738773.020472] [gpu-grad-01:770559:0]             sys.c:954  UCX  DEBUG SHM_HUGETLB are not supported on the system
+[1795738773.020475] [gpu-grad-01:770559:1]          ucp_ep.c:2698 UCX  DEBUG ep 0x9441c02a0c0: flags 0x4497 close flushed callback for request 0x7b87e500
+[1795738773.020481] [gpu-grad-01:770559:1]          ucp_ep.c:2651 UCX  DEBUG ep 0x9441c02a0c0: disconnected with request 0x7b87e500, Success
+[1795738773.020493] [gpu-grad-01:770559:0]           mpool.c:258  UCX  DEBUG mpool ucp_requests: allocated chunk 0x7f337964 of 41044 bytes with 128 elements
+[1795738773.020511] [gpu-grad-01:770559:0]      ucp_worker.h:494  UCX  DEBUG worker 0x6a7f03c0 flush_ops_count 2 -> 3
+[1795738773.020516] [gpu-grad-01:770559:0]          ucp_ep.c:2743 UCX  DEBUG ep 0x9441bdc00c0 flags 0x4055 cfg_index 2: close_nbx(flags=0x0)
+[1795738773.020518] [gpu-grad-01:770559:0]           flush.c:499  UCX  DEBUG close ep 0x9441bdc00c0
+[1795738773.020520] [gpu-grad-01:770559:0]             sys.c:954  UCX  DEBUG SHM_HUGETLB are not supported on the system
+[1795738773.020565] [gpu-grad-01:770559:0]           mpool.c:258  UCX  DEBUG mpool ucp_requests: allocated chunk 0x7557f294 of 41044 bytes with 128 elements
+[1795738773.020584] [gpu-grad-01:770559:0]      ucp_worker.h:494  UCX  DEBUG worker 0x68b93430 flush_ops_count 2 -> 3
+[1795738773.020589] [gpu-grad-01:770559:0]          ucp_ep.c:2743 UCX  DEBUG ep 0x9441a8510c0 flags 0x4055 cfg_index 2: close_nbx(flags=0x0)
+[1795738773.020590] [gpu-grad-01:770559:0]           flush.c:499  UCX  DEBUG close ep 0x9441a8510c0
+[1795738773.020592] [gpu-grad-01:770559:0]             sys.c:954  UCX  DEBUG SHM_HUGETLB are not supported on the system
+[1795738773.020608] [gpu-grad-01:770559:0]           mpool.c:258  UCX  DEBUG mpool ucp_requests: allocated chunk 0x7b884574 of 41044 bytes with 128 elements
+[1795738773.020625] [gpu-grad-01:770559:0]      ucp_worker.h:494  UCX  DEBUG worker 0x63b5e820 flush_ops_count 2 -> 3
+[1795738773.020629] [gpu-grad-01:770559:0]          ucp_ep.c:2743 UCX  DEBUG ep 0x9441a8310c0 flags 0x4055 cfg_index 2: close_nbx(flags=0x0)
+[1795738773.020630] [gpu-grad-01:770559:0]           flush.c:499  UCX  DEBUG close ep 0x9441a8310c0
+[1795738773.020633] [gpu-grad-01:770559:0]             sys.c:954  UCX  DEBUG SHM_HUGETLB are not supported on the system
+[1795738773.020646] [gpu-grad-01:770559:0]           mpool.c:258 [32;20m[2026-11-26 19:19:33,020] LMCache INFO:[0m Unregistering kv caches [3m(vllm_multi_process_adapter.py:2464:lmcache.integration.vllm.vllm_multi_process_adapter)[0m
+(APIServer pid=770320) INFO 11-26 19:19:33 [core_client.py:774] [shutdown] MPClient: engine manager stopped
+(APIServer pid=770320) INFO 11-26 19:19:33 [core_client.py:775] [shutdown] MPClient: cleaning up background resources
+(APIServer pid=770320) INFO 11-26 19:19:33 [core_client.py:777] [shutdown] MPClient: complete
+(APIServer pid=770320) INFO 11-26 19:19:33 [launcher.py:279] [shutdown] API server: engine client stopped
+(APIServer pid=770320) INFO 11-26 19:19:33 [launcher.py:282] [shutdown] API server: signalling HTTP server shutdown
+(APIServer pid=770320) INFO 11-26 19:19:33 [launcher.py:304] [shutdown] API server: shutting down FastAPI HTTP server
+INFO:     Shutting down
+(APIServer pid=770320) INFO 11-26 19:19:33 [loggers.py:335] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 12.8 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 28.8%, External prefix cache hit rate: 100.0%
+(APIServer pid=770320) INFO 11-26 19:19:33 [metrics.py:103] KV Transfer metrics: NixlPullConnector={'Num successful transfers': 1, 'Avg xfer time (ms)': 228670.487, 'P90 xfer time (ms)': 228670.487, 'Avg post time (ms)': 10.46, 'P90 post time (ms)': 10.46, 'Avg MB per transfer': 215.25, 'Throughput (MB/s)': 0.941, 'Avg number of descriptors': 28.0, 'Num failed transfers': 0, 'Num KV expired reqs': 0, 'Num notifs after expiry': 0}
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+/tmp/nbore/kvpd-cache/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

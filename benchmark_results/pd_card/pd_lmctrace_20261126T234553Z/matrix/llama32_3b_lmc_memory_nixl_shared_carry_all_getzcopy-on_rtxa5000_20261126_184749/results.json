@@ -1,0 +1,188 @@
+{
+ "mode": "memory",
+ "env": {
+  "mode": "memory",
+  "l1_gb": 8.0,
+  "eviction": "LRU",
+  "store_policy": "default",
+  "chunk": 256,
+  "odirect": true,
+  "d_role": "kv_both",
+  "mtrag_limit": 1,
+  "layout": "interleaved",
+  "store_wait_ms": 0.0,
+  "gpu_blocks": null,
+  "d_prefix_cache": true,
+  "transfer": "nixl",
+  "servers": "shared",
+  "routing": "round_robin",
+  "concurrency": 1,
+  "mtrag_docs": "all",
+  "conv_ids": [
+   "1534a095279f2cb888fb0bea17bd70da",
+   "0208bf26ec357a803445290fa88a2e9e",
+   "a2698b2973ea7db1ee5adb5e70ec02e4",
+   "c1e53df98a28f19448f4af244304b89a",
+   "cfbcfa3e382f12aed450b10f87a72aeb",
+   "3f5fa378239f7475baac89fa40288aaa",
+   "5c13daa9432149f6243aa1115629cd1a",
+   "694e275f1a01ad0e8ac448ad809f7930",
+   "aea2634b0e5f1c2444550d31c41adc94",
+   "79f0d0539d9ec0acbf90cb3388b30c17"
+  ],
+  "disk_reads": "retain",
+  "prefetch_policy": "retain",
+  "layout_label": "carry"
+ },
+ "trace": {
+  "files": 5,
+  "records": 1075,
+  "unreadable_lines": 0,
+  "by_role": {
+   "P": 80,
+   "LMC": 222,
+   "D1": 310,
+   "D2": 308,
+   "D3": 155
+  },
+  "hook_errors": {},
+  "unknown_events": {}
+ },
+ "requests": {
+  "P": 5,
+  "D": 5,
+  "turns": 5
+ },
+ "prompt_tokens": {
+  "P": 9229,
+  "D": 9229
+ },
+ "P": {
+  "local_hit_tokens": 6000,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 3229,
+  "stored_tokens": 3072,
+  "store_bytes": 352321536,
+  "store_s_median": 0.091195,
+  "store_s_p90": 0.094195,
+  "nixl_held_s_median": 217.02026
+ },
+ "D": {
+  "local_hit_tokens": 1888,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 0,
+  "requests_pulling": 0,
+  "retrieve_bytes": 0,
+  "pull_s_median_l1": null,
+  "pull_s_p90_l1": null,
+  "pull_s_median_l2": null,
+  "pull_s_p90_l2": null,
+  "retrieve_s_median": null,
+  "prefetch_s_median_l1": null,
+  "prefetch_s_median_l2": null,
+  "looked_up_before_p_store_end": 0,
+  "nixl_read_tokens": 7341,
+  "requests_reading_nixl": 5,
+  "nixl_read_s_median": 216.832951,
+  "nixl_read_s_p90": 228.955127,
+  "stored_tokens": 0
+ },
+ "chunks": {
+  "stored": 12,
+  "in_memory": 12,
+  "stored_by": {
+   "P": 12
+  },
+  "per_server": {
+   "LMC": 12
+  },
+  "stored_bytes": 352321536,
+  "to_disk": 0,
+  "removed_from_memory": 0,
+  "pulled": 0,
+  "pulled_from": {},
+  "read_outcomes": {
+   "new: stored by this request": 12,
+   "hit, not loaded": 28,
+   "held (on GPU already)": 28
+  },
+  "never_pulled": 12,
+  "never_pulled_holding_an_answer": 5,
+  "disk_reads": 0,
+  "touches": 96,
+  "reads_hook": true,
+  "pulls_per_chunk": {
+   "0": 12
+  },
+  "created_to_l1_s_median": 0.09527397155761719,
+  "l1_to_l2_s_median": null,
+  "lookups_of_unknown_chunks": 0
+ },
+ "checks": {
+  "chunk_tokens_match_prompt": "12 of 12",
+  "pulled_blocks_same_hash_as_p": "0 of 0",
+  "chunks_with_full_chain": "12 of 12"
+ },
+ "nixl": {
+  "handshakes": 3,
+  "failed_reads": 0,
+  "read_gb_s_median": 0.0009769213351710551,
+  "ucx_transports": {
+   "D1": {
+    "tcp/bond0": 206,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10,
+    "cuda_ipc/cuda": 1
+   },
+   "D2": {
+    "tcp/bond0": 208,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10,
+    "cuda_ipc/cuda": 1
+   },
+   "D3": {
+    "tcp/bond0": 205,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10,
+    "cuda_ipc/cuda": 1
+   },
+   "P": {
+    "tcp/bond0": 125,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 6
+   }
+  },
+  "ucx_transport_names": [
+   "cma",
+   "cuda_copy",
+   "cuda_ipc",
+   "tcp"
+  ],
+  "read_path": {
+   "D1": [
+    "zero-copy: cuda_ipc/cuda"
+   ],
+   "D2": [
+    "zero-copy: cuda_ipc/cuda"
+   ],
+   "D3": [
+    "zero-copy: cuda_ipc/cuda"
+   ]
+  },
+  "gpu_to_gpu": true,
+  "ucx_ipc_errors": [],
+  "all_gpus_visible": false,
+  "ucx_tls": null,
+  "ucx_get_zcopy": "on"
+ },
+ "health": {
+  "server_fatal": null,
+  "server_last_log_s": 877.18,
+  "degraded": {},
+  "server_errors": 0,
+  "server_error_kinds": {},
+  "server_alive_at_end": true,
+  "server_crashed": false,
+  "server_failed": false
+ }
+}
