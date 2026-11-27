@@ -19,6 +19,7 @@ for a run's own folder. Uses scripts/lmc_lifecycle.py's reading of the trace.
 import argparse
 import collections
 import gzip
+import json
 import math
 import pathlib
 import re
@@ -309,6 +310,24 @@ def turn_section(R, eng, k, t, P, D, px, links):
             blocks = [i for j, _ in d_st for i in range(j * 16, j * 16 + 16)]
             row(min(tw), max(tw + tr), f"{d} · LMCache", f"{len(tw)} disk write{'s' if len(tw) != 1 else ''} · "
                 "release CPU copies", notes={"D disk": "+" + ranges(blocks, "L"), "peak": True})
+    # LMCache memory evicting this prompt's objects (LRU, memory full), apart from the disk mode's removal of a copy
+    # once it is on disk
+    for srv in sorted({p_srv, d_srv}):
+        evs = []
+        for h in hashes:
+            c = R.chunks.get(R.ck(h, srv))
+            if not c:
+                continue
+            for nm, te, _ in c.get("l1") or []:
+                if nm != "l1.keys.evicted" or not (T <= te <= t_end):
+                    continue
+                if c.get("t_l2_stored") and 0 <= te - c["t_l2_stored"] < 1.0:
+                    continue
+                evs.append(te)
+        if evs:
+            who = "LMCache" if not per_engine else ("P" if srv == p_srv else d) + " · LMCache"
+            row(min(evs), max(evs), who, f"Memory full: evicts {len(evs)} object{'s' if len(evs) != 1 else ''} "
+                "(LRU)")
     for role in ("P", d):
         for tr in eng[role].resets:
             if T <= tr <= t_end + 1.0:
@@ -422,11 +441,18 @@ def turn_section(R, eng, k, t, P, D, px, links):
     return md, totals
 
 
-def page(R, run, conv=None, pair=None, title=None, evidence=None, pair_label=None):
+def conv_ids(R):
+    """The run's conversations, in order (the driver's conv keys)."""
+    return sorted(turn_pairs(R), key=lambda c: (c is None, int(c) if str(c).isdigit() else str(c)))
+
+
+def page(R, run, conv=None, pair=None, title=None, evidence=None, pair_label=None, totals=False):
     convs = turn_pairs(R)
     if not convs:
         raise SystemExit("no turns with both P and D in this run")
-    conv = conv if conv in convs else sorted(convs, key=lambda c: (c is None, str(c)))[0]
+    if conv not in convs and str(conv).isdigit() and int(conv) in convs:
+        conv = int(conv)
+    conv = conv if conv in convs else conv_ids(R)[0]
     turns = convs[conv]
     e = R.env
     layout = L.LAYOUT_NAMES.get(e.get("layout"), e.get("layout"))
@@ -485,7 +511,8 @@ def page(R, run, conv=None, pair=None, title=None, evidence=None, pair_label=Non
               f"{sm('d_local')} / {sm('nixl')} | | {sm('p_objects')}" + (f" / {sm('d_objects')}" if per_engine else "")
               + f" | {sm('p_disk')}" + (f" / {sm('d_disk')}" if per_engine else "") + f" | {sm('p_ev')} / {sm('d_ev')} |")
     md.append("")
-    return "\n".join(md) + "\n"
+    text = "\n".join(md) + "\n"
+    return (text, {"conv": conv, "id": cid, "turns": tots}) if totals else text
 
 
 def main(argv=None):
@@ -498,6 +525,8 @@ def main(argv=None):
     ap.add_argument("--title")
     ap.add_argument("--evidence")
     ap.add_argument("--pair-label")
+    ap.add_argument("--all", action="store_true",
+                    help="every conversation: --output is a folder, NN-<id>.md a page; --pair a folder alike")
     a = ap.parse_args(argv)
     if not (a.results or a.run):
         ap.error("--results or --run")
@@ -505,6 +534,18 @@ def main(argv=None):
     R = L.Run(run)
     R.analyse()
     out = pathlib.Path(a.output)
+    if a.all:
+        out.mkdir(parents=True, exist_ok=True)
+        index = []
+        for k, c in enumerate(conv_ids(R)):
+            name = f"{k + 1:02d}-{str((R.env.get('conv_ids') or [c])[k] if R.env.get('conv_ids') else c)[:8]}.md"
+            text, tot = page(R, run, c, f"{a.pair}/{name}" if a.pair else None, a.title, a.evidence, a.pair_label,
+                             totals=True)
+            (out / name).write_text(text)
+            index.append(dict(tot, page=name))
+        (out / "totals.json").write_text(json.dumps(index, indent=1, default=str))
+        print(f"wrote {len(index)} pages to {out}")
+        return
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page(R, run, a.conv, a.pair, a.title, a.evidence, a.pair_label))
     print(f"wrote {out}")

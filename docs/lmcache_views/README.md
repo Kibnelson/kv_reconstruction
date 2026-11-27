@@ -28,6 +28,7 @@ conversation, and an index. Each page follows its conversation turn by turn:
 | job 30728, memory mode | [job30728/memory/index.md](job30728/memory/index.md) |
 | job 30728, disk mode | [job30728/disk/index.md](job30728/disk/index.md) |
 | job 30786, the eight configurations (NIXL), turn timelines | [job30786/README.md](job30786/README.md) |
+| job 30806, the eight configurations (NIXL), ten conversations, turn timelines | [job30806/README.md](job30806/README.md) |
 
 Where the text comes from: a run from this commit on records every piece's text as the driver sent it (the answers
 too). Job 30728's driver kept only token ids, so its pages rebuild the text from the same pinned MTRAG file the
