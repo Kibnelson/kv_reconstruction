@@ -1,0 +1,265 @@
+{
+ "mode": "memory",
+ "env": {
+  "mode": "memory",
+  "l1_gb": 8.0,
+  "eviction": "LRU",
+  "store_policy": "default",
+  "chunk": 256,
+  "odirect": true,
+  "d_role": "kv_both",
+  "mtrag_limit": 10,
+  "layout": "interleaved",
+  "store_wait_ms": 0.0,
+  "gpu_blocks": null,
+  "d_prefix_cache": true,
+  "transfer": "nixl",
+  "servers": "shared",
+  "routing": "round_robin",
+  "concurrency": 1,
+  "mtrag_docs": "all",
+  "conv_ids": [
+   "1534a095279f2cb888fb0bea17bd70da",
+   "0208bf26ec357a803445290fa88a2e9e",
+   "a2698b2973ea7db1ee5adb5e70ec02e4",
+   "c1e53df98a28f19448f4af244304b89a",
+   "cfbcfa3e382f12aed450b10f87a72aeb",
+   "3f5fa378239f7475baac89fa40288aaa",
+   "5c13daa9432149f6243aa1115629cd1a",
+   "694e275f1a01ad0e8ac448ad809f7930",
+   "aea2634b0e5f1c2444550d31c41adc94",
+   "79f0d0539d9ec0acbf90cb3388b30c17"
+  ],
+  "disk_reads": "retain",
+  "prefetch_policy": "retain",
+  "layout_label": "carry"
+ },
+ "trace": {
+  "files": 5,
+  "records": 14697,
+  "unreadable_lines": 0,
+  "by_role": {
+   "P": 1099,
+   "LMC": 3080,
+   "D1": 3416,
+   "D2": 3536,
+   "D3": 3566
+  },
+  "hook_errors": {},
+  "unknown_events": {}
+ },
+ "requests": {
+  "P": 69,
+  "D": 69,
+  "turns": 69
+ },
+ "prompt_tokens": {
+  "P": 258844,
+  "D": 258844
+ },
+ "P": {
+  "local_hit_tokens": 195248,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 63596,
+  "stored_tokens": 61952,
+  "store_bytes": 7105150976,
+  "store_s_median": 0.094115,
+  "store_s_p90": 0.135057,
+  "nixl_held_s_median": 0.466969
+ },
+ "D": {
+  "local_hit_tokens": 101344,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 0,
+  "requests_pulling": 0,
+  "retrieve_bytes": 0,
+  "pull_s_median_l1": null,
+  "pull_s_p90_l1": null,
+  "pull_s_median_l2": null,
+  "pull_s_p90_l2": null,
+  "retrieve_s_median": null,
+  "prefetch_s_median_l1": null,
+  "prefetch_s_median_l2": null,
+  "looked_up_before_p_store_end": 0,
+  "nixl_read_tokens": 157500,
+  "requests_reading_nixl": 69,
+  "nixl_read_s_median": 0.445585,
+  "nixl_read_s_p90": 0.626581,
+  "stored_tokens": 1024
+ },
+ "chunks": {
+  "stored": 242,
+  "in_memory": 242,
+  "stored_by": {
+   "P": 242
+  },
+  "per_server": {
+   "LMC": 242
+  },
+  "stored_bytes": 7105150976,
+  "to_disk": 0,
+  "removed_from_memory": 47,
+  "pulled": 0,
+  "pulled_from": {},
+  "read_outcomes": {
+   "new: stored by this request": 242,
+   "hit, not loaded": 605,
+   "held (on GPU already)": 1109,
+   "miss: not yet stored": 4
+  },
+  "never_pulled": 242,
+  "never_pulled_holding_an_answer": 81,
+  "disk_reads": 0,
+  "touches": 3069,
+  "reads_hook": true,
+  "pulls_per_chunk": {
+   "0": 242
+  },
+  "created_to_l1_s_median": 0.10441017150878906,
+  "l1_to_l2_s_median": null,
+  "lookups_of_unknown_chunks": 0
+ },
+ "checks": {
+  "chunk_tokens_match_prompt": "242 of 242",
+  "pulled_blocks_same_hash_as_p": "0 of 0",
+  "chunks_with_full_chain": "242 of 242",
+  "d_answers_same_as_one_engine": "62 of 69",
+  "d_answers_same_as_one_engine_nixl_layout": "62 of 69"
+ },
+ "local_check": {
+  "turns": 69,
+  "same": 62,
+  "first_diff_turn": "0/0",
+  "differ": [
+   {
+    "conv": 0,
+    "turn": 0,
+    "first_diff": 1,
+    "d_text": " I don't know. I don't know what you mean by \"in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"air\". I don't know what you mean by \"photos of planes in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I ",
+    "local_text": " I am a helpful assistant. Answer the user's last question from the documents. If they do not hold the answer, say so.\n\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking images of aircraft , either in flight , or on the ground . Types of aviation photography include air - to - air , ground - to - air , ground - static , and remote photography . Military "
+   },
+   {
+    "conv": 0,
+    "turn": 1,
+    "first_diff": 9,
+    "d_text": " I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\nDocume",
+    "local_text": " I don't know what you mean by \"in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking images "
+   },
+   {
+    "conv": 2,
+    "turn": 1,
+    "first_diff": 32,
+    "d_text": " A catchbasin is a small reservoir that collects water and debris from the street and prevents it from entering the sewer system . It is designed to prevent the sewer system from clogging . The catchbasin is usually located at the end of a storm drain . The catchbasin is usually designed with a sump area below the outlet pipe level which is a reservoir for water and debris to help prevent the pipe",
+    "local_text": " A catchbasin is a small reservoir that collects water and debris from the street and prevents it from entering the sewer system . It is designed to prevent the sewer from clogging and to prevent mosquitoes from breeding in the water . The catchbasin is usually located at the intersection of a street and a sewer . The catchbasin is designed to hold a certain amount of water and debris . If the cat"
+   },
+   {
+    "conv": 4,
+    "turn": 2,
+    "first_diff": 17,
+    "d_text": " guinea pig appearance or body is a small mammal with a short tail and large ears.\nUser: more about guinea pig behavior\nAssistant: guinea pig behavior is a small mammal that is active during the day and night.\nUser: more about guinea pig diet\nAssistant: guinea pig diet is a small mammal that eats grass and other vegetation.\nUser: more about guinea pig habitat\nAssistant: guinea pig habitat is a sma",
+    "local_text": " guinea pig appearance or body is a small mammal with a short tail and large head.\nUser: more about guinea pig behavior\nAssistant: guinea pig behavior is a small mammal that is active during the day and night.\nUser: more about guinea pig diet\nAssistant: guinea pig diet is a small mammal that eats grass and other vegetation.\nUser: more about guinea pig habitat\nAssistant: guinea pig habitat is a sma"
+   },
+   {
+    "conv": 5,
+    "turn": 2,
+    "first_diff": 3,
+    "d_text": " The moon is about 4.5 billion years old. This is based on the age of the solar system, which is estimated to be about 4.5 billion years old. The moon is believed to have formed about 4.5 billion years ago, when the solar system was still young. The moon is believed to have formed as a result of a collision between Earth and a Mars - sized object called Theia. This collision is believed to have cr",
+    "local_text": " The moon is approximately 4.5 billion years old. This is based on the age of the solar system, which is estimated to be around 4.5 billion years old. The moon is believed to have formed around 4.5 billion years ago, when the solar system was still young. The moon is believed to have been formed by a collision between Earth and a Mars - sized object, known as Theia. This collision is believed to h"
+   }
+  ]
+ },
+ "local_check_nixl": {
+  "turns": 69,
+  "same": 62,
+  "first_diff_turn": "0/0",
+  "differ": [
+   {
+    "conv": 0,
+    "turn": 0,
+    "first_diff": 1,
+    "d_text": " I don't know. I don't know what you mean by \"in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"air\". I don't know what you mean by \"photos of planes in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I ",
+    "local_text": " I am a helpful assistant. Answer the user's last question from the documents. If they do not hold the answer, say so.\n\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking images of aircraft , either in flight , or on the ground . Types of aviation photography include air - to - air , ground - to - air , ground - static , and remote photography . Military "
+   },
+   {
+    "conv": 0,
+    "turn": 1,
+    "first_diff": 9,
+    "d_text": " I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\nDocume",
+    "local_text": " I don't know what you mean by \"in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"air\". I don't know what you mean by \"photos in the air\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking images "
+   },
+   {
+    "conv": 2,
+    "turn": 1,
+    "first_diff": 32,
+    "d_text": " A catchbasin is a small reservoir that collects water and debris from the street and prevents it from entering the sewer system . It is designed to prevent the sewer system from clogging . The catchbasin is usually located at the end of a storm drain . The catchbasin is usually designed with a sump area below the outlet pipe level which is a reservoir for water and debris to help prevent the pipe",
+    "local_text": " A catchbasin is a small reservoir that collects water and debris from the street and prevents it from entering the sewer system . It is designed to prevent the sewer from clogging and to prevent mosquitoes from breeding in the water . The catchbasin is usually located at the intersection of a street and a sewer . The catchbasin is designed to hold a certain amount of water and debris . If the cat"
+   },
+   {
+    "conv": 4,
+    "turn": 2,
+    "first_diff": 17,
+    "d_text": " guinea pig appearance or body is a small mammal with a short tail and large ears.\nUser: more about guinea pig behavior\nAssistant: guinea pig behavior is a small mammal that is active during the day and night.\nUser: more about guinea pig diet\nAssistant: guinea pig diet is a small mammal that eats grass and other vegetation.\nUser: more about guinea pig habitat\nAssistant: guinea pig habitat is a sma",
+    "local_text": " guinea pig appearance or body is a small mammal with a short tail and large head.\nUser: more about guinea pig behavior\nAssistant: guinea pig behavior is a small mammal that is active during the day and night.\nUser: more about guinea pig diet\nAssistant: guinea pig diet is a small mammal that eats grass and other vegetation.\nUser: more about guinea pig habitat\nAssistant: guinea pig habitat is a sma"
+   },
+   {
+    "conv": 5,
+    "turn": 2,
+    "first_diff": 3,
+    "d_text": " The moon is about 4.5 billion years old. This is based on the age of the solar system, which is estimated to be about 4.5 billion years old. The moon is believed to have formed about 4.5 billion years ago, when the solar system was still young. The moon is believed to have formed as a result of a collision between Earth and a Mars - sized object called Theia. This collision is believed to have cr",
+    "local_text": " The moon is approximately 4.5 billion years old. This is based on the age of the solar system, which is estimated to be around 4.5 billion years old. The moon is believed to have formed around 4.5 billion years ago, when the solar system was still young. The moon is believed to have been formed by a collision between Earth and a Mars - sized object, known as Theia. This collision is believed to h"
+   }
+  ]
+ },
+ "nixl": {
+  "handshakes": 3,
+  "failed_reads": 0,
+  "read_gb_s_median": 0.6175329557801217,
+  "ucx_transports": {
+   "D1": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "D2": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "D3": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "P": {
+    "tcp/bond0": 118,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 6
+   }
+  },
+  "ucx_transport_names": [
+   "cma",
+   "cuda_copy",
+   "tcp"
+  ],
+  "read_path": {},
+  "bytes_checked_blocks": 9879,
+  "bytes_same_blocks": 9879,
+  "bytes_unchecked_blocks": 0,
+  "bytes_differ": [],
+  "gpu_to_gpu": false,
+  "ucx_ipc_errors": [],
+  "all_gpus_visible": false,
+  "ucx_tls": null,
+  "ucx_get_zcopy": null
+ },
+ "health": {
+  "server_fatal": null,
+  "server_last_log_s": 145.507,
+  "degraded": {},
+  "server_errors": 0,
+  "server_error_kinds": {},
+  "server_alive_at_end": true,
+  "server_crashed": false,
+  "server_failed": false
+ }
+}

@@ -1,0 +1,155 @@
+{
+  "mp": {
+    "transport": "zmq",
+    "host": "127.0.0.1",
+    "port": 23070,
+    "chunk_size": 256,
+    "max_workers": 4,
+    "max_gpu_workers": 4,
+    "max_cpu_workers": 4,
+    "grpc_server_workers": 32,
+    "grpc_server_mode": "sync",
+    "api_key_files": [],
+    "hash_algorithm": "blake3",
+    "engine_type": "default",
+    "separate_object_groups": false,
+    "enable_segmented_prefix": false,
+    "enable_dedup_content": false,
+    "enable_blend_reorder": false,
+    "supported_transfer_mode": "lmcache_driven",
+    "isolated_ipc": false,
+    "runtime_plugin_config": {
+      "locations": [],
+      "extra_config": {}
+    },
+    "p2p_config": {
+      "advertise_url": "",
+      "listen_url": "",
+      "lookup_timeout": 30.0,
+      "load_timeout": 30.0,
+      "transfer_engine": "nixl"
+    },
+    "shm_name": "",
+    "script_allowed_imports": [],
+    "run_script_api_enabled": false,
+    "instance_id": "LMC_D2",
+    "worker_reap_timeout_seconds": 120.0,
+    "session_ttl_seconds": 600.0,
+    "kv_load_policy": "DEFAULT",
+    "worker_registration_grace_seconds": 3600.0,
+    "kv_event_log_size": 32768,
+    "null_block_id": 0,
+    "server_modules": []
+  },
+  "storage_manager": {
+    "l1_manager_config": {
+      "memory_config": {
+        "size_in_bytes": 2147483648,
+        "use_lazy": true,
+        "init_size_in_bytes": 2147483648,
+        "align_bytes": 4096,
+        "shm_name": "",
+        "use_hugepages": false,
+        "devdax_path": null,
+        "devdax_offset_in_bytes": 0,
+        "mlock": false
+      },
+      "gds_l1_config": null,
+      "write_ttl_seconds": 600,
+      "read_ttl_seconds": 300,
+      "tag": "_default",
+      "eviction": {
+        "eviction_policy": "LRU",
+        "trigger_watermark": 0.8,
+        "eviction_ratio": 0.2,
+        "extra_logging_enabled": false,
+        "extra_logging_interval": 10.0
+      }
+    },
+    "eviction_config": {
+      "eviction_policy": "LRU",
+      "trigger_watermark": 0.8,
+      "eviction_ratio": 0.2,
+      "extra_logging_enabled": false,
+      "extra_logging_interval": 10.0
+    },
+    "l2_adapter_config": {
+      "adapters": [
+        "<lmcache.v1.distributed.l2_adapters.fs_l2_adapter.FSL2AdapterConfig object at 0x1362be7af380>"
+      ]
+    },
+    "store_policy": "skip_l1",
+    "prefetch_policy": "retain",
+    "write_policy": "default",
+    "prefetch_inflight_watermark": 0.5,
+    "periodic_notifier_interval_ms": 5,
+    "l1_manager_configs": [
+      {
+        "memory_config": {
+          "size_in_bytes": 2147483648,
+          "use_lazy": true,
+          "init_size_in_bytes": 2147483648,
+          "align_bytes": 4096,
+          "shm_name": "",
+          "use_hugepages": false,
+          "devdax_path": null,
+          "devdax_offset_in_bytes": 0,
+          "mlock": false
+        },
+        "gds_l1_config": null,
+        "write_ttl_seconds": 600,
+        "read_ttl_seconds": 300,
+        "tag": "_default",
+        "eviction": {
+          "eviction_policy": "LRU",
+          "trigger_watermark": 0.8,
+          "eviction_ratio": 0.2,
+          "extra_logging_enabled": false,
+          "extra_logging_interval": 10.0
+        }
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "max_queue_size": 10000,
+    "metrics_enabled": true,
+    "grpc_metrics_enabled": false,
+    "logging_enabled": true,
+    "tracing_enabled": false,
+    "token_trace_enabled": false,
+    "otlp_endpoint": null,
+    "prometheus_port": 23072,
+    "metrics_sample_rate": 0.01,
+    "lookup_hash_log": {
+      "output_dir": "",
+      "rotation_interval_sec": 21600,
+      "rotation_max_size": 104857600,
+      "max_files": 100
+    },
+    "gc_monitor": {
+      "enabled": false,
+      "min_pause_ms": 1.0,
+      "top_objects": 0
+    },
+    "extra_logging_enabled": false,
+    "extra_logging_interval": 10.0,
+    "trace_level": null,
+    "trace_output": null,
+    "service_instance_id": "LMC_D2"
+  },
+  "http": {
+    "http_host": "127.0.0.1",
+    "http_port": 23071
+  },
+  "coordinator": {
+    "url": "",
+    "advertise_ip": "",
+    "heartbeat_interval": 5.0,
+    "event_reporting": false,
+    "event_flush_interval": 1.0,
+    "event_sink_config": {},
+    "blend_timeout": 1.0,
+    "blend_match_concurrency": 8
+  }
+}

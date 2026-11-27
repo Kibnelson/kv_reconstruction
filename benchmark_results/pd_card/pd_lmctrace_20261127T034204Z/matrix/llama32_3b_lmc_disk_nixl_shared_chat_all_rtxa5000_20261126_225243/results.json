@@ -1,0 +1,273 @@
+{
+ "mode": "disk",
+ "env": {
+  "mode": "disk",
+  "l1_gb": 8.0,
+  "eviction": "LRU",
+  "store_policy": "skip_l1",
+  "chunk": 256,
+  "odirect": true,
+  "d_role": "kv_both",
+  "mtrag_limit": 10,
+  "layout": "history_first",
+  "store_wait_ms": 0.0,
+  "gpu_blocks": null,
+  "d_prefix_cache": true,
+  "transfer": "nixl",
+  "servers": "shared",
+  "routing": "round_robin",
+  "concurrency": 1,
+  "mtrag_docs": "all",
+  "conv_ids": [
+   "1534a095279f2cb888fb0bea17bd70da",
+   "0208bf26ec357a803445290fa88a2e9e",
+   "a2698b2973ea7db1ee5adb5e70ec02e4",
+   "c1e53df98a28f19448f4af244304b89a",
+   "cfbcfa3e382f12aed450b10f87a72aeb",
+   "3f5fa378239f7475baac89fa40288aaa",
+   "5c13daa9432149f6243aa1115629cd1a",
+   "694e275f1a01ad0e8ac448ad809f7930",
+   "aea2634b0e5f1c2444550d31c41adc94",
+   "79f0d0539d9ec0acbf90cb3388b30c17"
+  ],
+  "disk_reads": "retain",
+  "prefetch_policy": "retain",
+  "layout_label": "chat"
+ },
+ "trace": {
+  "files": 5,
+  "records": 16245,
+  "unreadable_lines": 0,
+  "by_role": {
+   "P": 1148,
+   "LMC": 3968,
+   "D1": 3682,
+   "D2": 3613,
+   "D3": 3834
+  },
+  "hook_errors": {},
+  "unknown_events": {}
+ },
+ "requests": {
+  "P": 69,
+  "D": 69,
+  "turns": 69
+ },
+ "prompt_tokens": {
+  "P": 87764,
+  "D": 87764
+ },
+ "P": {
+  "local_hit_tokens": 23248,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 64516,
+  "stored_tokens": 62208,
+  "store_bytes": 7134511104,
+  "store_s_median": 0.082822,
+  "store_s_p90": 0.108748,
+  "nixl_held_s_median": 0.244861
+ },
+ "D": {
+  "local_hit_tokens": 10096,
+  "lmcache_loaded_tokens": 0,
+  "computed_tokens": 0,
+  "requests_pulling": 0,
+  "retrieve_bytes": 0,
+  "pull_s_median_l1": null,
+  "pull_s_p90_l1": null,
+  "pull_s_median_l2": null,
+  "pull_s_p90_l2": null,
+  "retrieve_s_median": null,
+  "prefetch_s_median_l1": null,
+  "prefetch_s_median_l2": null,
+  "looked_up_before_p_store_end": 0,
+  "nixl_read_tokens": 77668,
+  "requests_reading_nixl": 69,
+  "nixl_read_s_median": 0.213022,
+  "nixl_read_s_p90": 0.286533,
+  "stored_tokens": 3840
+ },
+ "chunks": {
+  "stored": 243,
+  "in_memory": 243,
+  "stored_by": {
+   "P": 243
+  },
+  "per_server": {
+   "LMC": 243
+  },
+  "stored_bytes": 7134511104,
+  "to_disk": 243,
+  "removed_from_memory": 243,
+  "pulled": 0,
+  "pulled_from": {},
+  "read_outcomes": {
+   "new: stored by this request": 243,
+   "hit, not loaded": 271,
+   "held (on GPU already)": 85,
+   "miss: not yet stored": 15
+  },
+  "never_pulled": 243,
+  "never_pulled_holding_an_answer": 87,
+  "disk_reads": 26,
+  "touches": 699,
+  "reads_hook": true,
+  "pulls_per_chunk": {
+   "0": 243
+  },
+  "created_to_l1_s_median": 0.09459185600280762,
+  "l1_to_l2_s_median": 0.1493697166442871,
+  "lookups_of_unknown_chunks": 0
+ },
+ "checks": {
+  "chunk_tokens_match_prompt": "243 of 243",
+  "pulled_blocks_same_hash_as_p": "0 of 0",
+  "chunks_with_full_chain": "243 of 243",
+  "d_answers_same_as_one_engine": "52 of 69",
+  "d_answers_same_as_one_engine_nixl_layout": "52 of 69",
+  "disk_mode_on_disk_then_out_of_memory": "243 of 243",
+  "disk_mode_pulls_from_disk": "0 of 0",
+  "disk_mode_pulls_while_still_in_memory": 0,
+  "disk_mode_reads_kept_in_memory": "26 of 26 disk reads still in memory at the end (prefetch policy retain)",
+  "disk_mode_server_memory_at_end": {
+   "_default": "26 objects, 763363328 bytes"
+  },
+  "disk_mode_files_at_end": "243 files, 7.13 GB"
+ },
+ "local_check": {
+  "turns": 69,
+  "same": 52,
+  "first_diff_turn": "0/0",
+  "differ": [
+   {
+    "conv": 0,
+    "turn": 0,
+    "first_diff": 1,
+    "d_text": " I don't know. I don't know what you mean by \"in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"air\". I don't know what you mean by \"photos of planes in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I ",
+    "local_text": " I am a helpful assistant. Answer the user's last question from the documents. If they do not hold the answer, say so.\n\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking images of aircraft , either in flight , or on the ground . Types of aviation photography include air - to - air , ground - to - air , ground - static , and remote photography . Military "
+   },
+   {
+    "conv": 0,
+    "turn": 3,
+    "first_diff": 40,
+    "d_text": " I don't know. I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"phtography\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"phtography\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you me",
+    "local_text": " I don't know. I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you"
+   },
+   {
+    "conv": 1,
+    "turn": 5,
+    "first_diff": 22,
+    "d_text": " A human guinea pig is a person who is used as a test subject in medical experiments . The term is often used as a metaphor for a subject of scientific experimentation , or any experiment or test in modern times . This dates back to the early 20th century ; the Oxford English Dictionary notes its first usage in this capacity in 1913 . In 1933 , Consumers Research founders F.J. Schlink and Arthur K",
+    "local_text": " A human guinea pig is a person who is used as a test subject in medical experiments . The term is a metaphor for a subject of scientific experimentation , or any experiment or test in modern times . This dates back to the early 20th century ; the Oxford English Dictionary notes its first usage in this capacity in 1913 . In 1933 , Consumers Research founders F.J. Schlink and Arthur Kallet wrote a "
+   },
+   {
+    "conv": 2,
+    "turn": 1,
+    "first_diff": 17,
+    "d_text": " A catchbasin is a small reservoir that collects water and debris from the street and directs it into the storm drain system . The catchbasin is designed to have a sump area below the outlet pipe level which is a reservoir for water and debris to help prevent the pipe from clogging . Unless they are constructed with permeable bottoms to allow water to infiltrate into the underlying soil , this sub",
+    "local_text": " A catchbasin is a small reservoir that collects water and debris from the street and prevents the pipe from clogging. It is designed with a sump area below the outlet pipe level which is a reservoir for water and debris to help prevent the pipe from clogging. Unless they are constructed with permeable bottoms to allow water to infiltrate into the underlying soil, this subterranean basin can becom"
+   },
+   {
+    "conv": 2,
+    "turn": 5,
+    "first_diff": 14,
+    "d_text": " The storm drain works in the other parts of the world by collecting the rainwater and directing it to the nearest water body. The storm drain works in the other parts of the world by collecting the rainwater and directing it to the nearest water body. The storm drain works in the other parts of the world by collecting the rainwater and directing it to the nearest water body. The storm drain works",
+    "local_text": " The storm drain works in the other parts of the world by collecting the water from the streets, roads, roofs, and other impervious surfaces. The water is then directed to the storm drain system, which is designed to handle the volume of water that is collected. The storm drain system is typically made up of a series of pipes that are connected to each other, and they are designed to handle the vo"
+   }
+  ]
+ },
+ "local_check_nixl": {
+  "turns": 69,
+  "same": 52,
+  "first_diff_turn": "0/0",
+  "differ": [
+   {
+    "conv": 0,
+    "turn": 0,
+    "first_diff": 1,
+    "d_text": " I don't know. I don't know what you mean by \"in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"air\". I don't know what you mean by \"photos of planes in the air\". I don't know what you mean by \"photos\". I don't know what you mean by \"planes\". I don't know what you mean by \"in the air\". I don't know what you mean by \"air\". I ",
+    "local_text": " I am a helpful assistant. Answer the user's last question from the documents. If they do not hold the answer, say so.\n\nDocument: Aviation photography\nAviation photography\nAviation photography is the act of taking images of aircraft , either in flight , or on the ground . Types of aviation photography include air - to - air , ground - to - air , ground - static , and remote photography . Military "
+   },
+   {
+    "conv": 0,
+    "turn": 3,
+    "first_diff": 40,
+    "d_text": " I don't know. I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"phtography\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"phtography\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you me",
+    "local_text": " I don't know. I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you mean by \"air-to-air\". I don't know what you mean by \"ground-to-air\". I don't know what you"
+   },
+   {
+    "conv": 1,
+    "turn": 5,
+    "first_diff": 22,
+    "d_text": " A human guinea pig is a person who is used as a test subject in medical experiments . The term is often used as a metaphor for a subject of scientific experimentation , or any experiment or test in modern times . This dates back to the early 20th century ; the Oxford English Dictionary notes its first usage in this capacity in 1913 . In 1933 , Consumers Research founders F.J. Schlink and Arthur K",
+    "local_text": " A human guinea pig is a person who is used as a test subject in medical experiments . The term is a metaphor for a subject of scientific experimentation , or any experiment or test in modern times . This dates back to the early 20th century ; the Oxford English Dictionary notes its first usage in this capacity in 1913 . In 1933 , Consumers Research founders F.J. Schlink and Arthur Kallet wrote a "
+   },
+   {
+    "conv": 2,
+    "turn": 1,
+    "first_diff": 17,
+    "d_text": " A catchbasin is a small reservoir that collects water and debris from the street and directs it into the storm drain system . The catchbasin is designed to have a sump area below the outlet pipe level which is a reservoir for water and debris to help prevent the pipe from clogging . Unless they are constructed with permeable bottoms to allow water to infiltrate into the underlying soil , this sub",
+    "local_text": " A catchbasin is a small reservoir that collects water and debris from the street and prevents the pipe from clogging. It is designed with a sump area below the outlet pipe level which is a reservoir for water and debris to help prevent the pipe from clogging. Unless they are constructed with permeable bottoms to allow water to infiltrate into the underlying soil, this subterranean basin can becom"
+   },
+   {
+    "conv": 2,
+    "turn": 5,
+    "first_diff": 14,
+    "d_text": " The storm drain works in the other parts of the world by collecting the rainwater and directing it to the nearest water body. The storm drain works in the other parts of the world by collecting the rainwater and directing it to the nearest water body. The storm drain works in the other parts of the world by collecting the rainwater and directing it to the nearest water body. The storm drain works",
+    "local_text": " The storm drain works in the other parts of the world by collecting the water from the streets, roads, roofs, and other impervious surfaces. The water is then directed to the storm drain system, which is designed to handle the volume of water that is collected. The storm drain system is typically made up of a series of pipes that are connected to each other, and they are designed to handle the vo"
+   }
+  ]
+ },
+ "nixl": {
+  "handshakes": 3,
+  "failed_reads": 0,
+  "read_gb_s_median": 0.6069540185120968,
+  "ucx_transports": {
+   "D1": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "D2": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "D3": {
+    "tcp/bond0": 202,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 10
+   },
+   "P": {
+    "tcp/bond0": 118,
+    "cuda_copy/cuda": 15,
+    "cma/memory": 6
+   }
+  },
+  "ucx_transport_names": [
+   "cma",
+   "cuda_copy",
+   "tcp"
+  ],
+  "read_path": {},
+  "bytes_checked_blocks": 4883,
+  "bytes_same_blocks": 4883,
+  "bytes_unchecked_blocks": 0,
+  "bytes_differ": [],
+  "gpu_to_gpu": false,
+  "ucx_ipc_errors": [],
+  "all_gpus_visible": false,
+  "ucx_tls": null,
+  "ucx_get_zcopy": null
+ },
+ "health": {
+  "server_fatal": null,
+  "server_last_log_s": 124.52,
+  "degraded": {},
+  "server_errors": 0,
+  "server_error_kinds": {},
+  "server_alive_at_end": true,
+  "server_crashed": false,
+  "server_failed": false
+ }
+}
